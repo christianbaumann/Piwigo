@@ -1,0 +1,3 @@
+[submodule "plugins/typetags"]
+	path = plugins/typetags
+	url = https://github.com/christianbaumann/Piwigo-Colored-Tags.git
