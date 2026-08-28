@@ -23,3 +23,7 @@
 # Eclipse
 .settings
 .project
+
+# Agent working state (local only)
+.rodney/
+.agent-tests/
