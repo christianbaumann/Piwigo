@@ -1,0 +1,11 @@
+## #ddev-generated
+## Playwright's Chromium needs OS shared libraries (libnspr4, libnss3, libgbm1,
+## libatk-bridge2.0-0, the Mesa stack, ...) that "npx playwright install --with-deps"
+## installs via apt at runtime. Runtime apt installs live in the container's
+## writable layer, which DDEV recreates on every "ddev restart" / image rebuild,
+## so they vanish silently (verified 2026-08-28: chromium failed with
+## "libnspr4.so: cannot open shared object file" right after a restart).
+## Baking them into the image here is what actually persists; the browser
+## binaries themselves persist separately via PLAYWRIGHT_BROWSERS_PATH pointing
+## at a git-ignored path on the project's mounted volume (.ddev/config.yaml).
+RUN npx --yes playwright@1.62.1 install-deps chromium
