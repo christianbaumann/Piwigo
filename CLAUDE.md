@@ -44,6 +44,11 @@ rm -rf _data/templates_c/* _data/combined/*
 
 ### Testing
 
+General test-design, layering, and quality-gate rules (stack-independent) live in
+`.claude/rules/testing.md`, `test-design.md`, `mutation-testing.md`, `e2e-tests.md`,
+`backpressure.md`, and `precommit-hooks.md` — this section covers only what's
+Piwigo/typetags-specific.
+
 Piwigo core has no test suite (no PHPUnit). The typetags plugin ships an integration test that exercises its web-service methods end to end:
 
 ```bash
