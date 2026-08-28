@@ -249,7 +249,7 @@ Create the pyramid's base. Four pure functions plus one structural guard. No dat
 
 ### Changes Required:
 
-#### [ ] 1. Test bootstrap
+#### [x] 1. Test bootstrap
 **File**: `plugins/typetags/tests/bootstrap.php` (new)
 ```php
 <?php
@@ -260,7 +260,7 @@ define('PIWIGO_ROOT', dirname(dirname(dirname(__DIR__))) . '/');
 require_once TYPETAGS_PATH . 'include/functions.inc.php';
 ```
 
-#### [ ] 2. Extract the partition logic so it can be tested at the unit layer
+#### [x] 2. Extract the partition logic so it can be tested at the unit layer
 **File**: `plugins/typetags/include/functions.inc.php`
 **Changes**: add a pure function; `typetags_picture_tags()` then calls it instead of inlining two loops. This is the "push the rule down" move — the behaviour is currently witnessed only by a page-source assertion.
 ```php
@@ -298,12 +298,14 @@ function typetags_partition_tags($all_colored, $assigned_ids)
 **File**: `plugins/typetags/include/events_public.inc.php:156-175`
 **Changes**: replace the two inline loops with one call. Net behaviour identical — the existing integration tests are the regression net for this.
 
-#### [ ] 3. Unit tests — written before the Phase 2 fix, and watched to fail
+#### [x] 3. Unit tests — written before the Phase 2 fix, and watched to fail
 **Files**: `tests/Unit/GetColorTextTest.php`, `CheckColorTest.php`, `GetTypetagIdTest.php`, `PartitionTagsTest.php`, `TemplateContractTest.php`
 
 The full case list is enumerated in *Testing Strategy* below.
 
-#### [ ] 4. Structural guard for the prefilter's template coupling
+**Deviation from the plan's literal reading**: `GetColorTextTest::testMalformedLengthReturnsSafeDefault` reproduces the Phase 2 defect (`get_color_text` throws `TypeError` on malformed length) and is marked `markTestSkipped()` here rather than left failing. The user's global CLAUDE.md rule requires all tests to pass before a commit and treats "write failing test, implement, verify, commit" as one atomic cycle; leaving this test red across a phase/commit boundary would violate that. Phase 2 will un-skip it first, run it, confirm it fails with the expected `TypeError` (the "watch it fail" step the plan calls for), then apply the fix and watch it pass — same test, same file, just the skip removed in Phase 2's cycle instead of Phase 1's.
+
+#### [x] 4. Structural guard for the prefilter's template coupling
 **File**: `tests/Unit/TemplateContractTest.php` (new)
 **Changes**: the prefilter replaces literal template text. If the template moves or a theme shadows it, both replacements fail silently and the feature disappears with no error. Assert the contract, and guard the guard against matching nothing.
 
@@ -345,7 +347,7 @@ public function testTheGuardActuallyReadTheTemplate(): void
 }
 ```
 
-#### [ ] 5. Structural guard: the search strings are not transcribed twice
+#### [x] 5. Structural guard: the search strings are not transcribed twice
 **File**: `tests/Unit/TemplateContractTest.php`
 **Changes**: the guard above hardcodes the same two strings the prefilter hardcodes — a second copy that rots independently. Reference A's rule is *do not transcribe the production list into the test; read it from production*. Extract both search strings into named constants in `events_public.inc.php` and have the guard read those constants, so one edit moves both.
 ```php
@@ -357,14 +359,14 @@ define('TYPETAGS_TPL_INJECT_POINT', '{if isset($metadata)}');
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `ddev exec vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml` — all green
-- [ ] The unit suite runs in under 1 second
-- [ ] `ddev exec php -l plugins/typetags/include/functions.inc.php` and `include/events_public.inc.php` clean
-- [ ] Integration script still passes after the partition extraction (regression net)
-- [ ] Each new test was observed to fail before its implementation existed (recorded in the mutant/failure table)
+- [x] `ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml` — all green (52 tests, 32981 assertions, 1 deliberate skip, 0 failures)
+- [x] The unit suite runs in under 1 second (0.078s measured 2026-08-28)
+- [x] `ddev exec php -l plugins/typetags/include/functions.inc.php` and `include/events_public.inc.php` clean
+- [x] Integration script still passes after the partition extraction (regression net) — 25/25
+- [x] Each new test was observed to fail before its implementation existed — all 52 assertions ran against pre-existing correct behaviour (the extraction is behaviour-preserving) except `testMalformedLengthReturnsSafeDefault`, which is skipped and will be watched failing in Phase 2 per the deviation noted under item 3
 
 #### Manual Verification:
-- [ ] Picture page renders identically before and after the partition extraction
+- [x] Picture page renders identically before and after the partition extraction — confirmed by the user in a headed browser (logged in as `chriss`, `picture.php?/1/category/1`): "Personen ×" assigned badge with remove button, 7 correctly-colored unassigned badges, no console errors
 
 **Implementation Note**: Run `/verify`. Pause before Phase 2.
 
@@ -377,7 +379,7 @@ Three confirmed defects, each fixed only after a test reproduces it. Per the use
 
 ### Changes Required:
 
-#### [ ] 1. `get_color_text()` — `TypeError` on malformed hex
+#### [x] 1. `get_color_text()` — `TypeError` on malformed hex
 **File**: `plugins/typetags/include/functions.inc.php:4-27`
 **Changes**: initialise `$rgb` and return a safe default for unparseable input. `#000` is the safe choice: it is the value a mid-to-light background needs, and it matches what the function already returns for the majority of the configured palette.
 ```php
@@ -410,7 +412,7 @@ function get_color_text($color)
 }
 ```
 
-#### [ ] 2. `addTag` — unvalidated `image_id` writes orphan rows
+#### [x] 2. `addTag` — unvalidated `image_id` writes orphan rows
 **File**: `plugins/typetags/main.inc.php:189-228`
 **Changes**: validate the image the same way the tag is validated, before the insert. `removeTag` needs no equivalent — a `DELETE` on a nonexistent image is already a no-op — so the fix stays asymmetric on purpose, and that asymmetry gets a comment.
 ```php
@@ -425,7 +427,11 @@ SELECT id FROM ' . IMAGES_TABLE . '
   }
 ```
 
-#### [ ] 3. Non-`ok` response leaves the badge permanently dead
+**Deviation from the plan's literal reading**: this fix's reproducing test (`AddTagTest::testNonexistentImageIsRejected`, `::testNonexistentImageWritesNoOrphanRow`) needs integration-layer infrastructure that Phase 3 formally owns. Rather than skip test-first for this defect, a minimal slice of that infrastructure was pulled forward: `tests/Support/Config.php`, `Db.php`, `WsClient.php`, and `tests/Integration/AddTagTest.php` with just these two tests. Phase 3 keeps this file and directory and ports the remaining 23 assertions into it rather than duplicating the setup.
+
+**Finding surfaced by writing the reproducing test**: the first fixture attempt used `image_id = 999999999`, which exceeds `piwigo_image_tag.image_id`'s column type (`mediumint(8) unsigned`, max 16777215 — `install/piwigo_structure-mysql.sql:206`). `INSERT IGNORE` silently clips out-of-range values to the column max instead of rejecting them, so the defect *did* write an orphan row — just at `image_id=16777215`, not at the id the test checked, producing a false pass on the first run. Confirmed directly: `SELECT * FROM piwigo_image_tag` showed the clipped row before it was cleaned up. The fixture now derives a nonexistent id from `MAX(id)+1000` instead of an arbitrary large constant, and the test asserts the fixture id stays within the column's range.
+
+#### [x] 3. Non-`ok` response leaves the badge permanently dead
 **File**: `plugins/typetags/include/events_public.inc.php:244-285` (add path) and `:305-359` (remove path)
 **Changes**: add the missing `else` branch to both `success` callbacks. This is the only fix in the injected JavaScript; it restores interactivity and surfaces the server's message instead of failing silently.
 ```js
@@ -443,15 +449,22 @@ SELECT id FROM ' . IMAGES_TABLE . '
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `GetColorTextTest::testMalformedLengthReturnsSafeDefault` fails before the fix, passes after
-- [ ] `AddTagTest::testNonexistentImageIsRejected` fails before the fix, passes after
-- [ ] `AddTagTest::testNonexistentImageWritesNoOrphanRow` confirms zero rows in `piwigo_image_tag`
-- [ ] E2E `edge-cases.spec.js` server-error case fails before the fix, passes after
-- [ ] Full suite green; `php -l` clean on all three changed files
+- [x] `GetColorTextTest::testMalformedLengthReturnsSafeDefault` fails before the fix (`TypeError: min(): Argument #1 ($value) must be of type array, null given`), passes after
+- [x] `AddTagTest::testNonexistentImageIsRejected` fails before the fix (`stat:"ok"` instead of `fail`/404), passes after
+- [x] `AddTagTest::testNonexistentImageWritesNoOrphanRow` confirms zero rows in `piwigo_image_tag` — failed before the fix (`1` row), passes after
+- [ ] E2E `edge-cases.spec.js` server-error case fails before the fix, passes after — **deferred to Phase 4**; reproduced and verified manually instead (see Manual Verification below), since the E2E harness doesn't exist yet
+- [x] Full suite green (54 tests, 32994 assertions); `php -l` clean on `functions.inc.php`, `events_public.inc.php`, `main.inc.php`; legacy `test_ws_tag_assignment.php` still 25/25
 
 #### Manual Verification:
-- [ ] With a deliberately corrupted `typetags.color` value, the picture page renders instead of white-screening
-- [ ] Rejecting a request server-side leaves the badge clickable again
+- [x] With a deliberately corrupted `typetags.color` value (`#12345`), the picture page renders HTTP 200 with no fatal error/TypeError, both as guest and logged in — checked by hand, then **automated** (see below) and moved into the regression suite
+- [x] Rejecting a request server-side leaves the badge clickable again — reproduced with a mocked `route.fulfill()` returning HTTP 200 `{stat:"fail",err:403}` for `typetags.image.addTag`: before the fix `pointer-events` stayed `none` with no console message; after the fix it returns to `auto` and logs `typetags: Invalid security token`. Real (unmocked) click still assigns the tag correctly afterward. Test data restored (image 1's tags, `typetags.color`). **Not yet automated** — it needs Phase 4's Playwright harness; tracked there as `edge-cases.spec.js` → `a server rejection leaves the badge clickable`, and listed in the hand-check ledger until that spec exists
+
+#### Automated during `/verify` (2026-08-28):
+- [x] `tests/Integration/MalformedColorRenderingTest.php` (new) automates the corrupted-colour manual check: forces `piwigo_typetags.color = '#12345'`, asserts the picture page returns HTTP 200 with no `Fatal error` / `TypeError` / `Smarty Compiler` string for both guest and logged-in, and restores the original colour in `tearDown()` (verified to restore correctly even across a failing run).
+  - **Proven able to fail**: removing the `empty($rgb)` guard from `get_color_text()` turns both tests red with the real white-screen (`Uncaught ValueError: min(): Argument #1 ($value) must contain at least one element`, reached via `typetags_render()` ← `get_common_tags()` ← `picture.php:898`). Guard restored, suite re-run green.
+  - **Not a duplicate of the unit test**: `GetColorTextTest::testMalformedLengthReturnsSafeDefault` proves one function stops throwing; this proves the whole request path survives a malformed value actually stored in the database — i.e. that `get_color_text()` was the only thing that choked. `typetags.color` is `varchar(255)` with no constraint, so the state it forces is one the live schema permits.
+  - Carries an anti-vacuity guard asserting the baseline colour is well-formed (length 7) before corrupting it, so the test cannot pass over an already-broken fixture.
+- [x] Full suite after automation: **56 tests, 33006 assertions, 0 failures**
 
 **Implementation Note**: Run `/verify`. Pause before Phase 3.
 
@@ -980,7 +993,9 @@ For behaviour no automated layer reaches. Each entry records the date, what was 
 
 | Date | Checked by hand | Replaced by |
 |---|---|---|
-| *(to be filled during Phase 5's `/verify` run)* | | |
+| 2026-08-28 | Picture page renders identically after the Phase 1 partition extraction (headed browser, logged in as `chriss`, `picture.php?/1/category/1`: "Personen ×" assigned badge, 7 correctly-coloured unassigned badges, 0 console errors). Confirmed by the user. | Not replaceable as-is — it was a before/after comparison and the "before" no longer exists. Ongoing rendering is covered by `MalformedColorRenderingTest` and, from Phase 4, the E2E specs. |
+| 2026-08-28 | A server-side rejection (HTTP 200 + `stat:"fail"`) leaves the badge clickable and logs a warning. Mocked via `route.fulfill()` in a headed browser; verified red before the fix (`pointer-events: none` forever, no console output) and green after (`pointer-events: auto`, `typetags: Invalid security token`). | *Pending* — Phase 4 `edge-cases.spec.js` → `a server rejection leaves the badge clickable` |
+| *(further entries added during Phase 5's `/verify` run)* | | |
 
 ### Manual Testing Steps
 

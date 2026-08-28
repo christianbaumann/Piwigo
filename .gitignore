@@ -27,3 +27,4 @@
 # Agent working state (local only)
 .rodney/
 .agent-tests/
+/.playwright-cli/
