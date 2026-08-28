@@ -477,11 +477,13 @@ Move the 447-line script into PHPUnit, delete the two vacuous assertions, and re
 
 ### Changes Required:
 
-#### [ ] 1. Configuration — no hardcoded credentials
+#### [x] 1. Configuration — no hardcoded credentials
 **File**: `tests/Support/Config.php` (new)
 **Changes**: environment variables with DDEV defaults, and a fail-fast message naming the missing piece. Replaces the hardcoded `chriss`/`test123`, `mysqli('db','db','db','db')`, and `http://localhost/ws.php`.
 
-#### [ ] 2. Fixture builder — setup-before, not cleanup-after
+Landed in the Phase 2 slice; unchanged here. `WsClient` gained `callGet()` for the GET characterization test.
+
+#### [x] 2. Fixture builder — setup-before, not cleanup-after
 **File**: `tests/Support/FixtureBuilder.php` (new)
 **Changes**: each scenario *forces* its preconditions and asserts they took effect, so a test never runs over a state it merely hoped for. Cleanup restores, but no assertion depends on cleanup having run — the reference rule is that cleanup is skipped on failure and destroys the failure evidence.
 
@@ -489,28 +491,56 @@ Scenarios needed by the four UI states: `someAssignedSomeUnassigned()`, `allColo
 
 Also restores `piwigo_user_cache.nb_available_tags`, which the current script mutates at `:317` and never puts back.
 
-#### [ ] 3. Replace the two vacuous assertions
+Added beyond the plan's literal reading: `categoryIdFor($imageId)`, so `PicturePageSourceTest` derives its `picture.php` URL from `piwigo_image_category` instead of hardcoding `/category/1`.
+
+#### [x] 3. Replace the two vacuous assertions
 **File**: `tests/Integration/PicturePageSourceTest.php` (new)
 **Changes**:
 - The `|| true` at `:379` becomes a **counted** assertion against a forced fixture: given exactly *K* unassigned colored tags, the page source contains exactly *K* `typetag-add` spans — with an anti-vacuity guard asserting `K > 0` first, so the count cannot pass over zero.
 - The tautological `:388` is **deleted**, not repaired. What it claimed (the × button renders) is a DOM fact that no page-source assertion can reach; it moves to E2E. What page source *can* assert is that `#Tags` contains one `a[data-tag-id]` per assigned colored tag — that becomes a real assertion in its place.
 
-#### [ ] 4. Port the remaining assertions, closing the gaps found
+**Both replacements were proven able to fail** by breaking production and watching them go red (step 2 of the "proving a check can fail" rule), each killing exactly one test and nothing else:
+
+| Mutation to `events_public.inc.php` | Killed |
+|---|---|
+| prefilter's `$replace` reduced to the unmodified anchor (no `data-tag-id`) | `testAssignedColouredTagsRenderAsTaggedAnchors` only |
+| injection guard `{if isset(...) && !empty(...)}` → `{if false}` | `testUnassignedBadgeCountMatchesFixture` only |
+
+Neither of the two deleted assertions would have moved under either mutation — which is what "cannot fail" meant in practice.
+
+#### [x] 4. Port the remaining assertions, closing the gaps found
 **Files**: `tests/Integration/AddTagTest.php`, `RemoveTagTest.php`, `CacheInvalidationTest.php`
 **Changes**: all 25 original assertions plus the gaps the coverage map exposed — `removeTag` with a nonexistent tag (only `addTag` was tested), `removeTag`'s cache invalidation (only `addTag`'s was), duplicate-add asserting `COUNT = 1` rather than mere presence, and `tag_id`/`image_id` boundary values.
 
-#### [ ] 5. Delete the superseded script
+Also added here, because they are integration-layer and no other phase claims them (Testing Strategy → *Regression — Affected Existing Functionality*): `tests/Integration/ColorHelperCallersTest.php`, covering `typetags_admin()`'s `admin.php?page=tags` render and `ws_typetags_type_add()`'s `check_color()` → `get_color_text()` round trip.
+
+**Deviations found by running the ported cases against the real endpoint** — the plan predicted the response codes from reading the handler, but two are decided a layer earlier, in `ws.php`'s parameter validation, and never reach it:
+
+| Case | Plan said | Actual | Why |
+|---|---|---|---|
+| `testEmptyTokenIsRejected` | 403 | `1002` (`WS_ERR_MISSING_PARAM`) | ws.php treats `''` as an absent parameter, so the handler's token check never runs |
+| `testZeroTagIdIsRejected` | 404 | `1003` (`WS_ERR_INVALID_PARAM`) | `WS_TYPE_ID` rejects non-positive ids before dispatch |
+
+Both are recorded as they behave, with the reason in the test's docblock. `testZeroImageIdIsRejected` / `testNegativeImageIdIsRejected` were added for symmetry with the tag-id boundary pair.
+
+#### [x] 5. Delete the superseded script
 **File**: `plugins/typetags/tests/test_ws_tag_assignment.php` — deleted once every assertion has a named successor. A mapping table goes in the commit message so nothing is lost silently.
+
+### Finding: editing a prefilter does not invalidate the compiled template
+
+Surfaced while running this phase, and it cost a false-red debugging cycle. `Template::set_prefilter()` hashes only the filter's *callback name* into Smarty's `compile_id` (`include/template.class.php:1060-1070`) — not the callback's source. Editing `typetags_picture_prefilter()` therefore leaves the previously compiled `picture.tpl` in `_data/templates_c/` in place, and every later request keeps serving the old injection with no error anywhere.
+
+Concretely: after reverting the `{if false}` mutation above, the compiled template still contained `<?php if (false) {?>` and `testUnassignedBadgeCountMatchesFixture` stayed red against correct source. `rm -rf _data/templates_c/*` fixed it. Written into CLAUDE.md's Testing section in this commit.
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `ddev exec vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml` — all green
-- [ ] Assertion count ≥ 25 (nothing lost in the port)
-- [ ] Suite passes twice in a row without manual DB repair (fixtures are self-restoring)
-- [ ] Suite passes when run with the tests in reverse order (no inter-test dependency)
-- [ ] `piwigo_user_cache` and `piwigo_image_tag` are byte-identical before and after a full run
-- [ ] `grep -rn '|| true' plugins/typetags/tests/` returns nothing
+- [x] `ddev exec plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml` — all green (39 tests, 124 assertions)
+- [x] Assertion count ≥ 25 (nothing lost in the port) — 124 integration assertions; full suite 91 tests / 33110 assertions
+- [x] Suite passes twice in a row without manual DB repair (fixtures are self-restoring)
+- [x] Suite passes when run with the tests in reverse order (no inter-test dependency) — also verified with `--order-by=random`
+- [x] `piwigo_user_cache` and `piwigo_image_tag` are byte-identical before and after a full run — also checked `piwigo_tags` and `piwigo_typetags`
+- [x] `grep -rn '|| true' plugins/typetags/tests/` returns nothing
 
 #### Manual Verification:
 - [ ] Reviewing the mapping table confirms every original assertion has a successor
@@ -878,47 +908,55 @@ Zero-One-Many across both inputs:
 #### `AddTagTest.php`
 
 **Happy path:**
-- [ ] `testAssignsColouredTag` — `stat: ok`, row present `[HAPPY]`
+- [x] `testAssignsColouredTag` — `stat: ok`, row present `[HAPPY]`
 
 **Negative:**
-- [ ] `testGuestIsRejected` — 401 `[NEG]`
-- [ ] `testBadTokenIsRejected` — 403 `[NEG]`
-- [ ] `testEmptyTokenIsRejected` — 403 `[BVA]`
-- [ ] `testMissingTokenParameterIsRejected` — WS missing-param error `[BVA]`
-- [ ] `testNonColouredTagIsRejected` — 404 `[NEG]`
-- [ ] `testNonexistentTagIsRejected` — `tag_id = 99999` → 404 `[NEG]`
-- [ ] `testZeroTagIdIsRejected` — 404 `[BVA]`
-- [ ] `testNegativeTagIdIsRejected` — `WS_TYPE_ID` rejects `[BVA]`
-- [ ] `testNonexistentImageIsRejected` — 404 `[NEG]` **(fails before Phase 2 fix)**
-- [ ] `testNonexistentImageWritesNoOrphanRow` — zero rows in `piwigo_image_tag` `[NEG]` **(fails before fix)**
+- [x] `testGuestIsRejected` — 401 `[NEG]`
+- [x] `testBadTokenIsRejected` — 403 `[NEG]`
+- [x] `testEmptyTokenIsRejected` — **1002, not 403**: ws.php treats `''` as absent `[BVA]`
+- [x] `testMissingTokenParameterIsRejected` — WS missing-param error (1002) `[BVA]`
+- [x] `testNonColouredTagIsRejected` — 404 `[NEG]`
+- [x] `testNonexistentTagIsRejected` — `MAX(id)+1000` → 404 `[NEG]`
+- [x] `testZeroTagIdIsRejected` — **1003, not 404**: `WS_TYPE_ID` rejects before dispatch `[BVA]`
+- [x] `testNegativeTagIdIsRejected` — `WS_TYPE_ID` rejects (1003) `[BVA]`
+- [x] `testZeroImageIdIsRejected` / `testNegativeImageIdIsRejected` — same boundary on the other id `[BVA]`
+- [x] `testNonexistentImageIsRejected` — 404 `[NEG]` **(failed before Phase 2 fix)**
+- [x] `testNonexistentImageWritesNoOrphanRow` — zero rows in `piwigo_image_tag` `[NEG]` **(failed before fix)**
 
 **State transition / idempotency:**
-- [ ] `testDuplicateAddIsIdempotent` — second call `ok`, and `COUNT(*) == 1` (stronger than the original presence check) `[ST]`
+- [x] `testDuplicateAddIsIdempotent` — second call `ok`, and `COUNT(*) == 1` (stronger than the original presence check) `[ST]`
 
 **Characterization (oracle is the code — no requirement confirms these):**
-- [ ] `testMethodAlsoAnswersToGet` — `post_only` is not set; records current behaviour so a future change is visible `[ERR]`
+- [x] `testMethodAlsoAnswersToGet` — `post_only` is not set; records current behaviour so a future change is visible `[ERR]`
 
 #### `RemoveTagTest.php`
-- [ ] `testRemovesAssignedTag` — `stat: ok`, row gone `[HAPPY]`
-- [ ] `testGuestIsRejected` / `testBadTokenIsRejected` / `testNonColouredTagIsRejected` `[NEG]`
-- [ ] `testNonexistentTagIsRejected` — gap: only `addTag` was tested `[NEG]`
-- [ ] `testRemoveWhenNotAssignedIsIdempotent` — `ok`, zero rows `[ST]`
-- [ ] `testRoundTrip` — unassigned → assigned → unassigned, DB verified at each step `[ST]`
+- [x] `testRemovesAssignedTag` — `stat: ok`, row gone `[HAPPY]`
+- [x] `testGuestIsRejected` / `testBadTokenIsRejected` / `testNonColouredTagIsRejected` — each also asserts the row survived the rejection `[NEG]`
+- [x] `testNonexistentTagIsRejected` — gap: only `addTag` was tested `[NEG]`
+- [x] `testRemoveWhenNotAssignedIsIdempotent` — `ok`, zero rows `[ST]`
+- [x] `testRoundTrip` — unassigned → assigned → unassigned, DB verified at each step `[ST]`
 
 #### `CacheInvalidationTest.php`
-- [ ] `testAddNullsAvailableTagCount` — with an anti-vacuity guard asserting the value was non-null *before* the call `[ST]`
-- [ ] `testRemoveNullsAvailableTagCount` — gap: only `addTag`'s was tested `[ST]`
-- [ ] `testCacheIsRestoredAfterRun` — the current script leaves `nb_available_tags` mutated `[ERR]`
+- [x] `testAddNullsAvailableTagCount` — with an anti-vacuity guard asserting the value was non-null *before* the call `[ST]`
+- [x] `testRemoveNullsAvailableTagCount` — gap: only `addTag`'s was tested `[ST]`
+- [x] `testCacheIsRestoredAfterRun` — the deleted script left `nb_available_tags` mutated `[ERR]`
 
 #### `PicturePageSourceTest.php`
-- [ ] `testPageReturnsTwoHundredForLoggedInUser` `[HAPPY]`
-- [ ] `testPageHasNoFatalError` / `testPageHasNoSmartyCompilerError` `[NEG]`
-- [ ] `testExactlyOneScriptBlockIsInjected` — regression guard for the duplicate-injection fix `[ERR]`
-- [ ] `testUnassignedBadgeCountMatchesFixture` — exactly *K* `typetag-add` spans for a forced *K*; **replaces the `|| true` assertion** `[ECP]`
-- [ ] `testFixtureProducesAtLeastOneUnassignedTag` — anti-vacuity: the count test cannot pass over zero `[ERR]`
-- [ ] `testAssignedColouredTagsRenderAsTaggedAnchors` — one `a[data-tag-id]` per assigned colored tag; **replaces the tautological assertion**, asserting what page source can actually witness `[HAPPY]`
-- [ ] `testGuestSeesNoAssignmentUi` — neither `typetags-unassigned` nor `typetag-add` `[NEG]`
-- [ ] `testImageWithNoTagsRendersNoTagsRow` — `#Tags` absent; proves State C's precondition is real `[BVA]`
+- [x] `testPageReturnsTwoHundredForLoggedInUser` `[HAPPY]`
+- [x] `testPageHasNoFatalError` / `testPageHasNoSmartyCompilerError` `[NEG]`
+- [x] `testExactlyOneScriptBlockIsInjected` — regression guard for the duplicate-injection fix `[ERR]`
+- [x] `testUnassignedBadgeCountMatchesFixture` — exactly *K* add badges for a forced *K*; **replaces the unconditionally-true assertion** `[ECP]`
+- [x] `testFixtureProducesAtLeastOneUnassignedTag` — anti-vacuity: the count test cannot pass over zero `[ERR]`
+- [x] `testAllAssignedRendersNoUnassignedSection` — State B server-side: the container is not rendered at all `[BVA]`
+- [x] `testAssignedColouredTagsRenderAsTaggedAnchors` — one `a[data-tag-id]` per assigned colored tag; **replaces the tautological assertion**, asserting what page source can actually witness `[HAPPY]`
+- [x] `testGuestSeesNoAssignmentUi` — 200, no `Fatal error`, and neither `typetags-unassigned` nor `typetag-add` `[NEG]`
+- [x] `testImageWithNoTagsRendersNoTagsRow` — `#Tags` absent; proves State C's precondition is real `[BVA]`
+
+All four element-presence assertions scan the page **with `<script>` blocks stripped**. The injected JavaScript builds both `#Tags` and `#typetags-unassigned` as string literals, so a raw-body scan finds the JS copy and reports an element the server never rendered — this was caught by two tests failing on their first run. `assertMarkupSurvivedStripping()` is the anti-vacuity guard on the stripping itself.
+
+#### `ColorHelperCallersTest.php` — the other callers of the colour helpers
+- [x] `testAdminTagsPageRenders` — `admin.php?page=tags` returns 200 with no fatal; `typetags_admin()` calls `get_color_text()` per colour `[HAPPY]`
+- [x] `testTypeAddReturnsContrastColour` — `typetags.type.add` normalises `AABBCC` → `#AABBCC` and returns `color_text` `#000` `[HAPPY]`
 
 ### End-to-End Tests
 
@@ -955,10 +993,10 @@ Mapped one-to-one onto the unticked boxes in Plan B. Box numbers are that file's
 
 The partition extraction (Phase 1) and the `get_color_text` guard (Phase 2) are both touched by code well outside this feature:
 
-- [ ] `typetags_render()` calls `get_color_text()` on every tag on every public page — covered by `PicturePageSourceTest` and by the E2E runs, which would break visibly if badge contrast regressed
-- [ ] `typetags_admin()` calls `get_color_text()` for the admin tags page — [ ] add one integration assertion that `admin.php?page=tags` returns 200 with no fatal
-- [ ] `ws_typetags_type_add()` calls both `check_color()` and `get_color_text()` — [ ] add an integration test creating a colour and asserting the returned `color_text`
-- [ ] `typetags_picture_tags()` is the sole caller of the extracted partition — the integration suite is its net; run it before and after the extraction and diff nothing
+- [x] `typetags_render()` calls `get_color_text()` on every tag on every public page — covered by `PicturePageSourceTest` and `MalformedColorRenderingTest`; the E2E runs add the visual half in Phase 4
+- [x] `typetags_admin()` calls `get_color_text()` for the admin tags page — `ColorHelperCallersTest::testAdminTagsPageRenders`
+- [x] `ws_typetags_type_add()` calls both `check_color()` and `get_color_text()` — `ColorHelperCallersTest::testTypeAddReturnsContrastColour`
+- [x] `typetags_picture_tags()` is the sole caller of the extracted partition — the integration suite is its net; ran before and after the extraction with no diff (Phase 1)
 
 ### Mutation Testing
 

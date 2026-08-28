@@ -49,26 +49,37 @@ General test-design, layering, and quality-gate rules (stack-independent) live i
 `backpressure.md`, and `precommit-hooks.md` — this section covers only what's
 Piwigo/typetags-specific.
 
-Piwigo core has no test suite (no PHPUnit). The typetags plugin ships an integration test that exercises its web-service methods end to end:
+Piwigo core has no test suite. The typetags plugin carries a PHPUnit suite in `plugins/typetags/`:
 
 ```bash
-ddev exec php plugins/typetags/tests/test_ws_tag_assignment.php
+# Unit — pure functions, no DDEV, no DB, no HTTP
+ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml
+
+# Integration — needs DDEV up; hits ws.php over curl and MariaDB directly
+ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+  plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
 ```
 
-It calls `http://localhost/ws.php` over curl and talks to MariaDB directly for fixture setup/teardown, so DDEV must be up with the plugin active. Exit code 0 = all passed.
+Login credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — deliberately not hardcoded; `tests/Support/Config.php` fails fast naming the missing variable. Everything else defaults to DDEV values. A fresh clone needs `ddev exec composer install -d plugins/typetags` first.
+
+The integration suite mutates the database and restores it (`tests/Support/FixtureBuilder.php`). It is not safe against a production install.
+
+**Clear `_data/templates_c/` after editing a Smarty prefilter.** `Template::set_prefilter()` hashes only the filter's *callback name* into Smarty's `compile_id` (`include/template.class.php:1060-1070`), not the callback's source. Editing `typetags_picture_prefilter()` therefore leaves the previously compiled `picture.tpl` in place, and the page — and the integration suite reading it — keeps showing the old injection with no error.
 
 Browser-level verification is done with `uvx rodney` (drive Chrome) and `uvx showboat` (report). The Chrome profile lands in the git-ignored `.rodney/`.
 
-### No lint, no CI, no dependency manager
+### No lint, no CI
 
-There is no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The only mechanical checks available are:
+Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). `plugins/typetags` is the exception: it carries its own `composer.json` (PHPUnit) and `package.json` (Playwright), both dev-only, with `vendor/` and `node_modules/` git-ignored inside the submodule.
+
+The mechanical checks available are:
 
 ```bash
 php -l <file>                  # syntax check; use ddev exec php -l for 8.4 parity
-ddev exec php plugins/typetags/tests/test_ws_tag_assignment.php
+ddev exec plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml
 ```
 
-Everything else is manual or browser-driven. Don't claim a lint or test pass that no command produced — say which of the two above actually ran.
+Everything else is manual or browser-driven. Don't claim a lint or test pass that no command produced — say which of the above actually ran.
 
 ## Architecture
 
