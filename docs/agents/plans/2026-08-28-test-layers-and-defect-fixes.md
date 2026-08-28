@@ -543,7 +543,12 @@ Concretely: after reverting the `{if false}` mutation above, the compiled templa
 - [x] `grep -rn '|| true' plugins/typetags/tests/` returns nothing
 
 #### Manual Verification:
-- [ ] Reviewing the mapping table confirms every original assertion has a successor
+- [x] Reviewing the mapping table confirms every original assertion has a successor — **automated** during `/verify` (2026-08-29) rather than eyeballed:
+  - `git show HEAD^:tests/test_ws_tag_assignment.php | grep -c 'assert_test('` → 26, minus the one `function assert_test(...)` definition line = **25 calls**, matching the mapping table's 25 rows
+  - every successor named in the table was resolved against the suite by grepping for `function <name>(` in `tests/Integration/` — 19 fully-qualified `Class::method` entries plus the one continuation-line `::testFixtureProducesAtLeastOneUnassignedTag`, **20 resolved, 0 missing**
+  - the integration suite declares 39 test methods in total, so the port added coverage rather than merely relocating it
+
+  **Not added to the regression suite, deliberately.** The mapping is a one-time closure record: `test_ws_tag_assignment.php` no longer exists, so neither side of the table can drift again. A permanent test would have to read the commit message for method names, which is exactly the "build no apparatus that proves another apparatus" and "no test reads a document for a word" rule this plan sets out in Phase 5.
 
 **Implementation Note**: Run `/verify`. Pause before Phase 4.
 
