@@ -49,3 +49,14 @@
   opacity: 0.6;
   pointer-events: none;
 }
+
+/* The photo screen's read-only album values. One fact per line: run together on
+   a single line they read as one sentence, and 'Oma Müllers Fotoalbum
+   Eigentümer' is not a thing anybody wrote. */
+#provenance-photo .provenance-inherited span {
+  display: block;
+}
+
+#provenance-photo-message.provenance-error {
+  color: #c00;
+}

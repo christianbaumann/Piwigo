@@ -710,6 +710,8 @@ one in-flight request at a time, progress bar per callback, failures surfaced ra
       column moves; 10 cases
 - [x] `ddev exec php -l` on every changed file
 - [x] E2E: `apply-provenance.spec.js` — 3 specs. Automates both manual steps below
+- [x] E2E: `photo-provenance.spec.js` — 5 specs. The photo save is entirely client-side, so no
+      page-source assertion can witness it; added in the verification pass that found the gap
 
 #### Manual Verification:
 - [x] ~~The progress bar advances and completes for the 76-photo album~~ →
@@ -737,6 +739,15 @@ Three things the plan did not anticipate, all recorded here rather than left imp
    above it joins a temporary table built through `mass_inserts()`. The two build their NULLs
    differently, so `ApplyTest` exercises both — a three-photo chunk alone would leave the branch the
    real 76-photo album always takes untested.
+
+A verification pass after the phase found one gap the success criteria had not named: the
+photo-level save had no E2E coverage at all. Its whole save path is a click handler in
+`photo_provenance.js` firing an AJAX request, which page source cannot witness, so `SetPhotoInfoTest`
+could prove the web service worked while the button did nothing. `photo-provenance.spec.js` closes
+it, and a `photo-provenance` seed scenario puts one photo in the state the copy-down would leave it
+in without running the apply, so the photo-screen specs are not also a test of the apply. The pass
+also fixed the block's own layout: the four read-only facts rendered as one run-on line, which is
+now one fact per line with a spec asserting it.
 
 The phase also closed a state leak the E2E suite had carried since Phase 4:
 `FixtureBuilder::restore()` only puts back rows it recorded, and a row that held no provenance is
@@ -1206,6 +1217,11 @@ browser can observe
 
 - [x] `album-provenance.spec.js` — open the modal, fill four fields, save, reload, values persist `[HAPPY]`
 - [x] `apply-provenance.spec.js` — apply to photos, progress completes, a photo page shows the values `[HAPPY]`
+- [x] `photo-provenance.spec.js` — the photo's own note saves and persists across a reload `[HAPPY]`
+- [x] `photo-provenance.spec.js` — the album-sourced values are shown and carry no editable
+      control, each on its own line `[DT]`
+- [x] `photo-provenance.spec.js` — application-level and network-level save failures each
+      surface `[NEG]`
 - [ ] `picture-provenance.spec.js` — the `#Provenance` row is visible in the rendered DOM `[HAPPY]`
 - [x] `apply-provenance.spec.js` — an application-level failure (HTTP 200 with `stat:"fail"`) surfaces
       an error in the UI `[NEG]`. Distinct from the next case, which hits a different client path

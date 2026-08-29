@@ -14,6 +14,7 @@
  * Usage:
  *   php tests/e2e/support/seed.php --scenario=no-provenance
  *   php tests/e2e/support/seed.php --scenario=with-provenance --album=12
+ *   php tests/e2e/support/seed.php --scenario=photo-provenance
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -40,6 +41,15 @@ const SEEDED_VALUES = array(
     'provenance_scanned_on'     => '2026-08-29',
     'provenance_note'           => 'geliehen im August',
     );
+
+/**
+ * The photo's own note 'photo-provenance' writes.
+ *
+ * Deliberately unlike any album value: a spec asserting the photo screen must
+ * be able to tell the photo's own note apart from the album's, which is the
+ * whole reason the schema carries two note columns.
+ */
+const SEEDED_PHOTO_NOTE = 'auf der Rückseite: Sommer 1972';
 
 function fail(string $message): never
 {
@@ -135,9 +145,9 @@ if (isset($args['restore']))
 // ── Seed ──────────────────────────────────────────────────────────────────
 
 $scenario = $args['scenario'] ?? null;
-if (!in_array($scenario, array('no-provenance', 'with-provenance'), true))
+if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance'), true))
 {
-    fail('--scenario must be one of: no-provenance, with-provenance');
+    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance');
 }
 
 $catId = isset($args['album']) ? (int)$args['album'] : $builder->anyAlbumId();
@@ -158,13 +168,30 @@ else
     $builder->recordAllProvenance();
 }
 
-$wanted = $scenario === 'with-provenance' ? SEEDED_VALUES : array();
+$wanted = $scenario === 'no-provenance' ? array() : SEEDED_VALUES;
 $actual = $builder->albumProvenance($catId, $wanted);
 
 // photoIdsInAlbum() asserts the 1:1 photo-album assumption the copy-down rests
 // on, so a spec can never apply over a photo that belongs to two albums.
 $photo_ids = $builder->photoIdsInAlbum($catId);
 $builder->clearImageProvenance($photo_ids);
+
+// 'photo-provenance' puts one photo in the state the copy-down would leave it
+// in - the four album-sourced values plus a note of its own - without running
+// the apply, so a photo-screen spec is not also a test of the apply.
+$photo = null;
+if ($scenario === 'photo-provenance')
+{
+    $copied = array('provenance_note' => SEEDED_PHOTO_NOTE);
+    foreach (provenance_copy_down_map() as $album_column => $image_column)
+    {
+        $copied[$image_column] = $actual[$album_column];
+    }
+    $photo = array(
+        'id' => $photo_ids[0],
+        'values' => $builder->imageProvenance($photo_ids[0], $copied),
+        );
+}
 
 save_snapshot(array(
     'state' => $builder->exportState(),
@@ -180,5 +207,6 @@ echo json_encode(array(
     'values' => $actual,
     'photo_ids' => $photo_ids,
     'photo_count' => count($photo_ids),
+    'photo' => $photo,
     'max_short_text_chars' => PROVENANCE_SHORT_TEXT_MAX_CHARS,
     ), JSON_UNESCAPED_UNICODE), "\n";
