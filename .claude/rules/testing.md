@@ -66,9 +66,9 @@ is one command, and nobody has to hand their own credentials to a test run or to
 - These accounts are dev-install scaffolding. Like the suites themselves, the script is never
   safe to point at production, and that is stated where the command is documented.
 
-In this repo: `plugins/provenance/tests/Support/TestUsers.php` declares the roles,
-`create-test-users.php` creates them, and the credentials land in the git-ignored
-`local/config/provenance-test.env`.
+In this repo, both plugins follow this: `tests/Support/TestUsers.php` declares the roles,
+`create-test-users.php` creates them, and the credentials land in a git-ignored
+`local/config/<plugin>-test.env`.
 
 ## Suite hygiene
 
@@ -140,8 +140,9 @@ never loosen one to get a run green.
 ```bash
 # Unit
 ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml
-# Integration (DDEV up; credentials from the environment)
-ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+# typetags: create the test accounts once, then source them
+ddev exec php plugins/typetags/tests/Support/create-test-users.php
+ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
   plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
 # provenance: create the test accounts once, then source them
 ddev exec php plugins/provenance/tests/Support/create-test-users.php
@@ -151,11 +152,11 @@ ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   cd plugins/provenance && npx playwright test'
 # Both
-ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
   plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'
 # E2E (DDEV up; the assignment UI only renders for a logged-in user)
-ddev exec bash -c 'cd plugins/typetags && TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
-  npx playwright test'
+ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
+  cd plugins/typetags && npx playwright test'
 # Syntax check at container PHP version
 ddev exec php -l <file>
 # Hook self-test

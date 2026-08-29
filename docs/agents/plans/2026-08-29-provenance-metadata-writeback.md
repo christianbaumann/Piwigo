@@ -1424,9 +1424,11 @@ New decision records: [0014](../decisions/0014-provenance-is-its-own-plugin.md),
 already covered by [0009](../decisions/0009-provenance-text-is-never-html.md) and
 [0012](../decisions/0012-move-defaults-to-keep-on-unattended-paths.md); no duplicates were written.
 
-**Still open, and not claimed by this phase**: the `plugins/typetags` integration and E2E suites
-were not run — they read `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD`, a human's
-credentials this session does not hold. Its unit suite did run, green, in every pass above.
+**Recorded as open by this phase, closed later the same day**: the `plugins/typetags` integration
+and E2E suites were not run — they read `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD`, a
+human's credentials no agent session holds. Its unit suite did run, green, in every pass above.
+Both were unblocked afterwards by giving typetags its own `create-test-users.php`; see the
+regression box in *Testing Strategy*.
 
 ---
 
@@ -1492,15 +1494,22 @@ Structural guards (they run in the normal unit suite; nothing else would report 
 - [x] `pwgprov.config` declares the namespace URI the writer uses — one constant, read by both
 
 #### Regression — affected existing functionality
-- [ ] **Unit half done, integration half not run** — `plugins/typetags` full unit + integration
-      suites. The two core patches sit in files typetags does not touch, but
-      `associate_images_to_categories()` is on the upload path that seeds its fixtures. Unit:
-      `ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml`
-      — OK (56 tests, 33,009 assertions), green twice and in reverse order, 2026-08-29. The
-      integration suite reads `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD`, a human's
-      credentials no agent session holds, so it stays unrun and is **not** claimed. Unlike the
-      provenance suites it has no `create-test-users.php` of its own; giving it one is the
-      durable fix.
+- [x] **Both halves run, 2026-08-29** — `plugins/typetags` full unit + integration suites. The two
+      core patches sit in files typetags does not touch, but `associate_images_to_categories()` is
+      on the upload path that seeds its fixtures, so the regression check is real.
+      Unit: OK (56 tests, 33,009 assertions), green twice and in reverse order.
+      Integration: **OK (44 tests, 150 assertions)**, green again in reverse order after a
+      password rotation.
+      E2E, which was blocked for the same reason: OK (26 specs).
+
+      This box was blocked, not merely unticked. The suites read
+      `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — a human's credentials, which
+      `.claude/rules/testing.md` (*Test accounts*) says a suite must never take, and which no
+      agent session holds. The durable fix named here was applied rather than worked around:
+      `plugins/typetags` now has its own `tests/Support/TestUsers.php` and
+      `create-test-users.php`, mirroring the provenance pair, creating `typetags_webmaster` and
+      `typetags_normal` with generated passwords in the git-ignored
+      `local/config/typetags-test.env`.
 - [x] `CoreAssociationCharacterizationTest` — the Phase 7 net, run before and after the patches.
       Re-ran green 2026-08-29 as part of the 125-test integration suite on the resynchronised
       install, so the net still holds against a real gallery rather than the one it was written on.
@@ -1623,7 +1632,8 @@ ddev exec bash -c 'cd plugins/provenance && set -a; . ../../local/config/provena
 # Full regression, both plugins
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --configuration plugins/provenance/phpunit.xml'
-ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+ddev exec php plugins/typetags/tests/Support/create-test-users.php   # once per install
+ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
   plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'
 
 # Syntax at container PHP version

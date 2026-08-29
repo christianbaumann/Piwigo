@@ -39,8 +39,11 @@ The run commands and the fresh-clone setup are in CLAUDE.md's Testing section â€
 cited here rather than repeated.
 
 **Measured 2026-08-29** (dates attached because counts rot): unit 56 tests / 33,009
-assertions in 0.105s; integration 44 tests / 150 assertions; E2E 26 (25 specs + 1 auth
-setup) in 8.9s. The unit suite's sub-second budget is what makes it eligible for a commit
+assertions in 0.105s; integration 44 tests / 150 assertions in 3.5s; E2E 26 (25 specs + 1 auth
+setup) in 11.0s. The integration and E2E figures are the first ever taken by a run this
+repository could reproduce: both suites used to read a human's login, so no agent session could
+execute them. `plugins/typetags/tests/Support/create-test-users.php` now creates
+`typetags_webmaster` and `typetags_normal`, as the provenance script does. The unit suite's sub-second budget is what makes it eligible for a commit
 gate; the other two are not.
 
 **`plugins/provenance`, measured 2026-08-29** (all three layers, after the gallery was

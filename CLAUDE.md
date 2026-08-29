@@ -91,15 +91,22 @@ Piwigo core has no test suite. Both plugins carry a PHPUnit suite and a Playwrig
 ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml
 
 # Integration — needs DDEV up; hits ws.php over curl and MariaDB directly
-ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
   plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
 
 # E2E — needs DDEV up; drives Chromium in the container against http://localhost/
-ddev exec bash -c 'cd plugins/typetags && TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
-  npx playwright test'
+ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
+  cd plugins/typetags && npx playwright test'
 ```
 
-Typetags login credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — deliberately not hardcoded; `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming the missing variable. Everything else defaults to DDEV values. A fresh clone needs `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'` first, and the same two for `plugins/provenance`.
+Neither plugin's suite takes a human's login. Each creates its own accounts with generated passwords — see *Test accounts* in `.claude/rules/testing.md`:
+
+```bash
+# once per install (also rotates the passwords)
+ddev exec php plugins/typetags/tests/Support/create-test-users.php
+```
+
+That writes the git-ignored `local/config/typetags-test.env` and creates `typetags_webmaster` and `typetags_normal`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'` first, and the same two for `plugins/provenance`.
 
 The provenance suite does not take a human's login. It creates its own accounts — see
 *Test accounts* in `.claude/rules/testing.md`:
