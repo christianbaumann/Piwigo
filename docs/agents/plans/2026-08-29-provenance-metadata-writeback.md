@@ -963,13 +963,13 @@ trigger_notify('site_update_associate_images', $insert_links);
 Fires **after** the bulk insert with the full id set — not inside the scan loop, where the rows do
 not exist yet. This introduces the first trigger into that file.
 
-#### [-] 4. Inheritance handler
+#### [x] 4. Inheritance handler
 **File**: `plugins/provenance/include/events_inherit.inc.php`
 **Changes**: for each `(image, category)` pair, copy the four album-sourced values onto the image and
 record `source='inherit'` history rows. Skips albums with no provenance set. `provenance_note` is
 never written.
 
-#### [ ] 5. Keep the instructions honest
+#### [x] 5. Keep the instructions honest
 **File**: `CLAUDE.md`
 **Changes**: the research recorded "`admin/site_update.php` fires no triggers at all". After patch 2
 that is false. Fix it in the same commit that makes it untrue (`.claude/rules/backpressure.md`).
@@ -977,22 +977,61 @@ that is false. Fix it in the same commit that makes it untrue (`.claude/rules/ba
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] The characterization suite passes **before** either patch — committed on its own
-- [ ] The same suite passes **after** both patches (the regression check). Name the command that ran
-- [ ] Integration: a photo associated to a provenance-carrying album via `pwg.images.setCategory`
-      inherits all four values `[HAPPY]`
-- [ ] Integration: a photo associated to an album with no provenance gets nothing, and no history
+- [x] The characterization suite passes **before** either patch — committed on its own (8e19a1d64)
+- [x] The same suite passes **after** both patches (the regression check): `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'` — OK (94 tests, 549 assertions), 2026-08-29
+- [x] Integration: a photo associated to a provenance-carrying album via `pwg.images.setCategory`
+      inherits all four values `[HAPPY]` — `InheritTest`, 6 cases
+- [x] Integration: a photo associated to an album with no provenance gets nothing, and no history
       row is written `[NEG]`
-- [ ] Integration: a photo discovered by filesystem sync inherits — needs a fixture that places a
-      real file on disk and drives the sync path (see Phase 10's FixtureBuilder work, delivered here)
-- [ ] Integration: inheritance does not overwrite an existing `provenance_note` `[NEG]`
-- [ ] `ddev exec php -l admin/include/functions.php admin/site_update.php`
+- [x] Integration: a photo discovered by filesystem sync inherits — `FixtureBuilder::createPhysicalAlbum()`
+      and `placePhotoInPhysicalAlbum()`, with the sync driven over one album only (`cat`), never the gallery
+- [x] Integration: inheritance does not overwrite an existing `provenance_note` `[NEG]`
+- [x] `ddev exec php -l admin/include/functions.php admin/site_update.php`
 
 #### Manual Verification:
 - [ ] Upload a photo into a provenance-carrying album through the normal admin UI and confirm it
       arrives with the values — exercises the upload path end to end, which no fixture drives
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
+
+### Deviation from the plan
+
+- **The stale claim was not in `CLAUDE.md`.** Step 5 named it as the file holding
+  "`admin/site_update.php` fires no triggers at all"; that sentence is in the *research note*
+  (`2026-08-29-per-photo-freetext-field-and-metadata-writeback.md:192,381,1305`), which is a dated
+  record of what was true when it was written and is not rewritten. `CLAUDE.md` said nothing about
+  the file either way, which is its own gap: it now documents both fork-local triggers, their exact
+  insertion points and their payloads, and states that `site_update.php` fires exactly one.
+
+- **The trigger sits inside `if (count($inserts))`, as the plan placed it** — alongside
+  `update_category($categories)`. It therefore does not fire when every named pair already existed,
+  which is right: nothing joined, so nothing can inherit.
+
+- **`WsClient` had to be fixed before the suite could be trusted.** PHP's curl flattens a nested
+  array in `CURLOPT_POSTFIELDS` to its last element, so `image_id => array(4, 7)` was posting only
+  `7`. Every existing multi-photo call was silently exercising one photo. The body is now encoded
+  with `http_build_query()`. Caught by the second characterization case, which is the only one that
+  associates two photos in a single call and then asserts both ranks.
+
+- **`admin/site_update.php` needs a scoped drive, not a quick sync.** `quick_sync` walks the whole
+  gallery; the suite posts `sync=files` with `cat=<fixture album>` instead, so it only ever sees the
+  throwaway physical album. `privacy_level` is read unconditionally at `:546` and must be supplied.
+
+### Mutants applied by hand (2026-08-29)
+
+The six characterization cases pass on their first run, so each was watched go red against a mutant
+of the line it claims to watch. Every mutant was applied on the host and its arrival in the
+container confirmed by checksum before the suite ran (`.claude/rules/mutation-testing.md`).
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `$rank = ++$current_rank_of[$category_id]` → `$rank = 1` | the two rank cases | killed (3 red: both rank cases and the new half of the skip case) |
+| `if (!in_array($image_id, $existing[$category_id]))` → `if (true)` | `testAnExistingPairIsSkippedAndKeepsItsRank` | killed (duplicate primary key) |
+| dissociate: `AND (category_id != storage_category_id OR … IS NULL)` removed | `testDissociateLeavesTheStorageLinkIntact` | killed |
+| move: `AND (storage_category_id IS NULL OR … != category_id)` removed | `testMoveKeepsTheStorageLinkAndAddsTheDestination` | killed |
+| sync: the images row's `storage_category_id` nulled, link left intact | `testFilesystemSyncInsertsALinkCarryingTheStorageCategory` | killed |
+
+Nothing else moved: each mutant killed exactly the cases watching it.
 
 ---
 
