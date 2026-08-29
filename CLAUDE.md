@@ -8,7 +8,7 @@ Piwigo — open-source photo gallery web application. Procedural PHP, Smarty tem
 
 - Version: `PHPWG_VERSION` in `include/constants.php` (currently `17.0.0beta1`)
 - Upstream supports PHP 7.4+; this checkout runs PHP 8.4 locally
-- This is a fork of Piwigo. It vendors the Colored Tags plugin (`plugins/typetags`) as a git submodule pointing at `github.com/christianbaumann/Piwigo-Colored-Tags`
+- This is a fork of Piwigo. It vendors the Colored Tags plugin (`plugins/typetags`) as a git submodule pointing at `github.com/christianbaumann/Piwigo-Colored-Tags`, and carries a fork-local plugin `plugins/provenance` as a plain tracked directory
 
 ### Git remotes
 
@@ -31,7 +31,10 @@ ddev mysql                 # DB shell (database/user/password all `db`, host `db
 ddev logs -f
 ```
 
-No build step for the application itself — PHP is served directly from the repo root. The only dependency managers are `plugins/typetags`' own `composer.json` and `package.json`, both dev-only (test runners; see Testing).
+No build step for the application itself — PHP is served directly from the repo root. The only dependency managers are the per-plugin `composer.json` / `package.json` files in `plugins/typetags` and `plugins/provenance`, all dev-only (test runners; see Testing).
+
+`exiftool` is available in the web container via `webimage_extra_packages` in `.ddev/config.yaml`
+(the provenance plugin's write-back needs it); production has it preinstalled.
 
 ### Caches
 
@@ -54,7 +57,7 @@ non-coverage table, the unit suite's mutant table, and the hand-check ledger of 
 oracle. Check it before adding a test — an omission there may be a recorded decision rather
 than a gap.
 
-Piwigo core has no test suite. The typetags plugin carries a PHPUnit suite and a Playwright suite in `plugins/typetags/`:
+Piwigo core has no test suite. Both plugins carry a PHPUnit suite and a Playwright suite of their own (`plugins/typetags/`, `plugins/provenance/`). The typetags commands:
 
 ```bash
 # Unit — pure functions, no DDEV, no DB, no HTTP
@@ -69,7 +72,23 @@ ddev exec bash -c 'cd plugins/typetags && TYPETAGS_TEST_USERNAME=<user> TYPETAGS
   npx playwright test'
 ```
 
-Login credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — deliberately not hardcoded; `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming the missing variable. Everything else defaults to DDEV values. A fresh clone needs `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'` first.
+Typetags login credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — deliberately not hardcoded; `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming the missing variable. Everything else defaults to DDEV values. A fresh clone needs `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'` first, and the same two for `plugins/provenance`.
+
+The provenance suite does not take a human's login. It creates its own accounts — see
+*Test accounts* in `.claude/rules/testing.md`:
+
+```bash
+# once per install (also rotates the passwords)
+ddev exec php plugins/provenance/tests/Support/create-test-users.php
+
+ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml
+ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
+  plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
+```
+
+That script writes the git-ignored `local/config/provenance-test.env` and creates
+`provenance_webmaster` and `provenance_normal`. It writes users directly and is never safe
+against a production database.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
 
@@ -81,7 +100,7 @@ Browser-level verification is done with `uvx rodney` (drive Chrome) and `uvx sho
 
 ### No lint, no CI
 
-Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). `plugins/typetags` is the exception: it carries its own `composer.json` (PHPUnit) and `package.json` (Playwright), both dev-only, with `vendor/` and `node_modules/` git-ignored inside the submodule.
+Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags` and `plugins/provenance` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
 
 The mechanical checks available are:
 
@@ -97,9 +116,9 @@ Everything else is manual or browser-driven. Don't claim a lint or test pass tha
 
 `.githooks/pre-commit` is version-controlled and installed with `bash tools/install-hooks.sh`, which sets `core.hooksPath` on **both** the superproject and `plugins/typetags` — a superproject `core.hooksPath` does not apply to submodule commits, and every plugin commit is one. Run it after a fresh clone.
 
-It runs `php -l` on staged PHP, blocks a newly *added* `|| true` in a staged test file (added lines only, so pre-existing code is grandfathered), and runs the unit suite. If DDEV is down the suite is skipped with a printed warning rather than a silent pass. `git commit --no-verify` bypasses it.
+It runs `php -l` on staged PHP, blocks a newly *added* `|| true` in a staged test file (added lines only, so pre-existing code is grandfathered), and runs every plugin's unit suite. If DDEV is down the suites are skipped with a printed warning rather than a silent pass. `git commit --no-verify` bypasses it.
 
-`.githooks/lib.sh` holds the three shared constants (test-path pattern, vacuous-assertion pattern, unit-suite command) so the hook and its self-test cannot drift apart.
+`.githooks/lib.sh` holds the three shared constants (test-path pattern, vacuous-assertion pattern, `UNIT_SUITES` — one command per gated plugin) so the hook and its self-test cannot drift apart.
 
 ## Architecture
 
@@ -188,7 +207,7 @@ Generated on demand by `i.php`, cached in `_data/i/`. Size definitions and defau
 
 ### Git-ignored working state
 
-`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
+`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
 
 `local/config/config.inc.php` and `local/config/database.inc.php` are git-ignored and hold the install's overrides and DB credentials.
 

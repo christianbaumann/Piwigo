@@ -6,7 +6,7 @@
 #   1. php -l on the staged content of staged *.php files (host PHP, for speed)
 #   2. no newly added vacuous assertion in staged test files - added lines only,
 #      so pre-existing occurrences are grandfathered
-#   3. the typetags unit suite, skipped with a printed warning when DDEV is down
+#   3. every plugin's unit suite, skipped with a printed warning when DDEV is down
 #
 # Installed for the superproject *and* for plugins/typetags: a superproject
 # core.hooksPath does not apply to submodule commits. See tools/install-hooks.sh.
@@ -79,11 +79,16 @@ then
 elif ! ddev exec true >/dev/null 2>&1
 then
   note "WARNING: DDEV is not running - unit suite skipped"
-elif ! output=$(cd "$PROJECT_ROOT" && ddev exec "${UNIT_SUITE_ARGS[@]}" 2>&1)
-then
-  note "unit suite failed"
-  printf '%s\n' "$output" >&2
-  failed=1
+else
+  for suite in "${UNIT_SUITES[@]}"
+  do
+    if ! output=$(cd "$PROJECT_ROOT" && ddev exec $suite 2>&1)
+    then
+      note "unit suite failed: $suite"
+      printf '%s\n' "$output" >&2
+      failed=1
+    fi
+  done
 fi
 
 exit $failed

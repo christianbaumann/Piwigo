@@ -43,6 +43,33 @@ source is worse than no test: it passes on pages where the behaviour is absent.
 If a rule is witnessed only by a higher-layer test, that is a gap in the pyramid. Close it
 by pushing the rule down, not by strengthening the browser test.
 
+## Test accounts
+
+A suite never logs in as a human's real account. Every role a suite needs gets its own
+dedicated account with a generated password, created by a script that is committed and
+re-runnable — so a fresh clone is one command away from a working suite, rotating a password
+is one command, and nobody has to hand their own credentials to a test run or to an agent.
+
+- **One account per role the tests actually exercise**, not one shared account that is given
+  whatever rights the newest test needs. An admin gate is only proven by an authenticated
+  non-admin failing to pass it; that needs a second account, so create it.
+- **Create as many as the cases require.** A missing role is a `[NEG]` case that silently
+  never gets written.
+- **The script is idempotent** — running it again resets the passwords rather than erroring
+  or creating duplicates — and it **asserts the account came out with the role it asked for**
+  instead of trusting the write.
+- **Passwords are generated, never typed, and never committed.** They land in a git-ignored
+  file that the suite reads through environment variables; the missing-variable message names
+  the script that creates them.
+- **The accounts are named for what they are** (`<plugin>_webmaster`, `<plugin>_normal`) so a
+  glance at the user list says which rows are test scaffolding.
+- These accounts are dev-install scaffolding. Like the suites themselves, the script is never
+  safe to point at production, and that is stated where the command is documented.
+
+In this repo: `plugins/provenance/tests/Support/TestUsers.php` declares the roles,
+`create-test-users.php` creates them, and the credentials land in the git-ignored
+`local/config/provenance-test.env`.
+
 ## Suite hygiene
 
 - Every suite is runnable by **one command**, and that command is written down.
@@ -116,6 +143,10 @@ ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration p
 # Integration (DDEV up; credentials from the environment)
 ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
   plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
+# provenance: create the test accounts once, then source them
+ddev exec php plugins/provenance/tests/Support/create-test-users.php
+ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
+  plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
 # Both
 ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
   plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'

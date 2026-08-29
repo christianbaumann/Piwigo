@@ -1,0 +1,6 @@
+{
+  "name": "christianbaumann/piwigo-provenance",
+  "description": "Provenance metadata plugin for Piwigo",
+  "require-dev": { "phpunit/phpunit": "^13.3" },
+  "config": { "sort-packages": true }
+}

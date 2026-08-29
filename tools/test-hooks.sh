@@ -20,9 +20,14 @@ PROBE_DIR="$PROJECT_ROOT/.hook-selftest/tests"
 TMP_DIR="$(mktemp -d)"
 failures=0
 
+# The plugin probe below is written inside a tracked directory, so cleanup has to
+# name it explicitly - a leftover would be committable.
+PLUGIN_PROBE="plugins/provenance/tests/HookSelftestVacuousProbeTest.php"
+
 cleanup()
 {
   rm -rf "$PROJECT_ROOT/.hook-selftest" "$TMP_DIR"
+  rm -f "$PROJECT_ROOT/$PLUGIN_PROBE"
 }
 trap cleanup EXIT INT TERM
 
@@ -125,6 +130,26 @@ run_case "syntax error blocks"      1 ".hook-selftest/tests/probe_broken.php"
 run_case "vacuous assertion blocks" 1 ".hook-selftest/tests/probe_vacuous.php"
 run_case "clean file passes"        0 ".hook-selftest/tests/probe_clean.php"
 
+# The three cases above stage from .hook-selftest/tests/, which TEST_PATH_PATTERN
+# matches on its leading `tests/` segment. That says nothing about a plugin's own
+# suite directory, which is where real test files actually live. This stages the
+# same vacuous probe at plugins/provenance/tests/ and asserts the ratchet still
+# bites - the manual box "watch the hook block a `|| true` in a
+# plugins/provenance/tests/ file", done by machine on every run instead of once
+# by hand.
+
+mkdir -p "$(dirname "$PROJECT_ROOT/$PLUGIN_PROBE")"
+cp "$PROBE_DIR/probe_vacuous.php" "$PROJECT_ROOT/$PLUGIN_PROBE"
+
+if printf '%s\n' "$PLUGIN_PROBE" | grep -Eq "$TEST_PATH_PATTERN"
+then
+  pass "$PLUGIN_PROBE is inside the ratchet's scope"
+else
+  fail "$PLUGIN_PROBE does not match TEST_PATH_PATTERN - the case below would prove nothing"
+fi
+
+run_case "vacuous assertion blocks in a plugin suite" 1 "$PLUGIN_PROBE"
+
 # --- installation -----------------------------------------------------------
 #
 # Every case above invokes the hook directly, so all three stay green in a repo
@@ -169,6 +194,30 @@ then
 else
   fail "plugins/typetags is not checked out - its hook wiring cannot be checked"
 fi
+
+# plugins/provenance is a plain directory in the superproject, not a submodule,
+# so the superproject's core.hooksPath already covers its commits and
+# install-hooks.sh needs no entry for it. The day it becomes a submodule that
+# stops being true silently - this says so instead.
+if [ -e "$PROJECT_ROOT/plugins/provenance/.git" ]
+then
+  fail "plugins/provenance is now its own repository - install-hooks.sh must configure it too"
+else
+  pass "plugins/provenance is a plain directory (superproject hooksPath covers it)"
+fi
+
+# Every gated suite must actually be runnable, or the hook's loop skips a plugin
+# with nothing but a passing exit code to show for it.
+for suite in "${UNIT_SUITES[@]}"
+do
+  set -- $suite
+  if [ -x "$PROJECT_ROOT/$1" ]
+  then
+    pass "gated suite runner exists: $1"
+  else
+    fail "gated suite runner is missing or not executable: $1 (run composer install for that plugin)"
+  fi
+done
 
 # --- git must actually run the hook on a real commit ------------------------
 #

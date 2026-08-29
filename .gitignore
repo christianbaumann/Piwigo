@@ -3,6 +3,7 @@
 /plugins/*
 !/plugins/index.php
 !/plugins/typetags
+!/plugins/provenance
 /themes/*
 !/themes/index.php
 !/themes/default

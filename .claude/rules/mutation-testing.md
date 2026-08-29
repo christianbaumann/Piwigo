@@ -48,6 +48,22 @@ Minimum shape of the table:
 | a return value swapped for its sibling | the negative/default-case test | killed / not killed |
 | a loop/condition negated (`in_array` → `!in_array`) | the partition/branch test | killed / not killed |
 
+## Wait for the file to reach the runtime before running the suite
+
+This project runs under DDEV with Mutagen, so a host file edit reaches the container a
+moment later. A mutant applied and immediately tested is read from the *pre-mutation* file:
+the run comes back green, the mutant is recorded as surviving, and the next run — already
+reverted on the host — comes back red. Every result is shifted by one and the whole table
+is wrong in a way that looks plausible.
+
+So: after applying or reverting a mutant, **verify the runtime actually sees the new bytes**
+before running anything — compare the host checksum against `ddev exec md5sum <file>` and
+poll until they agree. Also assert the mutation changed the file at all; a `sed` address
+form that silently does nothing (BSD `sed` rejects `0,/re/`, GNU accepts it) produces the
+same false "survived".
+
+Both failure modes were hit while building the provenance plugin's Phase 1 table, 2026-08-29.
+
 ## Record what did not die, honestly
 
 "Nothing else moved" is a real, useful claim: it means a mutant killed exactly the tests

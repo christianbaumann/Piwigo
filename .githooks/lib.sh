@@ -10,9 +10,9 @@ TEST_PATH_PATTERN='(^|/)tests/|Test\.php$|\.spec\.js$'
 # started from: an assertion whose condition ends in `|| true` cannot fail.
 VACUOUS_PATTERN='|| true'
 
-# The only suite fast enough and self-contained enough to gate a commit on.
-UNIT_SUITE_ARGS=(
-  plugins/typetags/vendor/bin/phpunit
-  --testsuite unit
-  --configuration plugins/typetags/phpunit.xml
+# The suites fast enough and self-contained enough to gate a commit on - one per
+# plugin that has one. Each entry is a whole command, run under `ddev exec`.
+UNIT_SUITES=(
+  "plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml"
+  "plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml"
 )
