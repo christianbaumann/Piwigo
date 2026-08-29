@@ -13,5 +13,10 @@ $lang['Applying provenance to %d photos...'] = 'Herkunft wird auf %d Fotos angew
 $lang['Provenance applied to %d photos'] = 'Herkunft auf %d Fotos angewendet';
 $lang['Provenance could not be applied'] = 'Herkunft konnte nicht angewendet werden';
 $lang['This album holds no photo'] = 'Dieses Album enthält keine Fotos';
+$lang['Write to %d files'] = 'In %d Dateien schreiben';
+$lang['Writing metadata into %d files...'] = 'Metadaten werden in %d Dateien geschrieben...';
+$lang['Metadata written into %d files'] = 'Metadaten in %d Dateien geschrieben';
+$lang['Metadata could not be written'] = 'Metadaten konnten nicht geschrieben werden';
+$lang['%d failed'] = '%d fehlgeschlagen';
 
 ?>

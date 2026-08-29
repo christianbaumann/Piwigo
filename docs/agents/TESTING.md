@@ -50,6 +50,25 @@ production install**, and neither ever will be — this is stated rather than as
 Fixtures force their precondition and assert it took effect; no assertion depends on
 cleanup having run, because cleanup is skipped on failure so it cannot erase the evidence.
 
+### Write-back throughput and disk cost — measured 2026-08-29
+
+`PROVENANCE_WRITEBACK_MAX_CHUNK` is 10 because of the figures below, not by guess. They are
+a **dated measurement, never an assertion** (`.claude/rules/test-design.md`, *assert the
+causal fact, not a wall-clock figure*) — nothing in any suite compares against them.
+
+Method: the 76 PNGs of `upload/2026/04/19/` copied to `/tmp/bench` inside the web container
+(exiftool 13.25, DDEV, PHP 8.4) and written one invocation per file, exactly as
+`provenance_exiftool_run()` does. Copies, never the collection itself.
+
+| What | Wall clock | Per file |
+|---|---|---|
+| 10 files (one write-back chunk) | 2.83 s | 283 ms |
+| 76 files (the whole album, 8 chunks) | 12.73 s | 167 ms |
+
+A chunk therefore spends about 5% of the production 60 s request ceiling, so the constant
+stays at 10. Disk: the same 76 files grew from 55 MB to 110 MB — one extra copy, the
+`_original` sidecars, created once and never rewritten (`WriteBackTest`).
+
 ### The commit gate, and what it was watched doing
 
 `.githooks/pre-commit` gates on the unit suite only — the one suite that runs without the
@@ -195,6 +214,8 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-08-29 | The pre-commit gate watched failing at the terminal before being trusted: two real `git commit` invocations in `plugins/typetags` (a PHP syntax error, then a newly added `\|\| true` in `tests/`), both rejected, neither creating a commit. Submodule reset to `3eeee007d` afterwards. | **Replaced 2026-08-29** by `tools/test-hooks.sh` → `git rejects a real commit` / `git accepts a clean commit`, which make real commits in a throwaway repo and assert the commit count. Three items from that session stay unautomated for stated reasons — see the commit-gate table above. |
 | 2026-08-29 | Modus rendering compared against the 2026-04-27 reference screenshots. Structure and palette match; the only difference is the older capture's dark colour scheme. | **Replaced 2026-08-29** by `rendering.spec.js` (4 specs), which assert computed colour and geometry on every run. Not kept as a screenshot baseline — pixel-diffing a photo gallery is flaky for reasons unrelated to this feature. |
 | 2026-08-29 | Phase 4 of the provenance plan opened two manual boxes: the album provenance modal opens, saves and survives a reload; and the injected block does not disturb the Properties layout at narrow widths. | **Replaced 2026-08-29** by `plugins/provenance/tests/e2e/album-provenance.spec.js` (4 specs), each watched failing against a mutant: a wrong web-service method name in the JS, a suppressed `value=` in the template, a 4000px `min-width` on the button, and a 5px `width` on the modal fields. |
+| 2026-08-29 | Phase 6 of the provenance plan opened two manual boxes: a written file's caption is visible where a normal photo tool shows it; and a full 76-photo write-back costs roughly one extra copy on disk. | **Replaced 2026-08-29** by `plugins/provenance/tests/Integration/WriteBackTest.php` → `testAnIndependentReaderFindsTheCaption` (ImageMagick's `identify`, a separate implementation from the writer, finds the caption in EXIF, IPTC-IIM 2:120 and XMP `photoshop:Headline`) and `testAWriteCostsOneExtraCopyOnDisk` (per-file ratio against the pristine size). Watched red against a dropped `PROVENANCE_IPTC_CAPTION_TAG` and an added `-overwrite_original` respectively. Only *legibility in a GUI viewer* survives — see the open table below. |
+| 2026-08-29 | The write-back button's browser path, which Phase 6's plan asked for no spec for. | **Replaced 2026-08-29** by `plugins/provenance/tests/e2e/writeback-provenance.spec.js` (4 specs), each watched failing against a mutant: a wrong web-service method in the client, a summary that drops the per-photo failure count, and a `fail()` that no longer sets `.provenance-error` (which killed both failure specs). |
 
 ### Open — no oracle, so no test
 
@@ -203,4 +224,5 @@ than accumulating. Nothing is marked done on prose alone.
 | A first-time `PluginMaintain::install()` against an **empty schema** | Needs a throwaway Piwigo instance with its own database; this repository has one install and no way to provision another. Running it against the live install would mean `uninstall()` first, which drops `piwigo_typetags` and `piwigo_tags.id_typetags` — destroying real tag-colour data to test a method that is already idempotent by construction (`CREATE TABLE IF NOT EXISTS`, an `ALTER` guarded by `SHOW COLUMNS`, a `conf_update_param` guarded by `empty()`). The risk is not worth the coverage. What *is* automated: `CleanCheckoutTest` (4 tests) asserts every runtime file is committed and unignored — the half of "installs from a clean checkout" that this repository can actually get wrong — and `PluginActivationTest` asserts install()'s effects are present on the live install. |
 | Badge contrast is *legible* for all 8 configured colours against the modus background | Subjective judgment. `get_color_text()` picks black or white by a lightness threshold and `rendering.spec.js` asserts the choice is applied, but whether the result reads comfortably is not a fact a machine can settle. |
 | The hover opacity transition *feels* right | Subjective. The opacity values themselves are asserted; the perception is not. |
+| A written file's caption *reads* correctly in a GUI viewer (macOS Preview, a phone gallery) | Subjective, and the falsifiable half is already automated: `WriteBackTest::testAnIndependentReaderFindsTheCaption` proves an independent library finds the caption in three standard slots. Whether a given viewer chooses to *show* that slot, and whether it looks right, is a judgment no assertion settles. Recorded while automating it: ImageMagick's EXIF reader replaces every non-ASCII byte with a dot while its IPTC and XMP readers do not — the file's bytes are correct, the reader is not. |
 | Committing does not *feel* slow with the pre-commit hook installed | Subjective, and a wall-clock assertion would violate *assert the causal fact, not a wall-clock figure*. |

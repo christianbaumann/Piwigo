@@ -36,6 +36,12 @@ No build step for the application itself — PHP is served directly from the rep
 `exiftool` is available in the web container via `webimage_extra_packages` in `.ddev/config.yaml`
 (the provenance plugin's write-back needs it); production has it preinstalled.
 
+ImageMagick's `identify` is also used, but only by the provenance integration suite, as an
+**independent** reader of what the write-back produced — reading back with exiftool cannot tell a
+caption written to the standard slots apart from one only exiftool knows about. It comes from the
+DDEV web image itself rather than `webimage_extra_packages`; if a future image drops it,
+`WriteBackTest::testAnIndependentReaderFindsTheCaption` fails loudly naming it.
+
 ### Caches
 
 Smarty compiles templates into `_data/templates_c/` and concatenates CSS/JS into `_data/combined/`.
@@ -98,6 +104,11 @@ That script writes the git-ignored `local/config/provenance-test.env` and create
 against a production database.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
+
+The provenance E2E suite seeds its own throwaway album for the write-back
+(`seed.php --scenario=writeback`): that operation writes **every** photo of the album it is
+started from, so it is never pointed at an album holding real scans. `--restore` deletes the
+album, its photo rows, the copied files and exiftool's `_original` sidecars.
 
 E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in `tests/e2e/support/PicturePage.js` — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 

@@ -127,6 +127,10 @@ define('PROVENANCE_IPTC_CAPTION_TAG', 'IPTC:Caption-Abstract');
 define('PROVENANCE_LOCK_DIR',
   dirname(dirname(rtrim(PROVENANCE_PATH, '/'))) . '/_data/provenance/locks/');
 
+/** Working area for the argfiles of one write-back operation. */
+define('PROVENANCE_ARGS_DIR',
+  dirname(dirname(rtrim(PROVENANCE_PATH, '/'))) . '/_data/provenance/args/');
+
 /**
  * The order provenance values appear in a composed caption.
  *
@@ -174,6 +178,57 @@ function provenance_xmp_tag_map()
     'provenance_album_note'     => 'AlbumNote',
     'provenance_note'           => 'PhotoNote',
     );
+}
+
+/**
+ * Provenance field => the l10n key labelling it inside a caption.
+ *
+ * The keys live here so the caption's shape is one definition, but the lookup
+ * itself happens at the call site: this file stays loadable without Piwigo's
+ * language layer, which is what keeps the composition layer unit-testable.
+ *
+ * @return array
+ */
+function provenance_caption_label_keys()
+{
+  return array(
+    'provenance_physical_album' => 'Physical album',
+    'provenance_owner'          => 'Owner',
+    'provenance_scanned_on'     => 'Scanned on',
+    'provenance_album_note'     => 'Album note',
+    'provenance_note'           => 'Note',
+    );
+}
+
+/**
+ * Labels the populated provenance values, ready for the composer.
+ *
+ * An absent label leaves the bare value rather than a leading colon: l10n()
+ * answers with the key when a translation is missing, and a caption reading
+ * ": Anna Mueller" would be written into every file of an album.
+ *
+ * @param array $values provenance field => raw value
+ * @param array $labels provenance field => label text
+ * @return array provenance field => labelled text, empty values dropped
+ */
+function provenance_caption_parts($values, $labels)
+{
+  $parts = array();
+
+  foreach (provenance_field_order() as $field)
+  {
+    $value = isset($values[$field]) ? trim((string)$values[$field]) : '';
+
+    if ($value === '')
+    {
+      continue;
+    }
+
+    $label = isset($labels[$field]) ? trim((string)$labels[$field]) : '';
+    $parts[$field] = ($label === '' ? '' : $label.': ').$value;
+  }
+
+  return $parts;
 }
 
 /**
@@ -309,6 +364,34 @@ function provenance_lock_path($image_path)
   return PROVENANCE_LOCK_DIR . sha1($image_path) . '.lock';
 }
 
+/**
+ * Names one write-back operation.
+ *
+ * Hex only, so the id can be concatenated into a path with no sanitising step
+ * that a later caller could forget.
+ *
+ * @return string
+ */
+function provenance_operation_id()
+{
+  return bin2hex(random_bytes(8));
+}
+
+/**
+ * Where one operation stages its argfiles.
+ *
+ * A directory per operation, removed whole in a finally, so a crashed run
+ * leaves at most one directory behind instead of orphan files nobody can
+ * attribute.
+ *
+ * @param string $operation_id
+ * @return string
+ */
+function provenance_operation_dir($operation_id)
+{
+  return PROVENANCE_ARGS_DIR . $operation_id . '/';
+}
+
 /*
  * ---------------------------------------------------------------------------
  * The copy-down operation.
@@ -333,10 +416,16 @@ define('PROVENANCE_APPLY_MAX_CHUNK', 200);
  * it turns "3.5" into 3 and would write onto a photo nobody asked for.
  *
  * @param mixed $value comma-joined ids
+ * @param int|null $max most ids the list may carry; the apply ceiling by default
  * @return array|null ids in the order given, deduplicated; null when unusable
  */
-function provenance_parse_id_list($value)
+function provenance_parse_id_list($value, $max = null)
 {
+  if ($max === null)
+  {
+    $max = PROVENANCE_APPLY_MAX_CHUNK;
+  }
+
   $ids = array();
 
   foreach (explode(',', (string)$value) as $member)
@@ -358,8 +447,45 @@ function provenance_parse_id_list($value)
 
   $ids = array_values(array_unique($ids));
 
-  return count($ids) > PROVENANCE_APPLY_MAX_CHUNK ? null : $ids;
+  return count($ids) > $max ? null : $ids;
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * The file write-back.
+ *
+ * Constants only; the behaviour lives in exiftool.inc.php, which needs a shell
+ * and a filesystem. Keeping the ceiling and the history field names here is what
+ * lets the suite read them without one.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * Most photo ids one writeBack request may carry.
+ *
+ * Far below the copy-down ceiling: one exiftool invocation costs orders of
+ * magnitude more than an UPDATE, and both share the production 60 s request
+ * ceiling. The measurement behind the figure is dated in docs/agents/TESTING.md.
+ */
+define('PROVENANCE_WRITEBACK_MAX_CHUNK', 10);
+
+/**
+ * How long a writer waits for the lock on one image before giving up.
+ *
+ * A blocking flock would wait for ever behind a wedged process and take the
+ * request's 60 s ceiling with it, so the wait is bounded and a photo that
+ * cannot be locked is reported as failed like any other.
+ */
+define('PROVENANCE_LOCK_TIMEOUT_SECONDS', 30);
+
+/** How long a writer sleeps between attempts at a held lock. */
+define('PROVENANCE_LOCK_RETRY_MICROSECONDS', 50000);
+
+/** History field naming a successful write of one file. */
+define('PROVENANCE_HISTORY_FIELD_FILE', 'file');
+
+/** History field naming a failed write of one file. */
+define('PROVENANCE_HISTORY_FIELD_FILE_ERROR', 'file_error');
 
 /*
  * ---------------------------------------------------------------------------

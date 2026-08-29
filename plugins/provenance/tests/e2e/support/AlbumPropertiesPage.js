@@ -9,7 +9,8 @@
  * maintain, because the same selector then has to be corrected in N places.
  *
  * Selector policy: locate by the ids the plugin emits on purpose
- * (#provenance-open, #provenance-modal, #provenance-save, the four field ids)
+ * (#provenance-open, #provenance-modal, #provenance-save, #provenance-write,
+ * the four field ids)
  * plus the one core id the layout check is about (#cat-properties-save) - never
  * by position within theme-generated markup.
  */
@@ -35,6 +36,13 @@ class AlbumPropertiesPage {
     this.applyMessage = page.locator('#provenance-apply-message');
     /** Carries .provenance-done once the run has finished every chunk. */
     this.applyDone = page.locator('#provenance-apply-progress.provenance-done');
+
+    this.writeButton = page.locator('#provenance-write');
+    this.writeProgress = page.locator('#provenance-write-progress');
+    this.writeBarFill = page.locator('#provenance-write-bar-fill');
+    this.writeMessage = page.locator('#provenance-write-message');
+    /** Carries .provenance-done once the run has finished every chunk. */
+    this.writeDone = page.locator('#provenance-write-progress.provenance-done');
 
     /** The album screen's own save button, which the block is injected next to. */
     this.albumSaveButton = page.locator('#cat-properties-save');
@@ -64,6 +72,14 @@ class AlbumPropertiesPage {
     return {
       done: Number(await this.applyProgress.getAttribute('data-done')),
       total: Number(await this.applyProgress.getAttribute('data-total')),
+    };
+  }
+
+  /** What the write-back run has covered, as the page itself publishes it. */
+  async writeCounts() {
+    return {
+      done: Number(await this.writeProgress.getAttribute('data-done')),
+      total: Number(await this.writeProgress.getAttribute('data-total')),
     };
   }
 

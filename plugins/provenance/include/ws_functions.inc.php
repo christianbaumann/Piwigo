@@ -357,3 +357,65 @@ UPDATE '.IMAGES_TABLE.'
     'changed' => provenance_record_change('photo', $image_id, 'provenance_note', $before, $note, 'photo_edit'),
     );
 }
+
+/**
+ * Writes the provenance of one chunk of photos into their files.
+ *
+ * The chunk is far smaller than the copy-down's (PROVENANCE_WRITEBACK_MAX_CHUNK
+ * against PROVENANCE_APPLY_MAX_CHUNK): one exiftool invocation costs orders of
+ * magnitude more than an UPDATE, and the production 60 s request ceiling is the
+ * same for both.
+ *
+ * A failed photo does not abandon the chunk (decision 13a) - the whole album is
+ * unusable otherwise the day one file turns out to be read-only - so the answer
+ * carries both counts and the caller decides what to say about them.
+ *
+ * @param array $param
+ * @param object $service
+ * @return array|PwgError
+ */
+function ws_provenance_writeBack($param, &$service)
+{
+  if (is_a_guest())
+  {
+    return new PwgError(401, 'Access denied');
+  }
+
+  if (get_pwg_token() != $param['pwg_token'])
+  {
+    return new PwgError(403, 'Invalid security token');
+  }
+
+  // Checked before anything is read or written: on a server without exec() the
+  // feature degrades to the database half rather than failing halfway through.
+  if (!provenance_exiftool_available())
+  {
+    return new PwgError(501, 'exiftool is not available on this server');
+  }
+
+  $image_ids = provenance_parse_id_list($param['image_ids'], PROVENANCE_WRITEBACK_MAX_CHUNK);
+  if ($image_ids === null)
+  {
+    return new PwgError(400, 'image_ids must be at most '.PROVENANCE_WRITEBACK_MAX_CHUNK.' comma-separated photo ids');
+  }
+
+  if (empty($image_ids))
+  {
+    return array('written' => 0, 'failed' => array());
+  }
+
+  $images = query2array('
+SELECT id, path, '.implode(', ', array_keys(provenance_image_columns())).'
+  FROM '.IMAGES_TABLE.'
+  WHERE id IN ('.implode(',', $image_ids).')
+;');
+
+  if (count($images) != count($image_ids))
+  {
+    return new PwgError(404, 'Photo not found');
+  }
+
+  load_language('plugin.lang', PROVENANCE_PATH);
+
+  return provenance_write_back($images, array_map('l10n', provenance_caption_label_keys()));
+}

@@ -21,7 +21,7 @@ if (basename(dirname(__FILE__)) != 'provenance')
   return;
 }
 
-global $prefixeTable;
+global $prefixeTable, $conf;
 
 // maintain.class.php defines this too, and runs first during install.
 if (!defined('PROVENANCE_PATH'))
@@ -33,6 +33,14 @@ define('PROVENANCE_XMP_CONFIG',    PROVENANCE_PATH . 'exiftool/pwgprov.config');
 
 include_once(PROVENANCE_PATH . 'include/functions.inc.php');
 include_once(PROVENANCE_PATH . 'include/history.inc.php');
+include_once(PROVENANCE_PATH . 'include/exiftool.inc.php');
+
+// The binary is expected on PATH. A host that keeps it elsewhere sets the
+// directory - with its trailing slash - in local/config/config.inc.php.
+if (!isset($conf['provenance_exiftool_path']))
+{
+  $conf['provenance_exiftool_path'] = '';
+}
 
 add_event_handler('ws_add_methods', 'provenance_add_methods');
 
@@ -110,6 +118,18 @@ function provenance_add_methods($arr)
       'pwg_token' => array(),
       ),
     'Saves one photo\'s own provenance note. The album-sourced values are not touched.',
+    PROVENANCE_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
+  );
+
+  $service->addMethod(
+    'pwg.provenance.writeBack',
+    'ws_provenance_writeBack',
+    array(
+      'image_ids' => array('default' => '', 'info' => 'At most '.PROVENANCE_WRITEBACK_MAX_CHUNK.' comma-separated photo ids'),
+      'pwg_token' => array(),
+      ),
+    'Writes the provenance of one chunk of photos into their image files as EXIF, IPTC and XMP.',
     PROVENANCE_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );

@@ -15,16 +15,19 @@
   color: #c00;
 }
 
-/* Apply progress. Hidden until a run starts: an empty bar sitting on the screen
-   would read as a run that is stuck at zero. */
-#provenance-apply-progress {
+/* Run progress, shared by the copy-down and the file write-back. Hidden until a
+   run starts: an empty bar sitting on the screen would read as a run that is
+   stuck at zero. */
+#provenance-apply-progress,
+#provenance-write-progress {
   display: none;
   align-items: center;
   gap: 10px;
   margin-left: 10px;
 }
 
-#provenance-apply-bar {
+#provenance-apply-bar,
+#provenance-write-bar {
   display: inline-block;
   width: 160px;
   height: 8px;
@@ -33,7 +36,8 @@
   overflow: hidden;
 }
 
-#provenance-apply-bar-fill {
+#provenance-apply-bar-fill,
+#provenance-write-bar-fill {
   display: block;
   width: 0;
   height: 100%;
@@ -41,7 +45,8 @@
   transition: width 0.2s;
 }
 
-#provenance-apply-message.provenance-error {
+#provenance-apply-message.provenance-error,
+#provenance-write-message.provenance-error {
   color: #c00;
 }
 

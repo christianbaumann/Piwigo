@@ -769,7 +769,7 @@ concurrency test is written before the writer is wired to any UI.
 
 ### Changes Required:
 
-#### [ ] 1. Capability probe
+#### [x] 1. Capability probe
 **File**: `plugins/provenance/include/exiftool.inc.php`
 **Changes**: copy the degradation shape of `pwg_image::is_ext_imagick()`
 (`admin/include/image.class.php:393-410`) verbatim in structure:
@@ -788,7 +788,7 @@ function provenance_exiftool_available()
 binary sits in a home directory. When unavailable, the write-back button is hidden and the WS method
 returns a typed error — every other part of the feature keeps working (research Finding D).
 
-#### [ ] 2. Locked, argfile-driven writer
+#### [x] 2. Locked, argfile-driven writer
 **File**: `plugins/provenance/include/exiftool.inc.php`
 **Changes**: per image — acquire an exclusive `flock` on `provenance_lock_path()`, write the argfile
 into `_data/provenance/args/<operation-id>/`, invoke
@@ -802,12 +802,12 @@ into `_data/provenance/args/<operation-id>/`, invoke
   (`.claude/rules/test-design.md`).
 - IPTC truncation, when it happens, is a `source='truncation'` history row (decision 10a).
 
-#### [ ] 3. `pwg.provenance.writeBack`
+#### [x] 3. `pwg.provenance.writeBack`
 **Changes**: `admin_only` + `post_only`, takes a chunk of `image_ids`, continues on error (decision
 13a), returns `array('written' => n, 'failed' => array(image_id => message))`. Chunk size starts at
 **10 images per request** and is justified by the measurement below, not guessed.
 
-#### [ ] 4. Measure throughput against the 60 s ceiling
+#### [x] 4. Measure throughput against the 60 s ceiling
 **Changes**: run a batched invocation over 76 real files in the container, record wall-clock as a
 **dated measurement** in `docs/agents/TESTING.md` — never as an assertion in the suite
 (`.claude/rules/test-design.md`, *assert the causal fact, not a wall-clock figure*). If the measured
@@ -816,34 +816,106 @@ per-image cost puts 10 images near the ceiling, the constant moves and the new f
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit: `provenance_build_argfile()` line-by-line output for every field combination (Phase 2
+- [x] Unit: `provenance_build_argfile()` line-by-line output for every field combination (Phase 2
       tests extended, not duplicated)
-- [ ] Integration: after a write, all five MWG slots and all five `XMP-pwgprov:*` tags read back
+- [x] Integration: after a write, all five MWG slots and all five `XMP-pwgprov:*` tags read back
       correctly — read via **exiftool or Imagick, never a raw byte grep** (XMP lands in a compressed
       `zTXt` chunk on PNG, so a substring search reports a false negative) and never via
       `exif_read_data()` (returns `false` for PNG `eXIf`)
-- [ ] Integration: pixels unchanged — sha256 of the decompressed IDAT stream matches pre-write, with
+- [x] Integration: pixels unchanged — sha256 of the decompressed IDAT stream matches pre-write, with
       an `assertGreaterThan(MIN_IDAT_BYTES, …)` guard first so a zero-byte read cannot pass
-- [ ] Integration: a `_original` sidecar exists after the first write, and is **unchanged** after a
+- [x] Integration: a `_original` sidecar exists after the first write, and is **unchanged** after a
       second and third write (measured research finding 6)
-- [ ] Integration: **concurrency** — N parallel writers against one file; the file still exists,
+- [x] Integration: **concurrency** — N parallel writers against one file; the file still exists,
       is readable, and carries one of the written values. This is the test for the one measured
       data-loss mode; it is written and watched red (locking disabled) before locking is enabled
-- [ ] Integration: text longer than `PROVENANCE_IPTC_MAX_BYTES` — XMP and EXIF hold the full text,
+- [x] Integration: text longer than `PROVENANCE_IPTC_MAX_BYTES` — XMP and EXIF hold the full text,
       IPTC holds a valid-UTF-8 truncated copy, and a `source='truncation'` history row exists `[BVA]`
-- [ ] Integration: non-latin-1 text (`Łódź Ω 日本 Müller`) round-trips through
+- [x] Integration: non-latin-1 text (`Łódź Ω 日本 Müller`) round-trips through
       `clean_iptc_value()` intact `[ERR]` — characterization of core's auto-detecting reader
-- [ ] Integration: with `exec` unavailable, the WS method returns a typed error and no file is
+- [x] Integration: with `exec` unavailable, the WS method returns a typed error and no file is
       touched `[NEG]`
-- [ ] Integration: after a failed write the operation directory is gone **and** the failure row is
+- [x] Integration: after a failed write the operation directory is gone **and** the failure row is
       in the history
-- [ ] `ddev exec php -l` on every changed file
+- [x] `ddev exec php -l` on every changed file
 
 #### Manual Verification:
-- [ ] Open a written file in an external viewer (macOS Preview / `exiftool` on the host) and confirm
-      the caption is visible where a normal photo tool shows it — hand-check ledger entry, because
-      "does a third-party tool find it" has no oracle in this repo
-- [ ] Confirm disk growth after a full 76-photo write-back is roughly one extra copy, once
+- [x] ~~Open a written file in an external viewer (macOS Preview / `exiftool` on the host) and
+      confirm the caption is visible where a normal photo tool shows it — hand-check ledger entry,
+      because "does a third-party tool find it" has no oracle in this repo~~ → **the falsifiable
+      half is automated**. There *is* an oracle in this repo: ImageMagick, a wholly separate
+      implementation from the writer. `WriteBackTest::testAnIndependentReaderFindsTheCaption`
+      asserts `identify -verbose` finds the caption in three standard slots — EXIF, IPTC-IIM 2:120
+      and XMP `photoshop:Headline` — which reading back with exiftool could never distinguish from
+      a caption written somewhere only exiftool knows about. Watched red against a mutant that
+      drops `PROVENANCE_IPTC_CAPTION_TAG` from `provenance_caption_tags()`, which killed that test
+      and nothing else in the pair it was run with.
+
+      Recorded while writing it: ImageMagick's **EXIF** reader replaces every non-ASCII *byte*
+      with a dot (`Müller` → `M..ller`), while its IPTC and XMP readers keep the UTF-8 intact. The
+      bytes in the file are correct; the test asserts the dotted form for that one slot rather
+      than weakening the comparison.
+
+      What stays for a human, and is now the whole of it: whether a GUI viewer *displays* the
+      caption legibly. Subjective, so it is a hand-check ledger entry in `docs/agents/TESTING.md`.
+- [x] ~~Confirm disk growth after a full 76-photo write-back is roughly one extra copy, once~~ →
+      **automated** as `WriteBackTest::testAWriteCostsOneExtraCopyOnDisk`, which asserts the causal
+      per-file fact — the sidecar is a byte-for-byte copy of the pristine file, and the pair costs
+      between 2× and `MAX_GROWTH_FACTOR` (2.2×) the original — rather than a measured album total
+      that would rot. Watched red against a mutant adding `-overwrite_original` to the exiftool
+      invocation. The one-off album figure (55 MB → 110 MB) is recorded as a dated measurement in
+      `docs/agents/TESTING.md`, not as an assertion.
+
+### Deviation from the plan
+
+1. **The concurrency test needed a start barrier before it could go red.** Twelve worker
+   *processes* each pay PHP startup and a database connect, which staggers them enough that the
+   contention never happens — the first version passed with no locking at all. The workers now
+   wait on a shared wall-clock start time (`write-back-worker.php`, argv 4). Two further findings:
+   the failure mode is probabilistic — a raw shell reproduction lost the file in **1 of 6** runs at
+   12-way contention, not the 5 of 6 the research recorded — and file *absence* is therefore a weak
+   signal. What the test asserts instead is that all twelve writers exit 0; without locking they
+   fail with `Temporary file already exists`, which is deterministic. Watched red on that
+   assertion, then green after `flock` was added.
+2. **The "`exec` unavailable" criterion is covered by two tests, not one.** `disable_functions`
+   cannot be toggled for a single request, so the probe's `function_exists('exec')` guard is
+   exercised by spawning `php -d disable_functions=exec` and asserting it answers `false` rather
+   than dying (with the enabled run asserted `true` as the anti-vacuity half). The web-service
+   half — typed error, no file touched — is driven by pointing
+   `$conf['provenance_exiftool_path']` at a directory with no binary in it, via a
+   `piwigo_config` row the test removes again.
+3. **The caption assertions are structural, not literal.** The labels come from `l10n()` inside
+   the request and this install runs in German, so an English literal would assert the locale.
+   `assertCarriesProvenance()` asserts what the composer actually guarantees: one part per
+   populated field, in field order, joined by `PROVENANCE_CAPTION_SEPARATOR`, each ending in its
+   value.
+4. **Integration tests never touch a collection scan.** `FixtureBuilder::createTestImage()` copies
+   a real PNG into `upload/provenance-test/`, registers it, and removes the row, the file and
+   exiftool's leftovers in teardown. This is the one phase where a defect destroys data, so the
+   suite owns its subject.
+5. **The three write-back constants live in `include/functions.inc.php`,** not in
+   `exiftool.inc.php` as the plan's file list implies. That file is the plugin's single constants
+   definition and the only one the unit suite can load without a shell.
+6. **The album screen gained the write-back button, which the plan's *Changes Required* did not
+   list** — its item 1 assumes one ("the write-back button is hidden"), and the mockup shows it.
+   Adding it meant the copy-down's chunk runner in `album_provenance.js` was extracted into one
+   `provenanceRunner()` that both operations configure, rather than a second copy of sixty lines.
+   The apply E2E specs are the regression net for that extraction and were re-run green.
+7. **A fourth E2E spec was added, which the plan's fixed list of five did not have.** The plan
+   assigns every spec to Phases 4 and 8 and asks for none here, which would have left the
+   write-back button — its method, its id list without `cat_id`, and its failure summary —
+   witnessed only through the runner the apply specs happen to share.
+   `writeback-provenance.spec.js` (4 specs) closes that, and the plan's E2E list above is
+   corrected rather than left saying "five".
+
+   It needed a fixture the suite did not have: the write-back writes **every** photo of the album
+   it is started from, so pointing a browser at a real album would put metadata into the
+   collection's own scans. `seed.php --scenario=writeback` therefore builds a throwaway album of
+   four copied photos (`FixtureBuilder::createTestAlbum()` / `attachImage()`), and `--restore`
+   deletes the album, the rows, the files and exiftool's sidecars outright rather than resetting
+   them. Each of the four specs was watched red against a mutant: a wrong method name in the
+   client, a summary that drops the failure count, and a `fail()` that no longer sets
+   `.provenance-error` (which killed both failure specs).
 
 **Implementation Note**: Pause for manual confirmation before proceeding. Do not begin Phase 7 until
 the concurrency test has been watched red with locking disabled and green with it enabled.
@@ -1174,7 +1246,7 @@ must cover a case that actually differs.
 **Happy path:**
 - [x] `AlbumSaveTest` — `setAlbumInfo` persists all four columns `[HAPPY]`
 - [x] `ApplyTest` — apply copies four values onto every photo in the album `[HAPPY]`
-- [ ] `WriteBackTest` — all five MWG slots and all five `XMP-pwgprov:*` tags read back `[HAPPY]`
+- [x] `WriteBackTest` — all five MWG slots and all five `XMP-pwgprov:*` tags read back `[HAPPY]`
 - [ ] `InheritTest` — a photo joining afterwards inherits `[HAPPY]`
 - [x] `HistoryTest` — a >255-byte value round-trips through `pwg.provenance.getHistory` `[HAPPY]`
 
@@ -1182,20 +1254,20 @@ must cover a case that actually differs.
 - [ ] guest → 401; bad token → 403; unknown id → 404; malformed date → 400, on every WS method `[NEG]`
 - [x] apply never writes `provenance_note` `[NEG]`
 - [x] apply modifies no image file (mtime + size unchanged) `[NEG]`
-- [ ] `exec` unavailable → typed error, no file touched `[NEG]`
-- [ ] a write failure leaves a history row and removes the operation directory `[NEG]`
+- [x] `exec` unavailable → typed error, no file touched `[NEG]`
+- [x] a write failure leaves a history row and removes the operation directory `[NEG]`
 - [ ] inheritance from an album with no provenance writes nothing and logs nothing `[NEG]`
 
 **Boundary / edge:**
-- [ ] text over 2000 bytes → full in XMP/EXIF, truncated in IPTC, truncation logged `[BVA]`
-- [ ] `Łódź Ω 日本 Müller` survives `clean_iptc_value()` `[ERR]`
+- [x] text over 2000 bytes → full in XMP/EXIF, truncated in IPTC, truncation logged `[BVA]`
+- [x] `Łódź Ω 日本 Müller` survives `clean_iptc_value()` `[ERR]`
 - [x] empty album fields clear the photo columns (NULL, not `''`) `[BVA]`
 - [ ] an album with zero photos — apply succeeds, writes nothing `[BVA]`
-- [ ] **concurrency**: N parallel writers on one file; the file exists and is readable afterwards.
+- [x] **concurrency**: N parallel writers on one file; the file exists and is readable afterwards.
       Written and watched **red with locking disabled** before locking is enabled — this is the one
       measured data-loss mode `[NEG]`
-- [ ] pixels unchanged after a write (IDAT sha256), with a byte lower-bound guard first `[ERR]`
-- [ ] `_original` unchanged after the second and third write `[ERR]`
+- [x] pixels unchanged after a write (IDAT sha256), with a byte lower-bound guard first `[ERR]`
+- [x] `_original` unchanged after the second and third write `[ERR]`
 
 **Deliberately failing (skipped) tests** — known gaps, visible in every run rather than buried in
 prose (`.claude/rules/test-design.md`):
@@ -1209,7 +1281,7 @@ Every locator lives in a page object; a locator in a spec is a bug. `retries: 0`
 tracing on, no bare sleeps — wait on locator and network state. Specs are drafted against the live
 app, not written from reading the templates.
 
-All five specs below belong to Phases 4 and 8. Phases 1-3 contribute none, and the
+The specs below belong to Phases 4, 6 and 8. Phases 1-3 contribute none, and the
 `tests/e2e/` directory itself is created by Phase 4 — nothing before it renders anything a
 browser can observe
 ([decision 0007](../decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md) for Phases 1-2,
@@ -1222,6 +1294,12 @@ browser can observe
       control, each on its own line `[DT]`
 - [x] `photo-provenance.spec.js` — application-level and network-level save failures each
       surface `[NEG]`
+- [x] `writeback-provenance.spec.js` — the write-back run completes, is chunked into more than one
+      request, and the files on disk really carry the metadata afterwards `[HAPPY]`
+- [x] `writeback-provenance.spec.js` — photos the server reports as failed are summarised in the
+      UI rather than swallowed by a run that looks clean `[DT]`
+- [x] `writeback-provenance.spec.js` — application-level and network-level failures each
+      surface `[NEG]`
 - [ ] `picture-provenance.spec.js` — the `#Provenance` row is visible in the rendered DOM `[HAPPY]`
 - [x] `apply-provenance.spec.js` — an application-level failure (HTTP 200 with `stat:"fail"`) surfaces
       an error in the UI `[NEG]`. Distinct from the next case, which hits a different client path
@@ -1231,7 +1309,9 @@ browser can observe
 
 Only what cannot be automated; each becomes a dated hand-check ledger entry in `TESTING.md`:
 
-1. Open a written file in an external viewer and confirm a normal photo tool shows the caption.
+1. ~~Open a written file in an external viewer and confirm a normal photo tool shows the caption.~~
+   Automated in Phase 6 via ImageMagick as an independent reader; only "does it *look* right in a
+   GUI viewer" survives as a ledger entry.
 2. Confirm the injected album block and the `#Provenance` row look right at a narrow viewport.
 3. Upload a photo through the real admin UI into a provenance-carrying album and confirm inheritance.
 4. Confirm the pre-commit gate blocks a staged `|| true` in a `plugins/provenance/tests/` file.

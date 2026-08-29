@@ -15,6 +15,7 @@
  *   php tests/e2e/support/seed.php --scenario=no-provenance
  *   php tests/e2e/support/seed.php --scenario=with-provenance --album=12
  *   php tests/e2e/support/seed.php --scenario=photo-provenance
+ *   php tests/e2e/support/seed.php --scenario=writeback
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -50,6 +51,16 @@ const SEEDED_VALUES = array(
  * whole reason the schema carries two note columns.
  */
 const SEEDED_PHOTO_NOTE = 'auf der Rückseite: Sommer 1972';
+
+/**
+ * How many photos the 'writeback' scenario puts in its own album.
+ *
+ * Four, because the client halves the album and caps the chunk: four photos are
+ * sent as two requests, which is what makes the chunking assertion mean
+ * something. More would only make the run slower - each photo is a real
+ * exiftool invocation.
+ */
+const WRITEBACK_PHOTO_COUNT = 4;
 
 function fail(string $message): never
 {
@@ -126,9 +137,19 @@ if (isset($args['restore']))
     // not in the recorded state at all - readAll() only remembers rows worth
     // putting back - so restore() alone would leave a seeded album and every
     // applied photo behind for good.
+    // An album this suite created holds nothing but copies, so it is deleted
+    // outright - files, image rows, links and the album - rather than reset.
+    $builder->importTestObjects($snapshot['test_objects'] ?? array());
+    $createdAlbums = !empty(($snapshot['test_objects'] ?? array())['albums']);
+    $builder->destroyTestImages();
+    $builder->destroyTestAlbums();
+
     $albumId = (int)$snapshot['album_id'];
-    $builder->albumProvenance($albumId, array());
-    $builder->clearImageProvenance($builder->photoIdsInAlbum($albumId));
+    if (!$createdAlbums)
+    {
+        $builder->albumProvenance($albumId, array());
+        $builder->clearImageProvenance($builder->photoIdsInAlbum($albumId));
+    }
 
     // History rows are append-only, so a spec that saved or applied leaves a
     // trail behind. Without this the E2E suite would quietly poison every later
@@ -145,15 +166,9 @@ if (isset($args['restore']))
 // ── Seed ──────────────────────────────────────────────────────────────────
 
 $scenario = $args['scenario'] ?? null;
-if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance'), true))
+if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback'), true))
 {
-    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance');
-}
-
-$catId = isset($args['album']) ? (int)$args['album'] : $builder->anyAlbumId();
-if ($catId <= 0)
-{
-    fail('--album must be a positive album id');
+    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback');
 }
 
 // Carry forward anything an earlier seed in this test already recorded, so a
@@ -162,10 +177,33 @@ $existing = load_snapshot();
 if ($existing !== null)
 {
     $builder->importState($existing['state']);
+    $builder->importTestObjects($existing['test_objects'] ?? array());
 }
 else
 {
     $builder->recordAllProvenance();
+}
+
+if ($scenario === 'writeback')
+{
+    // The write-back writes every photo of the album it is started from, so it
+    // is never pointed at an album holding real scans. This album holds copies
+    // and nothing else, and --restore deletes it whole.
+    $catId = $builder->createTestAlbum('provenance E2E write-back');
+
+    for ($i = 0; $i < WRITEBACK_PHOTO_COUNT; $i++)
+    {
+        $builder->attachImage($builder->createTestImage()['id'], $catId);
+    }
+}
+else
+{
+    $catId = isset($args['album']) ? (int)$args['album'] : $builder->anyAlbumId();
+}
+
+if ($catId <= 0)
+{
+    fail('--album must be a positive album id');
 }
 
 $wanted = $scenario === 'no-provenance' ? array() : SEEDED_VALUES;
@@ -175,6 +213,21 @@ $actual = $builder->albumProvenance($catId, $wanted);
 // on, so a spec can never apply over a photo that belongs to two albums.
 $photo_ids = $builder->photoIdsInAlbum($catId);
 $builder->clearImageProvenance($photo_ids);
+
+// 'writeback' puts every photo in the state the copy-down would leave it in, so
+// a spec of the write-back button is not also a test of the apply.
+if ($scenario === 'writeback')
+{
+    foreach ($photo_ids as $photo_id)
+    {
+        $copied = array('provenance_note' => SEEDED_PHOTO_NOTE);
+        foreach (provenance_copy_down_map() as $album_column => $image_column)
+        {
+            $copied[$image_column] = $actual[$album_column];
+        }
+        $builder->imageProvenance($photo_id, $copied);
+    }
+}
 
 // 'photo-provenance' puts one photo in the state the copy-down would leave it
 // in - the four album-sourced values plus a note of its own - without running
@@ -195,6 +248,7 @@ if ($scenario === 'photo-provenance')
 
 save_snapshot(array(
     'state' => $builder->exportState(),
+    'test_objects' => $builder->exportTestObjects(),
     'album_id' => $catId,
     // Carried forward, so a second seed in the same test does not move the mark
     // past rows the first one's spec already wrote.
@@ -208,5 +262,10 @@ echo json_encode(array(
     'photo_ids' => $photo_ids,
     'photo_count' => count($photo_ids),
     'photo' => $photo,
+    'photo_note' => $scenario === 'writeback' ? SEEDED_PHOTO_NOTE : null,
+    // Absolute paths, so a spec can read back what the browser's click really
+    // wrote into the files rather than trusting the page's own summary.
+    'photo_files' => array_column($builder->exportTestObjects()['images'], 'file'),
     'max_short_text_chars' => PROVENANCE_SHORT_TEXT_MAX_CHARS,
+    'writeback_max_chunk' => PROVENANCE_WRITEBACK_MAX_CHUNK,
     ), JSON_UNESCAPED_UNICODE), "\n";

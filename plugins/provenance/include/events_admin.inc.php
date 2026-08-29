@@ -68,6 +68,10 @@ SELECT image_id
       'PROVENANCE_PATH' => PROVENANCE_PATH,
       'PROVENANCE_SHORT_TEXT_MAX' => PROVENANCE_SHORT_TEXT_MAX_CHARS,
       'PROVENANCE_APPLY_MAX_CHUNK' => PROVENANCE_APPLY_MAX_CHUNK,
+      'PROVENANCE_WRITEBACK_MAX_CHUNK' => PROVENANCE_WRITEBACK_MAX_CHUNK,
+      // No exiftool means no write-back button: an action that can only fail is
+      // worse than an action the screen does not offer.
+      'PROVENANCE_EXIFTOOL' => provenance_exiftool_available(),
       'PROVENANCE_ALBUM' => array(
         'CAT_ID'         => $cat_id,
         'PHYSICAL_ALBUM' => (string)$values['provenance_physical_album'],

@@ -25,8 +25,17 @@ class FixtureBuilder
 
     private Db $db;
 
+    /** Where createTestImage() puts its copies, relative to the gallery root. */
+    private const TEST_IMAGE_DIR = 'upload/provenance-test/';
+
     /** table => (row id => (column => value)) recorded before this fixture wrote */
     private array $original = array();
+
+    /** photos this fixture created, to be removed again in teardown */
+    private array $testImages = array();
+
+    /** albums this fixture created, to be removed again in teardown */
+    private array $testAlbums = array();
 
     public function __construct(Db $db)
     {
@@ -237,6 +246,160 @@ class FixtureBuilder
             throw new RuntimeException("no album with id $catId");
         }
         return $row;
+    }
+
+    /**
+     * A photo of this suite's own, so the write-back never touches a real scan.
+     *
+     * The file is a copy of an existing photo - a real PNG with real pixels, so
+     * an exiftool write behaves as it does in production - placed under
+     * upload/provenance-test/ and registered as an image row. destroyTestImages()
+     * removes the row, the file, and anything exiftool left beside it.
+     *
+     * @return array id, db_path (as stored) and file (absolute)
+     */
+    public function createTestImage(): array
+    {
+        $source = (string)$this->db->scalar(
+            'SELECT path FROM piwigo_images WHERE path LIKE \'%.png\' ORDER BY id LIMIT 1'
+        );
+        $sourceFile = PIWIGO_ROOT . ltrim($source, './');
+        if (!is_file($sourceFile))
+        {
+            throw new RuntimeException("no source photo to copy: $sourceFile");
+        }
+
+        $dir = PIWIGO_ROOT . self::TEST_IMAGE_DIR;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+
+        $name = 'provenance-test-' . bin2hex(random_bytes(8)) . '.png';
+        if (!copy($sourceFile, $dir . $name))
+        {
+            throw new RuntimeException("cannot copy $sourceFile to $dir$name");
+        }
+
+        clearstatcache(true, $dir . $name);
+        $size = filesize($dir . $name);
+        if ($size < 1)
+        {
+            throw new RuntimeException('fixture image is empty; every write-back assertion would be vacuous');
+        }
+
+        $dbPath = './' . self::TEST_IMAGE_DIR . $name;
+        $this->db->query(
+            'INSERT INTO piwigo_images (file, path, date_available, filesize) VALUES (' .
+            "'" . $this->db->escape($name) . "', '" . $this->db->escape($dbPath) . "', NOW(), " . (int)ceil($size / 1024) . ')'
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException('fixture image row was not inserted');
+        }
+
+        $this->testImages[] = array('id' => $id, 'db_path' => $dbPath, 'file' => $dir . $name);
+
+        return end($this->testImages);
+    }
+
+    /**
+     * An album of this suite's own, holding nothing but fixture photos.
+     *
+     * The write-back operates on every photo of the album it is started from, so
+     * a browser-level test of that button must not be pointed at an album
+     * holding real scans. This is the album it is pointed at instead.
+     *
+     * @return int the new album's id
+     */
+    public function createTestAlbum(string $name): int
+    {
+        $this->db->query(
+            "INSERT INTO `piwigo_categories` (name, id_uppercat, uppercats, rank, global_rank, status, visible) " .
+            "VALUES ('" . $this->db->escape($name) . "', NULL, '', 1, '1', 'public', 'true')"
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException('fixture album row was not inserted');
+        }
+
+        // A top-level album's uppercats and global_rank are its own id; Piwigo
+        // computes them after the insert and so does this.
+        $this->db->query("UPDATE `piwigo_categories` SET uppercats = '$id', global_rank = '$id' WHERE id = $id");
+
+        $actual = (string)$this->db->scalar("SELECT uppercats FROM `piwigo_categories` WHERE id = $id");
+        if ($actual !== (string)$id)
+        {
+            throw new RuntimeException("fixture album $id did not take its uppercats: '$actual'");
+        }
+
+        $this->testAlbums[] = $id;
+
+        return $id;
+    }
+
+    /** Puts one photo in one album, asserting the link took effect. */
+    public function attachImage(int $imageId, int $catId): void
+    {
+        $this->db->query(
+            "INSERT INTO `piwigo_image_category` (image_id, category_id) VALUES ($imageId, $catId)"
+        );
+
+        $linked = (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM `piwigo_image_category` WHERE image_id = $imageId AND category_id = $catId"
+        );
+        if ($linked !== 1)
+        {
+            throw new RuntimeException("photo $imageId was not linked to album $catId");
+        }
+    }
+
+    /** Removes every album this fixture created. */
+    public function destroyTestAlbums(): void
+    {
+        foreach ($this->testAlbums as $id)
+        {
+            $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
+        }
+        $this->testAlbums = array();
+    }
+
+    /**
+     * What this fixture created, for a process that will not live long enough to
+     * remove it itself.
+     *
+     * The E2E suite seeds from one short-lived CLI process and cleans up from
+     * another, exactly as it does for the recorded provenance state.
+     */
+    public function exportTestObjects(): array
+    {
+        return array('images' => $this->testImages, 'albums' => $this->testAlbums);
+    }
+
+    public function importTestObjects(array $objects): void
+    {
+        $this->testImages = $objects['images'] ?? array();
+        $this->testAlbums = $objects['albums'] ?? array();
+    }
+
+    /** Removes every photo this fixture created, its file and exiftool's leftovers. */
+    public function destroyTestImages(): void
+    {
+        foreach ($this->testImages as $image)
+        {
+            $this->db->query('DELETE FROM piwigo_images WHERE id = ' . (int)$image['id']);
+            $this->db->query('DELETE FROM piwigo_image_category WHERE image_id = ' . (int)$image['id']);
+
+            foreach (glob($image['file'] . '*') as $leftover)
+            {
+                @unlink($leftover);
+            }
+            @unlink(provenance_lock_path($image['db_path']));
+        }
+        $this->testImages = array();
     }
 
     public function restore(): void

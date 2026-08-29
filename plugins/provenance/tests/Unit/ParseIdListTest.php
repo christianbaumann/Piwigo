@@ -78,4 +78,29 @@ final class ParseIdListTest extends TestCase
 
         $this->assertNull(provenance_parse_id_list(implode(',', $ids)));
     }
+
+    /**
+     * [BVA] The ceiling is a parameter, so a second caller with a smaller chunk
+     * gets its own limit rather than the apply one.
+     *
+     * The write-back sends far fewer ids per request than the copy-down - an
+     * exiftool invocation costs orders of magnitude more than an UPDATE - and a
+     * shared constant would silently give it the wrong ceiling.
+     */
+    public function testTheCeilingCanBeLoweredByTheCaller(): void
+    {
+        $ten = implode(',', range(1, 10));
+
+        $this->assertSame(range(1, 10), provenance_parse_id_list($ten, 10));
+        $this->assertNull(provenance_parse_id_list($ten, 9));
+    }
+
+    /** [ECP] Omitting the ceiling still means the apply ceiling. */
+    public function testTheDefaultCeilingIsTheApplyCeiling(): void
+    {
+        $atCeiling = implode(',', range(1, PROVENANCE_APPLY_MAX_CHUNK));
+
+        $this->assertCount(PROVENANCE_APPLY_MAX_CHUNK, provenance_parse_id_list($atCeiling));
+        $this->assertNull(provenance_parse_id_list($atCeiling . ',' . (PROVENANCE_APPLY_MAX_CHUNK + 1)));
+    }
 }

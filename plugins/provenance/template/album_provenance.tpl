@@ -11,6 +11,11 @@ const provenance_apply_max_chunk = {$PROVENANCE_APPLY_MAX_CHUNK};
 const provenance_str_applying = '{'Applying provenance to %d photos...'|@translate|escape:javascript}';
 const provenance_str_applied = '{'Provenance applied to %d photos'|@translate|escape:javascript}';
 const provenance_str_apply_error = '{'Provenance could not be applied'|@translate|escape:javascript}';
+const provenance_writeback_max_chunk = {$PROVENANCE_WRITEBACK_MAX_CHUNK};
+const provenance_str_writing = '{'Writing metadata into %d files...'|@translate|escape:javascript}';
+const provenance_str_written = '{'Metadata written into %d files'|@translate|escape:javascript}';
+const provenance_str_write_error = '{'Metadata could not be written'|@translate|escape:javascript}';
+const provenance_str_write_failed = '{'%d failed'|@translate|escape:javascript}';
 {/footer_script}
 
 <span class="buttonLike" id="provenance-open"><i class="icon-book"></i> {'Provenance'|@translate}</span>
@@ -20,6 +25,13 @@ const provenance_str_apply_error = '{'Provenance could not be applied'|@translat
   <span id="provenance-apply-bar"><span id="provenance-apply-bar-fill"></span></span>
   <span id="provenance-apply-message"></span>
 </span>
+{if $PROVENANCE_EXIFTOOL}
+<span class="buttonLike" id="provenance-write"><i class="icon-doc-text"></i> {'Write to %d files'|@translate|@sprintf:$PROVENANCE_ALBUM.PHOTO_COUNT}</span>
+<span id="provenance-write-progress">
+  <span id="provenance-write-bar"><span id="provenance-write-bar-fill"></span></span>
+  <span id="provenance-write-message"></span>
+</span>
+{/if}
 {/if}
 
 <div class="desc-modal" id="provenance-modal">
