@@ -1217,7 +1217,7 @@ fail against the absent row.
 
 ---
 
-## Phase 9: Move, dissociate and album-delete prompts
+## Phase 9: Move and dissociate prompts — APPROVED 2026-08-29 (item 3 descoped)
 
 ### Overview
 Decisions Q7 and Q8 answered "ask the user". That is a confirmation step to build, plus a documented
@@ -1238,7 +1238,7 @@ cited later rather than re-litigated.
 clear, or replace with the destination album's values. The choice travels as an explicit parameter,
 so the WS path and the UI path share one code path with different defaults.
 
-#### [ ] 3. Album-delete prompt
+#### [x] 3. Album-delete prompt — **descoped, not built**, see decision 0013
 **File**: `plugins/provenance/include/events_admin.inc.php`
 **Changes**: extend the **existing** `$photo_deletion_mode` prompt (`delete_categories()`,
 `admin/include/functions.php:53-151`) rather than inventing a second one. Cleanup hooks on
@@ -1253,26 +1253,44 @@ album's values are read **before** deletion if they are to be preserved.
       untouched `[ST]`
 - [x] Integration: move with `replace` — destination album's values present `[ST]`
 - [x] Integration: `pwg.images.setCategory` with no parameter defaults to `keep` `[DT]`
-- [ ] Integration: album deleted with `photo_deletion_mode='no_delete'` — surviving photos keep
+- [x] **Descoped, not verified** (decision 0013) — Integration: album deleted with `photo_deletion_mode='no_delete'` — surviving photos keep
       their inherited values `[ST]`
-- [ ] Integration: history rows record each of the above with the right `source`
+- [x] **Partially met** — the `move` source is covered by `InheritTest`; `album_delete` is written by no code path (decision 0013). Integration: history rows record each of the above with the right `source`
 - [x] `ddev exec php -l` on every changed file — 15 files, all clean, 2026-08-29
 
 #### Manual Verification:
-- [ ] The move prompt appears in the Batch Manager and its three choices behave as labelled
-- [ ] The delete prompt reads clearly alongside the existing photo-deletion choice
+- [x] **Not performed** — nobody confirmed this; automatable as an E2E spec, blocked on a seedable install (decision 0011). Carried in `docs/backlog.md`. The move prompt appears in the Batch Manager and its three choices behave as labelled
+- [x] **Descoped, not built** (decision 0013) — The delete prompt reads clearly alongside the existing photo-deletion choice
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 
-### Progress (2026-08-29) — phase NOT complete
+### Outcome (2026-08-29) — approved with item 3 descoped
 
-Items 1 and 2 are done and their tests ran green (`InheritTest`, 17 cases; `BatchManagerPageTest`,
-4 cases; `BatchTemplateAnchorTest`, 3 cases; `ResolveModeTest`, 11 cases). Item 3 is **not
-started**, and three success criteria therefore stay open: the album-delete `[ST]` case, the
-`source` coverage for `album_delete`, and both manual steps.
+Items 1 and 2 shipped and their tests ran green (`InheritTest`, 17 cases; `BatchManagerPageTest`,
+4 cases; `BatchTemplateAnchorTest`, 3 cases; `ResolveModeTest`, 11 cases), plus `php -l` over all
+15 PHP files the phase touched. The phase was approved by the user with item 3 descoped.
 
-Commits: `81f49176b`, `5c2f6a8a3`, `9aef092fe`, `757a12ca0`. Decision:
-[0012](../decisions/0012-move-defaults-to-keep-on-unattended-paths.md).
+Commits: `81f49176b`, `5c2f6a8a3`, `9aef092fe`, `757a12ca0`, `771796fd3`. Decisions:
+[0012](../decisions/0012-move-defaults-to-keep-on-unattended-paths.md),
+[0013](../decisions/0013-no-album-delete-prompt-in-v1.md).
+
+**Descoped, not done.** The four boxes below are ticked so the phase reads as closed, and each
+carries what actually happened. Nothing verified them, and nothing should read them as passed:
+
+- item 3, the album-delete prompt
+- Integration: album deleted with `photo_deletion_mode='no_delete'` `[ST]`
+- Integration: history rows record each of the above with the right `source` — the `move` source
+  is covered by `InheritTest`; `album_delete` is not, and nothing writes it
+- both manual steps
+
+The `album_delete` value stays in `provenance_history_sources()` and in the schema ENUM. No code
+path writes it today. Carried in `docs/backlog.md`.
+
+**Manual steps were not performed.** Neither was confirmed by anyone, and neither could be
+automated: the install lost its gallery on 2026-08-29 (decision 0011) and `FixtureBuilder`
+refuses to run without a throwaway-install marker, so no integration or E2E suite can execute.
+The Batch Manager step is automatable as an E2E spec once a seedable install exists — it is
+blocked, not un-automatable. Recorded in the hand-check ledger as blocked rather than as checked.
 
 **Deviation — the mode is a request parameter, not a move-only prompt.** Core fires one trigger
 for every virtual link and offers no way to tell a move from a plain association there
@@ -1282,21 +1300,14 @@ has. Same observable behaviour for every case this phase lists, and it needs no 
 cannot provide.
 
 **Deviation — dissociate is not covered.** `dissociate_images_from_category()`
-(`admin/include/functions.php:2115`) fires no trigger at all, so the phase's "dissociate" half
-would need a further core patch. Dissociation removes a link without asserting anything about
-origin, so the `keep` default is the right answer for it regardless; recorded in decision 0012
-rather than patched.
+(`admin/include/functions.php:2115`) fires no trigger at all. Dissociation removes a link without
+asserting anything about origin, so the `keep` default is the right answer for it regardless.
 
-**Item 3 needs a third fork-local core trigger.** There is no pre-delete event anywhere:
-`trigger_notify('delete_categories', $ids)` fires at `admin/include/functions.php:150`, after
-every row is gone, and neither `ws_categories_delete()` nor `admin/albums.php` fires anything.
-A `begin_delete_categories` trigger at the top of `delete_categories()` was agreed; the
-characterization net it needs is already committed (`81f49176b`).
-
-**Blocked.** The integration and E2E suites cannot run: the install lost its gallery on
-2026-08-29 (0 image rows, 1 album — see decision 0011) and `FixtureBuilder` now refuses to run
-without a throwaway-install marker. Both manual steps stay open for that reason, not for want of
-an oracle — the Batch Manager one is automatable as an E2E spec once a seedable install exists.
+**The third core trigger was agreed but never added.** `begin_delete_categories` was approved and
+is not needed while item 3 is descoped, so `admin/include/functions.php` is unpatched and this
+fork still carries exactly two fork-local triggers. The characterization net for
+`delete_categories()` was written first and is committed (`81f49176b`); it stands as coverage of
+core behaviour whether or not the trigger is ever added.
 
 ---
 ## Phase 10: Close-out — strength check and documentation
