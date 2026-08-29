@@ -37,6 +37,9 @@ class FixtureBuilder
     /** albums this fixture created, to be removed again in teardown */
     private array $testAlbums = array();
 
+    /** physical albums this fixture created: id => absolute directory */
+    private array $physicalAlbums = array();
+
     public function __construct(Db $db)
     {
         $this->db = $db;
@@ -354,6 +357,118 @@ class FixtureBuilder
         {
             throw new RuntimeException("photo $imageId was not linked to album $catId");
         }
+    }
+
+    /**
+     * A physical album: a real directory under galleries/ with a category row
+     * pointing at it, so the filesystem-sync path has something to discover.
+     *
+     * Scoped on purpose - the sync is driven with `cat` set to this album, so it
+     * never walks the rest of the gallery.
+     *
+     * @return array id and dir (the name under galleries/)
+     */
+    public function createPhysicalAlbum(string $dir): array
+    {
+        $path = PIWIGO_ROOT . 'galleries/' . $dir . '/';
+        if (!is_dir($path) && !mkdir($path, 0755, true) && !is_dir($path))
+        {
+            throw new RuntimeException("cannot create $path");
+        }
+
+        $siteId = (int)$this->db->scalar("SELECT id FROM `piwigo_sites` WHERE galleries_url = './galleries/'");
+        if ($siteId <= 0)
+        {
+            throw new RuntimeException('this install has no local site row to sync against');
+        }
+
+        $this->db->query(
+            "INSERT INTO `piwigo_categories` (name, dir, site_id, id_uppercat, uppercats, rank, global_rank, status, visible) " .
+            "VALUES ('" . $this->db->escape($dir) . "', '" . $this->db->escape($dir) . "', $siteId, NULL, '', 1, '1', 'public', 'true')"
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException('fixture physical album row was not inserted');
+        }
+        $this->db->query("UPDATE `piwigo_categories` SET uppercats = '$id', global_rank = '$id' WHERE id = $id");
+
+        $actual = (string)$this->db->scalar("SELECT dir FROM `piwigo_categories` WHERE id = $id");
+        if ($actual !== $dir)
+        {
+            throw new RuntimeException("fixture physical album $id did not take its dir: '$actual'");
+        }
+
+        $this->physicalAlbums[$id] = $path;
+
+        return array('id' => $id, 'dir' => $dir, 'path' => $path);
+    }
+
+    /**
+     * Puts a real photo file - never a stub - into a physical album, so the sync
+     * reads what it would read in production.
+     *
+     * @return string the file name inside the album
+     */
+    public function placePhotoInPhysicalAlbum(int $catId): string
+    {
+        if (!isset($this->physicalAlbums[$catId]))
+        {
+            throw new RuntimeException("album $catId is not a physical album this fixture created");
+        }
+
+        $source = (string)$this->db->scalar(
+            'SELECT path FROM piwigo_images WHERE path LIKE \'%.png\' ORDER BY id LIMIT 1'
+        );
+        $sourceFile = PIWIGO_ROOT . ltrim($source, './');
+        if (!is_file($sourceFile))
+        {
+            throw new RuntimeException("no source photo to copy: $sourceFile");
+        }
+
+        $name = 'provenance-sync-' . bin2hex(random_bytes(8)) . '.png';
+        if (!copy($sourceFile, $this->physicalAlbums[$catId] . $name))
+        {
+            throw new RuntimeException('cannot place a photo in ' . $this->physicalAlbums[$catId]);
+        }
+
+        clearstatcache(true, $this->physicalAlbums[$catId] . $name);
+        if (filesize($this->physicalAlbums[$catId] . $name) < 1)
+        {
+            throw new RuntimeException('placed photo is empty; every sync assertion below would be vacuous');
+        }
+
+        return $name;
+    }
+
+    /** Removes the physical albums, whatever the sync stored in them, and their files. */
+    public function destroyPhysicalAlbums(): void
+    {
+        foreach ($this->physicalAlbums as $id => $path)
+        {
+            $synced = array();
+            $result = $this->db->query('SELECT id FROM `piwigo_images` WHERE storage_category_id = ' . (int)$id);
+            while ($row = $result->fetch_assoc())
+            {
+                $synced[] = (int)$row['id'];
+            }
+            if (count($synced) > 0)
+            {
+                $list = implode(',', $synced);
+                $this->db->query("DELETE FROM `piwigo_image_category` WHERE image_id IN ($list)");
+                $this->db->query("DELETE FROM `piwigo_images` WHERE id IN ($list)");
+            }
+
+            $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
+
+            foreach (glob($path . '*') as $leftover)
+            {
+                @unlink($leftover);
+            }
+            @rmdir($path);
+        }
+        $this->physicalAlbums = array();
     }
 
     /** Removes every album this fixture created. */

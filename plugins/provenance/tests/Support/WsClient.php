@@ -24,7 +24,11 @@ class WsClient
             CURLOPT_URL => Config::baseUrl() . '/ws.php?format=json',
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => 1,
-            CURLOPT_POSTFIELDS => $params,
+            // Encoded here rather than handed to curl as an array: curl flattens
+            // a nested array to its last element, so image_id => array(4, 7)
+            // would silently post only 7 and every multi-photo call would test
+            // one photo.
+            CURLOPT_POSTFIELDS => http_build_query($params),
         );
         if ($useCookies)
         {
@@ -81,6 +85,25 @@ class WsClient
             $opts[CURLOPT_COOKIEFILE] = $this->cookieFile;
         }
         curl_setopt_array($ch, $opts);
+        $body = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return array('http_code' => $httpCode, 'body' => $body);
+    }
+
+    /** POST an admin page, reusing this client's session. */
+    public function postPage(string $path, array $params): array
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, array(
+            CURLOPT_URL => Config::baseUrl() . $path,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => http_build_query($params),
+            CURLOPT_COOKIEJAR => $this->cookieFile,
+            CURLOPT_COOKIEFILE => $this->cookieFile,
+        ));
         $body = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
