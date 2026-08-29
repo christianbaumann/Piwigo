@@ -1225,14 +1225,14 @@ default for the API paths that have no UI.
 
 ### Changes Required:
 
-#### [ ] 1. Documented default for unattended paths
+#### [x] 1. Documented default for unattended paths
 **File**: `plugins/provenance/include/events_inherit.inc.php`
 **Changes**: `pwg.images.setCategory` and `move_images_to_categories()` have no UI to prompt in. The
 default when unattended is **keep the existing values** — a move never silently rewrites provenance;
 the new album's values arrive only when an admin runs apply. Recorded as a decision file so it is
 cited later rather than re-litigated.
 
-#### [ ] 2. Move / dissociate prompt
+#### [x] 2. Move prompt (dissociate: not reachable, see below)
 **File**: `plugins/provenance/template/album_provenance.js` and the Batch Manager panel
 **Changes**: when a moved photo carries provenance from its old album, the admin is asked: keep,
 clear, or replace with the destination album's values. The choice travels as an explicit parameter,
@@ -1248,15 +1248,15 @@ album's values are read **before** deletion if they are to be preserved.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Integration: move with `keep` — values unchanged `[ST]`
-- [ ] Integration: move with `clear` — the four album-sourced columns are NULL, `provenance_note`
+- [x] Integration: move with `keep` — values unchanged `[ST]` — `testAnUnattendedMoveKeepsTheProvenanceThePhotoAlreadyHas`, `testAnExplicitKeepBehavesLikeNoParameterAtAll`
+- [x] Integration: move with `clear` — the four album-sourced columns are NULL, `provenance_note`
       untouched `[ST]`
-- [ ] Integration: move with `replace` — destination album's values present `[ST]`
-- [ ] Integration: `pwg.images.setCategory` with no parameter defaults to `keep` `[DT]`
+- [x] Integration: move with `replace` — destination album's values present `[ST]`
+- [x] Integration: `pwg.images.setCategory` with no parameter defaults to `keep` `[DT]`
 - [ ] Integration: album deleted with `photo_deletion_mode='no_delete'` — surviving photos keep
       their inherited values `[ST]`
 - [ ] Integration: history rows record each of the above with the right `source`
-- [ ] `ddev exec php -l` on every changed file
+- [x] `ddev exec php -l` on every changed file — 15 files, all clean, 2026-08-29
 
 #### Manual Verification:
 - [ ] The move prompt appears in the Batch Manager and its three choices behave as labelled
@@ -1264,8 +1264,41 @@ album's values are read **before** deletion if they are to be preserved.
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 
----
+### Progress (2026-08-29) — phase NOT complete
 
+Items 1 and 2 are done and their tests ran green (`InheritTest`, 17 cases; `BatchManagerPageTest`,
+4 cases; `BatchTemplateAnchorTest`, 3 cases; `ResolveModeTest`, 11 cases). Item 3 is **not
+started**, and three success criteria therefore stay open: the album-delete `[ST]` case, the
+`source` coverage for `album_delete`, and both manual steps.
+
+Commits: `81f49176b`, `5c2f6a8a3`, `9aef092fe`, `757a12ca0`. Decision:
+[0012](../decisions/0012-move-defaults-to-keep-on-unattended-paths.md).
+
+**Deviation — the mode is a request parameter, not a move-only prompt.** Core fires one trigger
+for every virtual link and offers no way to tell a move from a plain association there
+(`move_images_to_categories()` delegates to `associate_images_to_categories()`), so the rule is
+stated in terms of the photo instead: an association never overwrites provenance a photo already
+has. Same observable behaviour for every case this phase lists, and it needs no distinction core
+cannot provide.
+
+**Deviation — dissociate is not covered.** `dissociate_images_from_category()`
+(`admin/include/functions.php:2115`) fires no trigger at all, so the phase's "dissociate" half
+would need a further core patch. Dissociation removes a link without asserting anything about
+origin, so the `keep` default is the right answer for it regardless; recorded in decision 0012
+rather than patched.
+
+**Item 3 needs a third fork-local core trigger.** There is no pre-delete event anywhere:
+`trigger_notify('delete_categories', $ids)` fires at `admin/include/functions.php:150`, after
+every row is gone, and neither `ws_categories_delete()` nor `admin/albums.php` fires anything.
+A `begin_delete_categories` trigger at the top of `delete_categories()` was agreed; the
+characterization net it needs is already committed (`81f49176b`).
+
+**Blocked.** The integration and E2E suites cannot run: the install lost its gallery on
+2026-08-29 (0 image rows, 1 album — see decision 0011) and `FixtureBuilder` now refuses to run
+without a throwaway-install marker. Both manual steps stay open for that reason, not for want of
+an oracle — the Batch Manager one is automatable as an E2E spec once a seedable install exists.
+
+---
 ## Phase 10: Close-out — strength check and documentation
 
 ### Overview
