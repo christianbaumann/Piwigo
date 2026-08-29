@@ -106,6 +106,7 @@ So a later reader can tell a considered omission from an oversight.
 | Scoping of the `nb_available_tags` invalidation | Over-invalidation is safe; see [decision 0004](decisions/0004-unscoped-tag-cache-invalidation-accepted.md) | A performance characteristic, not a correctness one — nothing to assert |
 | Per-image visibility on `addTag` | "All logged-in users" is the recorded permission model; see [decision 0005](decisions/0005-tag-assignment-permission-model.md) | Would assert a requirement that does not exist |
 | `post_only` on the two image methods | Deliberately absent; see [decision 0003](decisions/0003-no-post-only-on-ws-methods.md) | Characterized instead, by `AddTagTest::testMethodAlsoAnswersToGet` `[ERR]` |
+| E2E specs for `plugins/provenance` Phases 1-2 | Neither phase renders anything a browser can observe; see [decision 0007](decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md) | Schema sits at the integration layer, the composition functions at the unit layer; an E2E spec would restate one of them |
 
 ## Mutant table — unit suite
 

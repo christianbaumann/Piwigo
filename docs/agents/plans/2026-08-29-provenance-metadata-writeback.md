@@ -288,14 +288,19 @@ private function add_column($table, $column, $definition)
 
 #### [x] 4. Test harness
 **Files**: `plugins/provenance/composer.json`, `phpunit.xml`, `package.json`,
-`playwright.config.js`, `tests/bootstrap.php`, `tests/Support/{Config,Db,FixtureBuilder}.php`,
-`tests/e2e/support/`
+`playwright.config.js`, `tests/bootstrap.php`, `tests/Support/{Config,Db,FixtureBuilder}.php`
 **Changes**: mirror `plugins/typetags/` — `failOnWarning="true" failOnRisky="true"`,
 `unit`/`integration` testsuites, `retries: 0`, `workers: 1`, `testDir: './tests/e2e'`, tracing on.
 Credentials from `PROVENANCE_TEST_USERNAME` / `PROVENANCE_TEST_PASSWORD`, failing fast by name;
 everything else defaults to DDEV values. `Db` and `Config` are copied rather than shared —
 `plugins/typetags` is a git submodule tracking upstream and must not become a dependency of core
 plugin code.
+
+`tests/e2e/` is **not** created here. `playwright.config.js` is the runner declaration only;
+`auth.setup.js`, `tests/e2e/support/` and the first spec land in Phase 4, the first phase with
+browser-observable behaviour, so until then `npx playwright test` correctly exits 1 with
+`No tests found`. Recorded as
+[decision 0007](../decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md).
 
 #### [x] 5. Dev environment: exiftool that survives a restart
 **File**: `.ddev/config.yaml`
@@ -1054,6 +1059,11 @@ prose (`.claude/rules/test-design.md`):
 Every locator lives in a page object; a locator in a spec is a bug. `retries: 0`, `workers: 1`,
 tracing on, no bare sleeps — wait on locator and network state. Specs are drafted against the live
 app, not written from reading the templates.
+
+All five specs below belong to Phases 4 and 8. Phases 1-3 contribute none, and the
+`tests/e2e/` directory itself is created by Phase 4 — nothing before it renders anything a
+browser can observe
+([decision 0007](../decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md)).
 
 - [ ] `album-provenance.spec.js` — open the modal, fill four fields, save, reload, values persist `[HAPPY]`
 - [ ] `album-provenance.spec.js` — apply to photos, progress completes, a photo page shows the values `[HAPPY]`
