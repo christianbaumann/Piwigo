@@ -931,7 +931,7 @@ as it is today.
 
 ### Changes Required:
 
-#### [ ] 1. Characterize the two functions as they behave now — lands and passes first, committed separately
+#### [x] 1. Characterize the two functions as they behave now — lands and passes first, committed separately
 **Files**: `plugins/provenance/tests/Integration/CoreAssociationCharacterizationTest.php`
 **Changes**: cover `associate_images_to_categories()` and the `admin/site_update.php` link insert
 **before** either is touched: existing pairs skipped and keeping their rank, new pairs getting
@@ -940,7 +940,7 @@ producing a non-NULL `storage_category_id`. Tagged `[ERR]` with the oracle decla
 the implementation, not a requirement. Each is watched go red by breaking the behaviour it claims to
 watch, since none of them can fail on first run.
 
-#### [ ] 2. Core patch 1 — the virtual-link funnel
+#### [x] 2. Core patch 1 — the virtual-link funnel
 **File**: `admin/include/functions.php` (in `associate_images_to_categories()`, after the
 `mass_inserts()` at `:2094-2098`, alongside the existing `update_category($categories)`)
 
@@ -952,7 +952,7 @@ trigger_notify('associate_images_to_categories',
 Fires after the rows are committed, so a handler sees real data. Piwigo's own style: `and`/`or`,
 long array syntax, two-space indent, Allman braces.
 
-#### [ ] 3. Core patch 2 — filesystem sync
+#### [x] 3. Core patch 2 — filesystem sync
 **File**: `admin/site_update.php`, immediately after the second `mass_inserts()` (the `$insert_links`
 one, `:676-681`) and before `pwg_activity('photo', $caddiables, 'add', …)` at `:683`
 
@@ -963,7 +963,7 @@ trigger_notify('site_update_associate_images', $insert_links);
 Fires **after** the bulk insert with the full id set — not inside the scan loop, where the rows do
 not exist yet. This introduces the first trigger into that file.
 
-#### [ ] 4. Inheritance handler
+#### [-] 4. Inheritance handler
 **File**: `plugins/provenance/include/events_inherit.inc.php`
 **Changes**: for each `(image, category)` pair, copy the four album-sourced values onto the image and
 record `source='inherit'` history rows. Skips albums with no provenance set. `provenance_note` is

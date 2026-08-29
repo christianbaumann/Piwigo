@@ -44,6 +44,14 @@ if (!isset($conf['provenance_exiftool_path']))
 
 add_event_handler('ws_add_methods', 'provenance_add_methods');
 
+// The two fork-local core triggers. Registered outside the IN_ADMIN block: the
+// virtual-link funnel is reached from ws.php as well as from the admin screens,
+// and the file is pulled in only when one of them actually fires.
+add_event_handler('associate_images_to_categories', 'provenance_inherit_associated',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_inherit.inc.php');
+add_event_handler('site_update_associate_images', 'provenance_inherit_site_update',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_inherit.inc.php');
+
 if (defined('IN_ADMIN'))
 {
   include_once(PROVENANCE_PATH . 'include/events_admin.inc.php');

@@ -680,6 +680,8 @@ SELECT *
         $insert_links
         );
 
+      trigger_notify('site_update_associate_images', $insert_links);
+
       pwg_activity('photo', $caddiables, 'add', array('sync'=>true));
 
       // add new photos to caddie

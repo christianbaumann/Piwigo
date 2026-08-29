@@ -2100,6 +2100,9 @@ SELECT
       );
 
     update_category($categories);
+
+    trigger_notify('associate_images_to_categories',
+      array('image_ids' => $images, 'category_ids' => $categories));
   }
 }
 

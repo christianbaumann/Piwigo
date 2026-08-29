@@ -9,6 +9,9 @@ Piwigo — open-source photo gallery web application. Procedural PHP, Smarty tem
 - Version: `PHPWG_VERSION` in `include/constants.php` (currently `17.0.0beta1`)
 - Upstream supports PHP 7.4+; this checkout runs PHP 8.4 locally
 - This is a fork of Piwigo. It vendors the Colored Tags plugin (`plugins/typetags`) as a git submodule pointing at `github.com/christianbaumann/Piwigo-Colored-Tags`, and carries a fork-local plugin `plugins/provenance` as a plain tracked directory
+- Two fork-local `trigger_notify()` calls have been added to core so the provenance plugin can hook the paths that create album links. Upstream has neither:
+  - `associate_images_to_categories` in `admin/include/functions.php`, inside the `if (count($inserts))` block — the funnel every virtual link goes through (API, Batch Manager, upload). Payload: `image_ids`, `category_ids`
+  - `site_update_associate_images` in `admin/site_update.php`, after the `$insert_links` `mass_inserts()` — the filesystem sync inserts its storage links directly without calling the helper. Payload: the `$insert_links` rows. This is the **only** trigger in that file; anything claiming it fires none is out of date
 
 ### Git remotes
 
