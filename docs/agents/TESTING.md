@@ -54,21 +54,35 @@ cleanup having run, because cleanup is skipped on failure so it cannot erase the
 
 `.githooks/pre-commit` gates on the unit suite only — the one suite that runs without the
 stack up. Design and installation are in CLAUDE.md; the rule it follows is
-`.claude/rules/precommit-hooks.md`. What belongs here is the record that it was watched
-working, **measured 2026-08-29**:
+`.claude/rules/precommit-hooks.md`. What belongs here is the record of what was watched, and
+which of it is now watched on every run instead of once.
 
-| Watched | How | Result |
+`tools/test-hooks.sh` is the standing check — **10 cases, measured 2026-08-29**: three
+probe preconditions, three direct-invocation cases, two installation checks, and two real
+`git commit` cases. A clean hook run takes 1.0s wall clock (measured 2026-08-29, of which
+the unit suite is 0.098s and the rest is `ddev exec` overhead). That figure is a dated
+measurement, not an assertion — nothing in the suite gates on it.
+
+| Watched | How | Now automated as |
 |---|---|---|
-| Blocks a real commit on a syntax error | `git commit` in `plugins/typetags` with a broken `.php` staged | rejected; commit not created |
-| Blocks a newly added `\|\| true` in a test file | same, `tests/HookRatchetProbe.php` | rejected, naming the offending added line |
-| Grandfathers a pre-existing one | committed the probe with `--no-verify`, then staged an unrelated edit to the same file | accepted — the vacuous line was not in the added lines |
-| `--no-verify` bypasses | as above | accepted |
-| Degrades rather than blocking when DDEV is down | stub `ddev` on `PATH` returning non-zero | `WARNING: DDEV is not running - unit suite skipped`, exit 0 |
-| The self-test has teeth | neutered the hook's vacuity grep | `tools/test-hooks.sh` went red on exactly that case, the other two stayed green |
-| The "probe changed nothing" guard has teeth | made `probe_vacuous.php` a copy of the clean baseline | reported red loudly instead of passing over nothing |
+| Blocks a real commit on a syntax error | `git commit` in `plugins/typetags` with a broken `.php` staged; rejected, commit not created | `git rejects a real commit` — a throwaway repo wired via `core.hooksPath`, asserting the commit count did not move |
+| Lets a clean commit through on the real path | — | `git accepts a clean commit`, asserting the count moved by exactly one |
+| Both repos are actually wired to `.githooks` | `git config --get core.hooksPath` read by hand in each | `superproject` / `plugins/typetags core.hooksPath resolves to .githooks` |
+| Blocks a newly added `\|\| true` in a test file | real `git commit` of `tests/HookRatchetProbe.php`; rejected, naming the offending added line | `vacuous assertion blocks` (direct invocation) |
+| Grandfathers a pre-existing one | committed the probe with `--no-verify`, then committed an unrelated edit to the *same file* cleanly | not automated — it needs two commits and a file already carrying the pattern in `HEAD`; the ratchet's mechanism (`git diff --cached -U0`, added lines only) is one line of the hook |
+| `--no-verify` bypasses | used to create the grandfathering fixture above | not automated — it is git's behaviour, not the hook's |
+| Degrades rather than blocking when DDEV is down | stub `ddev` on `PATH` returning non-zero: `WARNING: DDEV is not running - unit suite skipped`, exit 0 | not automated — it needs `PATH` manipulation around the runner the self-test itself depends on |
 
-The probe repository state was restored after each: `plugins/typetags` reset to
-`3eeee007d`, working tree clean.
+Proven able to fail, each killing exactly its own case:
+
+| Mutant | Killed | Nothing else moved |
+|---|---|---|
+| hook's vacuity grep neutered to `hits=""` | `vacuous assertion blocks` | yes |
+| `probe_vacuous.php` written as a byte-copy of the clean baseline | the "probe changed nothing" guard, plus the case it protects | yes |
+| `git -C plugins/typetags config --unset core.hooksPath` | `plugins/typetags core.hooksPath resolves to .githooks` | yes — the real-commit cases wire their own repo, so they stayed green |
+
+The hook was restored byte-identical after each mutant, `plugins/typetags` reset to
+`3eeee007d`, and the installer re-run.
 
 ### Clear the compiled template after editing a prefilter
 
@@ -147,6 +161,7 @@ than accumulating. Nothing is marked done on prose alone.
 |---|---|---|
 | 2026-08-28 | Picture page renders identically after the Phase 1 partition extraction (headed browser, logged in, `picture.php?/1/category/1`: "Personen ×" assigned badge, 7 correctly-coloured unassigned badges, 0 console errors). Confirmed by the user. | Not replaceable as-is — a before/after comparison whose "before" no longer exists. Ongoing rendering is covered by `MalformedColorRenderingTest` and `rendering.spec.js`. |
 | 2026-08-28 | A server-side rejection (HTTP 200 + `stat:"fail"`) leaves the badge clickable and logs a warning. Mocked via `route.fulfill()` in a headed browser; red before the fix, green after. | **Replaced 2026-08-29** by `edge-cases.spec.js` → `a server rejection leaves the badge clickable`, itself watched failing against the reverted fix |
+| 2026-08-29 | The pre-commit gate watched failing at the terminal before being trusted: two real `git commit` invocations in `plugins/typetags` (a PHP syntax error, then a newly added `\|\| true` in `tests/`), both rejected, neither creating a commit. Submodule reset to `3eeee007d` afterwards. | **Replaced 2026-08-29** by `tools/test-hooks.sh` → `git rejects a real commit` / `git accepts a clean commit`, which make real commits in a throwaway repo and assert the commit count. Three items from that session stay unautomated for stated reasons — see the commit-gate table above. |
 | 2026-08-29 | Modus rendering compared against the 2026-04-27 reference screenshots. Structure and palette match; the only difference is the older capture's dark colour scheme. | **Replaced 2026-08-29** by `rendering.spec.js` (4 specs), which assert computed colour and geometry on every run. Not kept as a screenshot baseline — pixel-diffing a photo gallery is flaky for reasons unrelated to this feature. |
 
 ### Open — no oracle, so no test

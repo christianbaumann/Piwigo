@@ -956,7 +956,7 @@ The second probe is the ratchet that matters most here: the defect this whole pl
 ### Success Criteria:
 
 #### Automated Verification:
-- [x] `bash tools/test-hooks.sh` passes all three cases (two red, one green) — plus three precondition checks
+- [x] `bash tools/test-hooks.sh` passes all three cases (two red, one green) — **10 cases after `/verify`**: three probe preconditions, the three direct-invocation cases, two installation checks, two real-`git commit` cases
 - [x] `git -C plugins/typetags config --get core.hooksPath` is set — `/Users/christian.baumann/git_repos/_own/piwigo/.githooks` (absolute; the superproject's is the relative `.githooks`)
 - [x] A commit in the submodule with a PHP syntax error is rejected — real `git commit`, rejected naming the file; submodule HEAD unmoved
 - [x] A staged new `|| true` inside a test file is rejected; an existing one elsewhere is not — the probe was committed with `--no-verify`, then an unrelated edit to the *same file* committed cleanly, which is the stricter form of the criterion
@@ -966,6 +966,36 @@ The second probe is the ratchet that matters most here: the defect this whole pl
 
 #### Manual Verification:
 - [x] The hook was watched failing once by hand before being trusted — two real `git commit` invocations in `plugins/typetags` (syntax error, then a new `|| true`), both rejected at the terminal, neither creating a commit. Recorded in [TESTING.md](../TESTING.md#the-commit-gate-and-what-it-was-watched-doing)
+
+#### Automated during `/verify` (2026-08-29):
+
+The manual box had an automatable core the three original self-test cases could not reach:
+they invoke `"$HOOK"` **directly**, so all three stay green in a repository where git has
+never been told the hook exists. What was watched by hand was the other thing — that a real
+`git commit` is refused — and that is what got automated.
+
+- [x] `superproject` / `plugins/typetags core.hooksPath resolves to .githooks` — resolves the
+  configured value (relative against the repo's top level, absolute as given) and compares it
+  to `.githooks`. This is the fresh-clone failure mode: nobody ran the installer, and the gate
+  silently does nothing.
+- [x] `git rejects a real commit` / `git accepts a clean commit` — a throwaway repo under
+  `mktemp -d`, wired via `core.hooksPath`, seeded with one `--no-verify` commit so the hook has
+  a `HEAD` to diff against. Asserts the exit code **and** that `rev-list --count HEAD` moved by
+  exactly one on the clean case and not at all on the rejected one. The count assertion is the
+  point: an exit code alone does not witness that the commit was withheld.
+- [x] **Proven able to fail** — `git -C plugins/typetags config --unset core.hooksPath` turned
+  `plugins/typetags core.hooksPath resolves to .githooks` red and **nothing else moved**; the
+  two real-commit cases wire their own repository, so they stayed green. Installer re-run.
+- [x] Hook wall clock on a clean run: **1.0s, measured 2026-08-29** (unit suite 0.098s, the
+  rest `ddev exec` overhead). A dated measurement, not an assertion — nothing gates on it, per
+  *assert the causal fact, not a wall-clock figure*.
+
+**Deliberately not automated**, each for a stated reason rather than dropped from the list
+(the reasons are in [TESTING.md](../TESTING.md#the-commit-gate-and-what-it-was-watched-doing)):
+grandfathering a pre-existing `|| true` (needs two commits and a file already carrying the
+pattern in `HEAD`, to exercise one line of the hook); `--no-verify` (git's behaviour, not the
+hook's); and the DDEV-down degradation (needs `PATH` manipulation around the very runner the
+self-test depends on). All three were watched by hand and are in the ledger.
 
 **Implementation Note**: Run `/verify`. Then Phase 7.
 
