@@ -24,6 +24,14 @@ final class InheritTest extends TestCase
         'provenance_note' => "geliehen im März\nzwei Bände",
         );
 
+    /** The destination album of every move case, so replace has something to take. */
+    private const SECOND_ALBUM = array(
+        'provenance_physical_album' => 'Tante Idas Kasten',
+        'provenance_owner' => 'Ida Schmitz',
+        'provenance_scanned_on' => '2026-05-02',
+        'provenance_note' => 'Schuhkarton, unsortiert',
+        );
+
     /** The photo's own note, which no inheritance may overwrite. */
     private const PHOTO_NOTE = 'Rückseite: Ostern 1968';
 
@@ -122,34 +130,144 @@ final class InheritTest extends TestCase
         $this->assertSame(array(), $this->newHistoryFields($image, 'inherit'));
     }
 
-    /** [ST] A photo moved to a second provenance-carrying album takes the new values. */
-    public function testMovingToAnotherAlbumReplacesTheInheritedValues(): void
+    /**
+     * [ST] [DT] An unattended move leaves the provenance the photo already has.
+     *
+     * Replaces testMovingToAnotherAlbumReplacesTheInheritedValues, which
+     * recorded the Phase 7 behaviour. Phase 9 deliberately reverses it: a move
+     * carries no statement about where a scan came from, so it must not rewrite
+     * one. The destination album's values arrive when an administrator asks for
+     * them - through apply, or through the move prompt's replace.
+     */
+    public function testAnUnattendedMoveKeepsTheProvenanceThePhotoAlreadyHas(): void
     {
-        $first = $this->fixture->createTestAlbum('provenance-inherit-first');
-        $this->fixture->albumProvenance($first, self::ALBUM);
-        $second = $this->fixture->createTestAlbum('provenance-inherit-second');
-        $this->fixture->albumProvenance($second, array(
-            'provenance_physical_album' => 'Tante Idas Kasten',
-            'provenance_owner' => 'Ida Schmitz',
-            'provenance_scanned_on' => '2026-05-02',
-            'provenance_note' => 'Schuhkarton, unsortiert',
-            ));
-        $image = $this->fixture->createTestImage()['id'];
-
-        $this->associate(array($image), $first);
-        $this->assertSame(
-            self::ALBUM['provenance_owner'],
-            $this->fixture->readImageProvenance($image)['provenance_owner'],
-            'anti-vacuity: the first inheritance must have landed before the move is meaningful'
-        );
-
-        $this->setCategory(array($image), $second, 'move');
+        list($image, $second) = $this->photoMovedFromOneAlbumToAnother(null);
 
         $actual = $this->fixture->readImageProvenance($image);
-        $this->assertSame('Tante Idas Kasten', $actual['provenance_physical_album']);
+        $this->assertSame(self::ALBUM['provenance_physical_album'], $actual['provenance_physical_album']);
+        $this->assertSame(self::ALBUM['provenance_owner'], $actual['provenance_owner']);
+        $this->assertSame(self::ALBUM['provenance_scanned_on'], $actual['provenance_scanned_on']);
+        $this->assertSame(self::ALBUM['provenance_note'], $actual['provenance_album_note']);
+        $this->assertSame(array(), $this->newHistoryFields($image, PROVENANCE_HISTORY_SOURCE_MOVE));
+    }
+
+    /** [ST] An explicit keep does the same thing as sending nothing. */
+    public function testAnExplicitKeepBehavesLikeNoParameterAtAll(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother(PROVENANCE_MODE_KEEP);
+
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readImageProvenance($image)['provenance_owner']
+        );
+    }
+
+    /** [ST] Replace takes the destination album's values. */
+    public function testAMoveWithReplaceTakesTheDestinationAlbumsValues(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother(PROVENANCE_MODE_REPLACE);
+
+        $actual = $this->fixture->readImageProvenance($image);
+        $this->assertSame(self::SECOND_ALBUM['provenance_physical_album'], $actual['provenance_physical_album']);
+        $this->assertSame(self::SECOND_ALBUM['provenance_owner'], $actual['provenance_owner']);
+        $this->assertSame(self::SECOND_ALBUM['provenance_scanned_on'], $actual['provenance_scanned_on']);
+        $this->assertSame(self::SECOND_ALBUM['provenance_note'], $actual['provenance_album_note']);
+    }
+
+    /** [ST] Clear empties the four album-sourced columns. */
+    public function testAMoveWithClearEmptiesTheFourAlbumSourcedColumns(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother(PROVENANCE_MODE_CLEAR);
+
+        $actual = $this->fixture->readImageProvenance($image);
+        foreach (provenance_copy_down_map() as $column)
+        {
+            $this->assertNull($actual[$column], "$column must have been cleared");
+        }
+    }
+
+    /** [NEG] Clear never reaches the photo's own note. */
+    public function testAMoveWithClearLeavesThePhotosOwnNote(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother(PROVENANCE_MODE_CLEAR, self::PHOTO_NOTE);
+
+        $this->assertSame(
+            self::PHOTO_NOTE,
+            $this->fixture->readImageProvenance($image)['provenance_note']
+        );
+    }
+
+    /** [DT] Clear is attributed to the move path, not to inheritance. */
+    public function testAMoveWithClearIsRecordedAgainstTheMoveSource(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother(PROVENANCE_MODE_CLEAR);
+
+        $this->assertSame(
+            array('provenance_album_note', 'provenance_owner', 'provenance_physical_album', 'provenance_scanned_on'),
+            $this->newHistoryFields($image, PROVENANCE_HISTORY_SOURCE_MOVE)
+        );
+    }
+
+    /** [DT] Replace is attributed to the move path too. */
+    public function testAMoveWithReplaceIsRecordedAgainstTheMoveSource(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother(PROVENANCE_MODE_REPLACE);
+
+        $this->assertSame(
+            array('provenance_album_note', 'provenance_owner', 'provenance_physical_album', 'provenance_scanned_on'),
+            $this->newHistoryFields($image, PROVENANCE_HISTORY_SOURCE_MOVE)
+        );
+    }
+
+    /**
+     * [DT] Keep still fills a photo that carries no provenance at all.
+     *
+     * Keep is about not overwriting, not about not writing: a photo joining its
+     * first provenance-carrying album has nothing to protect.
+     */
+    public function testKeepStillFillsAPhotoThatCarriesNoProvenance(): void
+    {
+        $album = $this->fixture->createTestAlbum('provenance-inherit-keep-empty');
+        $this->fixture->albumProvenance($album, self::ALBUM);
+        $image = $this->fixture->createTestImage()['id'];
+
+        $this->setCategory(array($image), $album, 'move', PROVENANCE_MODE_KEEP);
+
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readImageProvenance($image)['provenance_owner']
+        );
+    }
+
+    /**
+     * [NEG] A photo carrying only one of the four is still carrying provenance.
+     *
+     * Keep leaves it whole rather than filling the gaps from a different album:
+     * a half-and-half record would say a scan came from two places at once.
+     */
+    public function testKeepDoesNotFillTheGapsOfAPartiallyFilledPhoto(): void
+    {
+        $album = $this->fixture->createTestAlbum('provenance-inherit-keep-partial');
+        $this->fixture->albumProvenance($album, self::ALBUM);
+        $image = $this->fixture->createTestImage()['id'];
+        $this->fixture->imageProvenance($image, array('provenance_owner' => 'Ida Schmitz'));
+
+        $this->setCategory(array($image), $album, 'move', PROVENANCE_MODE_KEEP);
+
+        $actual = $this->fixture->readImageProvenance($image);
         $this->assertSame('Ida Schmitz', $actual['provenance_owner']);
-        $this->assertSame('2026-05-02', $actual['provenance_scanned_on']);
-        $this->assertSame('Schuhkarton, unsortiert', $actual['provenance_album_note']);
+        $this->assertNull($actual['provenance_physical_album'], 'the gap must not be filled from another album');
+    }
+
+    /** [NEG] A value the resolver cannot use falls back to keep, never to clear. */
+    public function testAnUnknownModeFallsBackToKeep(): void
+    {
+        list($image) = $this->photoMovedFromOneAlbumToAnother('incinerate');
+
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readImageProvenance($image)['provenance_owner']
+        );
     }
 
     /** [HAPPY] A photo discovered by the filesystem sync inherits its storage album's values. */
@@ -237,19 +355,66 @@ final class InheritTest extends TestCase
 
     // ── helpers ───────────────────────────────────────────────────────────
 
+    /**
+     * The arrangement every move case shares: a photo carrying the first
+     * album's provenance, moved into a second album that carries its own.
+     *
+     * Asserts the first inheritance landed before the move, so a case that
+     * checks what survived the move cannot pass over a photo that never had
+     * anything to lose.
+     *
+     * @param string|null $mode sent as the move-mode parameter, or omitted
+     * @param string|null $photoNote the photo's own note, set before the move
+     * @return array image id, destination album id
+     */
+    private function photoMovedFromOneAlbumToAnother(?string $mode, ?string $photoNote = null): array
+    {
+        $first = $this->fixture->createTestAlbum('provenance-inherit-first');
+        $this->fixture->albumProvenance($first, self::ALBUM);
+        $second = $this->fixture->createTestAlbum('provenance-inherit-second');
+        $this->fixture->albumProvenance($second, self::SECOND_ALBUM);
+        $image = $this->fixture->createTestImage()['id'];
+
+        $this->associate(array($image), $first);
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readImageProvenance($image)['provenance_owner'],
+            'anti-vacuity: the first inheritance must have landed before the move is meaningful'
+        );
+
+        if ($photoNote !== null)
+        {
+            $this->fixture->imageProvenance($image, array('provenance_note' => $photoNote));
+        }
+
+        $this->setCategory(array($image), $second, 'move', $mode);
+
+        return array($image, $second);
+    }
+
     private function associate(array $imageIds, int $catId): void
     {
         $this->setCategory($imageIds, $catId, 'associate');
     }
 
-    private function setCategory(array $imageIds, int $catId, string $action): void
+    private function setCategory(array $imageIds, int $catId, string $action, ?string $mode = null): void
     {
-        $res = $this->ws->call('pwg.images.setCategory', array(
+        $params = array(
             'image_id' => $imageIds,
             'category_id' => $catId,
             'action' => $action,
             'pwg_token' => $this->ws->token(),
-            ));
+            );
+
+        // pwg.images.setCategory is a core method the plugin cannot add a
+        // parameter to; the mode rides along in the same POST and the web
+        // service layer ignores what it does not declare.
+        if ($mode !== null)
+        {
+            $params[PROVENANCE_MOVE_MODE_PARAM] = $mode;
+        }
+
+        $res = $this->ws->call('pwg.images.setCategory', $params);
 
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
     }
