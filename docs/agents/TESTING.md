@@ -43,29 +43,52 @@ assertions in 0.105s; integration 44 tests / 150 assertions; E2E 26 (25 specs + 
 setup) in 8.9s. The unit suite's sub-second budget is what makes it eligible for a commit
 gate; the other two are not.
 
-**`plugins/provenance`, measured 2026-08-29**: unit 138 tests / 312 assertions in 0.012s.
-Its integration and E2E figures are **last-known, not current** — integration 94 tests / 549
-assertions and E2E 17 specs, both measured 2026-08-29 during Phase 7 and Phase 8, *before* the
-install lost its gallery the same day. Neither suite can execute today; see *Blocked, not
-skipped* below. A last-known figure is recorded as such rather than dropped, so nobody reads its
-absence as "there is no coverage there".
+**`plugins/provenance`, measured 2026-08-29** (all three layers, after the gallery was
+resynchronised — see *The gallery loss, and what running the suites again exposed* below): unit
+138 tests / 312 assertions in 0.012s; integration 125 tests / 685 assertions / 1 skipped in
+49.8s; E2E 23 (22 specs + 1 auth setup) in 14.8s. The skip is the deliberate one recorded in the
+non-coverage table, not a failure.
 
-### Blocked, not skipped — the provenance integration and E2E suites
+### The gallery loss, and what running the suites again exposed
 
-This install currently holds **0 rows in `piwigo_images`** (checked 2026-08-29). Every
-provenance integration fixture forces a real photo as its precondition and asserts it took
-effect, so all of them fail loudly at that assertion — `125 tests, 103 errors, 16 failures`, every
-one reading *"this install has no photo to record history against"*, which is the fixture
-refusing to run over a state it merely hoped for rather than a defect in the plugin.
+The install lost its gallery on 2026-08-29 (0 rows in `piwigo_images`;
+[decision 0011](decisions/0011-provenance-suites-require-a-throwaway-install.md)). While it was
+empty the provenance integration suite could not run at all — `125 tests, 103 errors`, every one
+a fixture refusing to run over a state it merely hoped for. It was resynchronised the same day
+from the recovered scans on disk (`admin.php?page=site_update&site=1&quick_sync=1`, 4 albums and
+105 photos), and all three layers are green again.
 
-This is the recorded state of the dev environment, not a finding of this phase: see
-[decision 0011](decisions/0011-provenance-suites-require-a-throwaway-install.md) and the two open
-`dev environment` items in `docs/backlog.md`. The recovered scans are on disk under `galleries/`
-but were never synchronised into the database.
+**Two real defects were hiding behind the empty gallery**, both in the fixtures rather than the
+plugin, and both of the same shape — a precondition *hoped for* instead of forced, which is
+exactly what `.claude/rules/test-design.md` (*fixture provenance*) forbids:
 
-What this costs, stated rather than hidden: the provenance close-out (Phase 10) could verify the
-unit layer and the commit gate, and could **not** verify the integration or E2E layer. Nothing
-below claims otherwise.
+- `FixtureBuilder::anyAlbumId()` returned `MIN(id) FROM piwigo_categories`. Every one of its four
+  callers immediately asks for that album's photos, so "any album" has always meant "an album
+  with photos" — `MIN(id)` only ever *happened* to satisfy that. The day an empty default album
+  outlived the gallery, all four failed in `setUp` with "album 1 holds no photo", which reads
+  like a broken plugin. It now selects the lowest-id album that actually holds a photo, and says
+  so in its failure message.
+- `SetAlbumInfoTest::setUp()` carried its **own hand-typed copy** of that same `MIN(id)` query —
+  the duplication `backpressure.md` (*single source of truth*) exists to prevent, and one of the
+  two copies was stale already. It reads through the fixture now. The test it broke asserts the
+  apply button renders, and that button is behind `{if $PROVENANCE_ALBUM.PHOTO_COUNT > 0}`, so
+  it genuinely needs an album with photos.
+
+A third thing the loss left behind, in the data rather than the code: three rows in
+`piwigo_image_category` pointing at album ids (263, 282, 301) that no longer existed. Harmless
+while `piwigo_images` was empty, they re-attached themselves to recycled photo ids 13/15/17 the
+moment the sync recreated rows, putting three photos in two albums each and breaking the 1:1
+invariant the copy-down fixture asserts. Deleted; 105 photos, 105 links, no photo in more than
+one album.
+
+**The suites do not touch a real scan, and this was measured rather than assumed.** All 105 files
+under `galleries/` were sha256-summed before the sync and again after the integration suite and
+after the E2E suite: byte-identical every time, with no `_original` sidecar anywhere and 105
+image rows still present. The write-back fixtures copy a real PNG into `upload/provenance-test/`
+or into a fixture-created album — *"a photo of this suite's own, so the write-back never touches
+a real scan"* — and exercise the copy. The throwaway marker's warning is still the one to obey
+(the suites do delete albums and photos through core), but the blast radius is the fixtures' own
+content.
 
 ### The integration and E2E suites mutate the real database
 
@@ -328,7 +351,7 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-08-29 | Phase 8: the provenance row and the Colored Tags injection both land on one logged-in picture page, and a logged-out visitor gets the row at all. | **Partly replaced 2026-08-29.** The guest half is now `PicturePageSourceTest::testGuestGetsTheRow` (watched red against an `is_a_guest()` early return) and `provenance.spec.js` → `the row is visible without logging in`. The coexistence half stays a hand check — the rule behind it is asserted at the unit layer instead; see the non-coverage table. |
 | 2026-08-29 | The write-back button's browser path, which Phase 6's plan asked for no spec for. | **Replaced 2026-08-29** by `plugins/provenance/tests/e2e/writeback-provenance.spec.js` (4 specs), each watched failing against a mutant: a wrong web-service method in the client, a summary that drops the per-photo failure count, and a `fail()` that no longer sets `.provenance-error` (which killed both failure specs). |
 | 2026-08-29 | Phase 7 of the provenance plan opened one manual box: upload a photo into a provenance-carrying album through the normal admin UI and confirm it arrives with the album's values. | **Replaced 2026-08-29** by `InheritTest::testAnUploadedPhotoInheritsTheAlbumsProvenance` and `testWithTheLoungeOnTheValuesArriveWhenTheLoungeIsEmptied`, which drive the exact web-service sequence the upload screen issues — `pwg.images.upload` with a real file, then `pwg.images.uploadCompleted` — so nothing about the path is assumed. What a browser would add on top is plupload's chunking, which is core's code on a screen the plugin does not touch; per the placement rule, a spec there would restate integration coverage one layer up. |
-| 2026-08-29 | Phase 9 of the provenance plan opened two manual boxes. One was descoped with the album-delete prompt ([decision 0013](decisions/0013-no-album-delete-prompt-in-v1.md)) and has nothing left to check. The other — the Batch Manager move prompt appears and its three choices behave as labelled — **was never performed by anyone**. | **Not replaced, and not checked — blocked.** It is automatable as an E2E spec; it is blocked only on a seedable install (see *Blocked, not skipped* above and [decision 0011](decisions/0011-provenance-suites-require-a-throwaway-install.md)). Carried as an open item in `docs/backlog.md` so it cannot quietly disappear. The underlying rule — that an unusable mode resolves to `keep` — *is* covered, at the unit layer by `ResolveModeTest` (11 cases). |
+| 2026-08-29 | Phase 9 of the provenance plan opened two manual boxes. One was descoped with the album-delete prompt ([decision 0013](decisions/0013-no-album-delete-prompt-in-v1.md)) and has nothing left to check. The other — the Batch Manager move prompt appears and its three choices behave as labelled — **was never performed by anyone**. | **Still not checked, but no longer blocked.** It was blocked on a seedable install; the gallery was resynchronised on 2026-08-29 and all three suites run again, so the E2E spec that would replace this entry is now writable. Carried as an open item in `docs/backlog.md` so it cannot quietly disappear. The underlying rule — that an unusable mode resolves to `keep` — *is* covered, at the unit layer by `ResolveModeTest` (11 cases). |
 | 2026-08-29 | Phase 10 close-out: the six-mutant pass over the provenance unit suite (see the mutant table above). Each mutant was applied and reverted by hand, the container confirmed to have picked up the bytes before each run, and the file confirmed byte-identical to HEAD after each. | Not replaceable, and deliberately so — `.claude/rules/mutation-testing.md` records mutants as prose precisely because a script that patches and reverts source is a second thing to keep correct that fails silently when the patched line moves. The one durable product of the pass *is* automated: the two anti-vacuity guards added to `ComposeCaptionTest`. |
 
 ### Open — no oracle, so no test

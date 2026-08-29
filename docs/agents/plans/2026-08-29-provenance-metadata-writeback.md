@@ -4,7 +4,7 @@ git_commit: 24e634b651dccd4ade28fc667a72d7af329131ea
 branch: master
 topic: "Provenance metadata for scanned photos: album-level entry, copy-down to photos, write-back into image files"
 tags: [plan, provenance, metadata, exiftool, xmp, iptc, exif, albums, audit-trail, plugin, core-patch]
-status: complete — integration and E2E verification blocked on a seedable install
+status: complete
 research: docs/agents/research/2026-08-29-per-photo-freetext-field-and-metadata-writeback.md
 ---
 
@@ -1362,16 +1362,16 @@ existing low-priority provenance items are unchanged by this plan.
 #### Automated Verification:
 - [x] Full unit suite: OK (138 tests, 312 assertions) in 0.012s, 2026-08-29 — 312 not 310, the two
       assertions being the anti-vacuity guards the mutation pass added to `ComposeCaptionTest`
-- [x] **Unit only** — full unit suite, both plugins, twice consecutively and in reverse order
+- [x] Full unit suite, both plugins, twice consecutively and in reverse order
       (`--order-by=reverse`), no manual repair: provenance 138/312 and typetags 56/33,009, green in
       all six runs, 2026-08-29
-- [ ] **Not met, and blocked** — Integration and E2E green. This install holds **0 rows in
-      `piwigo_images`**: the provenance integration suite returns `125 tests, 103 errors,
-      16 failures`, every one of them a fixture refusing to run over a state it merely hoped for
-      (*"this install has no photo to record history against"*), not a defect in the plugin. Same
-      blocker as Phase 9's unperformed manual steps — [decision 0011](../decisions/0011-provenance-suites-require-a-throwaway-install.md)
-      and the two open `dev environment` items in `docs/backlog.md`. Recorded in `TESTING.md` under
-      *Blocked, not skipped*, with the last-known figures kept and labelled as last-known
+- [x] Integration and E2E green — **met, after the install was resynchronised**. It held 0 rows in
+      `piwigo_images` at first attempt (`125 tests, 103 errors`); the gallery was resynchronised
+      from the recovered scans (4 albums, 105 photos) and two fixture defects the empty gallery
+      had been hiding were fixed. Integration 125 tests / 685 assertions / 1 deliberate skip;
+      E2E 23 (22 specs + 1 auth setup). Both green twice consecutively, integration also in
+      reverse order. All 105 scans verified byte-identical before and after. Written up in
+      `TESTING.md`, *The gallery loss, and what running the suites again exposed*
 - [x] `bash tools/test-hooks.sh` — all 15 cases passed, 2026-08-29
 - [x] Every count written into `TESTING.md` carries the date it was measured — including the
       hook self-test's 10 → 15 growth, which is dated and explained rather than silently edited
@@ -1385,8 +1385,40 @@ existing low-priority provenance items are unchanged by this plan.
       (`615f7990…`). All six killed; **no survivors**
 - [x] The hand-check ledger has an entry per surviving manual item, each with the reason it cannot
       be automated — three entries added (Phase 7's upload path, now replaced by `InheritTest`;
-      Phase 9's Batch Manager prompt, recorded as **blocked and never performed**, not as checked;
-      and this phase's mutation pass)
+      Phase 9's Batch Manager prompt, recorded as **never performed** — blocked at the time,
+      unblocked now that the install is seedable again, and still not checked; and this phase's
+      mutation pass)
+
+### Outcome (2026-08-29) — approved
+
+Everything in the phase shipped and every success criterion is met.
+
+The integration and E2E criterion was first recorded as blocked: the install held 0 rows in
+`piwigo_images`, so every fixture failed at its own precondition. The user directed that the
+environment be repaired rather than the criterion waived. The gallery was resynchronised from the
+recovered scans on disk (4 albums, 105 photos), and the empty gallery turned out to have been
+hiding two fixture defects and three orphaned `piwigo_image_category` rows — all fixed, all
+written up in `TESTING.md` under *The gallery loss, and what running the suites again exposed*.
+A full database dump and a file-level copy of `galleries/` were taken first, and all 105 scans
+were sha256-verified byte-identical after the sync, after the integration suite and after the
+E2E suite.
+
+The mutation pass found no survivor but did produce one real finding: the emptied-separator
+mutant killed two of its four casualties with a PHP `ValueError` rather than an assertion, because
+`ComposeCaptionTest` read `PROVENANCE_CAPTION_SEPARATOR` in a `substr_count()` needle and in an
+`assertStringNotContainsString()` — neither of which is a check once the constant is empty. Both
+were given an explicit lower-bound guard and **watched failing** against the re-applied mutant
+before it was reverted.
+
+New decision records: [0014](../decisions/0014-provenance-is-its-own-plugin.md),
+[0015](../decisions/0015-provenance-columns-stay-out-of-the-metadata-mappings.md),
+[0016](../decisions/0016-no-history-retention-in-v1.md). Items (c) and (d) of the phase were
+already covered by [0009](../decisions/0009-provenance-text-is-never-html.md) and
+[0012](../decisions/0012-move-defaults-to-keep-on-unattended-paths.md); no duplicates were written.
+
+**Still open, and not claimed by this phase**: the `plugins/typetags` integration and E2E suites
+were not run — they read `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD`, a human's
+credentials this session does not hold. Its unit suite did run, green, in every pass above.
 
 ---
 
@@ -1452,10 +1484,18 @@ Structural guards (they run in the normal unit suite; nothing else would report 
 - [x] `pwgprov.config` declares the namespace URI the writer uses — one constant, read by both
 
 #### Regression — affected existing functionality
-- [ ] `plugins/typetags` full unit + integration suites — the two core patches sit in files typetags
-      does not touch, but `associate_images_to_categories()` is on the upload path that seeds its
-      fixtures. Run them and name the command.
-- [ ] `CoreAssociationCharacterizationTest` — the Phase 7 net, run before and after the patches.
+- [ ] **Unit half done, integration half not run** — `plugins/typetags` full unit + integration
+      suites. The two core patches sit in files typetags does not touch, but
+      `associate_images_to_categories()` is on the upload path that seeds its fixtures. Unit:
+      `ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml`
+      — OK (56 tests, 33,009 assertions), green twice and in reverse order, 2026-08-29. The
+      integration suite reads `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD`, a human's
+      credentials no agent session holds, so it stays unrun and is **not** claimed. Unlike the
+      provenance suites it has no `create-test-users.php` of its own; giving it one is the
+      durable fix.
+- [x] `CoreAssociationCharacterizationTest` — the Phase 7 net, run before and after the patches.
+      Re-ran green 2026-08-29 as part of the 125-test integration suite on the resynchronised
+      install, so the net still holds against a real gallery rather than the one it was written on.
 
 ### Integration Tests (middle — real DB, real `ws.php`)
 
@@ -1472,16 +1512,16 @@ must cover a case that actually differs.
 - [x] `AlbumSaveTest` — `setAlbumInfo` persists all four columns `[HAPPY]`
 - [x] `ApplyTest` — apply copies four values onto every photo in the album `[HAPPY]`
 - [x] `WriteBackTest` — all five MWG slots and all five `XMP-pwgprov:*` tags read back `[HAPPY]`
-- [ ] `InheritTest` — a photo joining afterwards inherits `[HAPPY]`
+- [x] `InheritTest` — a photo joining afterwards inherits `[HAPPY]`
 - [x] `HistoryTest` — a >255-byte value round-trips through `pwg.provenance.getHistory` `[HAPPY]`
 
 **Negative / error propagation:**
-- [ ] guest → 401; bad token → 403; unknown id → 404; malformed date → 400, on every WS method `[NEG]`
+- [x] guest → 401; bad token → 403; unknown id → 404; malformed date → 400, on every WS method `[NEG]`
 - [x] apply never writes `provenance_note` `[NEG]`
 - [x] apply modifies no image file (mtime + size unchanged) `[NEG]`
 - [x] `exec` unavailable → typed error, no file touched `[NEG]`
 - [x] a write failure leaves a history row and removes the operation directory `[NEG]`
-- [ ] inheritance from an album with no provenance writes nothing and logs nothing `[NEG]`
+- [x] inheritance from an album with no provenance writes nothing and logs nothing `[NEG]`
 
 **Boundary / edge:**
 - [x] text over 2000 bytes → full in XMP/EXIF, truncated in IPTC, truncation logged `[BVA]`

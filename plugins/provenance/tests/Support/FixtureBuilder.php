@@ -133,13 +133,31 @@ class FixtureBuilder
         $this->original = $state;
     }
 
-    /** An album that exists, so a fixture refers to something real. */
+    /**
+     * An album that exists *and holds at least one photo*, so a fixture refers
+     * to something real rather than to whatever has the lowest id.
+     *
+     * Every caller of this immediately asks for the album's photos, so "any
+     * album" has always meant "an album with photos". Selecting MIN(id) only
+     * happened to satisfy that, and stopped the day an empty default album
+     * outlived the gallery: all four callers failed in setUp with "album 1 holds
+     * no photo", which reads like a broken plugin and is a fixture picking the
+     * wrong album. A precondition is forced here rather than hoped for.
+     */
     public function anyAlbumId(): int
     {
-        $id = $this->db->scalar('SELECT MIN(id) FROM piwigo_categories');
+        $id = $this->db->scalar(
+            'SELECT MIN(ic.category_id)
+               FROM `piwigo_image_category` ic
+               JOIN `piwigo_images` i ON i.id = ic.image_id
+               JOIN `piwigo_categories` c ON c.id = ic.category_id'
+        );
         if ($id === null)
         {
-            throw new RuntimeException('this install has no album to attach provenance to');
+            throw new RuntimeException(
+                'this install has no album holding a photo, so every copy-down assertion would be vacuous; ' .
+                'synchronise the gallery (admin.php?page=site_update) before running the suite'
+            );
         }
         return (int)$id;
     }

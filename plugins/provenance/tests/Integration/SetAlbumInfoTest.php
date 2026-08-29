@@ -35,12 +35,10 @@ final class SetAlbumInfoTest extends TestCase
         $this->fixture = new FixtureBuilder($this->db);
         $this->fixture->recordAllProvenance();
 
-        $catId = $this->db->scalar('SELECT MIN(id) FROM piwigo_categories');
-        if ($catId === null)
-        {
-            throw new RuntimeException('this install has no album to save provenance against');
-        }
-        $this->catId = (int)$catId;
+        // Read through the fixture, never a second hand-typed copy of the query:
+        // this test asserts the apply button renders, and that button is behind
+        // {if $PROVENANCE_ALBUM.PHOTO_COUNT > 0}, so it needs an album with photos.
+        $this->catId = $this->fixture->anyAlbumId();
 
         // Force the precondition rather than hope for it: every test below starts
         // from an album with no provenance at all.
