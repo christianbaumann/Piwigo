@@ -1391,9 +1391,11 @@ existing low-priority provenance items are unchanged by this plan.
       (`615f7990…`). All six killed; **no survivors**
 - [x] The hand-check ledger has an entry per surviving manual item, each with the reason it cannot
       be automated — three entries added (Phase 7's upload path, now replaced by `InheritTest`;
-      Phase 9's Batch Manager prompt, recorded as **never performed** — blocked at the time,
-      unblocked now that the install is seedable again, and still not checked; and this phase's
-      mutation pass)
+      Phase 9's Batch Manager prompt; and this phase's mutation pass).
+      **Updated 2026-08-29**: the Phase 9 entry was recorded as *never performed and still not
+      checked* — blocked at the time, unblocked once the install was seedable again. It has since
+      been **replaced rather than performed**, by `move-provenance.spec.js`. The ledger entry now
+      names that spec, so no surviving manual item is left mis-recorded as outstanding
 
 ### Outcome (2026-08-29) — approved
 
@@ -1515,7 +1517,8 @@ Fixture provenance is recorded per fixture: which case it covers and how it is b
 must cover a case that actually differs.
 
 **Happy path:**
-- [x] `AlbumSaveTest` — `setAlbumInfo` persists all four columns `[HAPPY]`
+- [x] `SetAlbumInfoTest::testSaveWritesAllFourColumns` — `setAlbumInfo` persists all four
+      columns `[HAPPY]`. Landed under that name, not the `AlbumSaveTest` this plan proposed
 - [x] `ApplyTest` — apply copies four values onto every photo in the album `[HAPPY]`
 - [x] `WriteBackTest` — all five MWG slots and all five `XMP-pwgprov:*` tags read back `[HAPPY]`
 - [x] `InheritTest` — a photo joining afterwards inherits `[HAPPY]`
