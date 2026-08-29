@@ -30,9 +30,94 @@ const SNAPSHOT_FILE = __DIR__ . '/../.state/snapshot.json';
 /** The audit trail. Named here rather than read from the plugin constant, which needs Piwigo booted. */
 const HISTORY_TABLE = 'piwigo_provenance_history';
 
+/** The l10n key the public row's <dt> carries. */
+const PROVENANCE_ROW_LABEL_KEY = 'Provenance';
+
 function history_high_water(Db $db): int
 {
     return (int)$db->scalar('SELECT COALESCE(MAX(id), 0) FROM ' . HISTORY_TABLE);
+}
+
+/**
+ * The row's label as the browsing account will really see it.
+ *
+ * Resolved from the account's own language rather than assumed: the install
+ * runs in German, so a spec asserting the English key would pass only by
+ * accident of l10n() echoing back an untranslated key. The language file is
+ * included rather than parsed - it assigns $lang and does nothing else.
+ */
+function row_label(Db $db, string $username): string
+{
+    $locale = $db->scalar(
+        "SELECT ui.language FROM piwigo_user_infos ui" .
+        " JOIN piwigo_users u ON u.id = ui.user_id" .
+        " WHERE u.username = '" . $db->escape($username) . "'"
+    );
+    if ($locale === null)
+    {
+        fail("no account named '$username' to resolve the row label for");
+    }
+
+    $file = dirname(__DIR__, 3) . '/language/' . $locale . '/plugin.lang.php';
+    if (!is_file($file))
+    {
+        fail("the plugin carries no translation for $locale: $file");
+    }
+
+    $lang = array();
+    include $file;
+
+    if (empty($lang[PROVENANCE_ROW_LABEL_KEY]))
+    {
+        fail('the ' . $locale . ' translation has no ' . PROVENANCE_ROW_LABEL_KEY . ' entry');
+    }
+
+    return $lang[PROVENANCE_ROW_LABEL_KEY];
+}
+
+function read_display_info(Db $db): string
+{
+    $value = $db->scalar(
+        "SELECT value FROM piwigo_config WHERE param = '" . PROVENANCE_DISPLAY_INFO_PARAM . "'"
+    );
+    if ($value === null)
+    {
+        fail('this install has no ' . PROVENANCE_DISPLAY_INFO_PARAM . ' for the public row to hang off');
+    }
+    return (string)$value;
+}
+
+function write_display_info(Db $db, string $serialized): void
+{
+    $db->query(
+        "UPDATE piwigo_config SET value = '" . $db->escape($serialized) .
+        "' WHERE param = '" . PROVENANCE_DISPLAY_INFO_PARAM . "'"
+    );
+}
+
+/**
+ * Forces the public row visible and asserts it took effect.
+ *
+ * The key is seeded by the plugin's install(), which an install predating the
+ * public row has never run - so a spec pointed at such a database would find no
+ * row and report the feature broken. Setup-before, not hope.
+ */
+function force_display_info(Db $db): void
+{
+    $map = unserialize(read_display_info($db));
+    if (!is_array($map))
+    {
+        fail(PROVENANCE_DISPLAY_INFO_PARAM . ' is not a serialized array');
+    }
+
+    $map[PROVENANCE_DISPLAY_INFO_KEY] = true;
+    write_display_info($db, serialize($map));
+
+    $actual = unserialize(read_display_info($db));
+    if (empty($actual[PROVENANCE_DISPLAY_INFO_KEY]))
+    {
+        fail('could not switch the public provenance row on');
+    }
 }
 
 /** The values 'with-provenance' writes. A spec reads them back off this script's output. */
@@ -155,6 +240,10 @@ if (isset($args['restore']))
     // trail behind. Without this the E2E suite would quietly poison every later
     // run of the integration suite, which reads the same table.
     $db->query('DELETE FROM ' . HISTORY_TABLE . ' WHERE id > ' . (int)$snapshot['history_id']);
+    if (isset($snapshot['display_info']))
+    {
+        write_display_info($db, (string)$snapshot['display_info']);
+    }
     $builder->importState($snapshot['state']);
     $builder->restore();
     unlink(SNAPSHOT_FILE);
@@ -183,6 +272,11 @@ else
 {
     $builder->recordAllProvenance();
 }
+
+// Carried forward like the recorded provenance is: a second seed in the same
+// test must not remember the state the first one already changed.
+$originalDisplayInfo = $existing['display_info'] ?? read_display_info($db);
+force_display_info($db);
 
 if ($scenario === 'writeback')
 {
@@ -250,6 +344,7 @@ save_snapshot(array(
     'state' => $builder->exportState(),
     'test_objects' => $builder->exportTestObjects(),
     'album_id' => $catId,
+    'display_info' => $originalDisplayInfo,
     // Carried forward, so a second seed in the same test does not move the mark
     // past rows the first one's spec already wrote.
     'history_id' => $existing['history_id'] ?? history_high_water($db),
@@ -266,6 +361,7 @@ echo json_encode(array(
     // Absolute paths, so a spec can read back what the browser's click really
     // wrote into the files rather than trusting the page's own summary.
     'photo_files' => array_column($builder->exportTestObjects()['images'], 'file'),
+    'row_label' => row_label($db, Config::username()),
     'max_short_text_chars' => PROVENANCE_SHORT_TEXT_MAX_CHARS,
     'writeback_max_chunk' => PROVENANCE_WRITEBACK_MAX_CHUNK,
     ), JSON_UNESCAPED_UNICODE), "\n";

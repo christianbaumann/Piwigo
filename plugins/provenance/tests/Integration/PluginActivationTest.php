@@ -16,9 +16,13 @@ final class PluginActivationTest extends TestCase
     private const PLUGIN_ID = 'provenance';
     private const HISTORY_TABLE = 'piwigo_provenance_history';
 
+    /** Core's own picture-page rows must survive the plugin adding one of its own. */
+    private const MIN_DISPLAY_INFO_KEYS = 5;
+
     private Db $db;
     private WsClient $ws;
     private FixtureBuilder $fixture;
+    private string $originalDisplayInfo;
 
     protected function setUp(): void
     {
@@ -29,12 +33,14 @@ final class PluginActivationTest extends TestCase
 
         $this->forceActive();
         $this->fixture->recordAllProvenance();
+        $this->originalDisplayInfo = $this->readDisplayInfo();
     }
 
     protected function tearDown(): void
     {
         $this->forceActive();
         $this->fixture->restore();
+        $this->writeDisplayInfo($this->originalDisplayInfo);
         $this->ws->logout();
     }
 
@@ -181,7 +187,92 @@ final class PluginActivationTest extends TestCase
         $this->assertSame('active', $this->pluginState(), 'the rejected call must not have uninstalled the plugin');
     }
 
+    /**
+     * [ST] The row-visibility key follows the install lifecycle: gone after an
+     * uninstall, back and switched on after the next activation.
+     *
+     * Driven as one transition rather than two tests, because the starting state
+     * is whatever the previous version of the plugin left behind - an install
+     * predating this key has columns but no key at all.
+     */
+    public function testDisplayInfoKeyFollowsTheInstallLifecycle(): void
+    {
+        $this->performAction('uninstall');
+        $afterUninstall = $this->displayInfoMap();
+
+        $this->assertGreaterThanOrEqual(
+            self::MIN_DISPLAY_INFO_KEYS,
+            count($afterUninstall),
+            'anti-vacuity: core\'s own rows are gone from the map, so its keys say nothing'
+        );
+        $this->assertArrayNotHasKey(PROVENANCE_DISPLAY_INFO_KEY, $afterUninstall);
+
+        $res = $this->performAction('activate');
+        $this->assertSame('ok', $res['json']['stat'], 'Got: ' . $res['body']);
+
+        $afterInstall = $this->displayInfoMap();
+
+        $this->assertArrayHasKey(PROVENANCE_DISPLAY_INFO_KEY, $afterInstall);
+        $this->assertTrue($afterInstall[PROVENANCE_DISPLAY_INFO_KEY], 'the row is installed switched off');
+        $this->assertGreaterThan(
+            count($afterUninstall),
+            count($afterInstall),
+            'the install replaced core\'s rows instead of adding one to them'
+        );
+    }
+
+    /**
+     * [NEG] A reinstall must not switch a row the administrator turned off back
+     * on - which is what the array_key_exists() guard in add_display_info_key()
+     * is for.
+     *
+     * Skipped, with no successor at any layer. install() runs a second time only
+     * through update(), and perform_action() reaches update() only by downloading
+     * and extracting an extension archive (admin/include/plugins.class.php:156-168);
+     * its 'install' case is skipped outright while a plugins-table row exists
+     * (lines 133-137), so 'activate' on an installed plugin calls no maintain
+     * method at all. A version of this test written against 'activate' passes
+     * without executing the guard: it was written, seen to survive the mutant
+     * that deletes the guard, and replaced by this skip rather than kept green.
+     *
+     * Recorded in docs/agents/decisions/0010-provenance-row-visibility-key.md.
+     */
+    public function testReinstallLeavesTheDisplayInfoKeyAsTheAdministratorSetIt(): void
+    {
+        $this->markTestSkipped(
+            'install() is only re-entered through update(), which needs a real extension archive; ' .
+            'no layer available here can drive it - see decisions/0010'
+        );
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
+
+    private function readDisplayInfo(): string
+    {
+        $value = $this->db->scalar(
+            "SELECT value FROM piwigo_config WHERE param = '" . PROVENANCE_DISPLAY_INFO_PARAM . "'"
+        );
+        if ($value === null)
+        {
+            throw new RuntimeException('this install has no ' . PROVENANCE_DISPLAY_INFO_PARAM . ' for the plugin to extend');
+        }
+        return (string)$value;
+    }
+
+    private function writeDisplayInfo(string $serialized): void
+    {
+        $this->db->query(
+            "UPDATE piwigo_config SET value = '" . $this->db->escape($serialized) .
+            "' WHERE param = '" . PROVENANCE_DISPLAY_INFO_PARAM . "'"
+        );
+    }
+
+    private function displayInfoMap(): array
+    {
+        $map = unserialize($this->readDisplayInfo());
+        $this->assertIsArray($map, PROVENANCE_DISPLAY_INFO_PARAM . ' is not a serialized array');
+        return $map;
+    }
 
     private function pluginState(): ?string
     {

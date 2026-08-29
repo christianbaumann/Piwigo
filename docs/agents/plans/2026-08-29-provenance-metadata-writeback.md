@@ -1067,7 +1067,7 @@ Showing provenance on the photo page, with a visibility toggle so it is not forc
 
 ### Changes Required:
 
-#### [ ] 1. Public prefilter
+#### [x] 1. Public prefilter
 **File**: `plugins/provenance/include/events_public.inc.php`
 **Changes**: registered on `loc_end_picture` guarded by `script_basename() == 'picture'`; injects one
 row into `<dl id="standard">` immediately before the anchor, held as a named constant matching
@@ -1088,7 +1088,7 @@ The row follows the existing shape exactly, and the values come from `{$current.
 {/if}
 ```
 
-#### [ ] 2. Visibility toggle
+#### [x] 2. Visibility toggle
 **File**: `plugins/provenance/maintain.class.php`
 **Changes**: `install()` adds a `provenance` key to the serialized `$conf['picture_informations']`
 map (seeded at `install/config.sql:52-57`, edited at `admin/configuration.php:280-283,527`);
@@ -1097,22 +1097,123 @@ map (seeded at `install/config.sql:52-57`, edited at `admin/configuration.php:28
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit: structural guard — `PROVENANCE_TPL_INJECT_POINT` occurs exactly once in `picture.tpl`,
-      with a byte-count anti-vacuity guard first
-- [ ] Integration: the picture page **source** contains `id="Provenance"` with the expected text,
-      scanned with `<script>` blocks stripped and guarded by an assertion that stripping left markup
-      behind (the trap `docs/agents/TESTING.md` records for typetags)
-- [ ] Integration: with the `picture_informations` key off, the row is absent `[DT]`
-- [ ] E2E: `provenance.spec.js` — the row is visible in the rendered DOM in both `default` and
-      `modus`; every locator lives in `tests/e2e/support/PicturePage.js`, none in the spec
-- [ ] `ddev exec php -l` on every changed file
+- [x] Unit: structural guard — `PicturePageAnchorTest`, 3 cases. `PROVENANCE_TPL_INJECT_POINT`
+      occurs exactly once in `picture.tpl`, behind an 8000-byte anti-vacuity guard; it closes
+      `<dl id="standard">` with no earlier `</dl>` between; and it does not span the
+      `{if isset($metadata)}` point Colored Tags injects at
+- [x] Integration: `PicturePageSourceTest`, 7 cases. The picture page **source** carries the row
+      inside `<dl id="standard">` with all five values joined by four separators, scanned with
+      `<script>` blocks stripped and guarded by an assertion that stripping left markup behind
+      (the trap `docs/agents/TESTING.md` records for typetags)
+- [x] Integration: with the `picture_informations` key off, the row is absent `[DT]`
+- [x] Integration: `PluginActivationTest::testDisplayInfoKeyFollowsTheInstallLifecycle` — install
+      adds the visibility key switched on, uninstall removes it, core's own keys survive both
+- [x] Integration: a **logged-out visitor** gets the row — `testGuestGetsTheRow`. The handler
+      carries no `is_a_guest()` guard, so nothing else said the public half of "public row" works
+- [x] Integration: markup forced into a value is escaped, not rendered —
+      `testMarkupInAValueIsEscapedRatherThanRendered` `[NEG]`
+- [x] E2E: `provenance.spec.js` — 6 specs; every locator lives in
+      `tests/e2e/support/PicturePage.js`, none in the spec. One theme, not two — see the deviation
+- [x] `ddev exec php -l` on every changed file
+- [x] Unit + integration + E2E green twice consecutively and in reverse order, 2026-08-29:
+      unit 124 tests / 278 assertions, integration 105 tests / 608 assertions (1 skipped),
+      E2E 23 specs. `bash tools/test-hooks.sh` passes; typetags unit suite 56 tests still green
 
 #### Manual Verification:
-- [ ] The row reads correctly in German (the local install's locale) and does not break the info
-      panel layout on a narrow viewport
-- [ ] `rm -rf _data/templates_c/*` after the prefilter edit, then confirm the row appears
+- [x] ~~The row reads correctly in German (the local install's locale) and does not break the info
+      panel layout on a narrow viewport~~ → **automated**, `provenance.spec.js` →
+      `the label is rendered in the language the account browses in` and
+      `the row stays inside its column on a narrow viewport`. `seed.php` resolves the expected
+      label out of the browsing account's own language file (`Herkunft` here), so an untranslated
+      key fails; the layout check drives a 320 px viewport and measures `document.body`'s
+      horizontal overflow
+- [x] ~~`rm -rf _data/templates_c/*` after the prefilter edit, then confirm the row appears~~ →
+      done, and the confirmation is the suites above: every integration and E2E run after the
+      prefilter edit renders the page freshly compiled
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
+
+### Deviation from the plan
+
+- **The anchor is the close of `<dl id="standard">`, not `{if isset($metadata)}`.** The plan named
+  that string and described the result as "one row into `<dl id="standard">`"; the two cannot both
+  hold. `{if isset($metadata)}` sits at `themes/default/template/picture.tpl:303`, *after* the
+  `</dl>` on line 301, so injecting before it emits `<div><dt>…</dt><dd>…</dd></div>` outside any
+  definition list. `PROVENANCE_TPL_INJECT_POINT` is `"{/strip}\n</dl>"` instead — one occurrence,
+  guarded by `PicturePageAnchorTest`.
+
+  There is a second reason, found while implementing: Colored Tags already injects at
+  `{if isset($metadata)}` (`plugins/typetags/include/events_public.inc.php:5,190`). Two prefilters
+  prepending at one anchor compose fine, but an anchor *spanning* that point would stop matching
+  whenever typetags' prefilter happened to run first — a row that disappears on plugin load order,
+  with no error anywhere.
+
+- **E2E covers one theme, because this install has one.** `piwigo_themes` holds `modus` alone, and
+  `themes/modus/` declares `'parent' => 'default'` with no `picture.tpl` of its own — so the page
+  the specs drive *is* `themes/default/template/picture.tpl`. There is no `default` theme to switch
+  to, and no second rendering to witness.
+
+- **`install()` seeding the visibility key does not make the row unconditional.** The plan's note
+  reads "without the key the row would render unconditionally"; the injected template asks
+  `{if !empty($display_info.provenance) …}`, so an absent key renders *nothing*. That is the safe
+  direction, and it is why both the integration fixture and `seed.php` force the key on rather than
+  hoping install() has run — this install predates the key and had none.
+
+- **Core drops the key on any Display-configuration save**, and the guard against a reinstall
+  overwriting the administrator's choice has no reachable test. Both recorded in
+  `docs/agents/decisions/0010-provenance-row-visibility-key.md`;
+  `PluginActivationTest::testReinstallLeavesTheDisplayInfoKeyAsTheAdministratorSetIt` is a skip
+  carrying the reason. A first version of that test was written against `performAction('activate')`,
+  seen to **survive** the mutant that deletes the guard, and replaced by the skip rather than kept
+  green.
+
+- **A first attempt at the narrow-viewport check was vacuous and was replaced.**
+  `documentElement.scrollWidth - clientWidth` reads 0 however wide the content gets, because the
+  theme clips the page's horizontal overflow; so does the row's own `scrollWidth`. Probed by
+  widening the rendered value to 400 characters: `document.body.scrollWidth - clientWidth` moved
+  0 → 2959 while the other two stayed at 0. The measurement is recorded on `PicturePage.js`.
+
+- **The new integration fixture leaked state and was caught by the reverse-order run.**
+  `recordAllProvenance()` only remembers rows that already carried provenance, so seeding a photo
+  that had none left the values behind and `InheritTest` failed later in the reversed suite.
+  `tearDown()` now clears before it restores, the same order `seed.php` documents.
+
+### Coverage audit after the phase (2026-08-29)
+
+The phase was re-read for behaviour nothing watches. Three findings, established by probe rather
+than by argument:
+
+- **A guest gets the row, and nobody had ever checked.** Every case ran as the webmaster, and the
+  handler carries no `is_a_guest()` guard - unlike the Colored Tags handler on the same page. Now
+  `PicturePageSourceTest::testGuestGetsTheRow` (the rule, at its lowest layer) plus one E2E spec
+  for the thing source cannot express: the guest page is a different render, and only a browser
+  says the theme still lays the row out where a visitor can read it. The spec asserts zero
+  `admin.php` links first, so it cannot pass on a leaked session (probed: 1 while logged in, 0 as
+  a guest).
+- **The template's `|escape` had no test.** Decision 0009 strips markup on every write path the
+  plugin owns, so this can only arrive some other way - which is exactly what the modifier is for
+  on a public page. Integration, not E2E: the escaping is server-side.
+- **Coexistence with Colored Tags is not tested, deliberately.** Both plugins prefilter the same
+  template; the rule that keeps them independent is already asserted at the **unit** layer by
+  `testAnchorDoesNotSpanTheColoredTagsInjectionPoint`. An integration test would restate it one
+  layer up while carrying a hand-typed copy of another plugin's internals. Verified once by hand
+  instead - both injections present on one logged-in page - and recorded in the ledger.
+
+### Mutants applied by hand (2026-08-29)
+
+Four production mutants, applied on the host with arrival in the container confirmed by checksum
+before each run (`.claude/rules/mutation-testing.md`).
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| the `add_display_info_key()` call deleted from `install()` | `testDisplayInfoKeyFollowsTheInstallLifecycle` | killed (1 red) |
+| the `array_key_exists()` guard dropped from `add_display_info_key()` | `testReinstallLeavesTheDisplayInfoKeyAsTheAdministratorSetIt` | **survived** — install() is unreachable a second time through `perform_action`; the test was replaced by a documented skip rather than left green |
+| `is_a_guest()` added to the handler's early return | `testGuestGetsTheRow` | killed (1 red; the five logged-in cases stayed green, which is the point) |
+| `|escape` removed from `public_provenance.tpl` | `testMarkupInAValueIsEscapedRatherThanRendered` | killed (1 red) |
+
+Nothing else moved: each mutant killed exactly the cases watching it. The prefilter itself needed
+no mutant — `PicturePageSourceTest` and `provenance.spec.js` were both written first and watched
+fail against the absent row.
 
 ---
 
@@ -1287,7 +1388,7 @@ Input validation helpers (Phase 4):
 Structural guards (they run in the normal unit suite; nothing else would report these regressions):
 - [x] `PROVENANCE_TPL_ALBUM_ANCHOR` occurs exactly once in `cat_modify.tpl`, after a
       `strlen()` lower-bound guard
-- [ ] `PROVENANCE_TPL_INJECT_POINT` occurs exactly once in `picture.tpl`, same guard
+- [x] `PROVENANCE_TPL_INJECT_POINT` occurs exactly once in `picture.tpl`, same guard
 - [x] `pwgprov.config` declares the namespace URI the writer uses — one constant, read by both
 
 #### Regression — affected existing functionality

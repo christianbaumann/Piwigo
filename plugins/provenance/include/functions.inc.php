@@ -504,6 +504,36 @@ define('PROVENANCE_TPL_ALBUM_ANCHOR', '<span class="buttonLike" id="cat-properti
 /** Injection point on the photo properties screen: immediately before its save bar. */
 define('PROVENANCE_TPL_PHOTO_ANCHOR', '<div class="savebar-footer">');
 
+/**
+ * Injection point on the public picture page: the close of <dl id="standard">,
+ * so the row lands as the last entry of the photo's information list.
+ *
+ * Deliberately not the {if isset($metadata)} point one line below, which the
+ * Colored Tags plugin already injects at: an anchor spanning that point would
+ * stop matching whenever that plugin's prefilter ran first, and the row would
+ * disappear depending on nothing more than plugin load order.
+ */
+define('PROVENANCE_TPL_INJECT_POINT', "{/strip}\n</dl>");
+
+/*
+ * ---------------------------------------------------------------------------
+ * Visibility of the public row.
+ *
+ * Core's own picture-page rows are switched by $conf['picture_informations'],
+ * a serialized map edited on Administration > Configuration > Display. The
+ * plugin seeds one more key into that map on install and removes it again on
+ * uninstall, so the row is switchable where an administrator already looks -
+ * see docs/agents/decisions/0010-provenance-row-visibility-key.md for what that
+ * costs.
+ * ---------------------------------------------------------------------------
+ */
+
+/** The config parameter holding the picture page's row-visibility map. */
+define('PROVENANCE_DISPLAY_INFO_PARAM', 'picture_informations');
+
+/** This plugin's key inside that map. */
+define('PROVENANCE_DISPLAY_INFO_KEY', 'provenance');
+
 /*
  * ---------------------------------------------------------------------------
  * Boundary validation for the album save.

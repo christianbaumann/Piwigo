@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
   KEY `object_lookup` (`object`, `object_id`, `occured_on`)
 ) DEFAULT CHARSET=utf8mb4
 ;');
+
+    $this->add_display_info_key();
   }
 
   function update($old_version, $new_version, &$errors=array())
@@ -75,6 +77,77 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
     }
 
     pwg_query('DROP TABLE IF EXISTS `' . $this->history_table . '`;');
+
+    $this->drop_display_info_key();
+  }
+
+  /**
+   * Seeds this plugin's key into the picture page's row-visibility map.
+   *
+   * Present and true, so the row an administrator has just installed the plugin
+   * for is visible without a second step. An existing key is left alone: a
+   * reinstall or a version bump runs install() again through update(), and must
+   * not silently switch a row the administrator turned off back on.
+   */
+  private function add_display_info_key()
+  {
+    $map = $this->display_info();
+
+    if ($map === null or array_key_exists(PROVENANCE_DISPLAY_INFO_KEY, $map))
+    {
+      return;
+    }
+
+    $map[PROVENANCE_DISPLAY_INFO_KEY] = true;
+    $this->save_display_info($map);
+  }
+
+  /** Takes the key out again, so an uninstall leaves core's map as it found it. */
+  private function drop_display_info_key()
+  {
+    $map = $this->display_info();
+
+    if ($map === null or !array_key_exists(PROVENANCE_DISPLAY_INFO_KEY, $map))
+    {
+      return;
+    }
+
+    unset($map[PROVENANCE_DISPLAY_INFO_KEY]);
+    $this->save_display_info($map);
+  }
+
+  /**
+   * The visibility map, or null when this install has none to extend.
+   *
+   * @return array|null
+   */
+  private function display_info()
+  {
+    global $conf;
+
+    if (!isset($conf[PROVENANCE_DISPLAY_INFO_PARAM]))
+    {
+      return null;
+    }
+
+    $map = unserialize($conf[PROVENANCE_DISPLAY_INFO_PARAM]);
+
+    return is_array($map) ? $map : null;
+  }
+
+  /**
+   * @param array $map
+   */
+  private function save_display_info($map)
+  {
+    global $conf;
+
+    conf_update_param(PROVENANCE_DISPLAY_INFO_PARAM, $map);
+
+    // $conf holds the serialized string, which is what picture.php unserializes;
+    // letting conf_update_param() put the array there instead would break the
+    // page for the rest of this request.
+    $conf[PROVENANCE_DISPLAY_INFO_PARAM] = serialize($map);
   }
 
   /**

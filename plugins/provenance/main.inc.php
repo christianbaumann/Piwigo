@@ -52,6 +52,14 @@ add_event_handler('associate_images_to_categories', 'provenance_inherit_associat
 add_event_handler('site_update_associate_images', 'provenance_inherit_site_update',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_inherit.inc.php');
 
+// The public row. Registered only on the picture page, and the file behind it is
+// pulled in only when the event actually fires.
+if (script_basename() == 'picture')
+{
+  add_event_handler('loc_end_picture', 'provenance_picture_row',
+    EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_public.inc.php');
+}
+
 if (defined('IN_ADMIN'))
 {
   include_once(PROVENANCE_PATH . 'include/events_admin.inc.php');
