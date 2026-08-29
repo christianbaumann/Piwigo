@@ -308,3 +308,100 @@ function provenance_lock_path($image_path)
 {
   return PROVENANCE_LOCK_DIR . sha1($image_path) . '.lock';
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * Template anchors the prefilters match against.
+ *
+ * A moved anchor is invisible at runtime - Smarty compiles the untouched
+ * template and the page renders without the feature - so each one is a named
+ * constant with a structural guard test behind it, and lives here rather than
+ * in the event file so the unit suite can read it without loading admin code.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Injection point on the album properties screen: immediately before the Save button. */
+define('PROVENANCE_TPL_ALBUM_ANCHOR', '<span class="buttonLike" id="cat-properties-save">');
+
+/*
+ * ---------------------------------------------------------------------------
+ * Boundary validation for the album save.
+ *
+ * Pure, so the rules live at the unit layer and the web-service handler only
+ * maps their outcome onto an HTTP status.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * Length of the two VARCHAR(255) provenance columns.
+ *
+ * Characters, not bytes: the tables are utf8mb4, where VARCHAR(255) holds 255
+ * characters. The contrast with PROVENANCE_IPTC_MAX_BYTES is deliberate - that
+ * one really is a byte budget, imposed by the IPTC packet rather than by MySQL.
+ */
+define('PROVENANCE_SHORT_TEXT_MAX_CHARS', 255);
+
+/**
+ * Whether a scan date is storable.
+ *
+ * Empty means the field is being cleared and is therefore valid. Anything else
+ * must be exactly YYYY-MM-DD *and* a real calendar date: the shape alone would
+ * let 2026-02-29 through, which MySQL then stores as 0000-00-00 - a provenance
+ * fact quietly replaced by a wrong one.
+ *
+ * @param mixed $value
+ * @return bool
+ */
+function provenance_is_valid_scanned_on($value)
+{
+  $value = trim((string)$value);
+
+  if ($value === '')
+  {
+    return true;
+  }
+
+  if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m))
+  {
+    return false;
+  }
+
+  return checkdate((int)$m[2], (int)$m[3], (int)$m[1]);
+}
+
+/**
+ * Cleans one single-line provenance value and reports whether it fits.
+ *
+ * Over-long input is reported, never cut: silently truncating a provenance fact
+ * is worse than refusing the save, so the caller answers with an error and the
+ * administrator sees what happened. Markup is stripped because this text is
+ * destined for an EXIF/IPTC packet, where it would be meaningless - which is
+ * also why $conf['allow_html_descriptions'] is not honoured here.
+ *
+ * @param mixed $value
+ * @return array array('text' => string, 'too_long' => bool)
+ */
+function provenance_clean_short_text($value)
+{
+  $text = trim(strip_tags((string)$value));
+
+  return array(
+    'text' => $text,
+    'too_long' => mb_strlen($text) > PROVENANCE_SHORT_TEXT_MAX_CHARS,
+    );
+}
+
+/**
+ * Cleans the free-text note.
+ *
+ * No length cap - the column is TEXT. Internal line breaks are kept; the writer
+ * collapses them when a value reaches an argfile line, and doing it here would
+ * destroy the administrator's formatting in the database as well.
+ *
+ * @param mixed $value
+ * @return string
+ */
+function provenance_clean_note($value)
+{
+  return trim(strip_tags((string)$value));
+}

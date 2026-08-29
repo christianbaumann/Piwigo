@@ -36,6 +36,13 @@ include_once(PROVENANCE_PATH . 'include/history.inc.php');
 
 add_event_handler('ws_add_methods', 'provenance_add_methods');
 
+if (defined('IN_ADMIN'))
+{
+  include_once(PROVENANCE_PATH . 'include/events_admin.inc.php');
+
+  add_event_handler('loc_begin_admin_page', 'provenance_admin_album');
+}
+
 /**
  * Registers the plugin's web-service methods.
  *
@@ -62,5 +69,21 @@ function provenance_add_methods($arr)
     'Reads the provenance audit trail of one album or photo, newest first.',
     PROVENANCE_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true)
+  );
+
+  $service->addMethod(
+    'pwg.provenance.setAlbumInfo',
+    'ws_provenance_setAlbumInfo',
+    array(
+      'cat_id' => array('type' => WS_TYPE_ID),
+      'physical_album' => array('default' => ''),
+      'owner' => array('default' => ''),
+      'scanned_on' => array('default' => '', 'info' => 'YYYY-MM-DD, or empty to clear'),
+      'note' => array('default' => ''),
+      'pwg_token' => array(),
+      ),
+    'Saves the provenance of one album. Empty values clear the field.',
+    PROVENANCE_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
   );
 }

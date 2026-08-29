@@ -1,0 +1,16 @@
+/* The modal reuses the album screen's own .desc-modal rules; only the parts that
+   screen has no equivalent for are defined here. */
+#provenance-modal .desc-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+#provenance-modal .desc-modal-footer {
+  align-items: center;
+  gap: 15px;
+}
+
+#provenance-message.provenance-error {
+  color: #c00;
+}
