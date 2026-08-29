@@ -452,7 +452,7 @@ SELECT id FROM ' . IMAGES_TABLE . '
 - [x] `GetColorTextTest::testMalformedLengthReturnsSafeDefault` fails before the fix (`TypeError: min(): Argument #1 ($value) must be of type array, null given`), passes after
 - [x] `AddTagTest::testNonexistentImageIsRejected` fails before the fix (`stat:"ok"` instead of `fail`/404), passes after
 - [x] `AddTagTest::testNonexistentImageWritesNoOrphanRow` confirms zero rows in `piwigo_image_tag` — failed before the fix (`1` row), passes after
-- [ ] E2E `edge-cases.spec.js` server-error case fails before the fix, passes after — **deferred to Phase 4**; reproduced and verified manually instead (see Manual Verification below), since the E2E harness doesn't exist yet
+- [x] E2E `edge-cases.spec.js` server-error case fails before the fix, passes after — **closed in Phase 4**: `a server rejection leaves the badge clickable` was watched red against the reverted fix (`pointer-events` stuck at `"none"`) and green with it restored, killing exactly that one test
 - [x] Full suite green (54 tests, 32994 assertions); `php -l` clean on `functions.inc.php`, `events_public.inc.php`, `main.inc.php`; legacy `test_ws_tag_assignment.php` still 25/25
 
 #### Manual Verification:
@@ -574,9 +574,16 @@ Two things to confirm in the CLI *before* a spec is written, because both are ru
 - what the × button's DOM actually looks like once `events_public.inc.php:218-223` has appended it inside the badge `<span>`
 - whether the separator text nodes between assigned tags are what the remove path's `previousSibling`/`nextSibling` logic assumes
 
+**Both were probed against the running site before any spec was written**, driving Chromium directly rather than reading `picture.tpl` and hoping:
+
+- **The × button is nested two levels deep**, not a sibling: `<a data-tag-id="3"><span style="background-color:…">Arbeiten <span class="typetag-remove" data-tag-id="3">×</span></span></a>`. The anchor's raw `textContent` therefore reads `"Arbeiten ×"`, which is why `PicturePage.assignedNames()` clones and strips the nested span before reading text — a naive text assertion would have compared against the wrong string.
+- **The separator is a `", "` text node** (comma *and* trailing space) sitting directly between the anchors inside `#Tags dd`. Both branches of the remove path's cleanup handle it: `next.textContent.trim() === ","` matches, and `prev.textContent.match(/,\s*$/)` matches. The add path's `tagsDD.append(", ")` produces the identical shape, so server-rendered and JS-appended separators are indistinguishable.
+
+Also confirmed by the probe and relied on by the specs: `#Categories` and `dl#standard` both exist on the picture page (the two insertion anchors the JS's "create the Tags row" branch falls back between), and `themes/modus` appears in the page's asset URLs, which is what lets the modus-theme spec guard against asserting under the wrong theme.
+
 ### Changes Required:
 
-#### [ ] 1. Page object — the only place locators live
+#### [x] 1. Page object — the only place locators live
 **File**: `tests/e2e/support/PicturePage.js` (new)
 ```js
 class PicturePage {
@@ -594,36 +601,149 @@ class PicturePage {
 ```
 Selector policy: locate by the stable ids and classes the plugin emits on purpose (`#Tags`, `#typetags-unassigned`, `.typetag-add`, `.typetag-remove`, `a[data-tag-id]`). Never by position within theme-generated markup.
 
-#### [ ] 2. Scenario seeding, reusing the PHPUnit fixture builder
-**File**: `tests/e2e/support/seed.php` (new)
+Beyond the plan's sketch, the page object also owns `unassignedTagName()` (so no spec hardcodes a tag name that lives in the database), `assignedTagIds()`, `separatorTextNodes()`, `tagsRowPrecedesCategories()`, `loadedThemePaths()`, and the two static readers `computedOpacity()` / `inlinePointerEvents()`. Every one exists because a spec needed a runtime fact, and putting the reader here is what keeps `querySelector` out of the specs.
+
+#### [x] 2. Scenario seeding, reusing the PHPUnit fixture builder
+**File**: `tests/e2e/support/seed.php` (new), plus `tests/e2e/support/seed.js` (the `execFileSync` wrapper the specs call)
 ```bash
 php tests/e2e/support/seed.php --scenario=all-assigned --image=1
+php tests/e2e/support/seed.php --restore
 ```
-Called from `beforeEach`. Setup-before, and it prints the state it achieved so a spec can assert the fixture is what it claims.
+Called from the spec body (seed) and `afterEach` (restore). Setup-before, and it prints the state it achieved as JSON — every spec asserts against `fixture.assigned_colored_count` / `unassigned_colored_count` rather than against a shape guessed from the scenario name.
 
-#### [ ] 3. Specs
-**Files**: `assign.spec.js`, `remove.spec.js`, `edge-cases.spec.js` — case list in *Testing Strategy*.
+**Deviation — cross-process restore.** `FixtureBuilder` records the original state in memory and restores it in the same process; Playwright seeds from one short-lived PHP process and restores from a later one. Rather than write a second restore path in the CLI (two definitions of how state is put back), `FixtureBuilder` gained `exportState()` / `importState()` and `seed.php` persists the export to a git-ignored `tests/e2e/.state/snapshot.json`. `--restore` re-imports it and calls the same `FixtureBuilder::restore()` the integration suite uses. A JSON round trip stringifies integer array keys, so `importState()` casts them back.
+
+**Deviation — a fifth fixture.** Box 540 ("unassigned section hides when the last tag is assigned") is a *transition to empty*, and none of the four planned scenarios can produce it: `someAssignedSomeUnassigned` leaves 7 unassigned, `allColoredAssigned` leaves 0. `FixtureBuilder::allButOneColoredAssigned()` was added, which covers a case that actually differs rather than differing only in its numbers.
+
+#### [x] 3. Specs
+**Files**: `assign.spec.js`, `remove.spec.js`, `edge-cases.spec.js` — 21 specs, case list in *Testing Strategy*. `rendering.spec.js` (4 more) was added by this phase's `/verify` run; see below.
 
 Two cases deserve calling out because they distinguish the defect from its lookalike:
 - **Network failure** (`route.abort()`) → jQuery's `error` callback fires, badge is re-enabled. This already worked; it is Plan B box 553.
 - **Server rejection** (`route.fulfill()` with HTTP 200 and `{"stat":"fail","err":403}`) → lands in `success`, and before the Phase 2 fix leaves the badge permanently dead. No existing box covers this; it is the defect's real signature.
 
-#### [ ] 4. No retries, no parallelism
-**File**: `tests/e2e/playwright.config.js`
-**Changes**: `retries: 0`, `workers: 1`, tracing on. A flaky test gets fixed or made deterministic — never retried into green, never disabled. Waits are on events and locator state, never on a bare timeout.
+**Authentication**: the assignment UI is not rendered for guests, so `auth.setup.js` logs in once as a Playwright setup project and saves `storageState`. Credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD`, never from a file — the same rule `tests/Support/Config.php` enforces. The setup asserts the login form is *gone* rather than merely that a navigation happened, since Piwigo re-renders that form on a failed login.
+
+#### [x] 4. No retries, no parallelism
+**File**: `plugins/typetags/playwright.config.js`
+**Changes**: `retries: 0`, `workers: 1`, `fullyParallel: false`, `forbidOnly: true`, `trace: 'on'`. A flaky test gets fixed or made deterministic — never retried into green, never disabled. Waits are on locator state and `expect.poll`, never on a bare timeout; the one `setTimeout` in the suite is inside a `page.route` handler, holding a mocked response open on purpose so the double-click test observes the in-flight window rather than racing past it.
+
+**Deviation — config location.** The plan put this at `tests/e2e/playwright.config.js`, but Playwright resolves its config relative to the working directory, so the documented command (`cd plugins/typetags && npx playwright test`) would not find it there without a `--config` flag. The config sits at the submodule root with `testDir: './tests/e2e'`, which keeps the documented command working verbatim. Specs still live in `tests/e2e/`, so the `grep tests/e2e/*.spec.js` criterion below is unaffected.
+
+### Finding: the two separator-cleanup branches are not symmetric
+
+Surfaced by `comma separators clean up with no leading or trailing comma` failing on its first run — a real finding, not a flaky test. Removing an assigned tag takes one of two cleanup paths:
+
+- **`nextSibling` branch** (a tag with a tag after it): `next.remove()` — the separator text node is deleted.
+- **`previousSibling` branch** (the last tag): `prev.textContent = prev.textContent.replace(/,\s*$/, "")` — the node's text is emptied, but the node itself stays.
+
+So removing the last tag leaves one zero-length text node behind. It is invisible and no requirement forbids it, so it is **recorded, not fixed**: the spec counts non-empty separator nodes for its real assertion and carries a separate characterization assertion pinning the leftover empty node at exactly one, so a future change to either branch shows up instead of passing silently.
+
+### Checklist mapping — Plan B boxes to specs
+
+**The plan said 23; the actual count of E2E-mapped boxes is 21**, and all 21 have a named spec. The 23 came from adding Plan B Phase 2's 4 E2E boxes to Phase 3's 17 and over-counting by two; boxes 512 and 513 in that same section are integration-covered, not E2E. Boxes 516 and 556 are split across layers, noted below.
+
+| Box | Spec |
+|---|---|
+| 514 | `assign` → unassigned badges render at reduced opacity with a plus prefix |
+| 515 | `remove` → assigned coloured tags show a remove button |
+| 516 | `remove` → the unassigned section is recreated when it had been hidden (browser half; server half is `PicturePageSourceTest::testAllAssignedRendersNoUnassignedSection`) |
+| 517 | `edge-cases` → the modus theme renders both sections correctly |
+| 537 | `assign` → clicking an unassigned badge moves it into the Tags row at full opacity |
+| 538 | `assign` → a remove button appears on the newly assigned tag |
+| 539 | `assign` → the badge disappears from the unassigned list |
+| 540 | `assign` → the unassigned section hides when the last tag is assigned |
+| 541 | `assign` → the Tags row is created when the image had no tags |
+| 542 | `assign` → the assignment survives a page reload |
+| 545 | `remove` → clicking it removes the tag from the Tags row |
+| 546 | `remove` → the tag reappears in the unassigned list at reduced opacity |
+| 547 | `remove` → the Tags row hides when the last tag is removed |
+| 548 | `remove` → the unassigned section is recreated when it had been hidden |
+| 549 | `remove` → the removal survives a page reload |
+| 552 | `edge-cases` → double-clicking issues exactly one request |
+| 553 | `edge-cases` → a network failure leaves the tag in place and the badge clickable |
+| 554 | `edge-cases` → comma separators render between multiple assigned tags |
+| 555 | `edge-cases` → comma separators clean up with no leading or trailing comma |
+| 556 | `assign` → the Tags row is created when the image had no tags (the "assigning creates the Tags row" half; the `#Tags`-absent half is `PicturePageSourceTest::testImageWithNoTagsRendersNoTagsRow`) |
+| 557 | `edge-cases` → an image with only non-coloured tags shows no remove buttons |
+
+Two specs map to no box, on purpose: `add then remove returns the page to its starting state` (round trip) and `a server rejection leaves the badge clickable` (the Phase 2 defect's signature — the box list predates the defect being found).
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `npx playwright test` — all green, exit 0
-- [ ] Passes three consecutive runs with no retries configured (no flake)
-- [ ] Every one of the 23 mapped checklist items has a named spec
-- [ ] `grep -rnE "locator\(|querySelector" tests/e2e/*.spec.js` returns nothing (locators stayed in the page object)
-- [ ] Traces are written for each test
+- [x] `npx playwright test` — all green, exit 0 (21 specs + 1 setup = 22 passed, 8.3s; 26 after `/verify`)
+- [x] Passes three consecutive runs with no retries configured (no flake) — 22/22 on all three, and again with the spec files given in reverse order
+- [x] Every one of the mapped checklist items has a named spec — **21, not 23**; mapping table above, and the miscount is explained there
+- [x] `grep -rnE "locator\(|querySelector" tests/e2e/*.spec.js` returns nothing (locators stayed in the page object)
+- [x] Traces are written for each test — one `trace.zip` per test under `test-results/`
+- [x] `piwigo_image_tag`, `piwigo_user_cache`, `piwigo_tags` and `piwigo_typetags` are byte-identical before and after three full runs; no snapshot file left behind
+- [x] Full PHPUnit suite still green after the `FixtureBuilder` change (91 tests, 33110 assertions); `php -l` clean on `seed.php` and `FixtureBuilder.php`
+
+#### Proven able to fail (step 2 of "proving a check can fail"):
+- [x] Reverting the Phase 2 `else` branch on the add path (and clearing `_data/templates_c/`) turns `a server rejection leaves the badge clickable` red with the defect's exact signature — `inlinePointerEvents` stuck at `"none"` instead of `""`. **Exactly one test moved**: the other 7 in `edge-cases.spec.js` stayed green. Fix restored, file confirmed byte-identical to HEAD, suite re-run green.
 
 #### Manual Verification:
-- [ ] Watching one run headed confirms the assertions describe what actually happens on screen
-- [ ] Rendering under the modus theme matches the screenshots in `.agent-tests/`
+- [x] Watching one run headed confirms the assertions describe what actually happens on screen — **automated** during `/verify` (2026-08-29), see below
+- [x] Rendering under the modus theme matches the screenshots in `.agent-tests/` — done as a one-time comparison and then **superseded by an automated check**, see below
+
+#### Automated during `/verify` (2026-08-29):
+
+Both manual boxes were about the same gap: the rest of the suite asserts DOM *shape*, which a
+badge can satisfy while being painted the wrong colour, collapsed to zero height, or sitting on
+a page whose script threw. That part has an oracle, so it is now a test —
+`tests/e2e/rendering.spec.js` (4 specs):
+
+- [x] `every unassigned badge paints its configured colour at a real size` — seeds `no-tags` so
+  the whole palette is on one page, then compares each badge's **computed** `background-color`
+  against the colour read from `piwigo_typetags` via the seeding CLI. `seed.php` now emits both
+  notations (`#FFCA4F` / `rgb(255, 202, 79)`), so the expected value is read from production
+  rather than a second copy of the palette typed into a spec.
+- [x] `every assigned badge paints its configured colour at a real size` — the same over
+  `all-assigned`, covering the `typetags_render()` path instead of the prefilter's.
+- [x] `a badge assigned in the browser is painted like a server-rendered one` — the add path
+  builds its badge as a JavaScript string literal, entirely separately from the PHP that renders
+  one. This clicks, reads the painted result, reloads, and asserts the PHP-rendered badge is
+  painted identically. Nothing below the browser can see a divergence between those two.
+- [x] `the assignment UI initialises with no console or page errors` — with an anti-vacuity guard
+  asserting the badges and remove buttons are actually present first, so a page that rendered no
+  assignment UI cannot pass by having no script to throw.
+
+**Proven able to fail** — four mutants, each killing exactly its target and nothing else:
+
+| Mutant | Killed | Nothing else moved |
+|---|---|---|
+| unassigned badge `background-color` hardcoded to `#123456` in the prefilter | `every unassigned badge paints its configured colour…` | yes (3 others green) |
+| JS-built badge's `background-color` hardcoded, PHP path untouched | `a badge assigned in the browser is painted like a server-rendered one` | yes (3 others green) |
+| `nonexistentFunctionCall()` at the top of the injected script | both `a badge assigned…` **and** `the assignment UI initialises…` | expected — a throwing init means no × buttons exist, so the second test died on its anti-vacuity guard rather than on its error assertion |
+| `console.error(…)` at the end of the injected script, UI otherwise intact | `the assignment UI initialises with no console or page errors` only | yes — this is the mutant that proves the error assertion itself has teeth, which the one above did not |
+
+After each mutant, `events_public.inc.php` was confirmed byte-identical to HEAD and
+`_data/templates_c/` cleared (per the prefilter/compile-cache finding in Phase 3).
+
+**The modus screenshot comparison, done once and recorded**: the 2026-04-27 reference images
+(`.agent-tests/2026-04-27-tag-assignment-ui/screenshots/07`, `10`) were compared against the new
+captures. Structure and colour match — `Schlagworte` carrying a pill badge with the `×` *inside*
+it, then `Alben`, `Besuche`, then the `+` badges at reduced opacity; `Personen` `#FFFFB6`,
+`Arbeiten` `#FFCA4F`, `Gewerbe` `#BE6CB7` in both. The only difference is modus's light/dark
+colour scheme (the reference was captured in dark mode), which is a theme setting, not a
+rendering regression. **Not added to the regression suite as a screenshot baseline**: pixel
+comparison of a photo gallery is flaky for reasons unrelated to this feature, and the substance
+of the comparison — that badges are painted their configured colours at real size — is what the
+four specs above now assert on every run, more precisely than a screenshot diff would.
+
+New evidence set: `.agent-tests/2026-08-29-phase4-e2e/` (report + 7 screenshots covering all four
+UI states and the add / remove / create-row transitions).
+
+**What stays manual** — no oracle, so it goes to the hand-check ledger rather than a test:
+whether the badge contrast is *legible* for all 8 colours, and whether the hover opacity
+transition *feels* right. Both were already listed under *Manual Testing Steps*.
+
+#### Final state of the suite (2026-08-29):
+- [x] Playwright: **26 passed** (25 specs + 1 auth setup), 9.5s
+- [x] PHPUnit: 91 tests, 33110 assertions
+- [x] `grep -rnE "locator\(|querySelector" tests/e2e/*.spec.js` → nothing; `grep -rn waitForTimeout tests/e2e/*.spec.js` → nothing
+- [x] Database byte-identical to the pre-Phase-4 baseline after every run above, mutation runs included
 
 **Implementation Note**: Run `/verify`. Pause before Phase 5.
 
@@ -968,31 +1088,51 @@ All four element-presence assertions scan the page **with `<script>` blocks stri
 Mapped one-to-one onto the unticked boxes in Plan B. Box numbers are that file's line numbers.
 
 #### `assign.spec.js` — add flow
-- [ ] `unassigned badges render at reduced opacity with a plus prefix` — box 514 `[HAPPY]`
-- [ ] `clicking an unassigned badge moves it into the Tags row at full opacity` — box 537 `[HAPPY]`
-- [ ] `a remove button appears on the newly assigned tag` — box 538 `[HAPPY]`
-- [ ] `the badge disappears from the unassigned list` — box 539 `[ST]`
-- [ ] `the unassigned section hides when the last tag is assigned` — box 540, State B `[BVA]`
-- [ ] `the Tags row is created when the image had no tags` — box 541, State C `[BVA]`
-- [ ] `the assignment survives a page reload` — box 542 `[ST]`
+- [x] `unassigned badges render at reduced opacity with a plus prefix` — box 514 `[HAPPY]`
+- [x] `clicking an unassigned badge moves it into the Tags row at full opacity` — box 537 `[HAPPY]`
+- [x] `a remove button appears on the newly assigned tag` — box 538 `[HAPPY]`
+- [x] `the badge disappears from the unassigned list` — box 539 `[ST]`
+- [x] `the unassigned section hides when the last tag is assigned` — box 540, State B `[BVA]`
+- [x] `the Tags row is created when the image had no tags` — box 541, State C `[BVA]`
+- [x] `the assignment survives a page reload` — box 542 `[ST]`
 
 #### `remove.spec.js` — remove flow
-- [ ] `assigned coloured tags show a remove button` — box 515 `[HAPPY]`
-- [ ] `clicking it removes the tag from the Tags row` — box 545 `[HAPPY]`
-- [ ] `the tag reappears in the unassigned list at reduced opacity` — box 546 `[ST]`
-- [ ] `the Tags row hides when the last tag is removed` — box 547 `[BVA]`
-- [ ] `the unassigned section is recreated when it had been hidden` — box 548, State B `[BVA]`
-- [ ] `the removal survives a page reload` — box 549 `[ST]`
-- [ ] `add then remove returns the page to its starting state` — round trip `[ST]`
+- [x] `assigned coloured tags show a remove button` — box 515 `[HAPPY]`
+- [x] `clicking it removes the tag from the Tags row` — box 545 `[HAPPY]`
+- [x] `the tag reappears in the unassigned list at reduced opacity` — box 546 `[ST]`
+- [x] `the Tags row hides when the last tag is removed` — box 547 `[BVA]`
+- [x] `the unassigned section is recreated when it had been hidden` — box 548, State B `[BVA]`
+- [x] `the removal survives a page reload` — box 549 `[ST]`
+- [x] `add then remove returns the page to its starting state` — round trip `[ST]`
 
 #### `edge-cases.spec.js`
-- [ ] `double-clicking issues exactly one request` — asserted by counting intercepted POSTs, not by eyeballing the UI — box 552 `[ERR]`
-- [ ] `a network failure leaves the tag in place and the badge clickable` — `route.abort()` — box 553 `[NEG]`
-- [ ] `a server rejection leaves the badge clickable` — `route.fulfill()`, HTTP 200 + `stat:"fail"` — **no existing box; this is the Phase 2 defect's signature** `[NEG]`
-- [ ] `comma separators render between multiple assigned tags` — box 554 `[HAPPY]`
-- [ ] `comma separators clean up with no leading or trailing comma` — box 555 `[BVA]`
-- [ ] `an image with only non-coloured tags shows no remove buttons` — box 557, State D `[NEG]`
-- [ ] `the modus theme renders both sections correctly` — box 517 `[HAPPY]`
+- [x] `double-clicking issues exactly one request` — asserted by counting intercepted POSTs, not by eyeballing the UI — box 552 `[ERR]`
+- [x] `a network failure leaves the tag in place and the badge clickable` — `route.abort()` — box 553 `[NEG]`
+- [x] `a server rejection leaves the badge clickable` — `route.fulfill()`, HTTP 200 + `stat:"fail"` — **no existing box; this is the Phase 2 defect's signature** `[NEG]`
+- [x] `comma separators render between multiple assigned tags` — box 554 `[HAPPY]`
+- [x] `comma separators clean up with no leading or trailing comma` — box 555 `[BVA]`
+- [x] `an image with only non-coloured tags shows no remove buttons` — box 557, State D `[NEG]`
+- [x] `the modus theme renders both sections correctly` — box 517 `[HAPPY]`
+
+#### `rendering.spec.js` — what the browser actually paints
+
+Added during Phase 4's `/verify` to automate the two manual boxes. Maps to no Plan B box: the
+checklist asked a human to look at the page, and these assert the part of "looks right" that has
+an oracle. Expected colours are read from `piwigo_typetags` through the seeding CLI, never typed
+into a spec.
+
+- [x] `every unassigned badge paints its configured colour at a real size` — whole palette on one
+  page via the `no-tags` fixture; computed `background-color` per badge, text colour is black or
+  white, bounding box above a named minimum `[ECP]` `[BVA]`
+- [x] `every assigned badge paints its configured colour at a real size` — the same over
+  `all-assigned`, exercising `typetags_render()` rather than the prefilter `[ECP]`
+- [x] `a badge assigned in the browser is painted like a server-rendered one` — the JS string
+  literal and the PHP renderer are two independent implementations of one badge; click, read the
+  paint, reload, assert they agree `[ST]`
+- [x] `the assignment UI initialises with no console or page errors` — with an anti-vacuity guard
+  asserting the badges and remove buttons exist first `[NEG]`
+
+*State transition applies only to the third case; the others are pure render checks.*
 
 ### Regression — Affected Existing Functionality
 
@@ -1037,7 +1177,8 @@ For behaviour no automated layer reaches. Each entry records the date, what was 
 | Date | Checked by hand | Replaced by |
 |---|---|---|
 | 2026-08-28 | Picture page renders identically after the Phase 1 partition extraction (headed browser, logged in as `chriss`, `picture.php?/1/category/1`: "Personen ×" assigned badge, 7 correctly-coloured unassigned badges, 0 console errors). Confirmed by the user. | Not replaceable as-is — it was a before/after comparison and the "before" no longer exists. Ongoing rendering is covered by `MalformedColorRenderingTest` and, from Phase 4, the E2E specs. |
-| 2026-08-28 | A server-side rejection (HTTP 200 + `stat:"fail"`) leaves the badge clickable and logs a warning. Mocked via `route.fulfill()` in a headed browser; verified red before the fix (`pointer-events: none` forever, no console output) and green after (`pointer-events: auto`, `typetags: Invalid security token`). | *Pending* — Phase 4 `edge-cases.spec.js` → `a server rejection leaves the badge clickable` |
+| 2026-08-28 | A server-side rejection (HTTP 200 + `stat:"fail"`) leaves the badge clickable and logs a warning. Mocked via `route.fulfill()` in a headed browser; verified red before the fix (`pointer-events: none` forever, no console output) and green after (`pointer-events: auto`, `typetags: Invalid security token`). | **Replaced 2026-08-29** by `edge-cases.spec.js` → `a server rejection leaves the badge clickable`, which was itself watched failing against the reverted fix |
+| 2026-08-29 | Modus rendering compared against the 2026-04-27 reference screenshots. Structure and palette match (`×` nested inside the badge pill; `#FFFFB6` / `#FFCA4F` / `#BE6CB7`); the only difference is modus's dark colour scheme in the older capture. | Superseded by `rendering.spec.js` — the four specs assert computed colour and geometry on every run, which is what the comparison was for. Not kept as a screenshot baseline (pixel diffing a photo gallery is flaky for unrelated reasons). |
 | *(further entries added during Phase 5's `/verify` run)* | | |
 
 ### Manual Testing Steps

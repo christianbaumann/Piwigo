@@ -49,7 +49,7 @@ General test-design, layering, and quality-gate rules (stack-independent) live i
 `backpressure.md`, and `precommit-hooks.md` — this section covers only what's
 Piwigo/typetags-specific.
 
-Piwigo core has no test suite. The typetags plugin carries a PHPUnit suite in `plugins/typetags/`:
+Piwigo core has no test suite. The typetags plugin carries a PHPUnit suite and a Playwright suite in `plugins/typetags/`:
 
 ```bash
 # Unit — pure functions, no DDEV, no DB, no HTTP
@@ -58,11 +58,17 @@ ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration p
 # Integration — needs DDEV up; hits ws.php over curl and MariaDB directly
 ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
   plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
+
+# E2E — needs DDEV up; drives Chromium in the container against http://localhost/
+ddev exec bash -c 'cd plugins/typetags && TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+  npx playwright test'
 ```
 
-Login credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — deliberately not hardcoded; `tests/Support/Config.php` fails fast naming the missing variable. Everything else defaults to DDEV values. A fresh clone needs `ddev exec composer install -d plugins/typetags` first.
+Login credentials come from `TYPETAGS_TEST_USERNAME` / `TYPETAGS_TEST_PASSWORD` — deliberately not hardcoded; `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming the missing variable. Everything else defaults to DDEV values. A fresh clone needs `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'` first.
 
-The integration suite mutates the database and restores it (`tests/Support/FixtureBuilder.php`). It is not safe against a production install.
+Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
+
+E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in `tests/e2e/support/PicturePage.js` — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 
 **Clear `_data/templates_c/` after editing a Smarty prefilter.** `Template::set_prefilter()` hashes only the filter's *callback name* into Smarty's `compile_id` (`include/template.class.php:1060-1070`), not the callback's source. Editing `typetags_picture_prefilter()` therefore leaves the previously compiled `picture.tpl` in place, and the page — and the integration suite reading it — keeps showing the old injection with no error.
 

@@ -74,12 +74,15 @@ by pushing the rule down, not by strengthening the browser test.
 ```bash
 # Unit
 ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml
-# Integration (DDEV up)
-ddev exec plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml
+# Integration (DDEV up; credentials from the environment)
+ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+  plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
 # Both
-ddev exec plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml
-# E2E
-ddev exec bash -c 'cd plugins/typetags && npx playwright test'
+ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+  plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'
+# E2E (DDEV up; the assignment UI only renders for a logged-in user)
+ddev exec bash -c 'cd plugins/typetags && TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
+  npx playwright test'
 # Syntax check at container PHP version
 ddev exec php -l <file>
 # Hook self-test
@@ -89,4 +92,9 @@ bash tools/test-hooks.sh
 A fresh clone needs `ddev exec composer install -d plugins/typetags` and
 `ddev exec bash -c 'cd plugins/typetags && npm install'` first. Dependency and run output
 (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser
-cache) is git-ignored by the submodule's own `.gitignore`.
+cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by the submodule's own
+`.gitignore`.
+
+The E2E suite mutates the database like the integration suite does. It seeds through
+`tests/e2e/support/seed.php`, which snapshots the original state to
+`tests/e2e/.state/snapshot.json` and restores it in `afterEach`.
