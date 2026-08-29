@@ -69,6 +69,45 @@ by pushing the rule down, not by strengthening the browser test.
   two definitions of the truth. Every assertion gets a named successor first, and the
   mapping goes in the commit message.
 
+### Cover the ground before you move it
+
+Before changing, extending, or refactoring existing functionality, first bring that area to
+exhaustive coverage of how it behaves **today**. Those tests land and pass on their own,
+before a line of the change is written. They are the regression net the edit is made
+against; written afterwards, they only record whatever the edit happened to produce.
+
+The order is fixed:
+
+1. **Characterize the area as-is.** Cover it at the lowest layer that can express it
+   (*Placement rule* above), to the equivalence classes and boundaries in `test-design.md`.
+   Run it green, commit it separately from the change.
+2. **Make the change**, itself governed by the normal discipline — test-first for the new
+   behaviour, production and test code in alternating cycles.
+3. **Re-run the area's suite as the regression check.** Name the command that ran.
+
+Three things this rule does not license:
+
+- **These tests do not prove the code correct.** Their oracle is the implementation, so
+  they are characterization tests: tag them `[ERR]` and declare the oracle, per *a test
+  whose oracle is the code must say so* in `test-design.md`. Where a requirement does exist
+  for some part of the area, write that part against the requirement instead and tag it
+  accordingly — a requirement is a better oracle than the code, and only what has no
+  requirement behind it is `[ERR]`.
+- **They pass on the first run, which normally is the tell** that a test recorded code
+  rather than drove it (*watch it fail first*). Here that is the point, so the strength
+  check moves: prove each one can fail by breaking the behaviour it claims to watch, per
+  *proving a check can actually fail*. A characterization test nobody has watched go red is
+  not yet a regression net.
+- **"Exhaustive" is bounded by the blast radius**, not by the file or the module. Cover
+  what the change can reach. For a large untested area, that bound is the ratchet in
+  `backpressure.md` — a demand to cover everything first gets abandoned, and then there is
+  no net at all.
+
+When a characterization test goes red after the change, that is a decision, not
+automatically a bug: either the change is wrong, or it deliberately replaced recorded
+behaviour. Say which, and if the latter, update the test in its own cycle with the reason —
+never loosen one to get a run green.
+
 ## This repo's commands
 
 ```bash
