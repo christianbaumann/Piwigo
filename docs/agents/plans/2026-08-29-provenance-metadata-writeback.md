@@ -291,8 +291,10 @@ private function add_column($table, $column, $definition)
 `playwright.config.js`, `tests/bootstrap.php`, `tests/Support/{Config,Db,FixtureBuilder}.php`
 **Changes**: mirror `plugins/typetags/` — `failOnWarning="true" failOnRisky="true"`,
 `unit`/`integration` testsuites, `retries: 0`, `workers: 1`, `testDir: './tests/e2e'`, tracing on.
-Credentials from `PROVENANCE_TEST_USERNAME` / `PROVENANCE_TEST_PASSWORD`, failing fast by name;
-everything else defaults to DDEV values. `Db` and `Config` are copied rather than shared —
+Credentials come from dedicated, script-created test accounts rather than a human's login, per
+*Test accounts* in [`.claude/rules/testing.md`](../../../.claude/rules/testing.md) — see the
+deviation note at the end of this phase. Missing variables fail fast by name; everything else
+defaults to DDEV values. `Db` and `Config` are copied rather than shared —
 `plugins/typetags` is a git submodule tracking upstream and must not become a dependency of core
 plugin code.
 
@@ -352,6 +354,23 @@ neither goes in the hand-check ledger.
       exception in `.claude/rules/test-design.md`). It stages the vacuous probe at
       `plugins/provenance/tests/` and asserts exit 1, after first asserting that path is inside
       `TEST_PATH_PATTERN`'s scope — so the case cannot pass by scanning nothing.
+
+### Deviation from the plan
+
+The plan named two credential variables, `PROVENANCE_TEST_USERNAME` / `PROVENANCE_TEST_PASSWORD`,
+implying the suite logs in as whichever account the operator hands it. That is not what was built,
+and *Test accounts* in [`.claude/rules/testing.md`](../../../.claude/rules/testing.md) is why: a
+suite never takes a human's account, and an admin gate is only proven by an authenticated
+**non-admin** failing it, which needs a second account the plan's single pair could not express.
+
+Delivered instead: `tests/Support/TestUsers.php` declares the two roles
+(`provenance_webmaster` → webmaster, `provenance_normal` → normal),
+`tests/Support/create-test-users.php` creates them idempotently with generated passwords, and the
+credentials land in the git-ignored `local/config/provenance-test.env` as four role-suffixed
+variables — `PROVENANCE_TEST_WEBMASTER_USERNAME` / `_PASSWORD` and
+`PROVENANCE_TEST_NORMAL_USERNAME` / `_PASSWORD`. `Config::required()` names the missing variable
+*and* the script that creates it. The commands above are the corrected ones; `CLAUDE.md` and
+`.claude/rules/testing.md` already documented this scheme.
 
 **Implementation Note**: After completing this phase and all automated verification passes, pause
 here for manual confirmation from the human before proceeding.
@@ -1088,16 +1107,19 @@ Only what cannot be automated; each becomes a dated hand-check ledger entry in `
 ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml
 ddev exec plugins/typetags/vendor/bin/phpunit  --testsuite unit --configuration plugins/typetags/phpunit.xml
 
-# Integration (DDEV up; credentials from the environment)
-ddev exec bash -c 'PROVENANCE_TEST_USERNAME=<user> PROVENANCE_TEST_PASSWORD=<pass> \
+# Test accounts - once per install; also rotates the passwords
+ddev exec php plugins/provenance/tests/Support/create-test-users.php
+
+# Integration (DDEV up; credentials sourced from the git-ignored env file)
+ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
 
-# E2E (DDEV up)
-ddev exec bash -c 'cd plugins/provenance && PROVENANCE_TEST_USERNAME=<user> PROVENANCE_TEST_PASSWORD=<pass> \
+# E2E (DDEV up; no specs before Phase 4 - see decision 0007)
+ddev exec bash -c 'cd plugins/provenance && set -a; . ../../local/config/provenance-test.env; set +a; \
   npx playwright test'
 
 # Full regression, both plugins
-ddev exec bash -c 'PROVENANCE_TEST_USERNAME=<user> PROVENANCE_TEST_PASSWORD=<pass> \
+ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --configuration plugins/provenance/phpunit.xml'
 ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
   plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'
