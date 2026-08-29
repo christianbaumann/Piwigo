@@ -84,7 +84,14 @@ ddev exec php plugins/provenance/tests/Support/create-test-users.php
 ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
+
+# E2E - drives Chromium in the container against the admin album screen
+ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
+  cd plugins/provenance && npx playwright test'
 ```
+
+Both plugins share one pinned browser cache: `PLAYWRIGHT_BROWSERS_PATH` in `.ddev/config.yaml`
+points at `plugins/typetags/.playwright-browsers`, so a fresh clone installs browsers once.
 
 That script writes the git-ignored `local/config/provenance-test.env` and creates
 `provenance_webmaster` and `provenance_normal`. It writes users directly and is never safe

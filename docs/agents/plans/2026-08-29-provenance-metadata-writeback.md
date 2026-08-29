@@ -547,7 +547,7 @@ album's existing save path cannot be extended.
 
 ### Changes Required:
 
-#### [ ] 1. Admin prefilter
+#### [x] 1. Admin prefilter
 **File**: `plugins/provenance/include/events_admin.inc.php`
 **Changes**: registered on `loc_begin_admin_page` (guarded by `defined('IN_ADMIN')`), returns early
 unless `$page['page'] === 'album'`, then `$template->set_prefilter('album_properties', …)`.
@@ -561,13 +561,13 @@ define('PROVENANCE_TPL_ALBUM_ANCHOR', '<span class="buttonLike" id="cat-properti
 Injection goes immediately **before** that anchor, so the provenance block sits above the Save
 button, inside the existing form area. Values and `PWG_TOKEN` reach JS through template variables.
 
-#### [ ] 2. Modal and JS
+#### [x] 2. Modal and JS
 **Files**: `plugins/provenance/template/album_provenance.tpl`, `template/album_provenance.js`
 **Changes**: reuse the page's own modal markup (`cat_modify.tpl:191-203`) and `buttonLike` /
 `icon-*` conventions. No new dependency, no framework. `PwgError` returns HTTP 200 with
 `stat:"fail"`, so failure handling lives in the jQuery `success` callback.
 
-#### [ ] 3. `pwg.provenance.setAlbumInfo`
+#### [x] 3. `pwg.provenance.setAlbumInfo`
 **File**: `plugins/provenance/include/ws_functions.inc.php`
 **Changes**: registered on `ws_add_methods`, `admin_only` **and** `post_only`. Guard order copied
 from `plugins/typetags/main.inc.php:189-238`: guest → 401, token mismatch → 403, unknown album →
@@ -587,20 +587,69 @@ an EXIF/IPTC packet, where markup is meaningless. Recorded as a decision file.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit: input-validation helpers (date shape, length, tag stripping) — `[ECP]` `[BVA]` `[NEG]`
-- [ ] Unit: structural guard — `PROVENANCE_TPL_ALBUM_ANCHOR` still occurs in
+- [x] Unit: input-validation helpers (date shape, length, tag stripping) — `[ECP]` `[BVA]` `[NEG]`
+- [x] Unit: structural guard — `PROVENANCE_TPL_ALBUM_ANCHOR` still occurs in
       `admin/themes/default/template/cat_modify.tpl`, **exactly once**, preceded by an
       `assertGreaterThan(MIN_TPL_BYTES, strlen($tpl))` anti-vacuity guard
-- [ ] Integration: `setAlbumInfo` writes all four columns; reads back through the DB
-- [ ] Integration: as guest → 401; bad token → 403; unknown `cat_id` → 404; malformed date → 400
-- [ ] Integration: the rendered album page source contains the injected block
-- [ ] `ddev exec php -l` on every changed file
+- [x] Integration: `setAlbumInfo` writes all four columns; reads back through the DB
+- [x] Integration: as guest → 401; bad token → 403; unknown `cat_id` → 404; malformed date → 400
+- [x] Integration: the rendered album page source contains the injected block
+- [x] `ddev exec php -l` on every changed file
+- [x] E2E: `album-provenance.spec.js` — 4 specs, the first in this plugin. Automates both manual
+      boxes below; command in *Test Commands*
 
 #### Manual Verification:
-- [ ] The modal opens, saves, and the values persist across a page reload
-- [ ] The injected block does not disturb the existing Properties layout at narrow widths
-- [ ] `rm -rf _data/templates_c/*` after any prefilter edit (CLAUDE.md caveat) — confirm the change
+- [x] ~~The modal opens, saves, and the values persist across a page reload~~ →
+      **automated**, `album-provenance.spec.js` → `the modal opens, saves, and the values persist
+      across a reload`
+- [x] ~~The injected block does not disturb the existing Properties layout at narrow widths~~ →
+      **automated**, `album-provenance.spec.js` → `does not disturb the footer at a narrow width`
+      and `the modal is usable in a tiny window`
+- [x] `rm -rf _data/templates_c/*` after any prefilter edit (CLAUDE.md caveat) — confirm the change
       is actually visible, since a stale compile shows the old injection with no error
+
+
+### Deviation from the plan
+
+Three, all recorded rather than silently absorbed.
+
+**`PROVENANCE_TPL_ALBUM_ANCHOR` lives in `include/functions.inc.php`, not `events_admin.inc.php`.**
+The structural guard is a unit test, and the unit bootstrap loads only `functions.inc.php` and
+`history.inc.php` — the two files that declare nothing but functions and constants. Defining the
+anchor in the admin event file would have forced the unit suite to load admin code to read one
+string. It sits with every other shared constant, under its own heading, and `events_admin.inc.php`
+reads it.
+
+**`cat_id` is validated by `WS_TYPE_ID`, not by a `check_input_parameter(..., PATTERN_ID)` call.**
+`ws.php` applies the type before the handler runs, so a second check inside the handler would be
+dead code. This matches `pwg.provenance.getHistory`, which Phase 3 declared the same way.
+
+**The injection is a button plus a modal, not an inline block.** The plan's anchor
+(`<span class="buttonLike" id="cat-properties-save">`) sits inside `div.cat-modify-footer-end`, a
+flex row holding the Save button and its two status messages — dropping four labelled inputs in
+there would have broken the footer at every width, which is precisely what the plan's own manual
+check warns about. What is injected before the anchor is a `Provenance` button and a
+`.desc-modal`, reusing the modal markup and CSS the album screen already carries for its
+description zoom (`cat_modify.tpl:191-203`, `admin/themes/default/theme.css:8035`). The plan's
+item 2 already called for that modal; only its position relative to item 1 changed.
+
+Also landed in this phase: `docs/agents/decisions/0009-provenance-text-is-never-html.md`, which the
+plan asked for by name.
+
+**A fourth deviation, added during verification.** Phase 4 originally listed no E2E criterion, and
+[decision 0008](../decisions/0008-no-e2e-tests-for-provenance-phase-3.md) had already named this
+phase as the owner of the plugin's first spec. Both manual boxes are browser-observable, so they
+were automated rather than left open: `tests/e2e/auth.setup.js`, `tests/e2e/support/seed.php`,
+`support/seed.js`, `support/AlbumPropertiesPage.js` and `album-provenance.spec.js` (4 specs).
+`FixtureBuilder` gained `exportState()` / `importState()` / `albumProvenance()` / `anyAlbumId()`,
+because the E2E suite seeds and restores from two separate short-lived processes.
+
+A fifth spec was written and then **deleted**: a differential on
+`document.documentElement.scrollWidth` with the injected block hidden and shown. Two mutants — a
+4000px `min-width` and a 4000px offset on the button — both left it green, because `#pwgMain`
+already forces the document to 979px at every viewport below 1024 for reasons unrelated to this
+plugin. A check that cannot fail is not a check; it is recorded in `docs/agents/TESTING.md` under
+*Tests NOT required* instead of being kept as a passing tautology.
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 

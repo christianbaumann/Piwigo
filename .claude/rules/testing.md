@@ -147,6 +147,9 @@ ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
 ddev exec php plugins/provenance/tests/Support/create-test-users.php
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
+# provenance E2E (DDEV up; the album properties screen is admin-only)
+ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
+  cd plugins/provenance && npx playwright test'
 # Both
 ddev exec bash -c 'TYPETAGS_TEST_USERNAME=<user> TYPETAGS_TEST_PASSWORD=<pass> \
   plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'
