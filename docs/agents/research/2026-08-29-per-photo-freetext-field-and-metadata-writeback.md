@@ -1,24 +1,101 @@
 ---
 date: 2026-08-29T05:10:18.540066+00:00
+last_updated: 2026-08-29T07:15:18+00:00
 git_commit: e7d58392d59e0390752b0a9cb2d398c14319b5a5
+last_updated_commit: 24e634b651dccd4ade28fc667a72d7af329131ea
 branch: master
-topic: "Per-photo freetext field with write-back into image file metadata (PNG/JPEG/TIFF/HEIC)"
-tags: [research, metadata, exif, iptc, xmp, picture-page, picture-modify, imagick, ui, albums, categories, propagation, requirements]
+topic: "Provenance metadata for scanned photos: per-photo and per-album freetext with write-back into image file metadata"
+tags: [research, metadata, exif, iptc, xmp, exiftool, provenance, picture-page, picture-modify, imagick, ui,
+       albums, categories, propagation, requirements, audit-trail, concurrency, locking, shared-hosting, all-inkl]
 status: complete
+production_host: "ALL-INKL PrivatPlus — probed 2026-08-29: PHP 8.4.16 fpm-fcgi, disable_functions empty, imagick present, exiftool 12.76 preinstalled. Write-back is FULLY supported."
 ---
 
-# Research: Per-photo freetext field written into image file metadata
+# Research: Provenance metadata for scanned photos, with write-back into image files
+
+## Document Status and Reading Guide
+
+This document grew across several rounds on 2026-08-29. It is long (2000+ lines) and **sections
+later in the file supersede earlier ones**. Read this guide first.
+
+**Where the scope ended up.** It began as "a freetext field per photo, written into the file's
+metadata". It is now: **structured provenance for scanned photographs** (which physical album, who
+owns it, when it was scanned) entered at **album level**, copied down to every photo, and written
+into the image files — with an audit trail.
+
+**Research state: complete.** Every question opened in this investigation is closed or measured.
+**Production feasibility: confirmed by probe on the live host** — `exec` permitted, Imagick present,
+and **ExifTool 12.76 already installed**. The write-back requirement is buildable as specified. See
+*Production Host Probe — RESULT*.
+
+| Round | Section | What it settled |
+|---|---|---|
+| 1 | `Summary` → `Open Questions` | The original per-photo research: read-only metadata layer, format capability matrix, UI injection points |
+| 2 | `Follow-up Research … Album-level` | Album schema, save path, propagation precedents, association model, batch infrastructure |
+| 3 | `Decisions Recorded` | Answers to the 15 requirements questions; the scope reframing to provenance |
+| 4 | `Conflict Resolutions` | The four ⚠ conflicts those answers created |
+| 5 | `Follow-on Resolutions` | Ten second-round questions |
+| 6 | `Audit Trail Infrastructure` | Core has no revision table; what must be built |
+| 7 | `Metadata-Writing Library Survey` | Only exiftool writes EXIF into PNG |
+| 8 | `Empirical Verification of exiftool` | Measured: all formats, zero pixel change, encoding, derivatives |
+| 9 | `Concurrency and Locking` | **Concurrent writes destroy files**; `flock` fixes it |
+| 10 | `Shared-Hosting Feasibility` | ALL-INKL PrivatPlus: two unknowns — **since resolved, see row 11** |
+| 11 | `Production Host Probe — RESULT` | Probe run on the live account: **no blockers**; ExifTool preinstalled; 60 s execution ceiling |
+
+**⚠ The three findings that most affect the plan:**
+
+1. **Concurrent exiftool writes delete the photo** — measured, 5 of 6 runs at 12-way contention.
+   Per-file `flock` on a separate lock file fully mitigates. Locking is mandatory, not advisory.
+2. **exiftool writes without re-encoding pixels** — measured byte-identical across PNG/JPEG/TIFF/HEIC.
+   This removes the lossy re-encode that made the Imagick route unattractive.
+3. **The production host has a 60-second `max_execution_time`** — absent locally (`0`), so every
+   batch operation must be chunked to fit. This is now the binding constraint on the write-back
+   design, replacing the earlier worry that the host might not support write-back at all.
+
+**⚠ Corrections made in later rounds** — earlier text in this file was wrong on these points and has
+been annotated in place:
+
+- "Piwigo core shells out nowhere today" — **false**; core ships an `exec()`-based ImageMagick backend.
+- "`_original` backups accumulate per save" — **false**; exiftool never overwrites an existing backup.
+- "`clean_iptc_value()` converts from windows-1252 unconditionally" — **false**; it auto-detects UTF-8.
+- "cron gives a scheduling escape hatch on the host" — **false**; ALL-INKL cron fetches a URL.
+- "ALL-INKL disables `exec` and lacks Imagick" — **false on this account**; those forum reports
+  describe the older mod_php setup. The host runs PHP-FPM with an empty `disable_functions`.
+
+**Next action:** planning. The capability probe has been run (round 11) and returned no blockers.
+The one open measurement is ExifTool throughput against the 60 s ceiling, which is sizing work for
+the plan rather than a feasibility question.
 
 ## Research Question
 
-Add a freetext field per photo; the text shall also be saved into an appropriate field in
-the image's file metadata. If several metadata standards have a field for such freetext,
-all shall be used (even if the text is then duplicated). The UI/UX shall fit the existing
+**As originally posed:** add a freetext field per photo; the text shall also be saved into an
+appropriate field in the image's file metadata. If several metadata standards have a field for such
+freetext, all shall be used (even if the text is then duplicated). The UI/UX shall fit the existing
 design without disturbing the current page layout. Formats of interest: PNG, JPG, TIFF, HEIC.
 
-Research only — this document describes what exists today. It contains no recommendation.
+**Extended during the investigation:**
+
+1. *A freetext field per album*, saved at album level and given to every image in it; image-level
+   text uses the same mechanism as the per-photo field.
+2. *Restated purpose* — this install holds **scans of real photographs** obtained from people's
+   physical albums. It must record provenance: which physical album, who owns it, when it was
+   scanned. So the unit is several typed fields, not one blob.
+3. *An audit trail* for all texts.
+4. *Does it work on the production host* — ALL-INKL PrivatPlus?
+
+Research only — this document describes what exists today and records decisions taken. Where a
+section proposes an approach, it is recording a decision already made by the product owner, not a
+recommendation from the research.
+
+**Working assumption recorded mid-research:** photo → album is treated as **1:1**. The codebase does
+not enforce this (see the scoping note in the album section); making it true is tracked separately in
+`docs/backlog.md`.
 
 ## Summary
+
+> **Scope note:** this section summarises **round 1 only** — the original per-photo question. The
+> scope was extended twice afterwards (album level, then provenance-for-scans) and several claims
+> below were later corrected. See the Document Status and Reading Guide above.
 
 Three findings dominate the picture.
 
@@ -762,10 +839,10 @@ uniqid), `loc_begin_index` / `loc_end_index`, `loc_begin_index_category_thumbnai
    the conflict case needs.
 10. **Whether `pwg.images.setInfo`'s `multiple_value_mode` (`ws.php:875`) applies to categories**
     was noted in the registration text but the handler branch was not traced.
-11. **`$conf['album_description_on_all_pages']`'s default value** was not looked up; it gates
-    whether the album description shows past page 1 (`index.php:341`).
-12. **The `rank` semantics of `associate_images_to_categories()`** (`admin/include/functions.php:2094-2098`)
-    were not examined for what happens on re-association of an existing pair.
+11. **[CLOSED — `false` (`include/config_default.inc.php:289`).** The album description shows only
+    on page 1 unless enabled.]
+12. **[CLOSED — it associates "only not already associated images": existing pairs are skipped and
+    keep their rank; new pairs get `++max_rank` per category.** No duplicate rows, no rank churn.]
 13. **Is adding a system package to the DDEV image acceptable?** exiftool needs
     `libimage-exiftool-perl` via `webimage_extra_packages` in `.ddev/config.yaml` — the one tracked
     file in `.ddev/`. Also unexamined: whether a production Piwigo host can be assumed to have it.
@@ -1803,6 +1880,568 @@ filesystem sync cannot mistake it for a photo.
   under `upload/`. This is the one item from the earlier "still open" list that remains open.
 - HEIC was exercised only through an Imagick-produced file, not a camera-produced one.
 
+## Concurrency and Locking on Originals (2026-08-29, measured)
+
+Closes the last open item. Measured in the DDEV web container against a real gallery PNG
+(`upload/2026/04/19/20260419142031-496f8727.png`, 638,507 bytes).
+
+### ⚠⚠ Finding 1 — concurrent exiftool writes DESTROY the original file
+
+This is the most serious finding in this document. **Twelve concurrent `exiftool` writes to the
+same file deleted the file outright in 5 of 6 runs.**
+
+```
+run 1: *** FILE LOST ***      run 4: *** FILE LOST ***
+run 2: *** FILE LOST ***      run 5: *** FILE LOST ***
+run 3: survived (value=w10)   run 6: *** FILE LOST ***
+=== 12 concurrent writers, 6 runs: survived=1  destroyed=5 ===
+```
+
+Error breakdown from a single 12-way run:
+
+```
+  1  1 image files updated
+  1  Error renaming temporary file to c.png
+ 10  Error: Temporary file already exists: c.png_exiftool_tmp
+```
+
+**Root cause: exiftool's temp filename is fixed, not randomized** — it is always
+`<filename>_exiftool_tmp`. Concurrent processes collide on that one name; the losers abort, and the
+interleaving of their cleanup with the winner's rename leaves **no file at the original path**.
+Not a corrupted file, not a stale file — *no file*. The photo is gone from disk while the
+`piwigo_images` row still points at it.
+
+Contention threshold, measured:
+
+| Concurrent writers | Outcome |
+|---|---|
+| 2 | file survives; **lost update** (one writer's value wins, others silently discarded) |
+| 3 | file survives; lost update |
+| 5 | file survives; lost update |
+| 12 | **file destroyed in 5 of 6 runs** |
+
+Even at low contention the behaviour is a silent lost update: every writer reports
+`1 image files updated`, but only one value persists.
+
+⚠ This is directly reachable by the feature as designed. Decision Q6b re-applies album text to every
+photo, and Q13 continues on error. Two admins pressing "apply" on overlapping albums, or an apply
+racing a per-photo save, produces exactly this contention on the shared files.
+
+### Finding 2 — `flock` fully mitigates it
+
+Same test, each write wrapped in an exclusive `flock` on a per-file lock:
+
+```
+=== with flock, 12 writers, 6 runs: survived=6  destroyed=0 ===
+=== per-writer outcomes ===
+     12  1 image files updated
+```
+
+**6 of 6 runs survived, zero errors, all twelve writes applied in sequence.** Serialization is
+sufficient; no exiftool flag is needed and none exists for this.
+
+PHP's `flock()` is the in-language equivalent. ⚠ Note the lock must be on a **separate lock file**,
+not on the image itself — exiftool replaces the image file via rename, so a lock held on the old
+inode would not exclude anything after the first write.
+
+### Finding 3 — the write is atomic, which protects readers
+
+Measured via inode identity across a write:
+
+| Mode | Inode before → after | Mechanism |
+|---|---|---|
+| default (keeps `_original`) | 535791 → **535798**; backup takes 535791 | original *renamed* to `_original`, new file renamed into place — **atomic** |
+| `-overwrite_original` | 535791 → **535797** | temp file + rename — **atomic** |
+| `-overwrite_original_in_place` | 535797 → **535797** | truncate and rewrite in place — **not atomic** |
+
+The mode chosen by decision 7b (default, keeping `_original`) is the atomic one, and the backup is
+literally the original inode renamed aside.
+
+Reader-during-write test — 200 `Imagick` opens against a file being rewritten 25 times:
+
+| Writer mode | Reads OK | Reads failed | File missing at open |
+|---|---|---|---|
+| default / atomic rename | 200 | 0 | 0 |
+| `-overwrite_original_in_place` | 200 | 0 | — |
+
+⚠ **Honest limitation**: the in-place mode also showed no reader failures, but that is my test
+failing to hit a narrow window, **not evidence that it is safe**. A metadata-only rewrite of a
+638 KB file is fast, so the truncated-file window is very short. The atomic rename path is
+*structurally* safe — a reader holding the path sees either the complete old file or the complete
+new one, never a partial one. The in-place path has no such guarantee and merely a small window.
+Only the first row of that table is a safety claim; the second is an unhit race.
+
+Practical consequence: **derivative generation (`i.php`) racing a metadata write is safe**, provided
+writes use the atomic mode. That closes the reader half of the concern.
+
+### What this means for the plan
+
+- **Per-file locking is mandatory, not advisory.** Without it the feature can delete photos from
+  disk under ordinary multi-user operation. This is the one finding in this document that describes
+  data loss rather than inconvenience.
+- The lock must be **per image file**, on a **separate lock file**, held across the whole exiftool
+  invocation.
+- ⚠ Piwigo has **no locking convention at all** for files under `upload/` — this is new
+  infrastructure, and `_data/` is the natural home for lock files by existing convention.
+- A lock also serializes the lost-update case, giving last-write-wins deterministically rather than
+  by race.
+- ⚠ Interaction with Q13 (continue on error): a writer that cannot acquire the lock within a timeout
+  must be recorded as a per-photo failure, not skipped silently — otherwise "applied to 200 photos"
+  is reported when fewer were written.
+- ⚠ The 12-way contention that triggers destruction is not exotic: the chunked-AJAX pattern
+  (`admin/themes/default/js/batchManagerGlobal.js`) issues requests through
+  `jQuery.manageAjax.create('queued', {queue:true, maxRequests:1})` — serialized **per browser tab**.
+  Two tabs, or two admins, are two independent queues hitting the same files.
+
+## Shared-Hosting Feasibility (ALL-INKL PrivatPlus)
+
+Question raised 2026-08-29: does the design — exiftool in particular — work on the production
+hosting package, ALL-INKL.COM **PrivatPlus**?
+
+⚠ The captured resource file
+`docs/agents/resources/Alte Tarife (nicht mehr bestellbar)  ALL‑INKL.COM.md` contains **only the
+SSL certificate pricing block**, not the tariff's technical specification. The package's actual
+capabilities (SSH, PHP `disable_functions`, Perl, extensions) are not in the repo and were
+researched separately.
+
+### Finding A — ⚠ Correction: Piwigo core *does* shell out, extensively
+
+An earlier statement in this document — "Piwigo core shells out nowhere today" — is **wrong** and is
+corrected here. Core calls `exec()` in at least these places:
+
+| Location | Purpose |
+|---|---|
+| `admin/include/image.class.php:380` | `command -v magick` — probe for the binary |
+| `admin/include/image.class.php:403` | `magick -version` — capability detection |
+| `admin/include/image.class.php:604`, `:751` | the actual resize / rotate calls |
+| `admin/include/functions_upload.inc.php:601` | upload-time image processing |
+| `admin/maintenance_actions.php:329`, `admin/include/functions.php:3730` | version reporting |
+| `include/ws_functions/pwg.php:213`, `:245` | `du -sk` for cache size reporting |
+
+Piwigo ships an **external-ImageMagick graphics backend** driven by shell-out, selected via
+`$conf['graphics_library'] = 'auto'` (`include/config_default.inc.php:260`) with a configurable
+binary path `$conf['ext_imagick_dir'] = ''` (`:264`).
+
+This materially changes the shared-hosting risk assessment: shelling out is not a foreign concept
+being introduced, it is an existing core mechanism with an established detection-and-fallback
+pattern.
+
+### Finding B — the exact degradation pattern to copy
+
+`pwg_image::is_ext_imagick()` (`admin/include/image.class.php:393-410`):
+
+```php
+static function is_ext_imagick()
+{
+  global $conf;
+  if (!function_exists('exec'))     // ← disable_functions check FIRST
+  {
+    return false;
+  }
+  @exec($conf['ext_imagick_dir'].pwg_image::get_ext_imagick_command().' -version', $returnarray);
+  if (is_array($returnarray) and !empty($returnarray[0]) and preg_match('/ImageMagick/i', $returnarray[0]))
+  { ... return true; }
+```
+
+Three properties worth copying verbatim for an exiftool integration:
+
+1. **`function_exists('exec')` is checked before anything else** — the graceful answer when a host
+   has `exec` in `disable_functions`.
+2. **Capability is probed by running `-version` and matching the output**, not assumed from a path.
+3. **The directory is configurable** (`ext_imagick_dir`), so a binary in a user's home directory is
+   supported without the binary being on `PATH`.
+
+### Finding C — ⚠⚠ exiftool is a Perl script, not a compiled binary (measured)
+
+This is the decisive fact for shared hosting.
+
+```
+$ file $(which exiftool)
+/usr/bin/exiftool: Perl script text executable      (8026 lines)
+```
+
+It requires **no root, no apt, no compilation**. Measured directly: copying the script plus its
+`Image/` module tree into an ordinary home directory and running it with `PERL5LIB` set works
+completely —
+
+```
+$ mkdir -p ~/et/lib && cp /usr/bin/exiftool ~/et/ && cp -r /usr/share/perl5/Image ~/et/lib/
+$ PERL5LIB=~/et/lib perl ~/et/exiftool -ver
+13.25
+```
+
+and a **full write through that self-contained copy succeeded** on a real gallery PNG, with EXIF,
+IPTC and XMP all reading back correctly (including `Łódź`, verified with `-charset iptc=UTF8` on
+both write and read):
+
+```
+[EXIF]  ImageDescription  : Oma Müller Łódź
+[IPTC]  Caption-Abstract  : Oma Müller Łódź
+[XMP]   Description       : Oma Müller Łódź
+```
+
+So on **any** host that offers Perl and permits `exec`, ExifTool can be deployed by uploading files
+into the web space — no package manager and no shell access required for installation.
+
+⚠ Read/write symmetry: `-charset iptc=UTF8` must be passed on **reads as well as writes** when
+reading via exiftool, or UTF-8 IPTC is re-interpreted as latin-1 and displays as mojibake. This does
+not affect Piwigo, which reads IPTC via `iptcparse()` + `clean_iptc_value()` (which auto-detects),
+but it will bite anyone verifying by hand.
+
+### Finding E — the PrivatPlus tariff specification (fetched from the source page)
+
+Fetched from `https://all-inkl.com/tarifinfo/?tnr=91d0dbfd38d950cb716c4dd26c5da08a&lang=de`
+(the tariff the repo's resource file was captured from — that file holds only the SSL pricing block).
+Tariff is listed under "Alte Tarife (nicht mehr bestellbar)", i.e. a legacy package still running but
+no longer sold.
+
+| Feature | Value |
+|---|---|
+| Tariff | **all-inkl PrivatPlus** |
+| **SSH-Zugang** | **nein** |
+| **Perl** | **"Eigene CGI's sind möglich"** — custom CGI scripts supported |
+| PHP | "PHP inklusive vieler Module ist installiert" (no version stated on this page) |
+| **Cronjobs** | **25 included** (more purchasable: 1 job €0.95/mo … 10 jobs €6.95/mo) |
+| Speicherplatz | 100 GB |
+| MySQL-Datenbanken | 25 |
+| SSI | included |
+| `.htaccess` | available |
+| ImageMagick / `exec` | **not mentioned** |
+| Memory / execution limits | **not stated** |
+
+Three things follow directly:
+
+- ⚠ **No SSH.** So the container-style `apt-get install libimage-exiftool-perl` route (decision C7a)
+  does **not** apply to production. But per Finding C this does not block ExifTool: it is a Perl
+  script that installs by **uploading files via FTP** into the web space, needing no shell.
+- ✅ **Perl with custom CGI is explicitly supported.** ExifTool's own runtime requirement is
+  therefore satisfied by the tariff as documented.
+- ⚠ **25 cron jobs — but see Finding F.3.** ALL-INKL cron jobs are configured by entering a **URL
+  to fetch**, not a shell command, so cron cannot invoke ExifTool directly; it schedules an HTTP
+  request to a PHP script and inherits PHP's restrictions. Still useful for scheduling deferred DB
+  work (which suits decision C2), but **not** an escape hatch from `disable_functions`.
+
+⚠ **The decisive unknown is not answered by the tariff page**: whether PHP's `exec()` /
+`shell_exec()` / `proc_open()` are permitted. SSH access and PHP `disable_functions` are independent
+settings — many shared hosts disable interactive SSH while still permitting PHP to spawn processes.
+The tariff page says nothing about `disable_functions`, and this cannot be settled from documentation
+alone.
+
+**How to settle it definitively** — one file uploaded to the production web space:
+
+**File name and extension.** A plain **`.php`** file, uploaded by FTP into the web root — the same
+place `index.php` lives. Two practical points:
+
+- ⚠ **Give it an unguessable name and delete it afterwards** (e.g. `probe-8f3a1c.php`). Its output
+  discloses PHP version, loaded extensions, `disable_functions` and paths — the kind of
+  reconnaissance detail that should not sit at a predictable URL such as `/test.php` or `/info.php`.
+- ⚠ **To test the PHP-CGI mode claim (F.1) the extension matters.** The reported workaround runs PHP
+  through a CGI handler, which ALL-INKL historically bound to a **different extension** (`.phpx`) or
+  to `.php` via an `.htaccess` `AddHandler` line. So a `.php` file measures **mod_php** — the default
+  mode. If mod_php reports `exec` disabled, a **second copy of the same probe under the CGI handler**
+  is what tests whether the workaround actually restores it. Both results matter; one alone does not
+  answer the question.
+
+```php
+<?php
+// probe-<random>.php  — delete after reading
+header('Content-Type: text/plain');
+var_dump(function_exists('exec'), function_exists('proc_open'), function_exists('shell_exec'));
+var_dump(ini_get('disable_functions'));
+var_dump(extension_loaded('imagick'), extension_loaded('exif'), extension_loaded('gd'));
+var_dump(PHP_VERSION, PHP_SAPI, ini_get('memory_limit'), ini_get('max_execution_time'));
+echo @shell_exec('perl -v') ?: "perl not reachable via shell_exec\n";
+echo @shell_exec('which exiftool') ?: "exiftool not on PATH\n";
+```
+
+`PHP_SAPI` is included deliberately: it reports which mode answered the request
+(`apache2handler` for mod_php, `cgi-fcgi` or similar under CGI), so the two probe results can be
+told apart.
+
+This is a five-minute check that resolves the entire question, and it is the recommended first
+action of the plan phase. Note Piwigo's own admin already surfaces part of this: the
+`is_ext_imagick()` probe (Finding B) reports whether the external ImageMagick backend is usable,
+which is exactly a `function_exists('exec')` + binary-probe result.
+
+⚠ **Fallback if `exec` is disabled**: ExifTool can still be reached as a **Perl CGI**, which the
+tariff explicitly supports — the script is invoked over HTTP by the web server rather than spawned
+by PHP. That is an unusual deployment and carries its own access-control burden (the CGI must not be
+callable by anyone who can reach the URL), and it was **not tested here**. The simpler degraded mode
+remains Imagick-only XMP + IPTC (Finding D).
+
+### Finding F — ⚠⚠ the two capabilities the design needs are both in doubt on this host
+
+Web research across ALL-INKL's own pages and German-language forums. **Confidence is marked
+per claim**, because the load-bearing facts are *not* in official documentation.
+
+#### F.1 `exec()` family — reportedly disabled by default `[USER-SOURCED]`
+
+Multiple independent forum threads spanning years and different CMSes (CMS Made Simple, TYPO3,
+Joomla-era, the Gallery project) consistently report the same `disable_functions` list under
+ALL-INKL's **default mod_php** mode:
+
+```
+exec, system, passthru, shell_exec, popen, escapeshellcmd, proc_open, proc_nice
+```
+
+- https://forum.cmsmadesimple.org/viewtopic.php?t=35147
+- https://www.typo3forum.net/discussion/50807/all-inkl-php-cgi-und-imagemagick
+
+⚠ **No official ALL-INKL document states this**, and none states `disable_functions` per tariff.
+The evidence is convergent user reports, which is suggestive but not authoritative.
+
+Two things cut against it:
+
+- ALL-INKL publishes a tutorial *"How to execute shell scripts"* whose example is literally
+  `exec("/bin/bash <path> 2>&1", $out, $result)`. It says only that "some commands are locked due
+  to security reasons" and that large scripts may hit resource limits — it does **not** say which
+  PHP mode or tariff this requires.
+  https://all-inkl.com/en/support/tutorials/scripts/miscellaneous/via-script/how-to-execute-shell-scripts_304.html
+- A second-hand report of an ALL-INKL support statement says the functions **can be re-enabled by
+  switching from mod_php to PHP-CGI mode** (`.htaccess` handler change), at the cost of "stricter
+  resource restrictions". `[USER-SOURCED, unconfirmed by any primary document]`
+
+**Net: genuinely ambiguous, leaning disabled-by-default.** Not safe to assume either way.
+
+#### F.2 ⚠ Imagick reportedly unavailable under PHP 8 `[USER-SOURCED]`
+
+Reports indicate **Imagick is not supported on ALL-INKL under PHP 8**, with users directed to GD
+instead. Primary confirmation could not be opened; treat as user-level.
+
+This is the more damaging of the two findings, and it **invalidates the fallback described in
+Finding D**. That fallback assumed Imagick could still write XMP + IPTC when `exec` was
+unavailable. If Imagick is absent:
+
+- **GD cannot write image metadata at all** — it has no profile API whatsoever.
+- Piwigo's own graphics layer degrades to GD (`$conf['graphics_library']`), which is why the site
+  still works, but nothing in that path can carry a metadata write.
+
+⚠ **Worst case, if both F.1 and F.2 hold: file metadata write-back is impossible on this host by
+any available mechanism.** Not degraded — impossible.
+
+#### F.3 Cron is URL-based, not shell-based `[OFFICIAL]`
+
+PrivatPlus's 25 cron jobs are configured in KAS by **entering a URL to fetch**, not an arbitrary
+shell command.
+
+⚠ This corrects an over-optimistic reading recorded in Finding E: cron does **not** provide a way to
+invoke ExifTool directly. It schedules an HTTP request to a PHP script, so it inherits whatever
+restrictions PHP is already under. It remains useful for *scheduling* deferred DB work (which suits
+decision C2), but it is not an escape hatch from `disable_functions`.
+
+#### F.4 Other specifics
+
+| Item | Finding | Confidence |
+|---|---|---|
+| SSH on PrivatPlus | **not included** (Premium and Business only) | `[OFFICIAL]` — plans comparison |
+| Perl / custom CGI | supported; scripts in `cgi-bin`, ASCII upload, `chmod 755` | `[OFFICIAL]` product page + `[USER]` detail |
+| Perl version | one 2011-era report cites 5.8.8 — almost certainly stale | `[UNKNOWN]` |
+| ExifTool preinstalled | **no evidence either way**; search returned nothing ALL-INKL-specific | `[UNKNOWN]` |
+| PHP versions | selectable per (sub)domain in KAS; 5.6 … 8.2 referenced in migration docs | `[OFFICIAL]` |
+| `gd` / `exif` / `mbstring` / `iconv` | not enumerated anywhere; GD implied available | `[UNKNOWN]` |
+| `memory_limit`, `max_execution_time` | not settable via KAS; since PHP 8 must use `.user.ini`, not `.htaccess` | `[USER]` |
+| Package | 100 GB, 5 domains, 25 MySQL, 25 cron, ~€7.95/mo | `[OFFICIAL]` |
+
+#### F.5 What this means
+
+The honest position: **this cannot be resolved from public sources.** The two facts the design
+depends on — whether `exec` is permitted, and whether Imagick exists — are both `[USER-SOURCED]`
+and both point the wrong way.
+
+The probe script in Finding E answers both at once and should run before any planning proceeds. Add
+one line to it:
+
+```php
+var_dump(extension_loaded('imagick'));   // ← the fallback depends entirely on this
+```
+
+Possible outcomes, and what each costs:
+
+| `exec` | `imagick` | Write-back capability |
+|---|---|---|
+| ✅ | either | **Full** — EXIF + IPTC + XMP via uploaded ExifTool (Finding C) |
+| ❌ | ✅ | **Degraded** — XMP + IPTC only, no EXIF; lossy re-encode on JPEG/HEIC |
+| ❌ | ❌ | **None** — no mechanism can write metadata; DB-only feature |
+
+⚠ Note the third row does **not** kill the feature: per Finding D, every other component (schema,
+propagation, audit trail, admin modal, public row, WS methods, locking) is pure PHP + MySQL. What is
+lost is Q9/Q15 — the write-into-the-file requirement — which is the feature's original premise.
+Whether the feature is still worth building without it is a product decision, not a technical one.
+
+⚠ Also worth flagging for the plan: the PHP-CGI switch (F.1) is a **global change to how the whole
+Piwigo install is served**, not a per-feature toggle, and carries a reported penalty of stricter
+resource limits. That is a decision about the hosting of the entire site, made in service of one
+feature.
+
+### Finding D — the design splits cleanly along the dependency
+
+Only one component of the feature depends on exiftool at all:
+
+| Component | Depends on | Works without `exec`? |
+|---|---|---|
+| Album provenance fields (schema, C1) | MySQL, PHP | ✅ |
+| Propagation to photos (C2, Q6b) | MySQL, PHP | ✅ |
+| Audit/history table (C6) | MySQL, PHP | ✅ |
+| Admin button + modal (prefilter) | PHP / Smarty | ✅ |
+| Public `#Provenance` row (9b) | PHP / Smarty | ✅ |
+| New WS method, core trigger patches | PHP | ✅ |
+| Per-file locking (`flock`) | PHP `flock()` | ✅ |
+| **File metadata write-back (Q9, Q15)** | **exiftool + `exec`** | ❌ |
+| — XMP + IPTC only, as a fallback | Imagick | ✅ *(measured in §C)* |
+| — EXIF | exiftool only | ❌ |
+
+So a host that forbids `exec` costs **the EXIF half of the write-back** — *provided Imagick is
+present*. Imagick was measured in the first pass as able to write XMP and IPTC profiles (but never
+EXIF), so that degraded mode retains XMP `dc:description` — which the MWG treats as a first-class
+member of the caption mirror set — plus IPTC.
+
+⚠ **This fallback is itself in doubt on ALL-INKL** — Imagick is reported unavailable under PHP 8
+there (Finding F.2). GD, the alternative, cannot write metadata at all. See F.5 for the full
+outcome matrix.
+
+⚠ Caveat on the degraded mode: the Imagick write path **re-encodes pixels**, measured lossy for
+JPEG and HEIC (§C). On a host without `exec`, write-back for those two formats trades image quality
+for metadata. PNG and TIFF re-encode losslessly.
+
+## Production Host Probe — RESULT (2026-08-29, measured on the live account)
+
+The capability probe was run on the production ALL-INKL PrivatPlus account. **It overturns the
+forum-sourced findings in Finding F entirely.** Verbatim output:
+
+```
+=== PHP mode ===
+PHP_VERSION:                       8.4.16-nmm1
+PHP_SAPI:                          fpm-fcgi
+memory_limit:                      384M
+max_execution_time:                60
+
+=== Process execution ===
+exec():                            YES
+shell_exec():                      YES
+proc_open():                       YES
+system():                          YES
+passthru():                        YES
+popen():                           YES
+disable_functions:                 (empty)
+
+=== Imaging and metadata extensions ===
+imagick:                           YES
+gd:                                YES
+exif:                              YES
+mbstring:                          YES
+iconv:                             YES
+ImageMagick version:               ImageMagick 6.9.12-98 Q16 x86_64 18038 https://legacy.imagemagick.org
+Imagick XMP write test:            OK (fallback usable)
+
+=== Perl and ExifTool ===
+perl:                              5.038002
+exiftool on PATH:                  /usr/bin/exiftool
+exiftool version:                  12.76
+
+=== Verdict for the write-back requirement ===
+FULL: ExifTool can be uploaded and invoked.
+```
+
+### ⚠ Corrections to Finding F — the forum reports were wrong (or stale)
+
+| Finding F claim | Confidence then | Measured reality |
+|---|---|---|
+| `exec`/`shell_exec`/`proc_open` disabled by default | `[USER-SOURCED]` | **All enabled. `disable_functions` is EMPTY.** |
+| Imagick unavailable under PHP 8 | `[USER-SOURCED]` | **Imagick present and working** — the live XMP write test passed |
+| ExifTool preinstalled | `[UNKNOWN]` | **Preinstalled at `/usr/bin/exiftool`, v12.76** |
+| PHP-CGI switch needed to re-enable exec | `[USER-SOURCED]` | **Moot** — no switch required |
+
+The likely explanation for the discrepancy: `PHP_SAPI` is **`fpm-fcgi`**, not `apache2handler`.
+The forum reports describe ALL-INKL's older **mod_php** configuration, where the restrictive
+`disable_functions` list applied. The account now runs **PHP-FPM**, where it does not. Those reports
+were not wrong when written; they are stale.
+
+**This closes the blocker.** No upload of ExifTool is needed, no CGI-mode workaround, no degraded
+mode. The `blocked_on` field in this document's frontmatter is cleared.
+
+### New constraints the probe revealed
+
+Three facts that were unknown before and that do bear on the plan:
+
+**⚠ 1. `max_execution_time: 60` seconds.** This is a hard per-request ceiling in production, where
+the local DDEV container has none (`max_execution_time: 0`). Every design measured locally must fit
+inside 60 s per request or be chunked.
+
+This **strongly validates decisions C2 and Q4**: file write-back as a separate, chunked operation
+rather than synchronous work on album save. It also puts a number on the chunk sizing that the
+Batch Manager pattern (`admin/themes/default/js/batchManagerGlobal.js`, blocks of
+`min(round(n/2), 1000)`) leaves open.
+
+⚠ Relevant sizing fact not yet measured: each `exiftool` invocation pays Perl interpreter startup.
+ExifTool can take **many files in a single invocation**, and offers `-stay_open` for long-running
+use — so per-file process spawning is not the only option. Neither the per-invocation startup cost
+nor the throughput of a batched invocation was measured; both matter for choosing a chunk size
+against a 60 s ceiling.
+
+**⚠ 2. ImageMagick 6.9.12 (legacy), not 7.1.1.** The production host runs the IM6 series; all local
+measurements in §C and the exiftool verification used IM 7.1.1.
+
+- Piwigo already handles the difference: `get_ext_imagick_command()`
+  (`admin/include/image.class.php:370-391`) probes `command -v magick` and falls back to `convert`,
+  which is the IM6 binary name.
+- The Imagick **fallback path was live-tested on the host** by the probe (write an XMP profile to a
+  PNG, read it back) and passed — so IM6's profile handling is confirmed working there, not assumed.
+- ⚠ Not verified on IM6: the IPTC-profile write and the pixel-fidelity figures from §C. Those
+  measurements stand for IM7 only. They matter only if the Imagick fallback is ever used, which the
+  probe result makes unnecessary.
+
+**3. ExifTool 12.76, not 13.25.** The production version is older than the one everything was
+measured against. **Checked against the changelog and cleared** — every mechanism used has been
+stable since 2017 or earlier. See the version comparison below. One HEIC-specific caveat is recorded
+there; it does not affect a PNG collection.
+
+**Other environment facts recorded:** PHP 8.4.16-nmm1 (close to the local 8.4.20, so no PHP version
+gap), `memory_limit` 384M, Perl 5.038002, and `exif`/`mbstring`/`iconv` all present — the extensions
+`get_exif_data()` and `clean_iptc_value()` depend on
+(`include/functions_metadata.inc.php:132-135`, `:99-113`).
+
+### ExifTool 12.76 vs 13.25 — every verified behaviour is present in the production version
+
+All local measurements ran on 13.25; production has **12.76** (released 2024-01-31). Checked against
+the official changelog (`Image::ExifTool::Changes`, the source from which `exiftool.org/history.html`
+is generated — https://raw.githubusercontent.com/exiftool/exiftool/master/Changes).
+
+| Capability used in this design | Introduced | In 12.76? |
+|---|---|---|
+| **PNG `eXIf` chunk write** | **10.42** (2017-02-10) — "Added ability to read/write PNG eXIF and zXIF chunks"; final `eXIf` casing in **10.59** (2017-07-07) | ✅ |
+| IPTC-in-PNG write (with the "non-standard" warning) | warning added **9.69** (2014-07-27); capability predates it | ✅ |
+| `-@ argfile` | **5.18** (2005-05-16) | ✅ |
+| `-charset iptc=UTF8` | **7.90** (2009-08-24), fixed **7.92** | ✅ |
+| `-overwrite_original` | **5.19** (2005-05-17) | ✅ |
+| `-overwrite_original_in_place` | **6.02** (2006-02-26) | ✅ |
+| `-XMP-dc:`, `-XMP-photoshop:`, `-XMP-tiff:` namespaces | core XMP tables, long predate v10 | ✅ |
+
+**Every mechanism this design depends on has been stable since 2017 or earlier.** 12.76 was itself a
+small patch release (Sony ARW raw-data duplication, HtmlDump offsets), not a feature release.
+
+Changes between 12.76 and 13.25 (~13 months, ~50 releases including the 13.00 bump) that touch
+metadata writing:
+
+- **PNG** — additive read-side only (GainMapImage extraction, Samsung trailer reading, a couple of
+  Stable Diffusion tags). **No fix or behaviour change to the core EXIF/IPTC/XMP PNG-writing path.**
+- **JPEG** — maker-note/vendor decode fixes (Vivo, OnePlus, Nikon Z lens names); nothing in core writing.
+- **TIFF** — routine tag additions only.
+- **WebP / GIF** — writer fixes, irrelevant here.
+- ⚠ **HEIC** — 13.25 carries: *"IMPORTANT: Fixed issue which could corrupt HEIC images from newer
+  iPhones under certain conditions when writing QuickTime:Rotation."*
+
+⚠ **The one caveat worth carrying**: that HEIC corruption bug is present in 12.76. It is scoped to
+writing `QuickTime:Rotation` on newer-iPhone HEIC files — something this design does not do (it
+writes only description/headline fields) — and the collection is **100% PNG** today. But if HEIC
+ingestion ever becomes real, the production ExifTool version becomes a live concern and should be
+re-checked then.
+
+No PNG-writing regression existing in 12.76 and fixed later was found; all PNG "Fixed" entries in the
+changelog predate 12.76 by years.
+
+**Conclusion: the production ExifTool version introduces no risk for this design.** The measurements
+taken on 13.25 transfer to 12.76 for PNG, JPEG and TIFF.
+
 ## For the Plan Phase — 3 Amigos Session (imagined)
 
 Three perspectives on the same story, run as if in a room. Recorded so the plan does not have to
@@ -1927,6 +2566,12 @@ Scenario: Applying to photos does not itself touch the files
    When the text is applied to the album's photos
    Then the photos' database values are updated
     And no image file has been modified
+
+Scenario: Concurrent writes to the same photo never destroy it
+  Given a photo whose file is being written by one metadata operation
+   When a second metadata operation targets the same photo
+   Then both operations complete
+    And the image file still exists and is readable
 
 Scenario: A file edited elsewhere does not overwrite album-sourced provenance
   Given a photo whose owner was inherited from its album
