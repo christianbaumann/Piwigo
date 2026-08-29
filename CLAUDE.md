@@ -54,6 +54,24 @@ Smarty compiles templates into `_data/templates_c/` and concatenates CSS/JS into
 rm -rf _data/templates_c/* _data/combined/*
 ```
 
+### `_data/provenance/` — the write-back working area
+
+The provenance plugin keeps its own scratch space under `_data/`, defined once in
+`plugins/provenance/include/functions.inc.php` and never spelled out anywhere else:
+
+- `_data/provenance/locks/` — one `<sha1(image path)>.lock` file per image guarded against a
+  concurrent exiftool write (`provenance_lock_path()`). A **separate** file, never the image
+  itself: exiftool replaces the image by rename, so a lock held on the old inode would exclude
+  nothing from the second writer onwards.
+- `_data/provenance/args/<operation id>/` — the exiftool argfiles of one write-back operation
+  (`provenance_operation_dir()`), removed whole in a `finally`, so a crashed run leaves at most
+  one directory behind instead of orphan files nobody can attribute.
+
+Both are created on demand and are safe to delete when nothing is writing. They are covered by
+the root `.gitignore`'s `_data` entry, so nothing there is ever committed. Note that the
+`_original` sidecars exiftool leaves next to a written image are **not** here — they sit beside
+the image in `upload/` or `galleries/` and are the only copy of the pre-write bytes.
+
 ### Testing
 
 General test-design, layering, and quality-gate rules (stack-independent) live in

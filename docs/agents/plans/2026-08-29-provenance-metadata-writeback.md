@@ -4,7 +4,7 @@ git_commit: 24e634b651dccd4ade28fc667a72d7af329131ea
 branch: master
 topic: "Provenance metadata for scanned photos: album-level entry, copy-down to photos, write-back into image files"
 tags: [plan, provenance, metadata, exiftool, xmp, iptc, exif, albums, audit-trail, plugin, core-patch]
-status: in_progress
+status: complete — integration and E2E verification blocked on a seedable install
 research: docs/agents/research/2026-08-29-per-photo-freetext-field-and-metadata-writeback.md
 ---
 
@@ -1318,7 +1318,7 @@ once, unit layer only, recorded as prose), plus the documentation the rules requ
 
 ### Changes Required:
 
-#### [ ] 1. Mutation table
+#### [x] 1. Mutation table
 **File**: `docs/agents/TESTING.md`
 **Changes**: a mutant → expected-killer → result table over the Phase 2 pure functions. Minimum set:
 
@@ -1334,43 +1334,59 @@ once, unit layer only, recorded as prose), plus the documentation the rules requ
 Survivors are recorded as findings with which of the two explanations applies (weak test, or an
 unreachable boundary) — not swapped for an easier mutant.
 
-#### [ ] 2. `docs/agents/TESTING.md`
+#### [x] 2. `docs/agents/TESTING.md`
 **Changes**: new suite section, the technique legend reference, the deliberate non-coverage table
 (everything in *What We're NOT Doing* that a reader might mistake for a gap), the dated throughput
 measurement from Phase 6, and hand-check ledger entries for: the external-viewer check, the
 narrow-viewport layout check, and the upload-path inheritance check.
 
-#### [ ] 3. Decision records
+#### [x] 3. Decision records
 **Files**: `docs/agents/decisions/0007-…` onward, one per file (0006 was taken in Phase 2)
 **Changes**: (a) provenance lives in its own plugin, not typetags, not core; (b) album-sourced
 fields stay out of `use_iptc_mapping`/`use_exif_mapping`, which is what prevents the sync revert
 loop; (c) `allow_html_descriptions` is not honoured for provenance text; (d) move defaults to
 `keep` on unattended API paths; (e) no history retention in v1.
 
-#### [ ] 4. `CLAUDE.md`
+#### [x] 4. `CLAUDE.md`
 **Changes**: the new plugin, its suites and their one-command invocations, the exiftool dependency
 and the `webimage_extra_packages` entry, the two core patches, and the `_data/provenance/` working
 area. Anything the plan made untrue is corrected here (the `site_update.php` "no triggers" claim was
 already fixed in Phase 7).
 
-#### [ ] 5. `docs/backlog.md`
+#### [x] 5. `docs/backlog.md`
 **Changes**: tick nothing off silently; add the growth path for the history table and note the two
 existing low-priority provenance items are unchanged by this plan.
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full unit suite: `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
-- [ ] Full suite, both plugins, twice consecutively and in reverse order, with no manual repair
-- [ ] Integration and E2E green (commands in *Test Commands*)
-- [ ] `bash tools/test-hooks.sh`
-- [ ] Every count written into `TESTING.md` carries the date it was measured
+- [x] Full unit suite: OK (138 tests, 312 assertions) in 0.012s, 2026-08-29 — 312 not 310, the two
+      assertions being the anti-vacuity guards the mutation pass added to `ComposeCaptionTest`
+- [x] **Unit only** — full unit suite, both plugins, twice consecutively and in reverse order
+      (`--order-by=reverse`), no manual repair: provenance 138/312 and typetags 56/33,009, green in
+      all six runs, 2026-08-29
+- [ ] **Not met, and blocked** — Integration and E2E green. This install holds **0 rows in
+      `piwigo_images`**: the provenance integration suite returns `125 tests, 103 errors,
+      16 failures`, every one of them a fixture refusing to run over a state it merely hoped for
+      (*"this install has no photo to record history against"*), not a defect in the plugin. Same
+      blocker as Phase 9's unperformed manual steps — [decision 0011](../decisions/0011-provenance-suites-require-a-throwaway-install.md)
+      and the two open `dev environment` items in `docs/backlog.md`. Recorded in `TESTING.md` under
+      *Blocked, not skipped*, with the last-known figures kept and labelled as last-known
+- [x] `bash tools/test-hooks.sh` — all 15 cases passed, 2026-08-29
+- [x] Every count written into `TESTING.md` carries the date it was measured — including the
+      hook self-test's 10 → 15 growth, which is dated and explained rather than silently edited
 
 #### Manual Verification:
-- [ ] Every mutant in the table was actually applied and reverted by hand; no result is asserted
-      from reasoning alone
-- [ ] The hand-check ledger has an entry per surviving manual item, each with the reason it cannot
-      be automated
+- [x] Every mutant in the table was actually applied and reverted by hand; no result is asserted
+      from reasoning alone. Six mutants, one at a time; after every apply and every revert the
+      container's `md5sum` was polled until it matched the host's before any suite ran (the
+      Mutagen off-by-one trap from Phase 1), `git diff` was read to confirm the edit landed, and
+      the file was restored from a pristine copy and confirmed byte-identical to HEAD
+      (`615f7990…`). All six killed; **no survivors**
+- [x] The hand-check ledger has an entry per surviving manual item, each with the reason it cannot
+      be automated — three entries added (Phase 7's upload path, now replaced by `InheritTest`;
+      Phase 9's Batch Manager prompt, recorded as **blocked and never performed**, not as checked;
+      and this phase's mutation pass)
 
 ---
 

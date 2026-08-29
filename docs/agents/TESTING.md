@@ -26,7 +26,8 @@ about this codebase:
 
 ## Suites
 
-Piwigo core has no test suite. `plugins/typetags` carries all three layers.
+Piwigo core has no test suite. `plugins/typetags` and `plugins/provenance` each carry all
+three layers, with their own `phpunit.xml` and their own `playwright.config.js`.
 
 | Layer | Needs | Budget | What it witnesses |
 |---|---|---|---|
@@ -41,6 +42,30 @@ cited here rather than repeated.
 assertions in 0.105s; integration 44 tests / 150 assertions; E2E 26 (25 specs + 1 auth
 setup) in 8.9s. The unit suite's sub-second budget is what makes it eligible for a commit
 gate; the other two are not.
+
+**`plugins/provenance`, measured 2026-08-29**: unit 138 tests / 312 assertions in 0.012s.
+Its integration and E2E figures are **last-known, not current** — integration 94 tests / 549
+assertions and E2E 17 specs, both measured 2026-08-29 during Phase 7 and Phase 8, *before* the
+install lost its gallery the same day. Neither suite can execute today; see *Blocked, not
+skipped* below. A last-known figure is recorded as such rather than dropped, so nobody reads its
+absence as "there is no coverage there".
+
+### Blocked, not skipped — the provenance integration and E2E suites
+
+This install currently holds **0 rows in `piwigo_images`** (checked 2026-08-29). Every
+provenance integration fixture forces a real photo as its precondition and asserts it took
+effect, so all of them fail loudly at that assertion — `125 tests, 103 errors, 16 failures`, every
+one reading *"this install has no photo to record history against"*, which is the fixture
+refusing to run over a state it merely hoped for rather than a defect in the plugin.
+
+This is the recorded state of the dev environment, not a finding of this phase: see
+[decision 0011](decisions/0011-provenance-suites-require-a-throwaway-install.md) and the two open
+`dev environment` items in `docs/backlog.md`. The recovered scans are on disk under `galleries/`
+but were never synchronised into the database.
+
+What this costs, stated rather than hidden: the provenance close-out (Phase 10) could verify the
+unit layer and the commit gate, and could **not** verify the integration or E2E layer. Nothing
+below claims otherwise.
 
 ### The integration and E2E suites mutate the real database
 
@@ -76,11 +101,17 @@ stack up. Design and installation are in CLAUDE.md; the rule it follows is
 `.claude/rules/precommit-hooks.md`. What belongs here is the record of what was watched, and
 which of it is now watched on every run instead of once.
 
-`tools/test-hooks.sh` is the standing check — **10 cases, measured 2026-08-29**: three
-probe preconditions, three direct-invocation cases, two installation checks, and two real
-`git commit` cases. A clean hook run takes 1.0s wall clock (measured 2026-08-29, of which
-the unit suite is 0.098s and the rest is `ddev exec` overhead). That figure is a dated
-measurement, not an assertion — nothing in the suite gates on it.
+`tools/test-hooks.sh` is the standing check — **15 cases, measured 2026-08-29** (10 before
+`plugins/provenance` was added to the gate): three probe preconditions, five
+direct-invocation cases, five installation checks, and two real `git commit` cases. The five
+installation checks are what grew — the gate now asserts a `core.hooksPath` for the
+superproject and for the `plugins/typetags` submodule, that `plugins/provenance` is a plain
+directory the superproject's `hooksPath` already covers (it would need its own installation
+if it were ever made a submodule — see
+[decision 0014](decisions/0014-provenance-is-its-own-plugin.md)), and that each entry in
+`UNIT_SUITES` names a runner that exists. A clean hook run takes 1.0s wall clock (measured
+2026-08-29, of which the unit suite is 0.098s and the rest is `ddev exec` overhead). That
+figure is a dated measurement, not an assertion — nothing in the suite gates on it.
 
 | Watched | How | Now automated as |
 |---|---|---|
@@ -132,6 +163,17 @@ So a later reader can tell a considered omission from an oversight.
 | The provenance row and the Colored Tags injection coexisting on one picture page | Both prefilters prepend at neighbouring anchors; the rule that keeps them independent — that `PROVENANCE_TPL_INJECT_POINT` does not span `{if isset($metadata)}` — is asserted at the **unit** layer by `PicturePageAnchorTest::testAnchorDoesNotSpanTheColoredTagsInjectionPoint` | Verified once by hand, 2026-08-29: both injections present on one logged-in page. An integration test would restate the unit rule one layer up while carrying a hand-typed copy of another plugin's internals |
 | Document-level horizontal overflow on the album properties screen | `document.documentElement.scrollWidth` is pinned at 979px by `#pwgMain` at every viewport below 1024, so it does not move when the injected block is given a 4000px `min-width` — measured against two mutants, 2026-08-29 | A check that cannot fail is not a check (`test-design.md`, anti-vacuity). The block's geometry is asserted directly instead, by `album-provenance.spec.js` → `does not disturb the footer at a narrow width` |
 | Document-level and element-level horizontal overflow on the **public picture page** | The same trap, a second time and on a different page: with the rendered value widened to 400 characters at a 320px viewport, `document.documentElement.scrollWidth - clientWidth` stayed at 0 (the theme clips it) and the row's own `scrollWidth - clientWidth` stayed at 0 (the element grows instead of overflowing). `document.body.scrollWidth - clientWidth` moved 0 → 2959 — measured 2026-08-29 | `provenance.spec.js` → `the row stays inside its column on a narrow viewport` measures `document.body`, and `PicturePage.js` carries the measurement so the next person does not re-derive it |
+| Provenance columns as keys in `use_iptc_mapping` / `use_exif_mapping` | Deliberately absent, and that absence is the mechanism: `get_sync_metadata_attributes()` (`admin/include/functions_metadata.php:125-150`) derives the columns a sync overwrites from `array_keys()` of those two arrays, so a column that is not a key is a column no sync writes. See [decision 0015](decisions/0015-provenance-columns-stay-out-of-the-metadata-mappings.md) | A test would assert the absence of a configuration entry. The positive half — that apply and inheritance are the only writers — is what the suites actually assert |
+| File-vs-database divergence after a third-party metadata edit | Not built (decision 4a); `images.date_metadata_update` is the recorded candidate signal, carried in `docs/backlog.md` | No behaviour exists to test. Testing it would assert a requirement that was deliberately deferred |
+| History retention, purge or a row cap | Not built; the table grows without bound by design, with the growth path recorded in [decision 0016](decisions/0016-no-history-retention-in-v1.md) | Same: nothing to assert. What *is* asserted is the property that keeps growth bounded in practice — an unchanged field writes no row (`ApplyTest`) |
+| A per-album write-permission model for provenance | Admin-only for this slice (decision C5). The admin gate itself is covered at the integration layer on every WS method (guest → 401, non-admin refused, bad token → 403) | Per-album rights are a requirement that does not exist; asserting them would invent one |
+| Batch Manager bulk actions for the four album-sourced columns | Album-level entry plus `pwg.provenance.applyToPhotos` *is* the bulk path (decision 2a). The Batch Manager carries only the move-mode prompt, which `BatchManagerPageTest` and `BatchTemplateAnchorTest` do cover | Outside the change's blast radius |
+| `pwg.images.setInfo` accepting provenance fields | Its allow-list is hard-coded with no hook, exactly like `ws_categories_setInfo`'s. The plugin owns `pwg.provenance.setPhotoInfo` instead, covered by `SetPhotoInfoTest` | Would test core's refusal to be extended, not the plugin |
+| Enforcement of the 1:1 photo↔album relationship | Core allows many-to-many via `piwigo_image_category` and this plan does not change that; it is a separate backlog item | The assumption is **asserted, not relied on** — the Phase 5 fixture asserts the photo is in exactly one album before the test body runs, so a violation fails loudly instead of producing a quietly wrong result |
+| The `album_delete` history source | Descoped from Phase 9 ([decision 0013](decisions/0013-no-album-delete-prompt-in-v1.md)). The value stays in `provenance_history_sources()` and in the schema ENUM, and **no code path writes it** | A test would need a third fork-local trigger (`begin_delete_categories`) that was agreed and never added. The characterization net for `delete_categories()` is committed regardless (`81f49176b`) |
+| HEIC ingestion, and the ExifTool 12.76 HEIC rotation-corruption caveat | The collection is 100% PNG. The caveat is recorded, not designed around | No input in the domain reaches the branch. Writing a HEIC fixture would test exiftool, not the plugin |
+| An exiftool `-stay_open` daemon | Not built — batched multi-file invocations only. The chunk size is set from the dated throughput measurement above, not guessed | A performance characteristic. Asserting one would mean a wall-clock assertion, which `test-design.md` forbids |
+| `owner` as a reference to a people table | Free text in v1 (decision 3a); the reference-table item is in `docs/backlog.md` | Would assert a data model that does not exist |
 
 ## Mutant table — unit suite
 
@@ -205,6 +247,69 @@ Why the invariant is worth a test even though a tracked-but-ignored file still r
 clones: the pattern is a trap for the *next* runtime file added under it, which would be
 silently skipped by `git add` and never noticed until someone cloned.
 
+## Mutant table — `plugins/provenance` unit suite
+
+Run 2026-08-29 against the provenance unit suite (138 tests), by hand, one mutant at a time.
+Scope and method per [decision 0001](decisions/0001-mutation-testing-unit-only.md) and
+`.claude/rules/mutation-testing.md`: unit layer only, prose not script, end of the plan rather
+than per-commit. Every mutant targets `plugins/provenance/include/functions.inc.php` — the
+Phase 2 composition layer, which is the only substantial provenance logic that loads with no
+database and no Piwigo bootstrap.
+
+**Method, and why it is stated.** DDEV runs Mutagen, so a host edit reaches the container a
+moment later; a mutant applied and immediately tested is read from the *pre-mutation* file and
+every result in the table shifts by one. So after each apply and each revert the container's
+`md5sum` was polled until it matched the host's before any suite ran, and `git diff` was read to
+confirm the edit landed at all (a `sed`/`perl` address that silently matches nothing produces
+the same false "survived"). Both failure modes were hit building the Phase 1 table; neither
+recurred here. The file was restored from a pristine copy after every mutant and confirmed
+byte-identical to HEAD (`615f7990…`) before the next.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `strlen($text) <= PROVENANCE_IPTC_MAX_BYTES` → `<` | the 1999/2000/2001-byte BVA trio | killed: `testExactlyAtTheCapIsUnchanged`, `testMultiByteTextUnderTheByteCapIsUnchanged` |
+| `strlen` → `mb_strlen` in `provenance_truncate_for_iptc()` (both calls) | the multi-byte truncation tests | killed: `testCharacterStraddlingTheBoundaryIsNotSplit`, `testAllMultiByteTextStaysValidUtf8`, `testJustOverTheCapIsTruncated`, `testTruncationMarkIsAppendedWithinTheBudget`, `BuildArgfileTest::testOnlyTheIptcSlotCarriesTheTruncatedCaption` |
+| `PROVENANCE_CAPTION_SEPARATOR` emptied | the composition-order test | killed — but see the finding below |
+| `if ($part !== '')` → `!== null` in `provenance_compose_caption()` (emptiness check weakened to a presence check) | the whitespace-only-part test | killed: `testWhitespaceOnlyPartIsOmitted`, `testEmptyPartIsOmitted`, `testAllPartsEmptyReturnsEmptyString` |
+| `provenance_field_order()` wrapped in `array_reverse()` | the deterministic-caption test | killed: 9 cases across `CaptionPartsTest` and `ComposeCaptionTest`, including `testOrderComesFromTheFieldOrderNotTheInputOrder` |
+| `array_merge(array('-charset', 'iptc=UTF8'), $lines)` → `$lines` | the argfile line-order test | killed: `testFullLineSequence`, `testCharsetDeclarationComesFirst` |
+
+**Nothing else moved** in any row: each mutant killed exactly the tests that watch it, and the
+remaining tests of the 138 stayed green every time. No mutant survived, so there is no
+unreachable-boundary finding here of the kind the typetags table records for `$l >= 0.45`.
+
+### The finding: two tests died of a `ValueError`, not of an assertion
+
+The emptied-separator mutant was killed, but two of its four casualties were killed for the
+wrong reason. `PROVENANCE_CAPTION_SEPARATOR` is read *by the tests* as well as by production,
+so with it set to `''`:
+
+- `ComposeCaptionTest::testMissingKeyIsOmitted` raised
+  `ValueError: substr_count(): Argument #2 ($needle) must not be empty`;
+- `ComposeCaptionTest::testSinglePartCarriesNoSeparator` failed on
+  `assertStringNotContainsString('', …)`, which is a check that cannot fail on a real separator
+  and cannot pass on an empty one — it was never testing the behaviour it named.
+
+A test that dies of a PHP error tells you the constant changed; it does not tell you the caption
+came out wrong. The behavioural kill was real and came from elsewhere
+(`CaptionPartsTest::testTheResultComposesInFieldOrder` compared the whole composed string), so
+the mutant is genuinely dead — but two of the watchmen were asleep.
+
+Fixed the way `.claude/rules/test-design.md` (*anti-vacuity*) prescribes, by giving each of the
+two an explicit lower-bound guard ahead of the assertion that depends on it:
+
+```php
+$this->assertNotSame('', PROVENANCE_CAPTION_SEPARATOR, 'an empty separator makes the count below meaningless');
+```
+
+Both guards were then **watched failing** — the mutant re-applied, and both tests re-run to
+confirm they now report the guard's message instead of a `ValueError` — before the mutant was
+reverted. Suite after the fix: 138 tests / 312 assertions (was 310), green.
+
+This is the same shape as the two typetags findings above: a mutant that dies while the test
+watching it is weaker than it looks. It is the reason the pass is worth running once even when
+every mutant is killed.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
@@ -222,6 +327,9 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-08-29 | Phase 8 of the provenance plan opened two manual boxes: the public row reads correctly in German, the install's own locale; and it does not break the info panel on a narrow viewport. | **Replaced 2026-08-29** by `plugins/provenance/tests/e2e/provenance.spec.js` → `the label is rendered in the language the account browses in` (the expected label is resolved by `seed.php` out of the browsing account's own language file, so an untranslated key fails) and `the row stays inside its column on a narrow viewport` (320px, `document.body` overflow — the two obvious probes were measured flat first; see the non-coverage table). |
 | 2026-08-29 | Phase 8: the provenance row and the Colored Tags injection both land on one logged-in picture page, and a logged-out visitor gets the row at all. | **Partly replaced 2026-08-29.** The guest half is now `PicturePageSourceTest::testGuestGetsTheRow` (watched red against an `is_a_guest()` early return) and `provenance.spec.js` → `the row is visible without logging in`. The coexistence half stays a hand check — the rule behind it is asserted at the unit layer instead; see the non-coverage table. |
 | 2026-08-29 | The write-back button's browser path, which Phase 6's plan asked for no spec for. | **Replaced 2026-08-29** by `plugins/provenance/tests/e2e/writeback-provenance.spec.js` (4 specs), each watched failing against a mutant: a wrong web-service method in the client, a summary that drops the per-photo failure count, and a `fail()` that no longer sets `.provenance-error` (which killed both failure specs). |
+| 2026-08-29 | Phase 7 of the provenance plan opened one manual box: upload a photo into a provenance-carrying album through the normal admin UI and confirm it arrives with the album's values. | **Replaced 2026-08-29** by `InheritTest::testAnUploadedPhotoInheritsTheAlbumsProvenance` and `testWithTheLoungeOnTheValuesArriveWhenTheLoungeIsEmptied`, which drive the exact web-service sequence the upload screen issues — `pwg.images.upload` with a real file, then `pwg.images.uploadCompleted` — so nothing about the path is assumed. What a browser would add on top is plupload's chunking, which is core's code on a screen the plugin does not touch; per the placement rule, a spec there would restate integration coverage one layer up. |
+| 2026-08-29 | Phase 9 of the provenance plan opened two manual boxes. One was descoped with the album-delete prompt ([decision 0013](decisions/0013-no-album-delete-prompt-in-v1.md)) and has nothing left to check. The other — the Batch Manager move prompt appears and its three choices behave as labelled — **was never performed by anyone**. | **Not replaced, and not checked — blocked.** It is automatable as an E2E spec; it is blocked only on a seedable install (see *Blocked, not skipped* above and [decision 0011](decisions/0011-provenance-suites-require-a-throwaway-install.md)). Carried as an open item in `docs/backlog.md` so it cannot quietly disappear. The underlying rule — that an unusable mode resolves to `keep` — *is* covered, at the unit layer by `ResolveModeTest` (11 cases). |
+| 2026-08-29 | Phase 10 close-out: the six-mutant pass over the provenance unit suite (see the mutant table above). Each mutant was applied and reverted by hand, the container confirmed to have picked up the bytes before each run, and the file confirmed byte-identical to HEAD after each. | Not replaceable, and deliberately so — `.claude/rules/mutation-testing.md` records mutants as prose precisely because a script that patches and reverts source is a second thing to keep correct that fails silently when the patched line moves. The one durable product of the pass *is* automated: the two anti-vacuity guards added to `ComposeCaptionTest`. |
 
 ### Open — no oracle, so no test
 

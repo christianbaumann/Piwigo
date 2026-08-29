@@ -83,6 +83,7 @@ final class ComposeCaptionTest extends TestCase
 
         $caption = provenance_compose_caption($parts);
 
+        $this->assertNotSame('', PROVENANCE_CAPTION_SEPARATOR, 'an empty separator makes the count below meaningless');
         $this->assertStringEndsWith('Album note: Rueckseiten beschriftet', $caption);
         $this->assertSame(3, substr_count($caption, PROVENANCE_CAPTION_SEPARATOR));
     }
@@ -110,6 +111,7 @@ final class ComposeCaptionTest extends TestCase
     {
         $caption = provenance_compose_caption(array('provenance_owner' => 'Owner: Anna Mueller'));
 
+        $this->assertNotSame('', PROVENANCE_CAPTION_SEPARATOR, 'an empty separator makes the assertion below meaningless');
         $this->assertSame('Owner: Anna Mueller', $caption);
         $this->assertStringNotContainsString(PROVENANCE_CAPTION_SEPARATOR, $caption);
     }
