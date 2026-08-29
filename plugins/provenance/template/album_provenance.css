@@ -14,3 +14,38 @@
 #provenance-message.provenance-error {
   color: #c00;
 }
+
+/* Apply progress. Hidden until a run starts: an empty bar sitting on the screen
+   would read as a run that is stuck at zero. */
+#provenance-apply-progress {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-left: 10px;
+}
+
+#provenance-apply-bar {
+  display: inline-block;
+  width: 160px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.3);
+  overflow: hidden;
+}
+
+#provenance-apply-bar-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #5a5;
+  transition: width 0.2s;
+}
+
+#provenance-apply-message.provenance-error {
+  color: #c00;
+}
+
+.buttonLike.provenance-busy {
+  opacity: 0.6;
+  pointer-events: none;
+}

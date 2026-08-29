@@ -311,6 +311,58 @@ function provenance_lock_path($image_path)
 
 /*
  * ---------------------------------------------------------------------------
+ * The copy-down operation.
+ *
+ * The server never iterates a whole album in one request: the client cuts the
+ * album into chunks and sends one at a time, so a large album cannot run into
+ * the production 60 s request ceiling. The chunk ceiling lives here because
+ * both sides need it - the client sizes its chunks by it, the handler refuses
+ * anything larger.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Most photo ids one applyToPhotos request may carry. */
+define('PROVENANCE_APPLY_MAX_CHUNK', 200);
+
+/**
+ * Turns the comma-joined chunk into photo ids.
+ *
+ * A malformed member rejects the whole list rather than being dropped: a chunk
+ * that silently applies to fewer photos than it names would leave the album
+ * half-applied with nothing saying so. (int) casting is deliberately not used -
+ * it turns "3.5" into 3 and would write onto a photo nobody asked for.
+ *
+ * @param mixed $value comma-joined ids
+ * @return array|null ids in the order given, deduplicated; null when unusable
+ */
+function provenance_parse_id_list($value)
+{
+  $ids = array();
+
+  foreach (explode(',', (string)$value) as $member)
+  {
+    $member = trim($member);
+
+    if ($member === '')
+    {
+      continue;
+    }
+
+    if (!preg_match('/^\d+$/', $member) or (int)$member <= 0)
+    {
+      return null;
+    }
+
+    $ids[] = (int)$member;
+  }
+
+  $ids = array_values(array_unique($ids));
+
+  return count($ids) > PROVENANCE_APPLY_MAX_CHUNK ? null : $ids;
+}
+
+/*
+ * ---------------------------------------------------------------------------
  * Template anchors the prefilters match against.
  *
  * A moved anchor is invisible at runtime - Smarty compiles the untouched
@@ -322,6 +374,9 @@ function provenance_lock_path($image_path)
 
 /** Injection point on the album properties screen: immediately before the Save button. */
 define('PROVENANCE_TPL_ALBUM_ANCHOR', '<span class="buttonLike" id="cat-properties-save">');
+
+/** Injection point on the photo properties screen: immediately before its save bar. */
+define('PROVENANCE_TPL_PHOTO_ANCHOR', '<div class="savebar-footer">');
 
 /*
  * ---------------------------------------------------------------------------

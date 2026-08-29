@@ -125,6 +125,107 @@ class FixtureBuilder
         return $actual;
     }
 
+    /**
+     * The photos of one album, asserting each is in exactly one album.
+     *
+     * The whole copy-down design rests on a photo belonging to a single album
+     * (the plan's 1:1 assumption). A fixture that merely hoped for it would make
+     * every apply assertion below meaningless the day a photo gains a second
+     * album, so the assumption is forced open here instead.
+     *
+     * @return array photo ids, ascending
+     */
+    public function photoIdsInAlbum(int $catId): array
+    {
+        $result = $this->db->query(
+            'SELECT ic.image_id, (SELECT COUNT(*) FROM `piwigo_image_category` a WHERE a.image_id = ic.image_id) AS albums
+               FROM `piwigo_image_category` ic
+              WHERE ic.category_id = ' . $catId . '
+              ORDER BY ic.image_id'
+        );
+
+        $ids = array();
+        while ($row = $result->fetch_assoc())
+        {
+            if ((int)$row['albums'] !== 1)
+            {
+                throw new RuntimeException(
+                    'photo ' . $row['image_id'] . " is in {$row['albums']} albums; the copy-down fixture assumes exactly one"
+                );
+            }
+            $ids[] = (int)$row['image_id'];
+        }
+
+        if (count($ids) === 0)
+        {
+            throw new RuntimeException("album $catId holds no photo to apply provenance to");
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Forces one photo's five provenance columns and asserts the write landed.
+     *
+     * @param array $values image column => value, '' or null to clear
+     */
+    public function imageProvenance(int $imageId, array $values): array
+    {
+        $assignments = array();
+        foreach (self::imageColumns() as $column)
+        {
+            $value = $values[$column] ?? null;
+            $assignments[] = "`$column` = " .
+                ($value === null || $value === '' ? 'NULL' : "'" . $this->db->escape((string)$value) . "'");
+        }
+
+        $this->db->query(
+            'UPDATE `piwigo_images` SET ' . implode(', ', $assignments) . ' WHERE id = ' . $imageId
+        );
+
+        $actual = $this->readImageProvenance($imageId);
+        foreach (self::imageColumns() as $column)
+        {
+            $wanted = ($values[$column] ?? null) === '' ? null : ($values[$column] ?? null);
+            if ($actual[$column] !== $wanted)
+            {
+                throw new RuntimeException(
+                    "fixture did not take effect: photo $imageId has $column = " .
+                    var_export($actual[$column], true) . ', wanted ' . var_export($wanted, true)
+                );
+            }
+        }
+
+        return $actual;
+    }
+
+    public function readImageProvenance(int $imageId): array
+    {
+        $result = $this->db->query(
+            'SELECT `' . implode('`, `', self::imageColumns()) . '` FROM `piwigo_images` WHERE id = ' . $imageId
+        );
+        $row = $result->fetch_assoc();
+        if ($row === null)
+        {
+            throw new RuntimeException("no photo with id $imageId");
+        }
+        return $row;
+    }
+
+    /** Clears every provenance column of the given photos. */
+    public function clearImageProvenance(array $imageIds): void
+    {
+        if (count($imageIds) === 0)
+        {
+            return;
+        }
+        $nulls = array_map(fn($c) => "`$c` = NULL", self::imageColumns());
+        $this->db->query(
+            'UPDATE `piwigo_images` SET ' . implode(', ', $nulls) .
+            ' WHERE id IN (' . implode(',', array_map('intval', $imageIds)) . ')'
+        );
+    }
+
     public function readAlbumProvenance(int $catId): array
     {
         $result = $this->db->query(

@@ -29,6 +29,13 @@ class AlbumPropertiesPage {
     this.scannedOn = page.locator('#provenance-scanned-on');
     this.note = page.locator('#provenance-note');
 
+    this.applyButton = page.locator('#provenance-apply');
+    this.applyProgress = page.locator('#provenance-apply-progress');
+    this.applyBarFill = page.locator('#provenance-apply-bar-fill');
+    this.applyMessage = page.locator('#provenance-apply-message');
+    /** Carries .provenance-done once the run has finished every chunk. */
+    this.applyDone = page.locator('#provenance-apply-progress.provenance-done');
+
     /** The album screen's own save button, which the block is injected next to. */
     this.albumSaveButton = page.locator('#cat-properties-save');
   }
@@ -44,6 +51,20 @@ class AlbumPropertiesPage {
   async reload() {
     await this.page.reload();
     await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  /**
+   * What the run has covered, as the page itself publishes it.
+   *
+   * Read from the element's own counters rather than measured off the bar: the
+   * bar is animated, so its geometry is a wall-clock figure and a measurement
+   * taken mid-transition says nothing about what the run did.
+   */
+  async applyCounts() {
+    return {
+      done: Number(await this.applyProgress.getAttribute('data-done')),
+      total: Number(await this.applyProgress.getAttribute('data-total')),
+    };
   }
 
   /** The four fields as the browser currently holds them. */

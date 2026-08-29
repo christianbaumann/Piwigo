@@ -663,7 +663,7 @@ decision C2 makes write-back a separate, explicit operation.
 
 ### Changes Required:
 
-#### [ ] 1. `pwg.provenance.applyToPhotos`
+#### [x] 1. `pwg.provenance.applyToPhotos`
 **File**: `plugins/provenance/include/ws_functions.inc.php`
 **Changes**: `admin_only` + `post_only`. Params: `cat_id`, and `image_ids` (a comma-joined chunk the
 client supplies). The server does **not** iterate a whole album in one request — the client chunks,
@@ -677,13 +677,13 @@ update set at all.
 
 Old values are read **before** the update so the history rows are accurate.
 
-#### [ ] 2. Chunking client
+#### [x] 2. Chunking client
 **File**: `plugins/provenance/template/album_provenance.js`
 **Changes**: chunk size `min(round(n/2), 200)` — smaller than the Batch Manager's 1000 because each
 row carries up to four `text` values, and the production request budget is 60 s. Serialized through
 one in-flight request at a time, progress bar per callback, failures surfaced rather than swallowed.
 
-#### [ ] 3. Photo-level save
+#### [x] 3. Photo-level save
 **File**: `plugins/provenance/include/events_admin.inc.php`
 **Changes**: `pwg.provenance.setPhotoInfo` writes `provenance_note` only, injected into
 `picture_modify` via prefilter (the photo screen's own anchor constant), same guard order.
@@ -691,21 +691,59 @@ one in-flight request at a time, progress bar per callback, failures surfaced ra
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Integration: apply writes the four album-sourced columns onto every photo in the album `[HAPPY]`
-- [ ] Integration: apply does **not** modify `provenance_note` on any photo `[NEG]` — the decision
+- [x] Unit: `provenance_parse_id_list()` — `ParseIdListTest`, 11 cases `[ECP]` `[BVA]` `[NEG]`
+- [x] Unit: structural guard — `PROVENANCE_TPL_PHOTO_ANCHOR` occurs exactly once in
+      `picture_modify.tpl`, after the form's last field — `PhotoTemplateAnchorTest`
+- [x] Integration: apply writes the four album-sourced columns onto every photo in the album `[HAPPY]`
+- [x] Integration: apply does **not** modify `provenance_note` on any photo `[NEG]` — the decision
       the whole two-note schema exists for
-- [ ] Integration: a second apply after an album edit overwrites the copied columns (decision Q6b) `[ST]`
-- [ ] Integration: clearing an album field clears it on the photos (empty writes NULL) `[BVA]`
-- [ ] Integration: history rows exist for changed fields and **not** for unchanged ones `[DT]`
-- [ ] Integration: the fixture asserts the photo is in exactly one album before the body runs —
+- [x] Integration: a second apply after an album edit overwrites the copied columns (decision Q6b) `[ST]`
+- [x] Integration: clearing an album field clears it on the photos (empty writes NULL) `[BVA]`
+- [x] Integration: history rows exist for changed fields and **not** for unchanged ones `[DT]`
+- [x] Integration: the fixture asserts the photo is in exactly one album before the body runs —
       the 1:1 assumption is asserted, never hoped for
-- [ ] Integration: apply leaves every image file's mtime and size unchanged (scenario
+- [x] Integration: apply leaves every image file's mtime and size unchanged (scenario
       *Applying to photos does not itself touch the files*) `[NEG]`
-- [ ] `ddev exec php -l` on every changed file
+- [x] Integration: guest → 401; non-admin → refused; bad token → 403; unknown `cat_id` → 404;
+      malformed id list, a photo outside the album, and an over-size chunk → 400 `[NEG]`
+- [x] Integration: `SetPhotoInfoTest` — the photo's own note is written, and no album-sourced
+      column moves; 10 cases
+- [x] `ddev exec php -l` on every changed file
+- [x] E2E: `apply-provenance.spec.js` — 3 specs. Automates both manual steps below
 
 #### Manual Verification:
-- [ ] The progress bar advances and completes for the 76-photo album
-- [ ] A deliberate mid-run failure (stop the DB) surfaces in the UI rather than silently stalling
+- [x] ~~The progress bar advances and completes for the 76-photo album~~ →
+      automated: `apply-provenance.spec.js` *the progress bar advances and completes for the whole
+      album*, which reads the counters the page publishes and asserts the album was really chunked
+- [x] ~~A deliberate mid-run failure (stop the DB) surfaces in the UI rather than silently stalling~~ →
+      automated as the two failure modes that differ in code path (`.claude/rules/e2e-tests.md`):
+      *an application-level failure surfaces instead of stalling* (HTTP 200 with `stat:"fail"`,
+      the success callback) and *a network-level failure surfaces instead of stalling* (an aborted
+      request, the error callback). Stopping the database was the manual proxy for these; the
+      seeded failures exercise the same client paths without taking the install down
+
+### Deviation from the plan
+
+Three things the plan did not anticipate, all recorded here rather than left implicit:
+
+1. **The client needs the album's photo ids.** The plan says the client chunks, but not where the
+   id list comes from. `pwg.categories.getImages` would cost paging round-trips and return whole
+   image objects, so the admin event assigns the ids into the page instead — the album screen
+   already knows which album it is showing.
+2. **The apply chunk is all-or-nothing.** A malformed id list, or one naming a photo outside the
+   album, refuses the whole request rather than applying the usable part. A half-applied chunk is
+   invisible afterwards, which is worse than a refusal the administrator can see.
+3. **`mass_updates()` switches branch at ten rows.** Below ten it issues N statements; at ten and
+   above it joins a temporary table built through `mass_inserts()`. The two build their NULLs
+   differently, so `ApplyTest` exercises both — a three-photo chunk alone would leave the branch the
+   real 76-photo album always takes untested.
+
+The phase also closed a state leak the E2E suite had carried since Phase 4:
+`FixtureBuilder::restore()` only puts back rows it recorded, and a row that held no provenance is
+not recorded at all — so a seeded album and every applied photo stayed behind, and the history rows
+the specs wrote poisoned the integration suite's next run. `seed.php --restore` now clears the
+seeded album and its photos and deletes the history rows written since the seed, before restoring
+what was really there.
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 
@@ -1094,13 +1132,13 @@ Techniques recorded as not applicable, with the reason:
 - [x] the lock path is never equal to the image path `[NEG]`
 
 Input validation helpers (Phase 4):
-- [ ] date `2026-04-19` accepted; `2026-13-01` rejected (`checkdate`); `2026-4-9` rejected;
+- [x] date `2026-04-19` accepted; `2026-13-01` rejected (`checkdate`); `2026-4-9` rejected;
       `''` accepted as "not set"; `19.04.2026` rejected `[ECP]` `[NEG]` `[BVA]`
-- [ ] a 255-byte `owner` accepted; 256 bytes rejected `[BVA]`
-- [ ] `<b>x</b>` → `x` after `strip_tags()` `[NEG]`
+- [x] a 255-byte `owner` accepted; 256 bytes rejected `[BVA]`
+- [x] `<b>x</b>` → `x` after `strip_tags()` `[NEG]`
 
 Structural guards (they run in the normal unit suite; nothing else would report these regressions):
-- [ ] `PROVENANCE_TPL_ALBUM_ANCHOR` occurs exactly once in `cat_modify.tpl`, after a
+- [x] `PROVENANCE_TPL_ALBUM_ANCHOR` occurs exactly once in `cat_modify.tpl`, after a
       `strlen()` lower-bound guard
 - [ ] `PROVENANCE_TPL_INJECT_POINT` occurs exactly once in `picture.tpl`, same guard
 - [x] `pwgprov.config` declares the namespace URI the writer uses — one constant, read by both
@@ -1123,16 +1161,16 @@ Fixture provenance is recorded per fixture: which case it covers and how it is b
 must cover a case that actually differs.
 
 **Happy path:**
-- [ ] `AlbumSaveTest` — `setAlbumInfo` persists all four columns `[HAPPY]`
-- [ ] `ApplyTest` — apply copies four values onto every photo in the album `[HAPPY]`
+- [x] `AlbumSaveTest` — `setAlbumInfo` persists all four columns `[HAPPY]`
+- [x] `ApplyTest` — apply copies four values onto every photo in the album `[HAPPY]`
 - [ ] `WriteBackTest` — all five MWG slots and all five `XMP-pwgprov:*` tags read back `[HAPPY]`
 - [ ] `InheritTest` — a photo joining afterwards inherits `[HAPPY]`
-- [ ] `HistoryTest` — a >255-byte value round-trips through `pwg.provenance.getHistory` `[HAPPY]`
+- [x] `HistoryTest` — a >255-byte value round-trips through `pwg.provenance.getHistory` `[HAPPY]`
 
 **Negative / error propagation:**
 - [ ] guest → 401; bad token → 403; unknown id → 404; malformed date → 400, on every WS method `[NEG]`
-- [ ] apply never writes `provenance_note` `[NEG]`
-- [ ] apply modifies no image file (mtime + size unchanged) `[NEG]`
+- [x] apply never writes `provenance_note` `[NEG]`
+- [x] apply modifies no image file (mtime + size unchanged) `[NEG]`
 - [ ] `exec` unavailable → typed error, no file touched `[NEG]`
 - [ ] a write failure leaves a history row and removes the operation directory `[NEG]`
 - [ ] inheritance from an album with no provenance writes nothing and logs nothing `[NEG]`
@@ -1140,7 +1178,7 @@ must cover a case that actually differs.
 **Boundary / edge:**
 - [ ] text over 2000 bytes → full in XMP/EXIF, truncated in IPTC, truncation logged `[BVA]`
 - [ ] `Łódź Ω 日本 Müller` survives `clean_iptc_value()` `[ERR]`
-- [ ] empty album fields clear the photo columns (NULL, not `''`) `[BVA]`
+- [x] empty album fields clear the photo columns (NULL, not `''`) `[BVA]`
 - [ ] an album with zero photos — apply succeeds, writes nothing `[BVA]`
 - [ ] **concurrency**: N parallel writers on one file; the file exists and is readable afterwards.
       Written and watched **red with locking disabled** before locking is enabled — this is the one
@@ -1166,12 +1204,12 @@ browser can observe
 ([decision 0007](../decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md) for Phases 1-2,
 [decision 0008](../decisions/0008-no-e2e-tests-for-provenance-phase-3.md) for Phase 3).
 
-- [ ] `album-provenance.spec.js` — open the modal, fill four fields, save, reload, values persist `[HAPPY]`
-- [ ] `album-provenance.spec.js` — apply to photos, progress completes, a photo page shows the values `[HAPPY]`
+- [x] `album-provenance.spec.js` — open the modal, fill four fields, save, reload, values persist `[HAPPY]`
+- [x] `apply-provenance.spec.js` — apply to photos, progress completes, a photo page shows the values `[HAPPY]`
 - [ ] `picture-provenance.spec.js` — the `#Provenance` row is visible in the rendered DOM `[HAPPY]`
-- [ ] `album-provenance.spec.js` — an application-level failure (HTTP 200 with `stat:"fail"`) surfaces
+- [x] `apply-provenance.spec.js` — an application-level failure (HTTP 200 with `stat:"fail"`) surfaces
       an error in the UI `[NEG]`. Distinct from the next case, which hits a different client path
-- [ ] `album-provenance.spec.js` — a network-level failure (aborted request) surfaces an error `[NEG]`
+- [x] `apply-provenance.spec.js` — a network-level failure (aborted request) surfaces an error `[NEG]`
 
 ### Manual Testing Steps
 

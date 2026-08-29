@@ -25,6 +25,14 @@ require_once dirname(__DIR__, 2) . '/bootstrap.php';
 
 const SNAPSHOT_FILE = __DIR__ . '/../.state/snapshot.json';
 
+/** The audit trail. Named here rather than read from the plugin constant, which needs Piwigo booted. */
+const HISTORY_TABLE = 'piwigo_provenance_history';
+
+function history_high_water(Db $db): int
+{
+    return (int)$db->scalar('SELECT COALESCE(MAX(id), 0) FROM ' . HISTORY_TABLE);
+}
+
 /** The values 'with-provenance' writes. A spec reads them back off this script's output. */
 const SEEDED_VALUES = array(
     'provenance_physical_album' => 'Oma Müllers Fotoalbum',
@@ -56,6 +64,12 @@ function parse_args(array $argv): array
     return $args;
 }
 
+/**
+ * The snapshot carries the recorded values *and* the album whose photos a seed
+ * emptied. A photo that held no provenance before is not in the recorded state
+ * at all - readAll() only remembers rows worth putting back - so without the
+ * album id, an apply run by a spec would leave its values behind for good.
+ */
 function load_snapshot(): ?array
 {
     if (!file_exists(SNAPSHOT_FILE))
@@ -64,21 +78,21 @@ function load_snapshot(): ?array
     }
 
     $decoded = json_decode(file_get_contents(SNAPSHOT_FILE), true);
-    if (!is_array($decoded))
+    if (!is_array($decoded) or !isset($decoded['state']))
     {
         fail('snapshot file is not valid JSON: ' . SNAPSHOT_FILE);
     }
     return $decoded;
 }
 
-function save_snapshot(array $state): void
+function save_snapshot(array $snapshot): void
 {
     $dir = dirname(SNAPSHOT_FILE);
     if (!is_dir($dir) and !mkdir($dir, 0777, true) and !is_dir($dir))
     {
         fail("could not create snapshot directory $dir");
     }
-    file_put_contents(SNAPSHOT_FILE, json_encode($state, JSON_PRETTY_PRINT));
+    file_put_contents(SNAPSHOT_FILE, json_encode($snapshot, JSON_PRETTY_PRINT));
 }
 
 $args = parse_args($argv);
@@ -98,7 +112,19 @@ if (isset($args['restore']))
         exit(0);
     }
 
-    $builder->importState($snapshot);
+    // Clear first, restore second. A row that carried no provenance before is
+    // not in the recorded state at all - readAll() only remembers rows worth
+    // putting back - so restore() alone would leave a seeded album and every
+    // applied photo behind for good.
+    $albumId = (int)$snapshot['album_id'];
+    $builder->albumProvenance($albumId, array());
+    $builder->clearImageProvenance($builder->photoIdsInAlbum($albumId));
+
+    // History rows are append-only, so a spec that saved or applied leaves a
+    // trail behind. Without this the E2E suite would quietly poison every later
+    // run of the integration suite, which reads the same table.
+    $db->query('DELETE FROM ' . HISTORY_TABLE . ' WHERE id > ' . (int)$snapshot['history_id']);
+    $builder->importState($snapshot['state']);
     $builder->restore();
     unlink(SNAPSHOT_FILE);
 
@@ -125,7 +151,7 @@ if ($catId <= 0)
 $existing = load_snapshot();
 if ($existing !== null)
 {
-    $builder->importState($existing);
+    $builder->importState($existing['state']);
 }
 else
 {
@@ -135,11 +161,24 @@ else
 $wanted = $scenario === 'with-provenance' ? SEEDED_VALUES : array();
 $actual = $builder->albumProvenance($catId, $wanted);
 
-save_snapshot($builder->exportState());
+// photoIdsInAlbum() asserts the 1:1 photo-album assumption the copy-down rests
+// on, so a spec can never apply over a photo that belongs to two albums.
+$photo_ids = $builder->photoIdsInAlbum($catId);
+$builder->clearImageProvenance($photo_ids);
+
+save_snapshot(array(
+    'state' => $builder->exportState(),
+    'album_id' => $catId,
+    // Carried forward, so a second seed in the same test does not move the mark
+    // past rows the first one's spec already wrote.
+    'history_id' => $existing['history_id'] ?? history_high_water($db),
+    ));
 
 echo json_encode(array(
     'scenario' => $scenario,
     'album_id' => $catId,
     'values' => $actual,
+    'photo_ids' => $photo_ids,
+    'photo_count' => count($photo_ids),
     'max_short_text_chars' => PROVENANCE_SHORT_TEXT_MAX_CHARS,
     ), JSON_UNESCAPED_UNICODE), "\n";

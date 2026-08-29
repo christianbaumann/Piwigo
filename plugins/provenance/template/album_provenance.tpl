@@ -6,9 +6,21 @@ const provenance_album_id = {$PROVENANCE_ALBUM.CAT_ID};
 const provenance_pwg_token = '{$PWG_TOKEN}';
 const provenance_str_saved = '{'Provenance saved'|@translate|escape:javascript}';
 const provenance_str_error = '{'Provenance could not be saved'|@translate|escape:javascript}';
+const provenance_photo_ids = '{$PROVENANCE_ALBUM.PHOTO_IDS}'.split(',').filter(Boolean).map(Number);
+const provenance_apply_max_chunk = {$PROVENANCE_APPLY_MAX_CHUNK};
+const provenance_str_applying = '{'Applying provenance to %d photos...'|@translate|escape:javascript}';
+const provenance_str_applied = '{'Provenance applied to %d photos'|@translate|escape:javascript}';
+const provenance_str_apply_error = '{'Provenance could not be applied'|@translate|escape:javascript}';
 {/footer_script}
 
 <span class="buttonLike" id="provenance-open"><i class="icon-book"></i> {'Provenance'|@translate}</span>
+{if $PROVENANCE_ALBUM.PHOTO_COUNT > 0}
+<span class="buttonLike" id="provenance-apply"><i class="icon-download"></i> {'Apply to %d photos'|@translate|@sprintf:$PROVENANCE_ALBUM.PHOTO_COUNT}</span>
+<span id="provenance-apply-progress">
+  <span id="provenance-apply-bar"><span id="provenance-apply-bar-fill"></span></span>
+  <span id="provenance-apply-message"></span>
+</span>
+{/if}
 
 <div class="desc-modal" id="provenance-modal">
   <div class="desc-modal-content">

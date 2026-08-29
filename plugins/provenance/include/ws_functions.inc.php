@@ -174,3 +174,186 @@ UPDATE '.CATEGORIES_TABLE.'
     'changed' => provenance_record_changes($changes),
     );
 }
+
+/**
+ * Copies one album's provenance onto the photos of one chunk.
+ *
+ * The server never walks a whole album: the client cuts it into chunks and sends
+ * one request at a time, so a large album cannot run into the production 60 s
+ * ceiling. A chunk is all-or-nothing - an unusable id list, or one naming a
+ * photo outside the album, refuses the whole request rather than applying part
+ * of it, because a half-applied album is invisible afterwards.
+ *
+ * provenance_note on the photo is not in the update set at all: the album's own
+ * free text lands in provenance_album_note, and what somebody wrote about one
+ * photo is never overwritten from above (decision C3).
+ *
+ * @param array $param
+ * @param object $service
+ * @return array|PwgError
+ */
+function ws_provenance_applyToPhotos($param, &$service)
+{
+  if (is_a_guest())
+  {
+    return new PwgError(401, 'Access denied');
+  }
+
+  if (get_pwg_token() != $param['pwg_token'])
+  {
+    return new PwgError(403, 'Invalid security token');
+  }
+
+  $cat_id = (int)$param['cat_id'];
+
+  $result = pwg_query('
+SELECT '.implode(', ', array_keys(provenance_album_columns())).'
+  FROM '.CATEGORIES_TABLE.'
+  WHERE id = '.$cat_id.'
+;');
+
+  if (!pwg_db_num_rows($result))
+  {
+    return new PwgError(404, 'Album not found');
+  }
+
+  $album = pwg_db_fetch_assoc($result);
+
+  $image_ids = provenance_parse_id_list($param['image_ids']);
+  if ($image_ids === null)
+  {
+    return new PwgError(400, 'image_ids must be at most '.PROVENANCE_APPLY_MAX_CHUNK.' comma-separated photo ids');
+  }
+
+  if (empty($image_ids))
+  {
+    return array('cat_id' => $cat_id, 'applied' => 0, 'changed' => 0);
+  }
+
+  $id_list = implode(',', $image_ids);
+
+  $in_album = query2array('
+SELECT image_id
+  FROM '.IMAGE_CATEGORY_TABLE.'
+  WHERE category_id = '.$cat_id.'
+    AND image_id IN ('.$id_list.')
+;', null, 'image_id');
+
+  if (count($in_album) != count($image_ids))
+  {
+    return new PwgError(400, 'Every photo in image_ids must belong to this album');
+  }
+
+  // The copy-down target columns, and what the album puts in each of them.
+  $values = array();
+  foreach (provenance_copy_down_map() as $album_column => $image_column)
+  {
+    $values[$image_column] = (string)$album[$album_column];
+  }
+
+  // Read before the update, so the history rows say what really changed.
+  $before = query2array('
+SELECT id, '.implode(', ', array_keys($values)).'
+  FROM '.IMAGES_TABLE.'
+  WHERE id IN ('.$id_list.')
+;', 'id');
+
+  // mass_updates() applies no escaping of its own.
+  $escaped = array();
+  foreach ($values as $column => $value)
+  {
+    $escaped[$column] = pwg_db_real_escape_string($value);
+  }
+
+  $datas = array();
+  foreach ($image_ids as $image_id)
+  {
+    $datas[] = array_merge(array('id' => $image_id), $escaped);
+  }
+
+  // Deliberately without MASS_UPDATES_SKIP_EMPTY: an album field cleared by the
+  // administrator has to clear on the photos too, not linger there.
+  mass_updates(
+    IMAGES_TABLE,
+    array('primary' => array('id'), 'update' => array_keys($values)),
+    $datas
+    );
+
+  $changes = array();
+  foreach ($image_ids as $image_id)
+  {
+    foreach ($values as $column => $value)
+    {
+      $changes[] = array(
+        'object'    => 'photo',
+        'object_id' => $image_id,
+        'field'     => $column,
+        'old'       => isset($before[$image_id]) ? $before[$image_id][$column] : null,
+        'new'       => $value,
+        'source'    => 'apply',
+        );
+    }
+  }
+
+  return array(
+    'cat_id' => $cat_id,
+    'applied' => count($image_ids),
+    'changed' => provenance_record_changes($changes),
+    );
+}
+
+/**
+ * Saves one photo's own provenance note.
+ *
+ * The only column this method writes is provenance_note. The four album-sourced
+ * columns are album-authoritative (decision C3) and are changed by an album
+ * operation or not at all, so a photo can never drift away from its album
+ * through this screen.
+ *
+ * picture_modify.php's own form posts to itself with a hard-coded set of fields
+ * and no hook, so - like the album screen - the block carries its own button.
+ *
+ * @param array $param
+ * @param object $service
+ * @return array|PwgError
+ */
+function ws_provenance_setPhotoInfo($param, &$service)
+{
+  if (is_a_guest())
+  {
+    return new PwgError(401, 'Access denied');
+  }
+
+  if (get_pwg_token() != $param['pwg_token'])
+  {
+    return new PwgError(403, 'Invalid security token');
+  }
+
+  $image_id = (int)$param['image_id'];
+
+  $result = pwg_query('
+SELECT provenance_note
+  FROM '.IMAGES_TABLE.'
+  WHERE id = '.$image_id.'
+;');
+
+  if (!pwg_db_num_rows($result))
+  {
+    return new PwgError(404, 'Photo not found');
+  }
+
+  list($before) = pwg_db_fetch_row($result);
+
+  $note = provenance_clean_note($param['note']);
+
+  pwg_query('
+UPDATE '.IMAGES_TABLE.'
+  SET provenance_note = '.($note === '' ? 'NULL' : '"'.pwg_db_real_escape_string($note).'"').'
+  WHERE id = '.$image_id.'
+;');
+
+  return array(
+    'image_id' => $image_id,
+    'changed' => provenance_record_change('photo', $image_id, 'provenance_note', $before, $note, 'photo_edit'),
+    );
+}

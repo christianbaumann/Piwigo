@@ -41,6 +41,7 @@ if (defined('IN_ADMIN'))
   include_once(PROVENANCE_PATH . 'include/events_admin.inc.php');
 
   add_event_handler('loc_begin_admin_page', 'provenance_admin_album');
+  add_event_handler('loc_begin_admin_page', 'provenance_admin_photo');
 }
 
 /**
@@ -83,6 +84,32 @@ function provenance_add_methods($arr)
       'pwg_token' => array(),
       ),
     'Saves the provenance of one album. Empty values clear the field.',
+    PROVENANCE_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
+  );
+
+  $service->addMethod(
+    'pwg.provenance.applyToPhotos',
+    'ws_provenance_applyToPhotos',
+    array(
+      'cat_id' => array('type' => WS_TYPE_ID),
+      'image_ids' => array('default' => '', 'info' => 'At most '.PROVENANCE_APPLY_MAX_CHUNK.' comma-separated photo ids, all in this album'),
+      'pwg_token' => array(),
+      ),
+    'Copies an album\'s provenance onto the photos of one chunk. The photo\'s own note is never touched.',
+    PROVENANCE_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
+  );
+
+  $service->addMethod(
+    'pwg.provenance.setPhotoInfo',
+    'ws_provenance_setPhotoInfo',
+    array(
+      'image_id' => array('type' => WS_TYPE_ID),
+      'note' => array('default' => ''),
+      'pwg_token' => array(),
+      ),
+    'Saves one photo\'s own provenance note. The album-sourced values are not touched.',
     PROVENANCE_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );
