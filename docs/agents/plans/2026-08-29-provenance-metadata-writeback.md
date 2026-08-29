@@ -364,7 +364,7 @@ Test-first throughout: write the test, **watch it fail for the expected reason**
 
 ### Changes Required:
 
-#### [ ] 1. Constants — one definition each
+#### [x] 1. Constants — one definition each
 **File**: `plugins/provenance/include/functions.inc.php`
 
 ```php
@@ -382,35 +382,58 @@ function provenance_field_order()
 Labels come from `l10n()` at call sites, never from a literal inside the composer — the composer
 takes already-labelled parts so it stays free of the language layer and testable without Piwigo.
 
-#### [ ] 2. `provenance_compose_caption(array $parts): string`
+#### [x] 2. `provenance_compose_caption(array $parts): string`
 Joins non-empty, trimmed parts with `PROVENANCE_CAPTION_SEPARATOR`. Empty and whitespace-only parts
 are dropped. All-empty input returns `''`.
 
-#### [ ] 3. `provenance_truncate_for_iptc(string $text): array`
+#### [x] 3. `provenance_truncate_for_iptc(string $text): array`
 Returns `array('text' => …, 'truncated' => bool)`. Truncates on a **UTF-8 character boundary** so
 the result is never invalid UTF-8, appending `PROVENANCE_TRUNCATION_MARK` within the byte budget.
 `strlen()` (bytes), not `mb_strlen()` — the IPTC limit is a byte limit.
 
-#### [ ] 4. `provenance_build_argfile(array $values, string $caption): array`
+#### [x] 4. `provenance_build_argfile(array $values, string $caption): array`
 Returns the argfile lines, in order: `-charset`, `iptc=UTF8`, the five MWG slots with the caption
 (IPTC getting the truncated copy), then the five `-XMP-pwgprov:*` lines. Empty values are omitted
 entirely rather than written as empty tags. One argument per line — the format exiftool's `-@`
 expects, and the reason no value ever reaches a command line (decision C8).
 
-#### [ ] 5. `provenance_lock_path(string $imagePath): string`
+#### [x] 5. `provenance_lock_path(string $imagePath): string`
 `_data/provenance/locks/<sha1 of the path>.lock`. A separate file, never the image itself — exiftool
 replaces the image by rename, so a lock on the old inode would exclude nothing after the first write.
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
-- [ ] `ddev exec php -l plugins/provenance/include/functions.inc.php`
-- [ ] Suite passes twice consecutively and in reverse order (`--order-by=reverse`)
+- [x] `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
+- [x] `ddev exec php -l plugins/provenance/include/functions.inc.php`
+- [x] Suite passes twice consecutively and in reverse order (`--order-by=reverse`)
 
 #### Manual Verification:
-- [ ] For each new function, break its behaviour once and confirm the test goes red
-      (`.claude/rules/test-design.md`, *proving a check can actually fail*)
+- [x] ~~For each new function, break its behaviour once and confirm the test goes red~~
+      (`.claude/rules/test-design.md`, *proving a check can actually fail*) → **automated as a
+      one-off, run 2026-08-29**. Each mutation was applied on the host, asserted to have changed
+      the file, and the container was polled (`md5` vs `ddev exec md5sum`) until it held the new
+      bytes before the suite ran — the shifted-by-one trap in `.claude/rules/mutation-testing.md`.
+      The file was restored and re-run green afterwards.
+
+      | Mutant | Result |
+      |---|---|
+      | `provenance_compose_caption()`: join order reversed | 4 failures |
+      | `provenance_truncate_for_iptc()`: `<=` → `<` | 2 failures |
+      | `provenance_build_argfile()`: `-charset` preamble dropped | 2 failures |
+      | `provenance_sanitize_argfile_value()`: newline collapsing removed | 2 failures |
+      | `provenance_lock_path()`: returns the image path itself | 3 failures |
+
+      The harness is **not** kept: `.claude/rules/test-design.md` (*build no apparatus that proves
+      another apparatus*) and `mutation-testing.md` (*keep it as prose, not a script*) both forbid
+      it, so this table is the artefact and nothing was added to the suite. The Phase 10 mutation
+      table supersedes it as the standing strength record.
+
+### Deviation from the plan
+
+`provenance_sanitize_argfile_value()` is one helper the plan did not name. The plan left the
+newline case as "rejected or escaped"; neither was taken — newlines are collapsed to a space.
+Recorded as [decision 0006](../decisions/0006-argfile-newlines-collapsed-not-rejected.md).
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 
@@ -883,7 +906,7 @@ measurement from Phase 6, and hand-check ledger entries for: the external-viewer
 narrow-viewport layout check, and the upload-path inheritance check.
 
 #### [ ] 3. Decision records
-**Files**: `docs/agents/decisions/0006-…` onward, one per file
+**Files**: `docs/agents/decisions/0007-…` onward, one per file (0006 was taken in Phase 2)
 **Changes**: (a) provenance lives in its own plugin, not typetags, not core; (b) album-sourced
 fields stay out of `use_iptc_mapping`/`use_exif_mapping`, which is what prevents the sync revert
 loop; (c) `allow_html_descriptions` is not honoured for provenance text; (d) move defaults to
@@ -934,36 +957,36 @@ Techniques recorded as not applicable, with the reason:
 ### Unit Tests (base — fast, isolated, exhaustive)
 
 `provenance_compose_caption()`:
-- [ ] all five parts present → joined in `provenance_field_order()` order with the separator `[HAPPY]`
-- [ ] one part empty string → omitted, no doubled separator `[ECP]`
-- [ ] one part whitespace-only → omitted `[ECP]`
-- [ ] all parts empty → returns `''` `[BVA]`
-- [ ] exactly one part → no separator anywhere `[BVA]`
-- [ ] parts containing the separator itself → not re-split, passed through `[ERR]`
-- [ ] leading/trailing whitespace trimmed per part `[ECP]`
+- [x] all five parts present → joined in `provenance_field_order()` order with the separator `[HAPPY]`
+- [x] one part empty string → omitted, no doubled separator `[ECP]`
+- [x] one part whitespace-only → omitted `[ECP]`
+- [x] all parts empty → returns `''` `[BVA]`
+- [x] exactly one part → no separator anywhere `[BVA]`
+- [x] parts containing the separator itself → not re-split, passed through `[ERR]`
+- [x] leading/trailing whitespace trimmed per part `[ECP]`
 
 `provenance_truncate_for_iptc()`:
-- [ ] text of 1999 bytes → unchanged, `truncated === false` `[BVA]`
-- [ ] text of exactly 2000 bytes → unchanged, `truncated === false` `[BVA]`
-- [ ] text of 2001 bytes → truncated, `truncated === true`, result ≤ 2000 bytes `[BVA]`
-- [ ] empty string → unchanged, not flagged `[BVA]`
-- [ ] multi-byte character straddling the boundary → result is valid UTF-8
+- [x] text of 1999 bytes → unchanged, `truncated === false` `[BVA]`
+- [x] text of exactly 2000 bytes → unchanged, `truncated === false` `[BVA]`
+- [x] text of 2001 bytes → truncated, `truncated === true`, result ≤ 2000 bytes `[BVA]`
+- [x] empty string → unchanged, not flagged `[BVA]`
+- [x] multi-byte character straddling the boundary → result is valid UTF-8
       (`mb_check_encoding`), never a split character `[ERR]`
-- [ ] a string of only multi-byte characters exceeding the cap → valid UTF-8, ≤ 2000 bytes `[BVA]`
-- [ ] the truncation mark itself fits inside the budget `[BVA]`
+- [x] a string of only multi-byte characters exceeding the cap → valid UTF-8, ≤ 2000 bytes `[BVA]`
+- [x] the truncation mark itself fits inside the budget `[BVA]`
 
 `provenance_build_argfile()`:
-- [ ] all fields present → exact line sequence, `-charset`/`iptc=UTF8` first `[HAPPY]`
-- [ ] IPTC line carries the truncated text while EXIF/XMP lines carry the full text `[DT]`
-- [ ] an empty field emits no line for that tag `[ECP]`
-- [ ] all fields empty → no tag lines at all (caller must not invoke exiftool) `[BVA]`
-- [ ] a value containing a newline → rejected or escaped, never producing two argfile lines `[NEG]`
-- [ ] a value containing `-` at line start → still parsed as a value, not a flag `[NEG]`
+- [x] all fields present → exact line sequence, `-charset`/`iptc=UTF8` first `[HAPPY]`
+- [x] IPTC line carries the truncated text while EXIF/XMP lines carry the full text `[DT]`
+- [x] an empty field emits no line for that tag `[ECP]`
+- [x] all fields empty → no tag lines at all (caller must not invoke exiftool) `[BVA]`
+- [x] a value containing a newline → rejected or escaped, never producing two argfile lines `[NEG]`
+- [x] a value containing `-` at line start → still parsed as a value, not a flag `[NEG]`
 
 `provenance_lock_path()`:
-- [ ] two different image paths → two different lock paths `[HAPPY]`
-- [ ] the same path twice → the same lock path (deterministic) `[HAPPY]`
-- [ ] the lock path is never equal to the image path `[NEG]`
+- [x] two different image paths → two different lock paths `[HAPPY]`
+- [x] the same path twice → the same lock path (deterministic) `[HAPPY]`
+- [x] the lock path is never equal to the image path `[NEG]`
 
 Input validation helpers (Phase 4):
 - [ ] date `2026-04-19` accepted; `2026-13-01` rejected (`checkdate`); `2026-4-9` rejected;
