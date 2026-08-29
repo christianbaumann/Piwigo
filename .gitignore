@@ -12,6 +12,12 @@
 /upload
 /galleries/*
 !/galleries/index.php
+# Recovered scans, tracked deliberately: the database rows and the originals
+# under upload/ were lost on 2026-08-29 and these copies are the only ones left.
+!/galleries/PHOTO_ALBUM
+!/galleries/Verschiedenes
+# Staging area for the recovery; its contents live in galleries/ now.
+/_temp
 /local/*
 !/local/**/index.php
 
@@ -29,3 +35,4 @@
 .rodney/
 .agent-tests/
 /.playwright-cli/
+.DS_Store
