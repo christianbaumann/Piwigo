@@ -43,8 +43,21 @@ different staged files.
 | `galleries/1992_Rund_um_Sefferweich` | 18 | 0 | 18 |
 | **total** | **105** | **62** | **43** |
 
-**62 of the 76 originals the cache knows about are recovered. 14 are not** — they exist only
-as derivatives of at most ~600px.
+**62 of the 76 originals the cache knows about are recovered. 14 were not.**
+
+Those 14 survived only as derivatives — 13 as a 120x120 square thumbnail alone, one
+(`20260419142033-2bbdc9bf`) also as a 594px medium. They were **deleted on request**, 15 files
+and 856 KB, after cross-checking that none of them belonged to a recovered original. The
+derivative cache now holds 142 files covering exactly the 62 recovered originals. Nothing of
+those 14 photographs remains anywhere.
+
+    20260419142031-5410e809    20260419142038-097a1073
+    20260419142032-11c7437f    20260419142038-5e5c14c0
+    20260419142032-3053aff4    20260419142038-702aa1ed
+    20260419142033-2bbdc9bf    20260419142038-b1d2de51
+    20260419142033-7418e904    20260419142038-e4fe7be7
+    20260419142033-d6df7b1e    20260419142039-043d4539
+    20260419142035-55814e9f    20260419142039-bee64951
 
 ## What the unproven 43 are
 
