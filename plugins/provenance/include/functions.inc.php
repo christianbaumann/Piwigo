@@ -81,7 +81,90 @@ function provenance_history_objects()
  */
 function provenance_history_sources()
 {
-  return array('album_edit', 'photo_edit', 'apply', 'inherit', 'writeback', 'truncation');
+  return array(
+    'album_edit', 'photo_edit', 'apply', 'inherit', 'writeback', 'truncation',
+    PROVENANCE_HISTORY_SOURCE_MOVE, PROVENANCE_HISTORY_SOURCE_ALBUM_DELETE,
+    );
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Modes: what an album operation does to a photo that already carries values.
+ *
+ * Core fires one trigger for every virtual link and offers no way to tell a
+ * move from a plain association there, so the choice cannot be inferred - it
+ * travels as an explicit request parameter that the Batch Manager's move panel
+ * and the album-delete prompt post, and that an unattended API call omits.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Leave what the photo already carries. The default, and destroys nothing. */
+define('PROVENANCE_MODE_KEEP', 'keep');
+
+/** Empty the four album-sourced columns. The photo's own note is never touched. */
+define('PROVENANCE_MODE_CLEAR', 'clear');
+
+/** Overwrite them with the destination album's values. */
+define('PROVENANCE_MODE_REPLACE', 'replace');
+
+/** Request parameter carrying the choice made for a move or an association. */
+define('PROVENANCE_MOVE_MODE_PARAM', 'provenance_move_mode');
+
+/** Request parameter carrying the choice made when an album is deleted. */
+define('PROVENANCE_DELETE_MODE_PARAM', 'provenance_delete_mode');
+
+/** History source for a write an explicit move mode caused. */
+define('PROVENANCE_HISTORY_SOURCE_MOVE', 'move');
+
+/** History source for a write an album deletion caused. */
+define('PROVENANCE_HISTORY_SOURCE_ALBUM_DELETE', 'album_delete');
+
+/**
+ * What a move or an association may do. Keep is first so a UI renders it as the
+ * pre-selected choice.
+ *
+ * @return array
+ */
+function provenance_move_modes()
+{
+  return array(PROVENANCE_MODE_KEEP, PROVENANCE_MODE_CLEAR, PROVENANCE_MODE_REPLACE);
+}
+
+/**
+ * What an album deletion may do. There is no album left to replace from, so
+ * only two of the three apply.
+ *
+ * @return array
+ */
+function provenance_delete_modes()
+{
+  return array(PROVENANCE_MODE_KEEP, PROVENANCE_MODE_CLEAR);
+}
+
+/**
+ * Reads a mode out of a request.
+ *
+ * Anything unusable - absent, empty, mistyped, not a string, or a mode the
+ * caller's list does not allow - resolves to keep. A mode rides on a core web
+ * service method the plugin cannot add a parameter to, so there is no call to
+ * return an error from; falling back to the choice that destroys nothing is the
+ * only safe reading of a value nobody can be asked about.
+ *
+ * @param array $request typically $_POST
+ * @param string $param
+ * @param array $allowed
+ * @return string one of $allowed
+ */
+function provenance_resolve_mode($request, $param, $allowed)
+{
+  if (!isset($request[$param]) or !is_string($request[$param]))
+  {
+    return PROVENANCE_MODE_KEEP;
+  }
+
+  $mode = trim($request[$param]);
+
+  return in_array($mode, $allowed, true) ? $mode : PROVENANCE_MODE_KEEP;
 }
 
 /**

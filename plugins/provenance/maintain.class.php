@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
 ) DEFAULT CHARSET=utf8mb4
 ;');
 
+    // A database created by an earlier version carries the ENUM that version
+    // declared. install() is re-entered through update() on every version bump,
+    // which is where a new source value has to reach an existing column - a
+    // CREATE TABLE IF NOT EXISTS never touches one.
+    $this->widen_source_enum();
+
     $this->add_display_info_key();
   }
 
@@ -148,6 +154,20 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
     // letting conf_update_param() put the array there instead would break the
     // page for the rest of this request.
     $conf[PROVENANCE_DISPLAY_INFO_PARAM] = serialize($map);
+  }
+
+  /**
+   * Brings the source column up to the recorder's current list.
+   *
+   * MySQL stores a value outside an ENUM as '', so a column that has not been
+   * widened does not fail loudly - it writes rows that claim nothing.
+   */
+  private function widen_source_enum()
+  {
+    pwg_query('
+ALTER TABLE `' . $this->history_table . '`
+  MODIFY `source` ' . $this->enum(provenance_history_sources()) . ' NOT NULL
+;');
   }
 
   /**

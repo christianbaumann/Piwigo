@@ -104,6 +104,53 @@ final class PluginActivationTest extends TestCase
         $this->assertSame($expected, $actual);
     }
 
+    /**
+     * [DT] The source column accepts every value the recorder validates against.
+     *
+     * The two lists are the same fact stored twice - one in a MySQL ENUM, one in
+     * provenance_history_sources() - and MySQL turns a value outside the ENUM
+     * into '', leaving a row that silently claims nothing.
+     *
+     * Driven through uninstall + activate, the only lifecycle a test can reach:
+     * install() is re-entered on an already-installed plugin solely through
+     * update(), which needs an extracted extension archive (decision 0010). The
+     * MODIFY in install() that widens an existing column on a version bump is
+     * therefore not witnessed here - what is witnessed is that a database the
+     * plugin creates accepts every source the recorder will write.
+     */
+    public function testTheSourceColumnAcceptsEveryRecordedSource(): void
+    {
+        $this->performAction('uninstall');
+        $res = $this->performAction('activate');
+        $this->assertSame('ok', $res['json']['stat'] ?? null, 'Got: ' . $res['body']);
+
+        $sources = provenance_history_sources();
+        $this->assertGreaterThan(
+            0,
+            count($sources),
+            'anti-vacuity: with no sources listed this test would assert nothing'
+        );
+
+        $type = (string)$this->db->scalar(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS" .
+            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . self::HISTORY_TABLE . "'" .
+            " AND COLUMN_NAME = 'source'"
+        );
+
+        $declared = array();
+        if (preg_match('/^enum\((.*)\)$/i', $type, $m))
+        {
+            $declared = array_map(
+                static fn (string $value): string => trim($value, "'"),
+                explode(',', $m[1])
+            );
+        }
+
+        sort($sources);
+        sort($declared);
+        $this->assertSame($sources, $declared, "the source ENUM is out of step with the recorder: $type");
+    }
+
     /** [ST] Uninstall removes every column and the table again. */
     public function testUninstallRemovesEveryColumnAndTheHistoryTable(): void
     {
