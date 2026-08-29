@@ -901,7 +901,7 @@ A ratchet, not a wall: block new breakage, leave existing state alone, and stay 
 
 ### Changes Required:
 
-#### [ ] 1. The hook
+#### [x] 1. The hook
 **File**: `.githooks/pre-commit` (new, version-controlled)
 **Changes**:
 - `php -l` on staged `*.php` only (host PHP for speed; the container is the parity check, run separately)
@@ -909,7 +909,21 @@ A ratchet, not a wall: block new breakage, leave existing state alone, and stay 
 - if DDEV is down, `php -l` still runs and the suite is skipped **with a printed warning**, never silently
 - `--no-verify` bypasses, by design
 
-#### [ ] 2. Install for BOTH repositories
+**Deviation — the suite does need DDEV.** The plan's phrasing ("the unit suite only — it is
+sub-second and needs no DDEV") conflates two things: the *suite* needs no database or HTTP,
+but the *runner* lives in the container (`ddev exec plugins/typetags/vendor/bin/phpunit`),
+and the host runs PHP 8.5 against a container on 8.4. Running it on the host would gate
+commits on a different PHP than the project targets. So the hook shells out to `ddev exec`
+(1.6s wall clock, measured 2026-08-29, of which the suite itself is 0.098s) and takes the
+DDEV-down path the plan already specifies. `php -l` still uses host PHP, as specified.
+
+**Deviation — a third file, `.githooks/lib.sh`.** The hook and its self-test would otherwise
+each carry a hand-typed copy of the vacuous-assertion pattern, which is exactly the
+*do not transcribe production data into a test* case. `lib.sh` holds the three shared
+constants (`TEST_PATH_PATTERN`, `VACUOUS_PATTERN`, `UNIT_SUITE_ARGS`); both source it, and
+the self-test builds its probe by interpolating `$VACUOUS_PATTERN` rather than retyping it.
+
+#### [x] 2. Install for BOTH repositories
 **File**: `tools/install-hooks.sh` (new)
 **Changes**: `core.hooksPath` on the superproject alone does **not** cover submodule commits, and every plugin commit is a submodule commit — so the hook would silently never run on the commits that matter. The installer configures both:
 ```bash
@@ -917,7 +931,7 @@ git config core.hooksPath .githooks
 git -C plugins/typetags config core.hooksPath "$(pwd)/.githooks"
 ```
 
-#### [ ] 3. Self-test for the hook — the hook's own anti-vacuity check
+#### [x] 3. Self-test for the hook — the hook's own anti-vacuity check
 **File**: `tools/test-hooks.sh` (new)
 **Changes**: a hook nobody has watched fail is a hook nobody knows works, and a hook that silently stops blocking is worse than none. The self-test stages throwaway probes, runs the hook, asserts the exit code, then unstages and deletes — it never creates a commit. It needs **two red probes and one green**, so it proves the hook can both block and let through.
 
@@ -929,23 +943,29 @@ run_case "clean file passes"     0 "$probe_dir/probe_clean.php"
 
 The second probe is the ratchet that matters most here: the defect this whole plan started from was an assertion ending in `|| true`. Grep **added lines only** (`git diff --cached -U0 | grep '^+'`), so pre-existing code is grandfathered and only new occurrences are blocked. A `trap` on `EXIT`/`INT`/`TERM` restores the tree even when the run is interrupted.
 
-#### [ ] 4. Guard against the mutation that changes nothing
+**Deviation — a temporary index instead of stage-then-unstage.** The plan's "stages probes, then unstages and deletes" would run the hook over whatever the developer already had staged, so an unrelated staged file could turn the green case red and the self-test would report a fault that is not the hook's. Each case instead exports `GIT_INDEX_FILE` to a throwaway index seeded with `git read-tree HEAD`, so the hook sees exactly one file and the real index is never written to at all. The `trap` still removes the probe directory and the temp index.
+
+**Added beyond the plan**: the self-test asserts `probe_vacuous.php` is *syntactically valid* before running the hook on it. Without that, a typo in the probe would make the syntax check fire, the case would go green, and it would say nothing about the vacuity ratchet it claims to test.
+
+#### [x] 4. Guard against the mutation that changes nothing
 **File**: `tools/test-hooks.sh`
 **Changes**: if a probe pattern stops matching what the hook looks for, the self-test passes over nothing and proves nothing. Assert each probe file actually differs from a clean baseline before running the hook on it — the designed failure is *"probe changed nothing"*, reported red rather than silently green.
+
+**Proven able to fail**: rewriting `probe_vacuous.php` as a byte-copy of the clean baseline turned the guard red (`probe_vacuous.php is identical to the clean baseline - it would prove nothing`) alongside the case it protects, instead of that case passing over nothing.
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `bash tools/test-hooks.sh` passes all three cases (two red, one green)
-- [ ] `git -C plugins/typetags config --get core.hooksPath` is set
-- [ ] A commit in the submodule with a PHP syntax error is rejected
-- [ ] A staged new `|| true` inside a test file is rejected; an existing one elsewhere is not
-- [ ] `git commit --no-verify` bypasses
-- [ ] With Docker stopped, the hook still runs `php -l` and prints the skip warning rather than passing silently
-- [ ] Deleting the hook's grep pattern makes `test-hooks.sh` go red (the self-test has teeth)
+- [x] `bash tools/test-hooks.sh` passes all three cases (two red, one green) — plus three precondition checks
+- [x] `git -C plugins/typetags config --get core.hooksPath` is set — `/Users/christian.baumann/git_repos/_own/piwigo/.githooks` (absolute; the superproject's is the relative `.githooks`)
+- [x] A commit in the submodule with a PHP syntax error is rejected — real `git commit`, rejected naming the file; submodule HEAD unmoved
+- [x] A staged new `|| true` inside a test file is rejected; an existing one elsewhere is not — the probe was committed with `--no-verify`, then an unrelated edit to the *same file* committed cleanly, which is the stricter form of the criterion
+- [x] `git commit --no-verify` bypasses — used to create the grandfathering fixture above
+- [x] With Docker stopped, the hook still runs `php -l` and prints the skip warning rather than passing silently — exercised with a stub `ddev` on `PATH` returning non-zero (`WARNING: DDEV is not running - unit suite skipped`, exit 0) rather than by stopping Docker, which takes the identical branch; the `ddev`-absent branch was checked too
+- [x] Deleting the hook's grep pattern makes `test-hooks.sh` go red (the self-test has teeth) — neutered `hits=$(… grep -F …)` to `hits=""`; **exactly one case moved**, the other two stayed green. Hook restored and confirmed byte-identical.
 
 #### Manual Verification:
-- [ ] The hook was watched failing once by hand before being trusted
+- [x] The hook was watched failing once by hand before being trusted — two real `git commit` invocations in `plugins/typetags` (syntax error, then a new `|| true`), both rejected at the terminal, neither creating a commit. Recorded in [TESTING.md](../TESTING.md#the-commit-gate-and-what-it-was-watched-doing)
 
 **Implementation Note**: Run `/verify`. Then Phase 7.
 

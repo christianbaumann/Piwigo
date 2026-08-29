@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+#
+# Pre-commit ratchet. Blocks new breakage, leaves pre-existing state alone,
+# and stays bypassable with `git commit --no-verify`.
+#
+#   1. php -l on the staged content of staged *.php files (host PHP, for speed)
+#   2. no newly added vacuous assertion in staged test files - added lines only,
+#      so pre-existing occurrences are grandfathered
+#   3. the typetags unit suite, skipped with a printed warning when DDEV is down
+#
+# Installed for the superproject *and* for plugins/typetags: a superproject
+# core.hooksPath does not apply to submodule commits. See tools/install-hooks.sh.
+
+set -uo pipefail
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
+. "$HOOK_DIR/lib.sh"
+
+failed=0
+
+note()
+{
+  printf 'pre-commit: %s\n' "$1" >&2
+}
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+# --- 1. syntax check on staged content -------------------------------------
+
+if command -v php >/dev/null 2>&1
+then
+  while IFS= read -r file
+  do
+    case "$file" in
+      *.php) ;;
+      *) continue ;;
+    esac
+
+    if ! output=$(git show ":$file" | php -l 2>&1)
+    then
+      note "PHP syntax error in $file"
+      printf '%s\n' "$output" >&2
+      failed=1
+    fi
+  done <<< "$staged"
+else
+  note "WARNING: php not found on PATH - syntax check skipped"
+fi
+
+# --- 2. vacuity ratchet on added lines only ---------------------------------
+
+test_files=$(printf '%s\n' "$staged" | grep -E "$TEST_PATH_PATTERN")
+
+if [ -n "$test_files" ]
+then
+  added=""
+  while IFS= read -r file
+  do
+    [ -n "$file" ] || continue
+    added+=$(git diff --cached -U0 -- "$file" | grep '^+' | grep -v '^+++')$'\n'
+  done <<< "$test_files"
+
+  hits=$(printf '%s' "$added" | grep -F -- "$VACUOUS_PATTERN")
+
+  if [ -n "$hits" ]
+  then
+    note "added test line(s) contain a condition that cannot fail (\"$VACUOUS_PATTERN\"):"
+    printf '%s\n' "$hits" >&2
+    failed=1
+  fi
+fi
+
+# --- 3. unit suite ----------------------------------------------------------
+
+if ! command -v ddev >/dev/null 2>&1
+then
+  note "WARNING: ddev not found - unit suite skipped"
+elif ! ddev exec true >/dev/null 2>&1
+then
+  note "WARNING: DDEV is not running - unit suite skipped"
+elif ! output=$(cd "$PROJECT_ROOT" && ddev exec "${UNIT_SUITE_ARGS[@]}" 2>&1)
+then
+  note "unit suite failed"
+  printf '%s\n' "$output" >&2
+  failed=1
+fi
+
+exit $failed

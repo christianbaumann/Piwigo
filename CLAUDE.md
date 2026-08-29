@@ -88,9 +88,18 @@ The mechanical checks available are:
 ```bash
 php -l <file>                  # syntax check; use ddev exec php -l for 8.4 parity
 ddev exec plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml
+bash tools/test-hooks.sh       # self-test for the commit gate below
 ```
 
 Everything else is manual or browser-driven. Don't claim a lint or test pass that no command produced — say which of the above actually ran.
+
+### Commit gate
+
+`.githooks/pre-commit` is version-controlled and installed with `bash tools/install-hooks.sh`, which sets `core.hooksPath` on **both** the superproject and `plugins/typetags` — a superproject `core.hooksPath` does not apply to submodule commits, and every plugin commit is one. Run it after a fresh clone.
+
+It runs `php -l` on staged PHP, blocks a newly *added* `|| true` in a staged test file (added lines only, so pre-existing code is grandfathered), and runs the unit suite. If DDEV is down the suite is skipped with a printed warning rather than a silent pass. `git commit --no-verify` bypasses it.
+
+`.githooks/lib.sh` holds the three shared constants (test-path pattern, vacuous-assertion pattern, unit-suite command) so the hook and its self-test cannot drift apart.
 
 ## Architecture
 

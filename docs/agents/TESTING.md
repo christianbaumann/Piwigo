@@ -50,6 +50,26 @@ production install**, and neither ever will be — this is stated rather than as
 Fixtures force their precondition and assert it took effect; no assertion depends on
 cleanup having run, because cleanup is skipped on failure so it cannot erase the evidence.
 
+### The commit gate, and what it was watched doing
+
+`.githooks/pre-commit` gates on the unit suite only — the one suite that runs without the
+stack up. Design and installation are in CLAUDE.md; the rule it follows is
+`.claude/rules/precommit-hooks.md`. What belongs here is the record that it was watched
+working, **measured 2026-08-29**:
+
+| Watched | How | Result |
+|---|---|---|
+| Blocks a real commit on a syntax error | `git commit` in `plugins/typetags` with a broken `.php` staged | rejected; commit not created |
+| Blocks a newly added `\|\| true` in a test file | same, `tests/HookRatchetProbe.php` | rejected, naming the offending added line |
+| Grandfathers a pre-existing one | committed the probe with `--no-verify`, then staged an unrelated edit to the same file | accepted — the vacuous line was not in the added lines |
+| `--no-verify` bypasses | as above | accepted |
+| Degrades rather than blocking when DDEV is down | stub `ddev` on `PATH` returning non-zero | `WARNING: DDEV is not running - unit suite skipped`, exit 0 |
+| The self-test has teeth | neutered the hook's vacuity grep | `tools/test-hooks.sh` went red on exactly that case, the other two stayed green |
+| The "probe changed nothing" guard has teeth | made `probe_vacuous.php` a copy of the clean baseline | reported red loudly instead of passing over nothing |
+
+The probe repository state was restored after each: `plugins/typetags` reset to
+`3eeee007d`, working tree clean.
+
 ### Clear the compiled template after editing a prefilter
 
 `Template::set_prefilter()` hashes only the callback's *name* into Smarty's `compile_id`
