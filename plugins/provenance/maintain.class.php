@@ -43,12 +43,12 @@ class provenance_maintain extends PluginMaintain
     pwg_query('
 CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `object` enum(\'album\',\'photo\') NOT NULL,
+  `object` ' . $this->enum(provenance_history_objects()) . ' NOT NULL,
   `object_id` int(10) unsigned NOT NULL,
-  `field` varchar(64) NOT NULL,
+  `field` varchar(' . PROVENANCE_HISTORY_FIELD_MAX_BYTES . ') NOT NULL,
   `old_value` text DEFAULT NULL,
   `new_value` text DEFAULT NULL,
-  `source` enum(\'album_edit\',\'photo_edit\',\'apply\',\'inherit\',\'writeback\',\'truncation\') NOT NULL,
+  `source` ' . $this->enum(provenance_history_sources()) . ' NOT NULL,
   `performed_by` mediumint(8) unsigned DEFAULT NULL,
   `occured_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -75,6 +75,18 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
     }
 
     pwg_query('DROP TABLE IF EXISTS `' . $this->history_table . '`;');
+  }
+
+  /**
+   * An ENUM column type built from the shared list, so the recorder cannot
+   * validate against a value the column does not accept.
+   *
+   * @param array $values
+   * @return string
+   */
+  private function enum($values)
+  {
+    return "enum('" . implode("','", $values) . "')";
   }
 
   private function add_column($table, $column, $definition)

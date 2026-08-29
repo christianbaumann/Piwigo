@@ -4,6 +4,10 @@
 define('PROVENANCE_PATH', dirname(__DIR__) . '/');
 define('PIWIGO_ROOT', dirname(dirname(dirname(__DIR__))) . '/');
 require_once PROVENANCE_PATH . 'include/functions.inc.php';
+// history.inc.php also only declares functions; the shaping half is pure and
+// unit-tested, and the two functions that reach the database are never called
+// unless a test boots the runtime through PiwigoRuntime.
+require_once PROVENANCE_PATH . 'include/history.inc.php';
 
 // Integration-layer support classes (no Piwigo core needed - they talk to
 // ws.php over HTTP and to MariaDB directly).
@@ -12,3 +16,4 @@ require_once __DIR__ . '/Support/Config.php';
 require_once __DIR__ . '/Support/Db.php';
 require_once __DIR__ . '/Support/WsClient.php';
 require_once __DIR__ . '/Support/FixtureBuilder.php';
+require_once __DIR__ . '/Support/PiwigoRuntime.php';

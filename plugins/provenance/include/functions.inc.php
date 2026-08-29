@@ -46,6 +46,44 @@ function provenance_image_columns()
     );
 }
 
+/*
+ * ---------------------------------------------------------------------------
+ * History table shape. maintain.class.php builds the CREATE TABLE from these,
+ * and the recorder validates against them, so an enum value cannot exist in one
+ * place and not the other.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Width of piwigo_provenance_history.field. */
+define('PROVENANCE_HISTORY_FIELD_MAX_BYTES', 64);
+
+/** Rows pwg.provenance.getHistory returns when the caller asks for no size. */
+define('PROVENANCE_HISTORY_PER_PAGE_DEFAULT', 50);
+
+/** Ceiling on that: a larger request is clamped down to this, not refused. */
+define('PROVENANCE_HISTORY_PER_PAGE_MAX', 500);
+
+/**
+ * What a history row can be about.
+ *
+ * @return array
+ */
+function provenance_history_objects()
+{
+  return array('album', 'photo');
+}
+
+/**
+ * What caused a history row. One value per write path in the plugin, so a row
+ * says which operation produced it without joining anything.
+ *
+ * @return array
+ */
+function provenance_history_sources()
+{
+  return array('album_edit', 'photo_edit', 'apply', 'inherit', 'writeback', 'truncation');
+}
+
 /**
  * The photo columns an album operation writes: everything except the photo's own
  * note. Keyed album column => image column, because the album stores its free

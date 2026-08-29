@@ -471,7 +471,7 @@ so no phase can add a write path that forgets to log.
 
 ### Changes Required:
 
-#### [ ] 1. `provenance_record_change(...)`
+#### [x] 1. `provenance_record_change(...)`
 **File**: `plugins/provenance/include/history.inc.php`
 **Changes**: one row per changed field. **A field whose value did not change writes no row** — the
 trail records changes, not saves, or a 76-photo re-apply of unchanged text writes 380 useless rows.
@@ -483,7 +483,7 @@ function provenance_record_change($object, $object_id, $field, $old, $new, $sour
 Bulk callers use `provenance_record_changes(array $rows)`, which funnels into a single
 `mass_inserts()` — the apply operation writes up to 4 rows × N photos.
 
-#### [ ] 2. Read path
+#### [x] 2. Read path
 **File**: `plugins/provenance/include/ws_functions.inc.php`
 **Changes**: `pwg.provenance.getHistory` — `admin_only`, params `object` (validated against
 `array('album','photo')`), `object_id` (`PATTERN_ID`), optional `date_min`/`date_max`, `per_page`
@@ -493,15 +493,43 @@ Bulk callers use `provenance_record_changes(array $rows)`, which funnels into a 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit tests for the row-shaping helper (pure part) pass
-- [ ] Integration: a recorded change is readable back through `pwg.provenance.getHistory` with
+- [x] Unit tests for the row-shaping helper (pure part) pass — `HistoryRowTest`, 18 cases
+      (`ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`,
+      63 tests / 187 assertions green, also green in reverse order)
+- [x] Integration: a recorded change is readable back through `pwg.provenance.getHistory` with
       `old_value` and `new_value` intact, including a value **longer than 255 bytes** — the exact
       case `piwigo_activity.details` cannot hold, which is why this table exists
-- [ ] Integration: `getHistory` as a non-admin returns `stat:"fail"` with 403
-- [ ] `ddev exec php -l` on every changed file
+      (`HistoryTest::testRecordedChangeIsReadableBackIncludingALongValue`, 8800-byte UTF-8 value)
+- [x] Integration: `getHistory` as a non-admin returns `stat:"fail"` with ~~403~~ **401** — see the
+      deviation below (`testNormalUserCannotReadTheHistory`, `testGuestCannotReadTheHistory`)
+- [x] `ddev exec php -l` on every changed file
 
 #### Manual Verification:
-- [ ] A history row's `occured_on` and `performed_by` match the acting admin in the DB
+- [x] ~~A history row's `occured_on` and `performed_by` match the acting admin in the DB~~ →
+      automated: `HistoryTest::testRowCarriesTheActingUserAndATimestamp` reads both columns
+      straight out of MariaDB and brackets `occured_on` between two `SELECT NOW()` readings taken
+      around the write, with the actor id looked up from `piwigo_users`
+
+### Deviation from the plan
+
+1. **The non-admin refusal is 401, not 403.** Core's `admin_only` option returns
+   `PwgError(401, 'Access denied')` (`include/ws_core.inc.php:515`). The plan's *Changes Required*
+   asks for `admin_only`, and its success criterion asks for 403; the two cannot both hold without
+   hand-rolling a gate beside the one core already enforces. `admin_only` was kept and the tests
+   assert 401.
+2. **The enum lists moved into `include/functions.inc.php`.** `provenance_history_objects()` and
+   `provenance_history_sources()` are now the single source: `maintain.class.php` builds the
+   `CREATE TABLE` enums from them, the recorder validates against them, and
+   `HistoryTest::testColumnEnumsMatchTheSharedLists` asserts the column agrees with the list.
+   Same for `PROVENANCE_HISTORY_FIELD_MAX_BYTES`, which the recorder rejects on rather than letting
+   MySQL cut a field name silently.
+3. **`tests/Support/PiwigoRuntime.php` is new.** `include/common.inc.php` cannot be included from
+   the CLI (`session_start()` dies without `$_SERVER['REMOTE_ADDR']`), so the write half of the
+   recorder is exercised against a smaller boot of *production* code — the real
+   `include/dblayer/functions_mysqli.inc.php`, hence the real `pwg_query()` and `mass_inserts()`,
+   against the real database. No copy of either was made.
+4. **`per_page` above the ceiling is clamped, not refused.** That is core's `maxValue` behaviour
+   (`include/ws_core.inc.php:577`), characterized by `testPerPageAboveTheCeilingIsClamped`.
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 
