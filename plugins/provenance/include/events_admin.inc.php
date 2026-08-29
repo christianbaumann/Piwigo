@@ -188,3 +188,42 @@ function provenance_photo_prefilter($content)
     $content
     );
 }
+
+/**
+ * Puts the move-mode choice into the Batch Manager's move panel.
+ *
+ * Registered on loc_end_element_set_global, which fires after the page has set
+ * its template filenames and so is the point a prefilter can still be added.
+ * The radios post alongside the move itself; loc_begin_element_set_global has
+ * already read the request by the time core dispatches the action, and
+ * provenance_inherit_into() reads the same parameter from $_POST.
+ */
+function provenance_batch_move_panel()
+{
+  global $template;
+
+  load_language('plugin.lang', PROVENANCE_PATH);
+
+  $template->set_prefilter('batch_manager_global', 'provenance_batch_prefilter');
+}
+
+/**
+ * Injects the radios immediately inside the move panel.
+ *
+ * The anchor is a constant with a structural guard test behind it: a string
+ * that silently stopped matching would leave the Batch Manager rendering
+ * perfectly, with every move quietly taking the unattended default.
+ *
+ * @param string $content
+ * @return string
+ */
+function provenance_batch_prefilter($content)
+{
+  $injection = file_get_contents(PROVENANCE_PATH . 'template/batch_move_provenance.tpl');
+
+  return str_replace(
+    PROVENANCE_TPL_BATCH_MOVE_ANCHOR,
+    PROVENANCE_TPL_BATCH_MOVE_ANCHOR . $injection,
+    $content
+    );
+}

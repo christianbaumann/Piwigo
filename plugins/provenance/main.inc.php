@@ -66,6 +66,7 @@ if (defined('IN_ADMIN'))
 
   add_event_handler('loc_begin_admin_page', 'provenance_admin_album');
   add_event_handler('loc_begin_admin_page', 'provenance_admin_photo');
+  add_event_handler('loc_end_element_set_global', 'provenance_batch_move_panel');
 }
 
 /**

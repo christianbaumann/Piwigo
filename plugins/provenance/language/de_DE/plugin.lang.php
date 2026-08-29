@@ -19,4 +19,9 @@ $lang['Metadata written into %d files'] = 'Metadaten in %d Dateien geschrieben';
 $lang['Metadata could not be written'] = 'Metadaten konnten nicht geschrieben werden';
 $lang['%d failed'] = '%d fehlgeschlagen';
 
+$lang['Provenance of the moved photos'] = 'Herkunft der verschobenen Fotos';
+$lang['Keep what each photo already has'] = 'Beibehalten, was das Foto bereits hat';
+$lang['Clear it'] = 'Leeren';
+$lang['Replace it with the destination album\'s'] = 'Durch die des Zielalbums ersetzen';
+
 ?>

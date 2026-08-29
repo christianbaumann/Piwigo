@@ -584,6 +584,12 @@ define('PROVENANCE_HISTORY_FIELD_FILE_ERROR', 'file_error');
 /** Injection point on the album properties screen: immediately before the Save button. */
 define('PROVENANCE_TPL_ALBUM_ANCHOR', '<span class="buttonLike" id="cat-properties-save">');
 
+/**
+ * Injection point in the Batch Manager: the div that opens the move action's
+ * panel, which the page shows only when 'move' is the chosen action.
+ */
+define('PROVENANCE_TPL_BATCH_MOVE_ANCHOR', '<div id="action_move" class="bulkAction">');
+
 /** Injection point on the photo properties screen: immediately before its save bar. */
 define('PROVENANCE_TPL_PHOTO_ANCHOR', '<div class="savebar-footer">');
 

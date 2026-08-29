@@ -19,4 +19,9 @@ $lang['Metadata written into %d files'] = 'Metadata written into %d files';
 $lang['Metadata could not be written'] = 'Metadata could not be written';
 $lang['%d failed'] = '%d failed';
 
+$lang['Provenance of the moved photos'] = 'Provenance of the moved photos';
+$lang['Keep what each photo already has'] = 'Keep what each photo already has';
+$lang['Clear it'] = 'Clear it';
+$lang['Replace it with the destination album\'s'] = 'Replace it with the destination album\'s';
+
 ?>
