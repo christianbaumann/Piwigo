@@ -4,7 +4,8 @@ git_commit: ab91a39614de706dfa0759957f5a548ad958967d
 branch: master
 topic: "Install Piwigo-Colored-Tags plugin via git submodule"
 tags: [plan, plugins, typetags, git-submodule]
-status: draft
+status: complete
+completed: 2026-08-29
 ---
 
 # Install Piwigo-Colored-Tags Plugin Implementation Plan
@@ -81,39 +82,67 @@ The plugin must be installed and activated through the Piwigo admin UI. This tri
 
 ### Steps (user performs manually):
 
-#### [ ] 1. Start DDEV (if not running)
+#### [x] 1. Start DDEV (if not running)
 ```bash
 ddev start
 ```
 
-#### [ ] 2. Activate the plugin
+#### [x] 2. Activate the plugin
 1. Log into the Piwigo admin panel
 2. Navigate to **Plugins > Manage** (or visit `admin.php?page=plugins_installed`)
 3. Find **"Colored Tags"** (typetags) in the list of uninstalled plugins
 4. Click **Install**, then **Activate**
 
-#### [ ] 3. Verify plugin works
+#### [x] 3. Verify plugin works
 - Visit `admin.php?page=plugin-typetags` to confirm the configuration page loads
 
 ### Success Criteria:
 
-#### Manual Verification:
-- [ ] Plugin appears in the installed plugins list with status "Active"
-- [ ] Plugin configuration page loads without errors
-- [ ] Tags in the gallery can be assigned colors
+#### Manual Verification — automated 2026-08-29:
+
+All three boxes had an oracle in the database or over HTTP, so none of them needed a human.
+They are now `tests/Integration/PluginActivationTest.php` in the typetags submodule, and
+each was watched failing against a deliberate break before being trusted.
+
+- [x] Plugin appears in the installed plugins list with status "Active" —
+  `PluginActivationTest::testPluginIsInstalledAndActive`. The list is a rendering of
+  `piwigo_plugins`, which is where `activate()` writes, so asserting the row asserts what
+  the list would show. **Proven able to fail**: setting `state='inactive'` turns it red
+  (and takes three other tests with it, since an inactive plugin registers no WS methods).
+- [x] Plugin configuration page loads without errors —
+  `PluginActivationTest::testConfigurationPageRendersEveryConfiguredColour`. Asserts more
+  than HTTP 200: every colour in `piwigo_typetags` must actually be painted onto the page,
+  so a shell that renders an empty list cannot pass. Expected values are read from the
+  table rather than typed into the test. **Proven able to fail**: renaming the template's
+  `background-color:` property turns it red alone.
+- [x] Tags in the gallery can be assigned colors —
+  `PluginActivationTest::testTagCanBeAssignedAColour`, driving `typetags.tags.setType`,
+  which is the write the admin tags screen performs. **Proven able to fail**: replacing the
+  handler's `WHERE id IN (...)` with `WHERE id IN (-1)` turns it and its state-transition
+  sibling red, and nothing else.
+
+Two tests beyond the three boxes, because writing them exposed the gaps:
+`::testTagColourCanBeRemovedAgain` `[ST]` (the same method with `typetag_id = 0`) and
+`::testGuestCannotAssignAColour` `[NEG]` — `setType` is the one `admin_only` method in this
+plugin, and nothing had asserted that gate. Removing `admin_only` turns that one red alone.
 
 ---
 
 ## Testing Strategy
 
-This project has no formal test suite (no PHPUnit). Verification is entirely manual.
+**Superseded 2026-08-29.** When this plan was written the project had no test suite and
+verification was entirely manual. `plugins/typetags` now carries unit, integration and E2E
+suites — see [docs/agents/TESTING.md](../TESTING.md) for the conventions and the commands.
 
-### Manual Testing Steps:
-1. Confirm `plugins/typetags/main.inc.php` exists after submodule add
-2. Confirm `git submodule status` shows the submodule
-3. Confirm the plugin appears in the Piwigo admin plugin list
-4. Confirm install + activate succeeds without errors
-5. Confirm tag color configuration page loads
+The five manual steps below are all automated by
+`tests/Integration/PluginActivationTest.php` except the first two, which are facts about
+the checkout rather than about the running application:
+
+1. `plugins/typetags/main.inc.php` exists after submodule add — Phase 1 automated criterion
+2. `git submodule status` shows the submodule — Phase 1 automated criterion
+3. The plugin appears in the admin plugin list — `::testPluginIsInstalledAndActive`
+4. Install + activate succeeded without errors — same test (state is `active`)
+5. The tag colour configuration page loads — `::testConfigurationPageRendersEveryConfiguredColour`
 
 ## References
 

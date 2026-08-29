@@ -63,6 +63,48 @@ construction is not a passing test — it is a test that has stopped existing. G
 pattern in review; it is exactly the kind of defect a pre-commit ratchet exists to catch
 (see `precommit-hooks.md`).
 
+## A test whose oracle is the code must say so
+
+A characterization test — one whose expected value was read off the current implementation
+rather than off a requirement — cannot find a defect in that code. It reports a *change*.
+Tag it `[ERR]` and give it a comment naming the behaviour it records and stating that no
+requirement confirms it. They are a refactor safety net and nothing more; treating one as
+evidence that behaviour is *correct* is the mistake this rule exists to prevent.
+
+## A known gap becomes a deliberately failing test
+
+When a defect or missing behaviour is found but not fixed in this cycle, write the test
+that reproduces it and mark it skipped, with the reason and a link to wherever it is
+recorded. Not silence, and not a line of prose in a document — a skipped test is visible in
+every future run and un-skipping it is the natural first step of the fix.
+
+## Assert the causal fact, not a wall-clock figure
+
+Assert the thing that *causes* the outcome, never a duration or a machine-speed proxy: that
+the request fired once, that the element reached its state, that the query ran N times. A
+threshold measured on one machine is a flake on another — and quietly widening one to make
+a run pass converts a real signal into noise. If a timing figure is genuinely the subject,
+it is a benchmark, recorded as a dated measurement, not an assertion in the suite.
+
+## Build no apparatus that proves another apparatus
+
+The guard suite stops here. Do not write a test that tests a test, a check that verifies a
+mutant record, or a scan that reads a document looking for a word. Each layer of
+meta-tooling is a new thing to keep correct, and it fails silently in exactly the way the
+thing it watches was supposed to. Where a check cannot be verified by machine, it is
+verified once by hand and the fact is recorded — see the hand-check ledger below.
+
+The exception, and the only one: a **self-test for a commit gate** (`precommit-hooks.md`),
+because a hook that silently stops blocking is worse than no hook, and nothing else can
+observe it.
+
+## Numbers in documentation rot
+
+Every measured count in a rule file, plan, or test document carries the date it was
+measured — "52 tests, measured 2026-08-29", not "52 tests". Where a number is load-bearing
+(a lower-bound constant, a coverage floor), keep it as a dated measurement and say so.
+Where it is not, leave it out rather than let it drift into a false claim.
+
 ## Do not transcribe production data into a test
 
 When a test's assertion must match a literal that production code also hardcodes (a

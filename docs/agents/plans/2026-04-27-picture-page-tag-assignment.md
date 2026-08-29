@@ -4,7 +4,8 @@ git_commit: e01ef19da76ee94b633acf9cbdf38a23dc9f1bc4
 branch: master
 topic: "Picture page: inline colored tag assignment UI"
 tags: [plan, typetags, picture-page, colored-tags, tag-assignment]
-status: draft
+status: complete
+completed: 2026-08-29
 ---
 
 # Picture Page: Inline Colored Tag Assignment — Implementation Plan
@@ -204,14 +205,31 @@ UPDATE ' . USER_CACHE_TABLE . '
 - [x] DDEV environment starts: `ddev start`
 - [x] No PHP syntax errors: `ddev exec php -l plugins/typetags/main.inc.php`
 
-#### Manual Verification:
-- [ ] `typetags.image.addTag` works: call via `ws.php?format=json` with valid params as logged-in user — returns success, tag appears in `IMAGE_TAG_TABLE`
-- [ ] `typetags.image.addTag` rejects guest: call without login — returns 401
-- [ ] `typetags.image.addTag` rejects bad token: call with wrong `pwg_token` — returns 403
-- [ ] `typetags.image.addTag` rejects non-colored tag: call with tag that has `id_typetags IS NULL` — returns 404
-- [ ] `typetags.image.removeTag` works: call with valid params — tag removed from `IMAGE_TAG_TABLE`
-- [ ] `typetags.image.removeTag` rejects guest/bad token/non-colored tag (same as addTag)
-- [ ] Duplicate add is idempotent (INSERT IGNORE): no error on re-adding already-assigned tag
+#### Manual Verification — automated 2026-08-29 (integration layer):
+
+Every box below is now a named PHPUnit test in `plugins/typetags/tests/Integration/`. The
+suite forces its fixtures and asserts they took effect, so none of these runs over state it
+merely hoped for.
+
+- [x] `typetags.image.addTag` works — `AddTagTest::testAssignsColouredTag` `[HAPPY]`
+- [x] `typetags.image.addTag` rejects guest (401) — `AddTagTest::testGuestIsRejected` `[NEG]`
+- [x] `typetags.image.addTag` rejects bad token (403) — `AddTagTest::testBadTokenIsRejected` `[NEG]`
+- [x] `typetags.image.addTag` rejects non-colored tag (404) — `AddTagTest::testNonColouredTagIsRejected` `[NEG]`
+- [x] `typetags.image.removeTag` works — `RemoveTagTest::testRemovesAssignedTag` `[HAPPY]`
+- [x] `typetags.image.removeTag` rejects guest/bad token/non-colored tag —
+  `RemoveTagTest::testGuestIsRejected`, `::testBadTokenIsRejected`,
+  `::testNonColouredTagIsRejected` `[NEG]`. Each also asserts the row **survived** the
+  rejection, which the original box did not ask for and which is the part that would
+  actually matter.
+- [x] Duplicate add is idempotent — `AddTagTest::testDuplicateAddIsIdempotent` `[ST]`,
+  asserting `COUNT(*) == 1` rather than mere presence. The mechanism is
+  `PRIMARY KEY (image_id, tag_id)` (`install/piwigo_structure-mysql.sql:208`).
+
+The port also closed gaps this checklist never had: `removeTag` with a nonexistent tag,
+both methods' cache invalidation, `tag_id`/`image_id` boundary values, and the two
+defects Phase 2 of the 2026-08-28 plan fixed (`::testNonexistentImageIsRejected`,
+`::testNonexistentImageWritesNoOrphanRow`). Full list in
+[docs/agents/TESTING.md](../TESTING.md) and the 2026-08-28 plan's Testing Strategy.
 
 **Implementation Note**: After completing this phase and all verification passes, pause here for manual confirmation before proceeding to the next phase.
 
@@ -508,13 +526,33 @@ function typetags_picture_prefilter($content)
 - [x] No PHP syntax errors: `ddev exec php -l plugins/typetags/include/events_public.inc.php`
 - [x] No PHP syntax errors: `ddev exec php -l plugins/typetags/main.inc.php`
 
-#### Manual Verification:
-- [ ] Picture page loads without errors for logged-in user
-- [ ] Picture page loads without errors for guest (no tag assignment UI shown)
-- [ ] Unassigned colored tags appear below the info box with reduced opacity and "+" prefix
-- [ ] Assigned colored tags show "x" button next to them
-- [ ] Unassigned section is hidden when all colored tags are already assigned
-- [ ] Tags section and unassigned section render correctly with the modus theme
+#### Manual Verification — automated 2026-08-29:
+
+Two of these are server-side facts and are asserted against page source; four are runtime
+DOM facts that page source cannot witness, and are Playwright specs.
+
+- [x] Picture page loads without errors for logged-in user —
+  `PicturePageSourceTest::testPageReturnsTwoHundredForLoggedInUser`, `::testPageHasNoFatalError`,
+  `::testPageHasNoSmartyCompilerError` `[HAPPY]` `[NEG]`
+- [x] Picture page loads without errors for guest, with no assignment UI —
+  `PicturePageSourceTest::testGuestSeesNoAssignmentUi` `[NEG]`
+- [x] Unassigned colored tags appear with reduced opacity and "+" prefix —
+  `assign.spec.js` → `unassigned badges render at reduced opacity with a plus prefix` `[HAPPY]`
+- [x] Assigned colored tags show "x" button —
+  `remove.spec.js` → `assigned coloured tags show a remove button` `[HAPPY]`
+- [x] Unassigned section hidden when all colored tags are assigned — split across layers,
+  because the two halves are different facts: the server never renders the container
+  (`PicturePageSourceTest::testAllAssignedRendersNoUnassignedSection` `[BVA]`), and the
+  browser recreates it when one is removed (`remove.spec.js` → `the unassigned section is
+  recreated when it had been hidden` `[BVA]`)
+- [x] Both sections render correctly with the modus theme —
+  `edge-cases.spec.js` → `the modus theme renders both sections correctly` `[HAPPY]`, which
+  guards against asserting under the wrong theme by checking `themes/modus` appears in the
+  page's asset URLs first
+
+What "render correctly" meant beyond shape — that badges are painted their configured
+colours at a real size — is `rendering.spec.js` (4 specs), which reads the expected palette
+out of `piwigo_typetags` rather than carrying a copy of it.
 
 **Implementation Note**: After completing this phase and all verification passes, pause here for manual confirmation before proceeding to the next phase.
 
@@ -533,28 +571,56 @@ This phase is about testing the complete interactive flow. The JS was injected i
 
 ### Success Criteria:
 
-#### Manual Verification — Add Tag Flow:
-- [ ] Click unassigned tag → tag appears in "Tags" row inside info box (full opacity, no "+")
-- [ ] Click unassigned tag → "x" button appears next to the newly assigned tag
-- [ ] Click unassigned tag → tag disappears from unassigned list
-- [ ] Click unassigned tag → unassigned section hides when last tag is assigned
-- [ ] Adding a tag when "Tags" row doesn't exist yet → "Tags" row is created
-- [ ] Page reload after adding → tag persists in "Tags" row (server-rendered)
+All 17 boxes below were automated 2026-08-29 as Playwright specs in
+`plugins/typetags/tests/e2e/`. Every one was drafted by driving the running site, not by
+reading `picture.tpl` — the badge markup is assembled at runtime by injected JavaScript, so
+the DOM a spec sees is not the DOM the template shows.
 
-#### Manual Verification — Remove Tag Flow:
-- [ ] Click "x" on assigned tag → tag disappears from "Tags" row
-- [ ] Click "x" on assigned tag → tag reappears in unassigned list (reduced opacity, "+")
-- [ ] Click "x" on assigned tag → "Tags" row hides when last tag is removed
-- [ ] Removing a tag when unassigned section was hidden → section reappears
-- [ ] Page reload after removing → tag persists in unassigned list
+#### Manual Verification — Add Tag Flow (`assign.spec.js`):
+- [x] Click unassigned tag → tag appears in "Tags" row at full opacity, no "+" —
+  `clicking an unassigned badge moves it into the Tags row at full opacity` `[HAPPY]`
+- [x] Click unassigned tag → "x" button appears — `a remove button appears on the newly assigned tag` `[HAPPY]`
+- [x] Click unassigned tag → tag disappears from unassigned list — `the badge disappears from the unassigned list` `[ST]`
+- [x] Unassigned section hides when the last tag is assigned — `the unassigned section hides when the last tag is assigned` `[BVA]`.
+  Needed a fifth fixture, `allButOneColoredAssigned()`: this is a *transition to empty*, and
+  neither planned scenario could produce it.
+- [x] Adding a tag when the "Tags" row doesn't exist → row is created —
+  `the Tags row is created when the image had no tags` `[BVA]`, State C
+- [x] Page reload after adding → tag persists, server-rendered — `the assignment survives a page reload` `[ST]`
 
-#### Manual Verification — Edge Cases:
-- [ ] Rapid clicks: double-clicking a tag doesn't cause duplicate requests or UI glitches
-- [ ] Network error: tag stays in place (not moved) if AJAX fails
-- [ ] Multiple colored tags: comma separators between assigned tags render correctly
-- [ ] Comma separators clean up properly when tags are removed (no leading/trailing commas)
-- [ ] Image with no tags at all: unassigned section shows, assigning creates the Tags row
-- [ ] Image with only non-colored tags: non-colored tags unaffected, no "x" buttons on them
+#### Manual Verification — Remove Tag Flow (`remove.spec.js`):
+- [x] Click "x" → tag disappears from "Tags" row — `clicking it removes the tag from the Tags row` `[HAPPY]`
+- [x] Click "x" → tag reappears in unassigned list at reduced opacity — `the tag reappears in the unassigned list at reduced opacity` `[ST]`
+- [x] Click "x" → "Tags" row hides when the last tag is removed — `the Tags row hides when the last tag is removed` `[BVA]`
+- [x] Removing when the unassigned section was hidden → section reappears — `the unassigned section is recreated when it had been hidden` `[BVA]`
+- [x] Page reload after removing → tag persists in unassigned list — `the removal survives a page reload` `[ST]`
+
+One spec maps to no box: `add then remove returns the page to its starting state`, the
+round trip the two flows imply but neither checklist asked for.
+
+#### Manual Verification — Edge Cases (`edge-cases.spec.js`):
+- [x] Double-clicking causes no duplicate requests — `double-clicking issues exactly one request` `[ERR]`,
+  asserted by counting intercepted POSTs rather than by eyeballing the UI
+- [x] Network error: tag stays in place — `a network failure leaves the tag in place and the badge clickable` `[NEG]`, via `route.abort()`
+- [x] Comma separators render between multiple assigned tags — `comma separators render between multiple assigned tags` `[HAPPY]`
+- [x] Comma separators clean up with no leading/trailing commas — `comma separators clean up with no leading or trailing comma` `[BVA]`.
+  This one failed on its first run and the failure was real: the two cleanup branches are
+  not symmetric — `nextSibling` deletes the separator node, `previousSibling` only empties
+  its text — so removing the last tag leaves one zero-length text node. Invisible, no
+  requirement forbids it, so it is recorded rather than fixed: the spec counts non-empty
+  separator nodes for its real assertion and pins the leftover at exactly one `[ERR]`, so a
+  future change to either branch surfaces instead of passing silently.
+- [x] Image with no tags: unassigned section shows, assigning creates the Tags row — split
+  across layers: `#Tags` genuinely absent server-side is
+  `PicturePageSourceTest::testImageWithNoTagsRendersNoTagsRow` `[BVA]`; the creation is
+  `assign.spec.js` → `the Tags row is created when the image had no tags`
+- [x] Image with only non-colored tags: unaffected, no "x" buttons — `an image with only non-coloured tags shows no remove buttons` `[NEG]`, State D
+
+One further spec maps to no box because the box list predates the defect being found:
+`a server rejection leaves the badge clickable`. A `PwgError` arrives as HTTP 200 with
+`stat:"fail"`, so it lands in jQuery's `success` callback, not `error` — before the Phase 2
+fix that left the badge permanently non-interactive with no message. It is a different code
+path from the network-failure box above, which is why both exist.
 
 **Implementation Note**: After completing this phase and all verification passes, the feature is ready.
 
@@ -562,19 +628,26 @@ This phase is about testing the complete interactive flow. The JS was injected i
 
 ## Testing Strategy
 
-The project has no formal test suite (no PHPUnit). All testing is manual via the DDEV environment.
+**Superseded 2026-08-29.** When this plan was written the project had no test suite and all
+testing was manual. `plugins/typetags` now carries unit, integration and E2E suites — see
+[docs/agents/TESTING.md](../TESTING.md) for the conventions, the commands, and the two
+ledgers.
 
-### Manual Testing Steps:
+### Manual Testing Steps — all automated:
 
-1. Start DDEV: `ddev start`
-2. Log in as a non-admin user (if available) and as admin
-3. Navigate to a picture page with some colored tags assigned
-4. Verify the unassigned tags section appears below the info box
-5. Test the full add/remove flow as described in Phase 3 success criteria
-6. Test as guest — verify no tag assignment UI is shown
-7. Test with a picture that has no tags assigned at all
-8. Test with a picture where all colored tags are already assigned
-9. Verify no console errors in browser DevTools
+| Step | Successor |
+|---|---|
+| 1. Start DDEV | Precondition of the integration and E2E suites, which fail fast without it |
+| 2. Log in | `tests/e2e/auth.setup.js` (asserts the login form is *gone*, since Piwigo re-renders it on failure) and `WsClient::login()` |
+| 3–5. Navigate, verify the unassigned section, run the add/remove flow | `assign.spec.js`, `remove.spec.js` |
+| 6. Test as guest | `PicturePageSourceTest::testGuestSeesNoAssignmentUi` |
+| 7. Picture with no tags | `FixtureBuilder::imageWithNoTags()` — State C |
+| 8. Picture with all colored tags assigned | `FixtureBuilder::allColoredAssigned()` — State B |
+| 9. No console errors | `rendering.spec.js` → `the assignment UI initialises with no console or page errors`, with an anti-vacuity guard asserting the badges exist first |
+
+What stays manual, because it has no oracle: whether badge contrast is *legible* for all 8
+colours, and whether the hover transition *feels* right. Both are in the hand-check ledger
+in [docs/agents/TESTING.md](../TESTING.md) with that reason, not ticked here.
 
 ### Test Design Techniques Applied:
 

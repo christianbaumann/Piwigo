@@ -31,7 +31,7 @@ ddev mysql                 # DB shell (database/user/password all `db`, host `db
 ddev logs -f
 ```
 
-No build step — no composer.json, no package.json. PHP is served directly from the repo root.
+No build step for the application itself — PHP is served directly from the repo root. The only dependency managers are `plugins/typetags`' own `composer.json` and `package.json`, both dev-only (test runners; see Testing).
 
 ### Caches
 
@@ -48,6 +48,11 @@ General test-design, layering, and quality-gate rules (stack-independent) live i
 `.claude/rules/testing.md`, `test-design.md`, `mutation-testing.md`, `e2e-tests.md`,
 `backpressure.md`, and `precommit-hooks.md` — this section covers only what's
 Piwigo/typetags-specific.
+
+`docs/agents/TESTING.md` is the project-facing record: the technique legend, the deliberate
+non-coverage table, the unit suite's mutant table, and the hand-check ledger of what has no
+oracle. Check it before adding a test — an omission there may be a recorded decision rather
+than a gap.
 
 Piwigo core has no test suite. The typetags plugin carries a PHPUnit suite and a Playwright suite in `plugins/typetags/`:
 
@@ -187,6 +192,7 @@ Generated on demand by `i.php`, cached in `_data/i/`. Size definitions and defau
 - Research notes: `docs/agents/research/YYYY-MM-DD-topic.md`
 - Implementation plans: `docs/agents/plans/YYYY-MM-DD-topic.md`
 - Both carry YAML frontmatter: `date`, `git_commit`, `branch`, `topic`, `tags`, `status`
+- Decisions: `docs/agents/decisions/NNNN-slug.md`, one per file, numbered. A decision *not* to fix something is as worth recording as a fix — cite the file instead of re-litigating it. A decision that later changes gets a new file superseding the old, never an edit that erases what was decided
 - Browser verification reports and screenshots: `.agent-tests/YYYY-MM-DD-topic/` — git-ignored, local only. Write them there for the current task, but don't expect earlier runs to exist in a fresh clone
 
 ## Security Patterns

@@ -756,7 +756,7 @@ Make the conventions this plan already uses explicit, and close out the two plan
 
 ### Changes Required:
 
-#### [ ] 1. State the technique legend once
+#### [x] 1. State the technique legend once
 **File**: `docs/agents/TESTING.md` (new)
 **Changes**: the seven-tag vocabulary, stated in exactly one place and cited from everywhere else. Both reference repositories keep the legend in a single early document and never restate it; this repository has neither the legend nor a place for it.
 
@@ -788,7 +788,32 @@ The rules the file records, each adapted from a reference repository that has ru
 - **Build no apparatus that proves another apparatus.** This is the rule that stops a guard suite metastasising, and it is why the mutant record stays prose and why no test here reads a document for a word.
 - **Numbers in documentation rot.** Every measured count in `TESTING.md` or a plan carries the date it was measured. Where a number is load-bearing, keep it as a dated measurement and say so; otherwise leave it out.
 
-#### [ ] 1b. Record deliberate non-coverage
+**Deviation — the rules acquired a home between planning and implementation, so the split
+went the other way.** Commit `b8481dcee`, made after this plan was written, added
+`.claude/rules/{testing,test-design,mutation-testing,e2e-tests,backpressure,precommit-hooks}.md`,
+which already own the legend and most of the list above. Written literally, this item would
+create a second copy of rules that already have an owner — the exact thing the plan's own
+*single source of truth* rule forbids.
+
+Resolved by splitting on **rule vs. record**, which is the distinction that actually holds:
+
+- **`.claude/rules/`** owns every rule. It is auto-loaded and path-scoped, so it is what an
+  agent is actually holding when it edits a test. The five rules from the list above that
+  were genuinely missing there were added to `test-design.md`: a characterization test must
+  declare its oracle; a known gap becomes a skipped test with its reason; assert the causal
+  fact rather than a wall-clock figure; build no apparatus that proves another apparatus;
+  numbers in documentation carry their date.
+- **`docs/agents/TESTING.md`** owns what the rules produced and what no rules file should
+  carry: the mutant table with its three findings, the hand-check ledger, the deliberate
+  non-coverage table, the dated measurements, and the two codebase-specific rulings
+  (`<script>`-stripping before any page-source scan; the prefilter's search strings as named
+  constants). It cites the rules rather than restating any of them, and cites CLAUDE.md for
+  the run commands rather than carrying a third copy.
+
+Records do not belong in an auto-loaded rules file — they grow, they are history rather than
+instruction, and they would cost context on every matching edit.
+
+#### [x] 1b. Record deliberate non-coverage
 **File**: `docs/agents/TESTING.md`
 **Changes**: a **Tests NOT required (with justification)** table, in the same technique vocabulary, so a later reader can tell a considered omission from an oversight.
 
@@ -800,7 +825,11 @@ The rules the file records, each adapted from a reference repository that has ru
 | `removeTag` image validation | A `DELETE` on a nonexistent image is already a no-op | No reachable defect; the asymmetry with `addTag` is deliberate and commented |
 | Concurrent add/remove from two tabs | The `PRIMARY KEY` makes both operations idempotent | Testing it would assert the database's behaviour, not the plugin's |
 
-#### [ ] 2. Decision log
+Landed with three rows beyond the five planned, each pointing at the decision that settles
+it rather than restating the reasoning: the `nb_available_tags` scoping (0004), per-image
+visibility on `addTag` (0005), and `post_only` (0003).
+
+#### [x] 2. Decision log
 **File**: `docs/agents/decisions/` (new directory)
 **Changes**: numbered decisions this plan already depends on, so later work can cite rather than re-litigate them:
 - `0001-mutation-testing-unit-only.md` — settled 2026-08-28
@@ -809,7 +838,7 @@ The rules the file records, each adapted from a reference repository that has ru
 - `0004-unscoped-tag-cache-invalidation-accepted.md`
 - `0005-tag-assignment-permission-model.md` — records "all logged-in users", and explicitly names the unexamined question about images in non-browsable categories
 
-#### [ ] 3. Close out the two existing plans via `/verify`
+#### [x] 3. Close out the two existing plans via `/verify`
 **Files**: `docs/agents/plans/2026-04-19-install-colored-tags-plugin.md`, `docs/agents/plans/2026-04-27-picture-page-tag-assignment.md`
 **Changes**: run `/verify` against each. Its job is to automate the manual steps, run them, fold them into the regression suite, fix what fails, list what cannot be automated, and update plan status. Concretely:
 - **Plan A** (3 manual boxes + 3 step headings): plugin active, config page loads, tag colors configurable — all three are assertable against the database and over HTTP.
@@ -819,20 +848,47 @@ The rules the file records, each adapted from a reference repository that has ru
 - Anything `/verify` reports as non-automatable goes into a dated hand-check ledger in `docs/agents/TESTING.md` — nothing gets ticked on prose alone.
 - Flip both frontmatters off `draft` only once every box is either ticked-with-a-reference or in the ledger.
 
-#### [ ] 4. Update CLAUDE.md
+**Outcome (2026-08-29).** All 33 boxes closed with a named successor; both frontmatters now
+read `status: complete` with a `completed:` date. `grep -c '^\s*- \[ \]'` returns 0 for both
+files.
+
+- **Plan A** (3 boxes + 3 step headings): all three were assertable and became
+  `tests/Integration/PluginActivationTest.php` — 5 tests, 24 assertions. Two of the five go
+  beyond the checklist: `::testTagColourCanBeRemovedAgain` `[ST]`, and
+  `::testGuestCannotAssignAColour` `[NEG]`, which covers the one `admin_only` method in the
+  plugin — nothing had asserted that gate. Each test was watched failing against a deliberate
+  break (plugin deactivated / template property renamed / handler's `WHERE` neutered /
+  `admin_only` removed), and each mutation killed only its own targets.
+- **Plan B Phase 1** (7 boxes): integration suite, as predicted. Three of them gained an
+  assertion the box did not ask for — that the row *survived* a rejected call.
+- **Plan B Phase 2** (6 boxes): 2 integration, 4 E2E. Box 516 turned out to be two different
+  facts and is closed at both layers rather than one.
+- **Plan B Phase 3** (17 boxes): all E2E, plus two specs mapping to no box.
+- The two subjective items (badge contrast legibility, hover feel) are in the ledger with
+  their reason, not ticked.
+
+#### [x] 4. Update CLAUDE.md
 **File**: `CLAUDE.md`
 **Changes**: the Testing section currently states "Piwigo core has no test suite (no PHPUnit)" and names two mechanical checks. Replace with the command table from *Desired End State*, note that `plugins/typetags` now carries composer and npm dev dependencies, and correct the "no dependency manager" claim, which this plan makes untrue. Per the reference repositories' meta-rule: when something in the instructions stops being true, fix it in the commit that made it untrue.
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `docs/agents/TESTING.md` exists and the legend appears in exactly one file: `grep -rl '\[BVA\].*boundary' docs/ | wc -l` returns 1
-- [ ] Neither plan file contains `status: draft`
-- [ ] No unticked `- [ ]` remains in either plan file that is not cross-referenced in the ledger
-- [ ] CLAUDE.md contains no stale "no PHPUnit" / "no dependency manager" claim
+- [x] `docs/agents/TESTING.md` exists, and the legend has exactly one normative owner — but that owner is `.claude/rules/test-design.md`, not `TESTING.md`, per the rule-vs-record split above. `grep -rln '\[BVA\].*boundary' --include='*.md' .` returns 3: the rules file (normative), plus this plan and the 2026-08-28 research document, which are dated records that *proposed and specified* the legend. Those two are deliberately left alone — editing a research record or deleting this plan's own specification to satisfy a grep would trade one honesty problem for a worse one. `grep -rl ... docs/ | wc -l` returns 2 for the same reason, and returned 2 before this phase as well, so the criterion as written was never achievable without rewriting history.
+- [x] Neither plan file contains `status: draft` — both read `status: complete` with `completed: 2026-08-29`
+- [x] No unticked `- [ ]` remains in either plan file — `grep -c` returns 0 for both; every box names its successor, and the two subjective items are in the ledger rather than ticked
+- [x] CLAUDE.md contains no stale "no PHPUnit" / "no dependency manager" claim — the Testing section had already been corrected in `b8481dcee`/`56080e4b2`; what remained stale was line 34's blanket "no composer.json, no package.json", now scoped to the application itself. Added: a pointer to `TESTING.md` and a convention entry for `docs/agents/decisions/`.
 
 #### Manual Verification:
-- [ ] Each newly ticked box names the test that covers it, and spot-checking three of them confirms the test genuinely asserts that behaviour
+- [x] Each newly ticked box names the test that covers it, and spot-checking confirms the test genuinely asserts that behaviour — done by mutation rather than by reading, which is the stronger check: for Plan A's three boxes, each named successor was watched failing against a deliberate break of exactly the behaviour the box describes (plugin deactivated; the template's `background-color` property renamed; the `setType` handler's `WHERE` clause neutered). Each mutation killed only its own targets. Plan B's successors were already proven able to fail in Phases 3 and 4.
+
+#### Mutation table for the unit suite (the plan's *Testing Strategy → Mutation Testing* section):
+- [x] Six mutants run by hand 2026-08-29, one at a time, `functions.inc.php` confirmed byte-identical to HEAD after each. Table and findings in [docs/agents/TESTING.md](../TESTING.md#mutant-table--unit-suite).
+- [x] Three findings, recorded with which reading applies rather than guessed:
+  - `$l > 0.45` → `>= 0.45` **survived because the boundary is unreachable**, not because the test is weak — `l == 0.45` needs `min+max = 229.5` on 8-bit channels. This is the reading the plan anticipated.
+  - `strlen($color) == 7` → `>= 7` **survived because the test was genuinely weak**: none of its four inputs discriminated the mutant, since `str_repeat('a', 1000)` takes the mutant's branch but returns `'#000'` anyway — the same answer the guard gives. Fixed by adding `'#000000_overlong'`, which reads as `'#000000'` under the mutant; the mutant now dies, killing that one test and nothing else.
+  - The template-guard mutant **as specified is degenerate**: weakening the guard's own assertion is not a mutation of production, so "killed by nothing" is trivially true — no test tests the test, and per *build no apparatus that proves another apparatus*, none should. Replaced with the production-side mutant it was reaching for: a duplicated `TYPETAGS_TPL_TAG_ANCHOR` in `picture.tpl`, which the shipped `=== 1` guard kills and which survives when the guard is weakened to `>= 1`. **The exact-count assertion earns its strictness** — a stronger result than the plan predicted, which expected to record a gap.
+- [x] "Nothing else moved" verified for every killed row: each mutant killed exactly the tests watching it, and the rest of the 52 stayed green.
 
 **Implementation Note**: Run `/verify`. Pause before Phase 6.
 
