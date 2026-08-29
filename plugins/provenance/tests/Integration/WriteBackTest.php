@@ -527,6 +527,56 @@ final class WriteBackTest extends TestCase
         $this->assertSame(400, $res['json']['err']);
     }
 
+    // ── known gaps ────────────────────────────────────────────────────────
+
+    /**
+     * A third party edits the file's metadata behind Piwigo's back; the plugin
+     * notices that file and database have diverged.
+     *
+     * Skipped - nothing detects this today, by decision. No provenance column is
+     * a key in use_iptc_mapping / use_exif_mapping (decisions/0015), so no
+     * synchronisation ever reads these tags back, and a caption rewritten in
+     * Lightroom or by a bare exiftool call is invisible to the gallery for good.
+     * The plan puts divergence detection out of scope for v1 (decision 4a) and
+     * docs/backlog.md carries it as a low-priority item naming
+     * images.date_metadata_update as the candidate signal. Un-skipping this test
+     * is that item's first step; the body below is the divergence it must catch.
+     *
+     * [NEG]
+     */
+    public function testAThirdPartyEditIsDetectedAsFileDatabaseDivergence(): void
+    {
+        $this->markTestSkipped(
+            'no divergence detection exists in v1 - see decisions/0015 and the ' .
+            '"detect file-vs-DB divergence" item in docs/backlog.md'
+        );
+
+        $this->fixture->imageProvenance($this->image['id'], self::VALUES);
+        $this->writeBack(array($this->image['id']));
+        $this->assertNotSame('', (string)$this->tagValue($this->readTags(), 'EXIF:ImageDescription'));
+
+        // The third-party edit: exiftool alone, no Piwigo involved.
+        exec(
+            'exiftool -overwrite_original -EXIF:ImageDescription=' . escapeshellarg('edited elsewhere') .
+            ' ' . escapeshellarg($this->image['file']) . ' 2>/dev/null',
+            $out,
+            $status
+        );
+        $this->assertSame(0, $status, 'the fixture edit did not happen, so there is no divergence to detect');
+        $this->assertSame('edited elsewhere', (string)$this->tagValue($this->readTags(), 'EXIF:ImageDescription'));
+
+        // What the fix owes: the gallery reports this photo as diverged rather
+        // than continuing to present its database values as what the file says.
+        $res = $this->ws->call('pwg.provenance.checkDivergence', array(
+            'image_ids' => (string)$this->image['id'],
+            'pwg_token' => $this->ws->token(),
+        ));
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        $this->assertSame(array($this->image['id']), $res['json']['result']['diverged']);
+    }
+
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function writeBack(array $ids): array

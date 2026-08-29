@@ -1259,7 +1259,12 @@ album's values are read **before** deletion if they are to be preserved.
 - [x] `ddev exec php -l` on every changed file — 15 files, all clean, 2026-08-29
 
 #### Manual Verification:
-- [x] **Not performed** — nobody confirmed this; automatable as an E2E spec, blocked on a seedable install (decision 0011). Carried in `docs/backlog.md`. The move prompt appears in the Batch Manager and its three choices behave as labelled
+- [x] **Automated 2026-08-29, no longer a manual step** — `plugins/provenance/tests/e2e/move-provenance.spec.js`
+      (3 specs) drives the real Batch Manager: the prompt appears with one labelled choice per mode,
+      and `replace` and `clear` each perform a real move and leave the labelled outcome. It was never
+      performed by hand — it was blocked on a seedable install, and the install was resynchronised
+      before anyone got to it. Watched failing against the mutant that renders the block
+      `display:none`, which `BatchManagerPageTest` survives
 - [x] **Descoped, not built** (decision 0013) — The delete prompt reads clearly alongside the existing photo-deletion choice
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
@@ -1286,11 +1291,12 @@ carries what actually happened. Nothing verified them, and nothing should read t
 The `album_delete` value stays in `provenance_history_sources()` and in the schema ENUM. No code
 path writes it today. Carried in `docs/backlog.md`.
 
-**Manual steps were not performed.** Neither was confirmed by anyone, and neither could be
-automated: the install lost its gallery on 2026-08-29 (decision 0011) and `FixtureBuilder`
-refuses to run without a throwaway-install marker, so no integration or E2E suite can execute.
-The Batch Manager step is automatable as an E2E spec once a seedable install exists — it is
-blocked, not un-automatable. Recorded in the hand-check ledger as blocked rather than as checked.
+**Manual steps were not performed by hand, and one no longer needs to be.** Neither was confirmed
+by anyone at the time: the install had lost its gallery on 2026-08-29 (decision 0011) and
+`FixtureBuilder` refuses to run without a throwaway-install marker, so no suite could execute. The
+album-delete step stayed descoped. The Batch Manager step was **automated instead of performed**,
+later the same day once the install was resynchronised — `move-provenance.spec.js`, see the
+manual-verification box above. Nobody ever checked it by hand, and nobody now needs to.
 
 **Deviation — the mode is a request parameter, not a move-only prompt.** Core fires one trigger
 for every virtual link and offers no way to tell a move from a plain association there
@@ -1527,7 +1533,9 @@ must cover a case that actually differs.
 - [x] text over 2000 bytes → full in XMP/EXIF, truncated in IPTC, truncation logged `[BVA]`
 - [x] `Łódź Ω 日本 Müller` survives `clean_iptc_value()` `[ERR]`
 - [x] empty album fields clear the photo columns (NULL, not `''`) `[BVA]`
-- [ ] an album with zero photos — apply succeeds, writes nothing `[BVA]`
+- [x] an album with zero photos — apply succeeds, writes nothing `[BVA]`. Distinct from the
+      empty-chunk case: it kills a mutant that makes the 404 branch require image_category rows,
+      which the empty-chunk test survives (checked 2026-08-29)
 - [x] **concurrency**: N parallel writers on one file; the file exists and is readable afterwards.
       Written and watched **red with locking disabled** before locking is enabled — this is the one
       measured data-loss mode `[NEG]`
@@ -1536,9 +1544,11 @@ must cover a case that actually differs.
 
 **Deliberately failing (skipped) tests** — known gaps, visible in every run rather than buried in
 prose (`.claude/rules/test-design.md`):
-- [ ] a photo in **two** albums: which album's provenance applies. Skipped with the reason and a
+- [x] a photo in **two** albums: which album's provenance applies. Skipped with the reason and a
       link to the `docs/backlog.md` 1:1 item. Un-skipping it is the first step of that fix.
-- [ ] file-vs-DB divergence after a third-party edit is detected. Skipped, decision 4a, backlog item.
+      `ApplyTest::testAPhotoInTwoAlbumsIsRefusedRatherThanSilentlyReassigned`
+- [x] file-vs-DB divergence after a third-party edit is detected. Skipped, decision 4a, backlog item.
+      `WriteBackTest::testAThirdPartyEditIsDetectedAsFileDatabaseDivergence`
 
 ### End-to-End Tests (top — real browser)
 
@@ -1565,7 +1575,11 @@ browser can observe
       UI rather than swallowed by a run that looks clean `[DT]`
 - [x] `writeback-provenance.spec.js` — application-level and network-level failures each
       surface `[NEG]`
-- [ ] `picture-provenance.spec.js` — the `#Provenance` row is visible in the rendered DOM `[HAPPY]`
+- [x] `provenance.spec.js` — the `#Provenance` row is visible in the rendered DOM `[HAPPY]`.
+      Landed under that name, not the `picture-provenance.spec.js` this plan proposed
+- [x] `move-provenance.spec.js` — the Batch Manager move prompt appears with one labelled choice
+      per mode `[HAPPY]`, and `replace` / `clear` each perform a real move and leave the labelled
+      outcome `[ST]`. Added 2026-08-29, closing Phase 9's one unperformed manual step
 - [x] `apply-provenance.spec.js` — an application-level failure (HTTP 200 with `stat:"fail"`) surfaces
       an error in the UI `[NEG]`. Distinct from the next case, which hits a different client path
 - [x] `apply-provenance.spec.js` — a network-level failure (aborted request) surfaces an error `[NEG]`
@@ -1579,7 +1593,11 @@ Only what cannot be automated; each becomes a dated hand-check ledger entry in `
    GUI viewer" survives as a ledger entry.
 2. Confirm the injected album block and the `#Provenance` row look right at a narrow viewport.
 3. Upload a photo through the real admin UI into a provenance-carrying album and confirm inheritance.
-4. Confirm the pre-commit gate blocks a staged `|| true` in a `plugins/provenance/tests/` file.
+4. ~~Confirm the pre-commit gate blocks a staged `|| true` in a `plugins/provenance/tests/` file.~~
+   Automated: `tools/test-hooks.sh` → `vacuous assertion blocks in a plugin suite`, which stages the
+   probe at `plugins/provenance/tests/` and asserts the ratchet's scope covers it.
+5. ~~Confirm the Batch Manager move prompt appears and its three choices behave as labelled.~~
+   Automated 2026-08-29 in `move-provenance.spec.js`; it was never performed by hand.
 
 ### Test Commands
 

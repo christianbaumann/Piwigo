@@ -126,12 +126,18 @@ against a production database.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
 
-The provenance E2E suite seeds its own throwaway album for the write-back
-(`seed.php --scenario=writeback`): that operation writes **every** photo of the album it is
-started from, so it is never pointed at an album holding real scans. `--restore` deletes the
-album, its photo rows, the copied files and exiftool's `_original` sidecars.
+Two provenance E2E scenarios seed throwaway albums of their own rather than touching real scans:
 
-E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in `tests/e2e/support/PicturePage.js` — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
+- `seed.php --scenario=writeback` — one album of copied photos. The write-back writes **every**
+  photo of the album it is started from, so it is never pointed at an album holding real scans.
+- `seed.php --scenario=move` — a source and a destination album with one copied photo, for the
+  Batch Manager move prompt. A move rearranges the gallery, so it never moves a real scan.
+
+`--restore` deletes those albums, their photo rows, the copied files and exiftool's `_original`
+sidecars. `seed.php --read-photo=<id>` reads one photo's provenance columns back, for outcomes
+the browser cannot show.
+
+E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in a page object under `tests/e2e/support/` (`PicturePage.js`, `AlbumPropertiesPage.js`, `PhotoPropertiesPage.js`, `BatchManagerPage.js`) — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 
 **Clear `_data/templates_c/` after editing a Smarty prefilter.** `Template::set_prefilter()` hashes only the filter's *callback name* into Smarty's `compile_id` (`include/template.class.php:1060-1070`), not the callback's source. Editing `typetags_picture_prefilter()` therefore leaves the previously compiled `picture.tpl` in place, and the page — and the integration suite reading it — keeps showing the old injection with no error.
 

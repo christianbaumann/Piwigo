@@ -64,6 +64,7 @@ final class ApplyTest extends TestCase
         $this->fixture->clearImageProvenance($this->photoIds);
         $this->fixture->albumProvenance($this->catId, array());
         $this->fixture->restore();
+        $this->fixture->destroyTestAlbums();
         $this->db->query('DELETE FROM ' . self::HISTORY_TABLE . ' WHERE id > ' . $this->baselineHistoryId);
         $this->ws->logout();
     }
@@ -192,6 +193,76 @@ final class ApplyTest extends TestCase
         $this->assertSame(0, $res['json']['result']['applied']);
         $this->assertSame(0, $this->historyCount());
     }
+
+    /**
+     * [BVA] An album that holds no photos at all applies successfully and writes
+     * nothing.
+     *
+     * Not the same case as the empty chunk above: there the album is the real
+     * 76-photo one and only the id list is empty, so every membership check has
+     * rows to work with. Here piwigo_image_category holds nothing for the album,
+     * which is what a freshly created album looks like the moment somebody fills
+     * in its provenance and hits apply before uploading a single scan.
+     */
+    public function testAnAlbumWithNoPhotosAppliesAndWritesNothing(): void
+    {
+        $empty = $this->fixture->createTestAlbum('provenance-apply-empty-album');
+        $this->fixture->albumProvenance($empty, self::ALBUM);
+
+        // Read straight from the table: photoIdsInAlbum() is a fixture guard that
+        // throws on an empty album, which is exactly the state under test here.
+        $this->assertSame(
+            0,
+            (int)$this->db->scalar('SELECT COUNT(*) FROM piwigo_image_category WHERE category_id = ' . $empty),
+            'the fixture album must really hold no photos, or this test proves nothing'
+        );
+
+        $res = $this->apply(array(), $empty);
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        $this->assertSame(0, $res['json']['result']['applied']);
+        $this->assertSame(0, $this->historyCount());
+
+        // The album's own values are untouched - apply reads them, never writes them.
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readAlbumProvenance($empty)['provenance_owner']
+        );
+    }
+
+    /**
+     * A photo that belongs to two albums: which album's provenance applies.
+     *
+     * Skipped - there is no answer to assert yet. Core allows many-to-many
+     * through piwigo_image_category, this feature assumes 1:1, and today the
+     * last apply to run simply overwrites the previous album's values with no
+     * warning to anybody. The fix is the "enforce a 1:1 photo-album
+     * relationship" item in docs/backlog.md; un-skipping this test is its first
+     * step, and the body below is written against the behaviour that fix owes:
+     * a photo in a second album is refused rather than silently reassigned.
+     *
+     * [NEG]
+     */
+    public function testAPhotoInTwoAlbumsIsRefusedRatherThanSilentlyReassigned(): void
+    {
+        $this->markTestSkipped(
+            'no defined behaviour to assert: core permits many-to-many and this feature assumes 1:1 - ' .
+            'see the "enforce a 1:1 photo-album relationship" item in docs/backlog.md'
+        );
+
+        $second = $this->fixture->createTestAlbum('provenance-apply-second-album');
+        $this->fixture->albumProvenance($second, array_merge(self::ALBUM, array('provenance_owner' => 'Berta Schmidt')));
+
+        $shared = $this->photoIds[0];
+        $this->fixture->attachImage($shared, $second);
+
+        $res = $this->apply(array($shared), $second);
+
+        $this->assertSame('fail', $res['json']['stat'], $res['body']);
+        $this->assertSame(400, $res['json']['err']);
+        $this->assertNull($this->fixture->readImageProvenance($shared)['provenance_owner']);
+    }
+
 
     // ── the history ───────────────────────────────────────────────────────
 

@@ -16,6 +16,7 @@
  *   php tests/e2e/support/seed.php --scenario=with-provenance --album=12
  *   php tests/e2e/support/seed.php --scenario=photo-provenance
  *   php tests/e2e/support/seed.php --scenario=writeback
+ *   php tests/e2e/support/seed.php --scenario=move
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -73,6 +74,93 @@ function row_label(Db $db, string $username): string
     }
 
     return $lang[PROVENANCE_ROW_LABEL_KEY];
+}
+
+/**
+ * The move prompt's title and its per-mode labels, in the language the given
+ * account browses in.
+ *
+ * Both halves are read out of production rather than typed here: the strings and
+ * their mode come from the template that renders them, the translations from the
+ * locale file the request would use. A spec carrying its own copy of either
+ * would assert this install's language, and would go stale the day only one of
+ * the two copies is edited.
+ *
+ * @return array title plus one entry per mode value
+ */
+function move_mode_labels(Db $db, string $username): array
+{
+    $locale = user_locale($db, $username);
+    $lang = plugin_lang($locale);
+
+    $tpl = (string)file_get_contents(PROVENANCE_PATH . 'template/batch_move_provenance.tpl');
+    if (strlen($tpl) < 200)
+    {
+        fail('the move-prompt template is too short to have been read');
+    }
+
+    $labels = array();
+
+    if (!preg_match("/provenance-move-mode-title\">\{'([^']+)'\|\@translate\}/", $tpl, $m))
+    {
+        fail('could not find the move-prompt title in its template');
+    }
+    $labels['title'] = translate($lang, $m[1], $locale);
+
+    if (!preg_match_all("/value=\"([a-z]+)\"[^>]*>\s*\{'((?:[^'\\\\]|\\\\.)+)'\|\@translate\}/", $tpl, $ms, PREG_SET_ORDER))
+    {
+        fail('could not find the move-mode radios in their template');
+    }
+    foreach ($ms as $match)
+    {
+        $labels[$match[1]] = translate($lang, str_replace("\\'", "'", $match[2]), $locale);
+    }
+
+    if (count($labels) !== count(provenance_move_modes()) + 1)
+    {
+        fail('the template does not offer one labelled radio per move mode');
+    }
+
+    return $labels;
+}
+
+function user_locale(Db $db, string $username): string
+{
+    $locale = $db->scalar(
+        "SELECT ui.language FROM piwigo_user_infos ui" .
+        " JOIN piwigo_users u ON u.id = ui.user_id" .
+        " WHERE u.username = '" . $db->escape($username) . "'"
+    );
+    if ($locale === null)
+    {
+        fail("no account named '$username' to resolve labels for");
+    }
+
+    return (string)$locale;
+}
+
+function plugin_lang(string $locale): array
+{
+    $file = dirname(__DIR__, 3) . '/language/' . $locale . '/plugin.lang.php';
+    if (!is_file($file))
+    {
+        fail("the plugin carries no translation for $locale: $file");
+    }
+
+    $lang = array();
+    include $file;
+
+    return $lang;
+}
+
+function translate(array $lang, string $key, string $locale): string
+{
+    if (empty($lang[$key]))
+    {
+        fail("the $locale translation has no '$key' entry");
+    }
+
+    return $lang[$key];
 }
 
 function read_display_info(Db $db): string
@@ -136,6 +224,21 @@ const SEEDED_VALUES = array(
  * whole reason the schema carries two note columns.
  */
 const SEEDED_PHOTO_NOTE = 'auf der Rückseite: Sommer 1972';
+
+/**
+ * The destination album's values for the 'move' scenario.
+ *
+ * Every field differs from SEEDED_VALUES, because the whole question the move
+ * prompt answers is *which album's* values a moved photo ends up with. A
+ * destination sharing even one value with the source would let a spec pass
+ * while the choice was ignored.
+ */
+const MOVE_DESTINATION_VALUES = array(
+    'provenance_physical_album' => 'Opa Schmidts Fotokiste',
+    'provenance_owner'          => 'Berta Schmidt',
+    'provenance_scanned_on'     => '2026-07-01',
+    'provenance_note'           => 'Kiste vom Dachboden',
+    );
 
 /**
  * How many photos the 'writeback' scenario puts in its own album.
@@ -252,12 +355,36 @@ if (isset($args['restore']))
     exit(0);
 }
 
+// ── Read back ─────────────────────────────────────────────────────────────
+
+/*
+ * What one photo's provenance columns hold right now.
+ *
+ * The move spec needs the *outcome* of a real move, and the browser cannot show
+ * it: whether a moved photo kept, cleared or replaced its provenance is a fact
+ * about five database columns, and the picture page composes them into one
+ * sentence that cannot distinguish a cleared field from an absent one. Same
+ * reasoning as the write-back spec reading the files on disk instead of
+ * trusting the page's own summary.
+ */
+if (isset($args['read-photo']))
+{
+    $photoId = (int)$args['read-photo'];
+    if ($photoId <= 0)
+    {
+        fail('--read-photo must be a positive photo id');
+    }
+
+    echo json_encode($builder->readImageProvenance($photoId), JSON_UNESCAPED_UNICODE), "\n";
+    exit(0);
+}
+
 // ── Seed ──────────────────────────────────────────────────────────────────
 
 $scenario = $args['scenario'] ?? null;
-if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback'), true))
+if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback', 'move'), true))
 {
-    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback');
+    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback, move');
 }
 
 // Carry forward anything an earlier seed in this test already recorded, so a
@@ -278,6 +405,7 @@ else
 $originalDisplayInfo = $existing['display_info'] ?? read_display_info($db);
 force_display_info($db);
 
+$destination = null;
 if ($scenario === 'writeback')
 {
     // The write-back writes every photo of the album it is started from, so it
@@ -289,6 +417,23 @@ if ($scenario === 'writeback')
     {
         $builder->attachImage($builder->createTestImage()['id'], $catId);
     }
+}
+elseif ($scenario === 'move')
+{
+    // Two throwaway albums, because a move needs somewhere to come from and
+    // somewhere to go, and a spec that moved a real scan out of a real album
+    // would leave the collection rearranged. One photo, so "the moved photo"
+    // is unambiguous and the batch manager's select-all is exact.
+    $catId = $builder->createTestAlbum('provenance E2E move source');
+    $destinationId = $builder->createTestAlbum('provenance E2E move destination');
+
+    $builder->attachImage($builder->createTestImage()['id'], $catId);
+
+    $destination = array(
+        'album_id' => $destinationId,
+        'album_name' => 'provenance E2E move destination',
+        'values' => $builder->albumProvenance($destinationId, MOVE_DESTINATION_VALUES),
+        );
 }
 else
 {
@@ -319,6 +464,23 @@ if ($scenario === 'writeback')
         {
             $copied[$image_column] = $actual[$album_column];
         }
+        $builder->imageProvenance($photo_id, $copied);
+    }
+}
+
+// 'move' puts its one photo in the state the copy-down would leave it in, so the
+// spec starts from a photo that really carries the *source* album's provenance -
+// otherwise 'keep' and 'clear' would be indistinguishable and 'replace' would
+// have nothing to replace.
+if ($scenario === 'move')
+{
+    $copied = array();
+    foreach (provenance_copy_down_map() as $album_column => $image_column)
+    {
+        $copied[$image_column] = $actual[$album_column];
+    }
+    foreach ($photo_ids as $photo_id)
+    {
         $builder->imageProvenance($photo_id, $copied);
     }
 }
@@ -358,10 +520,14 @@ echo json_encode(array(
     'photo_count' => count($photo_ids),
     'photo' => $photo,
     'photo_note' => $scenario === 'writeback' ? SEEDED_PHOTO_NOTE : null,
+    // The 'move' scenario's second album: where the photo is moved to, and the
+    // values 'replace' must leave on it.
+    'destination' => $destination,
     // Absolute paths, so a spec can read back what the browser's click really
     // wrote into the files rather than trusting the page's own summary.
     'photo_files' => array_column($builder->exportTestObjects()['images'], 'file'),
     'row_label' => row_label($db, Config::username()),
+    'move_mode_labels' => move_mode_labels($db, Config::username()),
     'max_short_text_chars' => PROVENANCE_SHORT_TEXT_MAX_CHARS,
     'writeback_max_chunk' => PROVENANCE_WRITEBACK_MAX_CHUNK,
     ), JSON_UNESCAPED_UNICODE), "\n";
