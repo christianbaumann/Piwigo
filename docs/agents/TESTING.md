@@ -107,6 +107,7 @@ So a later reader can tell a considered omission from an oversight.
 | Per-image visibility on `addTag` | "All logged-in users" is the recorded permission model; see [decision 0005](decisions/0005-tag-assignment-permission-model.md) | Would assert a requirement that does not exist |
 | `post_only` on the two image methods | Deliberately absent; see [decision 0003](decisions/0003-no-post-only-on-ws-methods.md) | Characterized instead, by `AddTagTest::testMethodAlsoAnswersToGet` `[ERR]` |
 | E2E specs for `plugins/provenance` Phases 1-2 | Neither phase renders anything a browser can observe; see [decision 0007](decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md) | Schema sits at the integration layer, the composition functions at the unit layer; an E2E spec would restate one of them |
+| E2E specs for `plugins/provenance` Phase 3 | The phase registers `ws_add_methods` and nothing else - no prefilter, no template, no screen; see [decision 0008](decisions/0008-no-e2e-tests-for-provenance-phase-3.md) | Row shaping is unit-level, the recorder's SQL and the admin gate are integration-level; a browser would restate the gate |
 
 ## Mutant table — unit suite
 

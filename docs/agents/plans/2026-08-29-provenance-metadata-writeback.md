@@ -503,6 +503,10 @@ Bulk callers use `provenance_record_changes(array $rows)`, which funnels into a 
 - [x] Integration: `getHistory` as a non-admin returns `stat:"fail"` with ~~403~~ **401** — see the
       deviation below (`testNormalUserCannotReadTheHistory`, `testGuestCannotReadTheHistory`)
 - [x] `ddev exec php -l` on every changed file
+- [x] E2E: none, and `tests/e2e/` is still not created - the phase registers `ws_add_methods` and
+      nothing else, so there is no DOM to observe
+      ([decision 0008](../decisions/0008-no-e2e-tests-for-provenance-phase-3.md)). Verified
+      2026-08-29: `npx playwright test --list` reports `Total: 0 tests in 0 files`, exit 1
 
 #### Manual Verification:
 - [x] ~~A history row's `occured_on` and `performed_by` match the acting admin in the DB~~ →
@@ -1110,7 +1114,8 @@ app, not written from reading the templates.
 All five specs below belong to Phases 4 and 8. Phases 1-3 contribute none, and the
 `tests/e2e/` directory itself is created by Phase 4 — nothing before it renders anything a
 browser can observe
-([decision 0007](../decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md)).
+([decision 0007](../decisions/0007-no-e2e-tests-for-provenance-phases-1-and-2.md) for Phases 1-2,
+[decision 0008](../decisions/0008-no-e2e-tests-for-provenance-phase-3.md) for Phase 3).
 
 - [ ] `album-provenance.spec.js` — open the modal, fill four fields, save, reload, values persist `[HAPPY]`
 - [ ] `album-provenance.spec.js` — apply to photos, progress completes, a photo page shows the values `[HAPPY]`
@@ -1142,7 +1147,7 @@ ddev exec php plugins/provenance/tests/Support/create-test-users.php
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
 
-# E2E (DDEV up; no specs before Phase 4 - see decision 0007)
+# E2E (DDEV up; no specs before Phase 4 - see decisions 0007 and 0008)
 ddev exec bash -c 'cd plugins/provenance && set -a; . ../../local/config/provenance-test.env; set +a; \
   npx playwright test'
 
