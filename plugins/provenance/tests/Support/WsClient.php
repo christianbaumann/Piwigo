@@ -92,6 +92,44 @@ class WsClient
         return array('http_code' => $httpCode, 'body' => $body);
     }
 
+    /**
+     * Multipart call, for the one method that takes a real file.
+     *
+     * Kept apart from call(): that one urlencodes its body, which cannot carry a
+     * file, and this one must not urlencode, which would not carry an array.
+     *
+     * @param string $field the $_FILES key the handler reads
+     */
+    public function upload(string $method, string $filePath, string $field, array $params = array()): array
+    {
+        if (!is_file($filePath))
+        {
+            throw new RuntimeException("nothing to upload at $filePath");
+        }
+
+        $params['method'] = $method;
+        $params[$field] = new CURLFile($filePath, 'image/png', basename($filePath));
+
+        $ch = curl_init();
+        curl_setopt_array($ch, array(
+            CURLOPT_URL => Config::baseUrl() . '/ws.php?format=json',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => $params,
+            CURLOPT_COOKIEJAR => $this->cookieFile,
+            CURLOPT_COOKIEFILE => $this->cookieFile,
+        ));
+        $body = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return array(
+            'http_code' => $httpCode,
+            'body' => $body,
+            'json' => json_decode($body, true),
+        );
+    }
+
     /** POST an admin page, reusing this client's session. */
     public function postPage(string $path, array $params): array
     {

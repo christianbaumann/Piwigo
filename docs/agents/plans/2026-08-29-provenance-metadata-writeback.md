@@ -989,8 +989,23 @@ that is false. Fix it in the same commit that makes it untrue (`.claude/rules/ba
 - [x] `ddev exec php -l admin/include/functions.php admin/site_update.php`
 
 #### Manual Verification:
-- [ ] Upload a photo into a provenance-carrying album through the normal admin UI and confirm it
-      arrives with the values — exercises the upload path end to end, which no fixture drives
+- [x] ~~Upload a photo into a provenance-carrying album through the normal admin UI and confirm it
+      arrives with the values~~ → **automated**, `InheritTest` →
+      `testAnUploadedPhotoInheritsTheAlbumsProvenance` and
+      `testWithTheLoungeOnTheValuesArriveWhenTheLoungeIsEmptied`. The suite drives the exact
+      web-service sequence the upload screen issues - `pwg.images.upload` with a real file, then
+      `pwg.images.uploadCompleted` - so nothing about the path is assumed
+- [x] Full provenance E2E suite green after both core patches (17 specs, 2026-08-29):
+      `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; cd plugins/provenance && npx playwright test'`
+
+#### E2E: none, and that is the finding
+
+Phase 7 adds no UI. The behaviour is inheritance on association, and the manual step named the one
+path no fixture drove: the admin uploader. That path is now witnessed at the **integration** layer,
+through the same two web-service calls the upload screen makes. What a browser would add on top is
+plupload's chunking and its own call sequence - core's code, not the plugin's, on a screen the
+plugin does not touch. Per the placement rule in `.claude/rules/testing.md`, a spec there would
+restate existing coverage one layer up while witnessing nothing new, so none was written.
 
 **Implementation Note**: Pause for manual confirmation before proceeding.
 
@@ -1013,6 +1028,15 @@ that is false. Fix it in the same commit that makes it untrue (`.claude/rules/ba
   with `http_build_query()`. Caught by the second characterization case, which is the only one that
   associates two photos in a single call and then asserts both ranks.
 
+- **The upload path does not associate at upload time on this install.** `$conf['lounge_active']` is
+  `true`, so `add_uploaded_file()` calls `fill_lounge()` rather than
+  `associate_images_to_categories()`; the association - and therefore the inheritance - happens
+  later, inside `empty_lounge()`, which the upload screen reaches through
+  `pwg.images.uploadCompleted`. Both funnel through the patched function, so one trigger covers
+  both, but a handler hung on the upload itself would have found no album and written nothing. The
+  `[ST]` case records where in the sequence the values really appear, and skips with a reason where
+  the lounge is off.
+
 - **`admin/site_update.php` needs a scoped drive, not a quick sync.** `quick_sync` walks the whole
   gallery; the suite posts `sync=files` with `cat=<fixture album>` instead, so it only ever sees the
   throwaway physical album. `privacy_level` is read unconditionally at `:546` and must be supplied.
@@ -1030,6 +1054,7 @@ container confirmed by checksum before the suite ran (`.claude/rules/mutation-te
 | dissociate: `AND (category_id != storage_category_id OR … IS NULL)` removed | `testDissociateLeavesTheStorageLinkIntact` | killed |
 | move: `AND (storage_category_id IS NULL OR … != category_id)` removed | `testMoveKeepsTheStorageLinkAndAddsTheDestination` | killed |
 | sync: the images row's `storage_category_id` nulled, link left intact | `testFilesystemSyncInsertsALinkCarryingTheStorageCategory` | killed |
+| `associate_images_to_categories` handler registered on an event that never fires | both `InheritTest` upload cases | killed |
 
 Nothing else moved: each mutant killed exactly the cases watching it.
 

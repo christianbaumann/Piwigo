@@ -308,6 +308,27 @@ class FixtureBuilder
     }
 
     /**
+     * Takes ownership of a photo somebody else created, so teardown removes it.
+     *
+     * An upload driven through ws.php produces a real image row and a real file
+     * that this fixture never made and would otherwise leave behind.
+     */
+    public function adoptImage(int $imageId): void
+    {
+        $dbPath = $this->db->scalar('SELECT path FROM piwigo_images WHERE id = ' . $imageId);
+        if ($dbPath === null)
+        {
+            throw new RuntimeException("no photo with id $imageId to adopt");
+        }
+
+        $this->testImages[] = array(
+            'id' => $imageId,
+            'db_path' => (string)$dbPath,
+            'file' => PIWIGO_ROOT . ltrim((string)$dbPath, './'),
+            );
+    }
+
+    /**
      * An album of this suite's own, holding nothing but fixture photos.
      *
      * The write-back operates on every photo of the album it is started from, so
