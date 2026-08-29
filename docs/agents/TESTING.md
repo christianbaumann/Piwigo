@@ -37,8 +37,8 @@ Piwigo core has no test suite. `plugins/typetags` carries all three layers.
 The run commands and the fresh-clone setup are in CLAUDE.md's Testing section — one copy,
 cited here rather than repeated.
 
-**Measured 2026-08-29** (dates attached because counts rot): unit 52 tests / 32,986
-assertions in 0.096s; integration 44 tests / 150 assertions; E2E 26 (25 specs + 1 auth
+**Measured 2026-08-29** (dates attached because counts rot): unit 56 tests / 33,009
+assertions in 0.105s; integration 44 tests / 150 assertions; E2E 26 (25 specs + 1 auth
 setup) in 8.9s. The unit suite's sub-second budget is what makes it eligible for a commit
 gate; the other two are not.
 
@@ -151,6 +151,34 @@ guard kills it; the same mutant survives when the guard is weakened to `>= 1`. S
 exact-count assertion earns its strictness, which is a stronger result than the plan
 predicted.
 
+### Second run — `CleanCheckoutTest` (2026-08-29)
+
+Added with Phase 7, so it got its own pass rather than riding on the one above. Four
+mutants, one at a time, `main.inc.php` and `.gitignore` confirmed byte-identical to HEAD
+and the git index confirmed clean after each.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| a runtime include target added that exists on disk but was never `git add`ed | the include-graph test | killed: `testEveryRuntimeIncludeTargetIsCommitted`, alone |
+| a runtime filename appended to `.gitignore` | the ignore-rules test | **survived on first run**, killed after the test was fixed — see below |
+| `git rm --cached maintain.class.php` (a loader entry point never committed) | the entry-point test | killed: `testLoaderEntryPointsAreCommitted`, alone |
+| two includes refactored off the literal `TYPETAGS_PATH . '<path>'` idiom, shrinking what the scan can discover | the anti-vacuity floor | killed: `testGuardFixtureIsNotVacuous`, alone (3 targets against a floor of 4) |
+
+**Nothing else moved** in any killed row: the other 55 tests stayed green each time.
+
+**The finding: `testNoRuntimeFileIsGitIgnored` was vacuous as first written.** `git
+check-ignore` ignores its own rules for **tracked** files unless `--no-index` is passed, so
+the only path that could have failed it was one both ignored *and* untracked — which
+`testEveryRuntimeIncludeTargetIsCommitted` already catches. The test duplicated coverage
+while appearing to add some. Fixed by adding `--no-index`, which makes it query the rules
+themselves; the mutant then died, killing that one test and nothing else. This is the same
+shape as the `strlen >= 7` finding above: a mutant surviving because the test was genuinely
+weak, not because the target was unreachable.
+
+Why the invariant is worth a test even though a tracked-but-ignored file still reaches
+clones: the pattern is a trap for the *next* runtime file added under it, which would be
+silently skipped by `git add` and never noticed until someone cloned.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
@@ -168,6 +196,7 @@ than accumulating. Nothing is marked done on prose alone.
 
 | Item | Why it cannot be automated |
 |---|---|
+| A first-time `PluginMaintain::install()` against an **empty schema** | Needs a throwaway Piwigo instance with its own database; this repository has one install and no way to provision another. Running it against the live install would mean `uninstall()` first, which drops `piwigo_typetags` and `piwigo_tags.id_typetags` — destroying real tag-colour data to test a method that is already idempotent by construction (`CREATE TABLE IF NOT EXISTS`, an `ALTER` guarded by `SHOW COLUMNS`, a `conf_update_param` guarded by `empty()`). The risk is not worth the coverage. What *is* automated: `CleanCheckoutTest` (4 tests) asserts every runtime file is committed and unignored — the half of "installs from a clean checkout" that this repository can actually get wrong — and `PluginActivationTest` asserts install()'s effects are present on the live install. |
 | Badge contrast is *legible* for all 8 configured colours against the modus background | Subjective judgment. `get_color_text()` picks black or white by a lightness threshold and `rendering.spec.js` asserts the choice is applied, but whether the result reads comfortably is not a fact a machine can settle. |
 | The hover opacity transition *feels* right | Subjective. The opacity values themselves are asserted; the perception is not. |
 | Committing does not *feel* slow with the pre-commit hook installed | Subjective, and a wall-clock assertion would violate *assert the causal fact, not a wall-clock figure*. |

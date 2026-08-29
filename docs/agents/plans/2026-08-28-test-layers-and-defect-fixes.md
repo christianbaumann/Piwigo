@@ -4,7 +4,8 @@ git_commit: 317f34b6ec41528666225e8bc1cdde2d3ad4d858
 branch: master
 topic: "Test pyramid for typetags: unit layer, hardened integration layer, E2E layer, and the defects they expose"
 tags: [plan, typetags, testing, phpunit, playwright, test-design, quality-gate]
-status: draft
+status: complete
+completed: 2026-08-29
 ---
 
 # Test Pyramid for typetags + Defect Fixes — Implementation Plan
@@ -1008,26 +1009,89 @@ The submodule is 3 commits ahead of `origin/master` (`e07139f`, `7dc69fc`, `9974
 
 ### Changes Required:
 
-#### [ ] 1. Push the plugin
+#### [x] 1. Push the plugin
 ```bash
 git -C plugins/typetags push origin master
 ```
+Pushed 2026-08-29: `aaf0c0e..3eeee00  master -> master`. Eight commits, not three — the
+three pre-existing ones (`9974177`, `7dc69fc`, `e07139f`) plus the five this plan produced
+(`6059914` toolchain, `7642e08` unit layer + defect fixes, `4aebd2a` integration port,
+`39a8fa8` E2E layer, `3eeee00` Plan A closure).
 
-#### [ ] 2. Bump the superproject pointer and commit
-```bash
-git add plugins/typetags
-git commit -m "bump typetags submodule: test pyramid and defect fixes"
-```
+#### [x] 2. Bump the superproject pointer and commit
+
+**Deviation — already done, so nothing to commit.** The pointer was bumped incrementally as
+each phase landed (most recently in `91d3a820a`), so `git ls-tree HEAD plugins/typetags`
+already read `3eeee007d`, identical to the submodule's `HEAD`. `git submodule status`
+carried no `+`. A separate bump commit would have been empty. The ordering the phase
+assumes — push, *then* bump — held anyway: the pointer only became *valid for anyone else*
+at the moment of the push, which is the property this phase exists to establish.
 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `git -C plugins/typetags status` reports no commits ahead of origin
-- [ ] A clone into a temp dir with `--recurse-submodules` checks out cleanly and the unit suite passes there
-- [ ] `git submodule status` shows no `+` or `-` prefix
+- [x] `git -C plugins/typetags status` reports no commits ahead of origin — `rev-list --count origin/master..master` → 0
+- [x] A clone into a temp dir with `--recurse-submodules` checks out cleanly and the unit suite passes there — the clone resolved `plugins/typetags` from the GitHub URL in `.gitmodules` at `3eeee007d`, which is what proves the push landed rather than merely that the local repo is self-consistent. `composer install` then `phpunit --testsuite unit` → **52 tests, 32986 assertions, 0 failures** (host PHP 8.5.7, PHPUnit 13.3.2). Ran on the host deliberately: the temp clone is outside the DDEV mount, and the unit suite passing with no container is the "no DB, no HTTP, no bootstrap" property from the layer table demonstrated rather than asserted. The container remains the canonical runner for PHP-version parity.
+- [x] `git submodule status` shows no `+` or `-` prefix
 
 #### Manual Verification:
-- [ ] The three pre-existing commits are on the remote and the plugin still installs from a clean checkout
+- [x] The three pre-existing commits are on the remote and the plugin still installs from a clean checkout — **both clauses automated during `/verify` (2026-08-29)**, see below
+
+#### Automated during `/verify` (2026-08-29):
+
+**First clause — commits on the remote.** `git merge-base --is-ancestor <c> origin/master` for
+each of `e07139f`, `7dc69fc`, `9974177`: all three reachable. That is the entire clause; it
+needed no eyeballing and is re-checkable by one command.
+
+**Second clause — "still installs from a clean checkout".** Reading `maintain.class.php`
+reframed this. `install()` does three things, each already guarded: `conf_update_param`
+behind `empty($conf['TypeTags'])`, an `ALTER TABLE ... ADD id_typetags` behind a
+`SHOW COLUMNS` probe, and `CREATE TABLE IF NOT EXISTS`. It is idempotent by construction, and
+`PluginActivationTest` already asserts its effects on the live install. So the *database* half
+of "installs" was never the risk.
+
+The risk this phase actually introduces is the **checkout** half: Phase 0 added the submodule's
+first `.gitignore`, and the plugin is consumed as a pinned submodule commit. A runtime file
+present on this machine but never committed works perfectly here and is absent from every
+clone — and no existing layer can see it, because the unit suite reads the working tree and the
+integration and E2E suites drive the working tree through a web server. All three stay green
+while a clone of the same commit is broken.
+
+That is a structural guard, and it became one — `tests/Unit/CleanCheckoutTest.php` (4 tests,
+23 assertions), unit layer, no DB or HTTP:
+
+- [x] `testEveryRuntimeIncludeTargetIsCommitted` — the runtime file list is **discovered** from
+  production by scanning tracked sources for `TYPETAGS_PATH . '<path>'` (3 PHP includes + 2
+  `.tpl` templates), never transcribed into the test, so a new include is covered the day it is
+  added `[ERR]`
+- [x] `testLoaderEntryPointsAreCommitted` — `main.inc.php` and `maintain.class.php`, which
+  Piwigo's loader requires by convention and which therefore never appear in the include graph `[ERR]`
+- [x] `testNoRuntimeFileIsGitIgnored` — no `.gitignore` rule matches a runtime path `[ERR]`
+- [x] `testGuardFixtureIsNotVacuous` — two lower bounds: ≥4 discovered targets (measured
+  2026-08-29: 5) so a rotted regex fails loudly, and ≥100 tracked files (measured 2026-08-29:
+  154) because `git ls-files` returns an empty set with exit status 0 outside a work tree `[ERR]`
+
+Skips with a stated reason when there is no git work tree — a plugin installed from a zip has
+no repository, and committed-ness is not observable there.
+
+- [x] **Proven able to fail** — four production-side mutants, each killing exactly its target
+  with the other 55 tests green; table and the finding in
+  [TESTING.md](../TESTING.md#second-run--cleancheckouttest-2026-08-29).
+- [x] **A finding, recorded rather than smoothed over**: `testNoRuntimeFileIsGitIgnored` was
+  **vacuous as first written**. `git check-ignore` skips tracked files unless `--no-index` is
+  passed, so the only path that could fail it was one both ignored and untracked — already
+  caught by the first test. It duplicated coverage while appearing to add some. Fixed with
+  `--no-index`; the mutant then died, killing that one test and nothing else. Same shape as the
+  `strlen >= 7` finding in Phase 5.
+- [x] Unit suite after the addition: **56 tests, 33009 assertions**, 0.105s — green in default
+  and reverse order. `main.inc.php`, `.gitignore` and the git index all confirmed restored after
+  the mutation run.
+
+**What stays manual, and why** — in the ledger, not ticked: a first-time `install()` against a
+genuinely empty schema. Reaching it on the live install would require `uninstall()` first, which
+drops `piwigo_typetags` and `piwigo_tags.id_typetags` — destroying real tag-colour data to test
+a method that is idempotent by construction. The coverage is not worth the risk, and provisioning
+a second Piwigo instance is infrastructure this repository does not have.
 
 ---
 
@@ -1050,87 +1114,87 @@ Test pyramid, bottom-heavy. Each behaviour lives at the lowest layer that can ex
 | other length | `'#12345'` | `'#000'` after fix (throws before) |
 
 **Happy path:**
-- [ ] `testSevenCharLightColourGetsBlackText` — `'#FFFFB6'` → `'#000'` `[HAPPY]`
-- [ ] `testSevenCharDarkColourGetsWhiteText` — `'#007DAD'` → `'#fff'` `[HAPPY]`
-- [ ] `testFourCharShorthandIsSupported` — `'#fff'` → `'#000'`, `'#000'` → `'#fff'` `[ECP]`
-- [ ] `testAllConfiguredPaletteColoursResolve` — the 8 live colours, none throws, each returns `#000` or `#fff` `[HAPPY]`
+- [x] `testSevenCharLightColourGetsBlackText` — `'#FFFFB6'` → `'#000'` `[HAPPY]`
+- [x] `testSevenCharDarkColourGetsWhiteText` — `'#007DAD'` → `'#fff'` `[HAPPY]`
+- [x] `testFourCharShorthandIsSupported` — `'#fff'` → `'#000'`, `'#000'` → `'#fff'` `[ECP]`
+- [x] `testAllConfiguredPaletteColoursResolve` — the 8 live colours, none throws, each returns `#000` or `#fff` `[HAPPY]`
 
 **Boundary values** (threshold `$l > 0.45`):
-- [ ] `testThresholdJustBelowGetsWhiteText` — `'#00E500'`, `l = 0.449020` → `'#fff'` `[BVA]`
-- [ ] `testThresholdJustAboveGetsBlackText` — `'#00E600'`, `l = 0.450980` → `'#000'` `[BVA]`
-- [ ] `testThresholdIsUnreachableOnEightBitChannels` — documents that `l == 0.45` requires `min+max = 229.5`; asserts no `#RRGGBB` produces exactly `0.45` `[BVA]`
-- [ ] `testFourCharThresholdBoundary` — `'#0d0'` → `'#fff'`, `'#0e0'` → `'#000'` `[BVA]`
-- [ ] `testExtremes` — `'#000000'` → `'#fff'`, `'#ffffff'` → `'#000'` `[BVA]`
+- [x] `testThresholdJustBelowGetsWhiteText` — `'#00E500'`, `l = 0.449020` → `'#fff'` `[BVA]`
+- [x] `testThresholdJustAboveGetsBlackText` — `'#00E600'`, `l = 0.450980` → `'#000'` `[BVA]`
+- [x] `testThresholdIsUnreachableOnEightBitChannels` — documents that `l == 0.45` requires `min+max = 229.5`; asserts no `#RRGGBB` produces exactly `0.45` `[BVA]`
+- [x] `testFourCharThresholdBoundary` — `'#0d0'` → `'#fff'`, `'#0e0'` → `'#000'` `[BVA]`
+- [x] `testExtremes` — `'#000000'` → `'#fff'`, `'#ffffff'` → `'#000'` `[BVA]`
 
 **Negative and edge:**
-- [ ] `testMalformedLengthReturnsSafeDefault` — `'#12345'`, `'#'`, `'ab'`, 1000-char string → `'#000'`, no throw `[NEG]` **(fails before Phase 2 fix)**
-- [ ] `testEmptyReturnsEmptyString` — `''` → `''` `[ECP]`
-- [ ] `testZeroStringIsTreatedAsEmpty` — `'0'` → `''`; records the `empty()` quirk `[ERR]`
-- [ ] `testNullIsTreatedAsEmpty` — `null` → `''` `[ERR]`
-- [ ] `testNonHexOfCorrectLengthDoesNotThrow` — `'notahex'`, `'#GGGGGG'` → `'#fff'`; records that `hexdec` silently ignores invalid characters, so garbage is accepted rather than rejected `[ERR]`
-- [ ] `testCaseInsensitive` — `'#ffffb6'` and `'#FFFFB6'` agree `[ECP]`
-- [ ] `testLeadingHashIsNotValidated` — `'1234567'` is processed as if it were a colour; characterization, no requirement behind it `[ERR]`
+- [x] `testMalformedLengthReturnsSafeDefault` — `'#12345'`, `'#'`, `'ab'`, 1000-char string → `'#000'`, no throw `[NEG]` **(fails before Phase 2 fix)**
+- [x] `testEmptyReturnsEmptyString` — `''` → `''` `[ECP]`
+- [x] `testZeroStringIsTreatedAsEmpty` — `'0'` → `''`; records the `empty()` quirk `[ERR]`
+- [x] `testNullIsTreatedAsEmpty` — `null` → `''` `[ERR]`
+- [x] `testNonHexOfCorrectLengthDoesNotThrow` — `'notahex'`, `'#GGGGGG'` → `'#fff'`; records that `hexdec` silently ignores invalid characters, so garbage is accepted rather than rejected `[ERR]`
+- [x] `testCaseInsensitive` — `'#ffffb6'` and `'#FFFFB6'` agree `[ECP]`
+- [x] `testLeadingHashIsNotValidated` — `'1234567'` is processed as if it were a colour; characterization, no requirement behind it `[ERR]`
 
 *Decision table not applicable: one condition (lightness) and two outcomes. State transition not applicable: the function is pure and holds no state.*
 
 #### `check_color($hex)` — `tests/Unit/CheckColorTest.php`
 
 **Happy path:**
-- [ ] `testSixDigitHexIsAccepted` — `'aabbcc'` → `'#aabbcc'` `[HAPPY]`
-- [ ] `testThreeDigitHexIsExpanded` — `'abc'` → `'#aabbcc'` `[HAPPY]`
-- [ ] `testLeadingHashIsStripped` — `'#abc'` → `'#aabbcc'` `[ECP]`
+- [x] `testSixDigitHexIsAccepted` — `'aabbcc'` → `'#aabbcc'` `[HAPPY]`
+- [x] `testThreeDigitHexIsExpanded` — `'abc'` → `'#aabbcc'` `[HAPPY]`
+- [x] `testLeadingHashIsStripped` — `'#abc'` → `'#aabbcc'` `[ECP]`
 
 **Boundary values** (length after `ltrim('#')`):
-- [ ] `testLengthZeroRejected` — `''` → `false` `[BVA]`
-- [ ] `testLengthTwoRejected` — `'ab'` → `false` `[BVA]`
-- [ ] `testLengthThreeAccepted` — `'abc'` → `'#aabbcc'` `[BVA]`
-- [ ] `testLengthFourRejected` — `'abcd'` → `false` `[BVA]`
-- [ ] `testLengthFiveRejected` — `'abcde'` → `false` `[BVA]`
-- [ ] `testLengthSixAccepted` — `'aabbcc'` → `'#aabbcc'` `[BVA]`
-- [ ] `testLengthSevenRejected` — `'abcdefg'` → `false` `[BVA]`
+- [x] `testLengthZeroRejected` — `''` → `false` `[BVA]`
+- [x] `testLengthTwoRejected` — `'ab'` → `false` `[BVA]`
+- [x] `testLengthThreeAccepted` — `'abc'` → `'#aabbcc'` `[BVA]`
+- [x] `testLengthFourRejected` — `'abcd'` → `false` `[BVA]`
+- [x] `testLengthFiveRejected` — `'abcde'` → `false` `[BVA]`
+- [x] `testLengthSixAccepted` — `'aabbcc'` → `'#aabbcc'` `[BVA]`
+- [x] `testLengthSevenRejected` — `'abcdefg'` → `false` `[BVA]`
 
 **Negative and edge:**
-- [ ] `testNonHexCharactersRejected` — `'gggggg'`, `'ab c'` → `false` `[NEG]`
-- [ ] `testMultipleLeadingHashesAreAllStripped` — `'###abc'` → `'#aabbcc'`; characterization of `ltrim` `[ERR]`
-- [ ] `testCaseIsPreserved` — `'ABCDEF'` → `'#ABCDEF'` `[ERR]`
-- [ ] `testWhitespaceIsNotTrimmed` — `' abc'` → `false` `[ERR]`
+- [x] `testNonHexCharactersRejected` — `'gggggg'`, `'ab c'` → `false` `[NEG]`
+- [x] `testMultipleLeadingHashesAreAllStripped` — `'###abc'` → `'#aabbcc'`; characterization of `ltrim` `[ERR]`
+- [x] `testCaseIsPreserved` — `'ABCDEF'` → `'#ABCDEF'` `[ERR]`
+- [x] `testWhitespaceIsNotTrimmed` — `' abc'` → `false` `[ERR]`
 
 **Cross-function property:**
-- [ ] `testCheckColorOutputNeverMakesGetColorTextThrow` — for every accepted input, feeding the result to `get_color_text()` yields `#000` or `#fff` `[ECP]`
+- [x] `testCheckColorOutputNeverMakesGetColorTextThrow` — for every accepted input, feeding the result to `get_color_text()` yields `#000` or `#fff` `[ECP]`
 
 #### `get_typetag_id($input)` — regex branch only — `tests/Unit/GetTypetagIdTest.php`
 
 The `'|'` branch touches the database and is covered at the integration layer; only the pure paths belong here.
 
-- [ ] `testMarkerFormReturnsId` — `'~~123~~'` → `'123'` `[HAPPY]`
-- [ ] `testZeroId` — `'~~0~~'` → `'0'` `[BVA]`
-- [ ] `testEmptyMarkerRejected` — `'~~~~'` → `false` `[BVA]`
-- [ ] `testNonNumericMarkerRejected` — `'~~12a~~'` → `false` `[NEG]`
-- [ ] `testWhitespaceInMarkerRejected` — `'~~ 12 ~~'` → `false` `[NEG]`
-- [ ] `testAnchoringIsEnforced` — `'~~123~~x'` → `false` `[BVA]`
-- [ ] `testPlainStringReturnsFalse` — `'plain'`, `''` → `false` `[ECP]`
+- [x] `testMarkerFormReturnsId` — `'~~123~~'` → `'123'` `[HAPPY]`
+- [x] `testZeroId` — `'~~0~~'` → `'0'` `[BVA]`
+- [x] `testEmptyMarkerRejected` — `'~~~~'` → `false` `[BVA]`
+- [x] `testNonNumericMarkerRejected` — `'~~12a~~'` → `false` `[NEG]`
+- [x] `testWhitespaceInMarkerRejected` — `'~~ 12 ~~'` → `false` `[NEG]`
+- [x] `testAnchoringIsEnforced` — `'~~123~~x'` → `false` `[BVA]`
+- [x] `testPlainStringReturnsFalse` — `'plain'`, `''` → `false` `[ECP]`
 
 #### `typetags_partition_tags()` — `tests/Unit/PartitionTagsTest.php`
 
 Zero-One-Many across both inputs:
 
-- [ ] `testNoColouredTags` — `[]`, `[]` → both lists empty `[BVA]`
-- [ ] `testOneColouredNoneAssigned` — 1 unassigned, 0 assigned `[BVA]`
-- [ ] `testOneColouredAndAssigned` — 0 unassigned, 1 assigned `[BVA]`
-- [ ] `testManyColouredNoneAssigned` — drives State C `[HAPPY]`
-- [ ] `testManyColouredAllAssigned` — unassigned empty; drives State B and box 516 `[BVA]`
-- [ ] `testManyColouredSomeAssigned` — drives State A `[HAPPY]`
-- [ ] `testAssignedIdsContainingNonColouredTagsAreIgnored` — a plain tag id in `$assigned_ids` must not appear in either output; drives State D and box 557 `[NEG]`
-- [ ] `testPartitionIsCompleteAndDisjoint` — invariant: `unassigned ∪ assigned == all_colored`, intersection empty `[ECP]`
-- [ ] `testColorTextIsAddedToUnassignedOnly` — every unassigned entry carries `color_text`; assigned ids are bare `[HAPPY]`
-- [ ] `testStringAndIntegerIdsBothMatch` — `'5'` and `5` both resolve; records the loose `in_array` `[ERR]`
-- [ ] `testInputOrderIsPreserved` — the query orders by name; the partition must not reorder `[ST]`
+- [x] `testNoColouredTags` — `[]`, `[]` → both lists empty `[BVA]`
+- [x] `testOneColouredNoneAssigned` — 1 unassigned, 0 assigned `[BVA]`
+- [x] `testOneColouredAndAssigned` — 0 unassigned, 1 assigned `[BVA]`
+- [x] `testManyColouredNoneAssigned` — drives State C `[HAPPY]`
+- [x] `testManyColouredAllAssigned` — unassigned empty; drives State B and box 516 `[BVA]`
+- [x] `testManyColouredSomeAssigned` — drives State A `[HAPPY]`
+- [x] `testAssignedIdsContainingNonColouredTagsAreIgnored` — a plain tag id in `$assigned_ids` must not appear in either output; drives State D and box 557 `[NEG]`
+- [x] `testPartitionIsCompleteAndDisjoint` — invariant: `unassigned ∪ assigned == all_colored`, intersection empty `[ECP]`
+- [x] `testColorTextIsAddedToUnassignedOnly` — every unassigned entry carries `color_text`; assigned ids are bare `[HAPPY]`
+- [x] `testStringAndIntegerIdsBothMatch` — `'5'` and `5` both resolve; records the loose `in_array` `[ERR]`
+- [x] `testInputOrderIsPreserved` — the query orders by name; the partition must not reorder `[ST]`
 
 #### Structural guards — `tests/Unit/TemplateContractTest.php`
 
-- [ ] `testPictureTemplateStillContainsBothPrefilterTargets` — each search string occurs exactly once `[ERR]`
-- [ ] `testNoChildThemeShadowsPictureTemplate` — `themes/modus/template/picture.tpl` absent `[ERR]`
-- [ ] `testGuardFixtureIsNotVacuous` — the template file exists and exceeds 1000 bytes, so a moved or emptied template fails loudly instead of matching zero times `[ERR]`
+- [x] `testPictureTemplateStillContainsBothPrefilterTargets` — each search string occurs exactly once `[ERR]`
+- [x] `testNoChildThemeShadowsPictureTemplate` — `themes/modus/template/picture.tpl` absent `[ERR]`
+- [x] `testGuardFixtureIsNotVacuous` — the template file exists and exceeds 1000 bytes, so a moved or emptied template fails loudly instead of matching zero times `[ERR]`
 
 *These are the "assert what the compiler does not watch" tests. Without them, a theme change or upstream merge removes the feature with no error anywhere.*
 
@@ -1253,15 +1317,15 @@ The partition extraction (Phase 1) and the `get_color_text` guard (Phase 2) are 
 
 Per the decision settled 2026-08-28, mutation applies to **unit tests only** — never to an integration, E2E, or structural guard test, because a red end-to-end run does not say which mutation caused it. Kept as prose, not as a script: a script that patches and reverts source is a second thing to keep correct.
 
-- [ ] Record a mutant table for the unit suite: mutant → killed by. Minimum set:
+- [x] Record a mutant table for the unit suite: mutant → killed by. Minimum set:
   - `$l > 0.45` → `$l >= 0.45` — should be killed by the BVA pair, and if it is *not*, that proves the threshold is unreachable rather than that the test is weak; record which
   - `$l > 0.45` → `$l > 0.5` — killed by the palette test
   - `strlen($color) == 7` → `>= 7` — killed by the malformed-length test
   - `return '#000'` (the new guard) → `return '#fff'` — killed by the malformed-length test
   - `in_array($tag['id'], $assigned_ids)` → `!in_array(...)` — killed by the partition tests
   - `substr_count(...) === 1` → `>= 1` in the template guard — killed by nothing today; record the gap honestly rather than claiming coverage
-- [ ] Record what did **not** move. The phrasing matters: *"Nothing else moved"* is the claim that a mutant killed exactly the tests that watch it. A mutant too weak to kill proves nothing about the test and is recorded as such, not quietly replaced with an easier one.
-- [ ] Where a mutant is expected to be killed and is not, record which — an unkillable `$l >= 0.45` mutant is evidence the threshold is unreachable, not evidence the test is weak. Both readings are findings; guessing between them is not.
+- [x] Record what did **not** move. The phrasing matters: *"Nothing else moved"* is the claim that a mutant killed exactly the tests that watch it. A mutant too weak to kill proves nothing about the test and is recorded as such, not quietly replaced with an easier one.
+- [x] Where a mutant is expected to be killed and is not, record which — an unkillable `$l >= 0.45` mutant is evidence the threshold is unreachable, not evidence the test is weak. Both readings are findings; guessing between them is not.
 
 ### Fixture Provenance
 
