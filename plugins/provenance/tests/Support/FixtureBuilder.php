@@ -40,9 +40,53 @@ class FixtureBuilder
     /** physical albums this fixture created: id => absolute directory */
     private array $physicalAlbums = array();
 
+    /**
+     * The piwigo_config row that marks an install as expendable.
+     *
+     * Written by create-test-users.php, which is already documented as never
+     * safe to point at production. Nothing else writes it, so a real install
+     * cannot acquire it by accident.
+     */
+    private const THROWAWAY_PARAM = 'provenance_throwaway_install';
+
     public function __construct(Db $db)
     {
         $this->db = $db;
+        self::assertThrowawayInstall($db);
+    }
+
+    /**
+     * Refuses to build a fixture against an install that has not been declared
+     * expendable.
+     *
+     * This suite deletes albums and photos through core, drives the filesystem
+     * sync, and rewrites image files. On 2026-08-29 an install holding real
+     * scans lost every photo row and every original file during a Phase 9 test
+     * run; the deleting code path was never identified, because Piwigo logs no
+     * activity for delete_elements() and the database had neither binary nor
+     * general logging on. A guard narrowed to one suspected path would have
+     * been a guard on the wrong thing, so this one is unconditional: the suites
+     * run only where losing the content costs nothing.
+     *
+     * Fails closed. An install without the marker gets a message naming the
+     * script that sets it, never a run.
+     */
+    public static function assertThrowawayInstall(Db $db): void
+    {
+        $marker = $db->scalar(
+            "SELECT value FROM piwigo_config WHERE param = '" . $db->escape(self::THROWAWAY_PARAM) . "'"
+        );
+
+        if ((string)$marker !== '1')
+        {
+            throw new RuntimeException(
+                "This install is not marked as a throwaway, and the provenance suites destroy content.\n" .
+                "They delete albums and photos through core, drive the filesystem sync and rewrite image files.\n" .
+                "Run them only against an install whose gallery you can afford to lose, and mark it with:\n" .
+                "  ddev exec php plugins/provenance/tests/Support/create-test-users.php\n" .
+                "Never mark a production install."
+            );
+        }
     }
 
     public function columnExists(string $table, string $column): bool

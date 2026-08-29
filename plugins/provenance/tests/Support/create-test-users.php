@@ -10,6 +10,12 @@
  * webmaster session - which is the thing this script exists to hand out.
  *
  * Passwords are generated, printed nowhere, and land only in a git-ignored file.
+ *
+ * It also marks the install as a throwaway. The provenance suites delete albums
+ * and photos through core, drive the filesystem sync and rewrite image files,
+ * and FixtureBuilder refuses to run without that marker - so this script is the
+ * single place that says "losing this gallery costs nothing".
+ *
  * Never point this at a production database.
  */
 
@@ -28,6 +34,20 @@ $template = $db->query('SELECT * FROM piwigo_user_infos ORDER BY user_id LIMIT 1
 if ($template === null)
 {
     fwrite(STDERR, "No user_infos row to take defaults from - is this a real Piwigo install?\n");
+    exit(1);
+}
+
+// Declares the install expendable. FixtureBuilder refuses to build a fixture
+// without this row; see assertThrowawayInstall() for what the suites do to a
+// gallery and why the guard is unconditional.
+$db->query(
+    "INSERT INTO piwigo_config (param, value, comment)
+     VALUES ('provenance_throwaway_install', '1', 'Set by plugins/provenance/tests/Support/create-test-users.php. The provenance suites destroy gallery content; never set this on a production install.')
+     ON DUPLICATE KEY UPDATE value = '1'"
+);
+if ((string)$db->scalar("SELECT value FROM piwigo_config WHERE param = 'provenance_throwaway_install'") !== '1')
+{
+    fwrite(STDERR, "Could not mark this install as a throwaway; the suites will refuse to run.\n");
     exit(1);
 }
 
