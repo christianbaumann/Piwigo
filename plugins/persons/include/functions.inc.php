@@ -1,0 +1,471 @@
+<?php
+defined('PERSONS_PATH') or die('Hacking attempt!');
+
+/*
+ * Pure helpers and constants. This file declares functions and constants and
+ * nothing else, so the unit suite can include it with no database and no Piwigo
+ * bootstrap. maintain.class.php, the web-service handlers and the tests all read
+ * the schema and the coordinate rules from here rather than each carrying a copy.
+ *
+ * ---------------------------------------------------------------------------
+ * The coordinate contract, stated once and referenced everywhere else.
+ *
+ * Stored: normalized [0..1], CENTER origin, PRE-rotation. That is what MWG
+ * declares normative, and what every other reader of these files expects.
+ * Rendering converts to a top-left corner and multiplies by the element's
+ * measured box; nothing else in this plugin invents a second convention.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Width of piwigo_persons.name and .url_name. */
+define('PERSONS_NAME_MAX_BYTES', 255);
+
+/**
+ * The smallest box that may be drawn, as a fraction of each axis.
+ *
+ * A fraction rather than a pixel count on purpose: the picture page renders a
+ * derivative whose pixel size changes with the window, so a pixel minimum would
+ * mean a different real-world box at every width.
+ */
+define('PERSONS_MIN_BOX_FRACTION', 0.01);
+
+/**
+ * How far a region's AppliedToDimensions aspect ratio may drift from the
+ * image's current one before the region is shown as possibly out of date.
+ *
+ * Not zero: a proportional resize goes through integer pixel dimensions, so
+ * 4000x3000 -> 1999x1499 is the same picture with a ratio that no longer
+ * matches to the last decimal.
+ */
+define('PERSONS_STALE_RATIO_TOLERANCE', 0.02);
+
+/** Persons offered in the picker before the user has typed anything. */
+define('PERSONS_PICKER_RECENT_LIMIT', 10);
+
+/** Ceiling on a search result set. A wider net is capped, never refused. */
+define('PERSONS_SEARCH_MAX_RESULTS', 25);
+
+/** Photos one write-back or rescan request handles, so none can time out. */
+define('PERSONS_WRITEBACK_MAX_CHUNK', 10);
+
+/** Seconds a writer waits for another writer's lock on the same file. */
+define('PERSONS_LOCK_TIMEOUT_SECONDS', 30);
+
+/*
+ * Scratch space, mirroring plugins/provenance. Both are safe to delete when
+ * nothing is writing. Derived from PERSONS_PATH rather than PHPWG_ROOT_PATH so
+ * this file still loads with no Piwigo bootstrap, which is what lets the unit
+ * suite include it.
+ */
+define('PERSONS_LOCK_DIR',
+  dirname(dirname(rtrim(PERSONS_PATH, '/'))) . '/_data/persons/locks/');
+define('PERSONS_ARGS_DIR',
+  dirname(dirname(rtrim(PERSONS_PATH, '/'))) . '/_data/persons/args/');
+
+/**
+ * The person index table, as column name => SQL definition.
+ *
+ * id is a mediumint deliberately. The whole reason persons are not simply
+ * piwigo_tags rows is that piwigo_tags.id is a smallint, and a gallery can hold
+ * more people than that ceiling allows.
+ *
+ * @return array
+ */
+function persons_person_columns()
+{
+  return array(
+    'id'           => 'mediumint(8) unsigned NOT NULL AUTO_INCREMENT',
+    'name'         => 'varchar(' . PERSONS_NAME_MAX_BYTES . ') NOT NULL',
+    'url_name'     => 'varchar(' . PERSONS_NAME_MAX_BYTES . ') BINARY DEFAULT NULL',
+    'tag_id'       => 'smallint(5) unsigned DEFAULT NULL',
+    'lastmodified' => 'timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+    );
+}
+
+/**
+ * The region index table, as column name => SQL definition.
+ *
+ * Every row here is derived: it is rebuilt from what the image file says, and
+ * the table may be dropped and rescanned at any time without losing anything.
+ *
+ * area_* are the stored coordinate contract above. applied_* record the
+ * AppliedToDimensions the region was written against, which is the only way to
+ * tell a resized image from an untouched one. rotation_at_write records
+ * images.rotation at the same moment, which is the only way to tell a changed
+ * display transform from a physically rotated file.
+ *
+ * @return array
+ */
+function persons_region_columns()
+{
+  return array(
+    'id'                => 'int(10) unsigned NOT NULL AUTO_INCREMENT',
+    'image_id'          => 'mediumint(8) unsigned NOT NULL',
+    'person_id'         => 'mediumint(8) unsigned NOT NULL',
+    'area_x'            => 'double NOT NULL',
+    'area_y'            => 'double NOT NULL',
+    'area_w'            => 'double NOT NULL',
+    'area_h'            => 'double NOT NULL',
+    'applied_w'         => 'int(10) unsigned DEFAULT NULL',
+    'applied_h'         => 'int(10) unsigned DEFAULT NULL',
+    'rotation_at_write' => 'tinyint(3) unsigned DEFAULT NULL',
+    'region_type'       => "enum('" . implode("','", persons_region_types()) . "') NOT NULL DEFAULT 'Face'",
+    'source'            => "enum('" . implode("','", persons_region_sources()) . "') NOT NULL DEFAULT 'piwigo'",
+    );
+}
+
+/**
+ * The MWG region types. Face is what this plugin writes; the rest exist because
+ * a file may already carry them and a merge must never drop one.
+ *
+ * @return array
+ */
+function persons_region_types()
+{
+  return array('Face', 'Pet', 'Focus', 'BarCode');
+}
+
+/**
+ * Who wrote a region. 'foreign' marks one this plugin found in a file and did
+ * not create, which is what keeps a merge from treating it as ours to rewrite.
+ *
+ * @return array
+ */
+function persons_region_sources()
+{
+  return array('piwigo', 'foreign');
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Coordinate math. Pure, and the single implementation of the contract above.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * MWG center origin -> top-left corner, both normalized.
+ *
+ * @param float $x centre x
+ * @param float $y centre y
+ * @param float $w
+ * @param float $h
+ * @return array left, top, w, h
+ */
+function persons_center_to_corner($x, $y, $w, $h)
+{
+  return array(
+    'left' => $x - $w / 2,
+    'top'  => $y - $h / 2,
+    'w'    => $w,
+    'h'    => $h,
+    );
+}
+
+/**
+ * Top-left corner -> MWG center origin, both normalized. The inverse of
+ * persons_center_to_corner().
+ *
+ * @param float $l
+ * @param float $t
+ * @param float $w
+ * @param float $h
+ * @return array x, y, w, h
+ */
+function persons_corner_to_center($l, $t, $w, $h)
+{
+  return array(
+    'x' => $l + $w / 2,
+    'y' => $t + $h / 2,
+    'w' => $w,
+    'h' => $h,
+    );
+}
+
+/**
+ * Applies the MWG rule for a region that does not fit the image.
+ *
+ * A region whose CENTRE is outside [0..1] describes a subject that is not in
+ * the picture at all and is dropped. A region whose centre is inside but whose
+ * box overruns an edge is clipped to the edge - the subject is there, the
+ * writer merely recorded a box larger than the frame.
+ *
+ * @param array $region x, y, w, h (plus any other keys, preserved)
+ * @return array|null the clipped region, or null when it must be dropped
+ */
+function persons_clip_region($region)
+{
+  $x = (float)$region['x'];
+  $y = (float)$region['y'];
+  $w = (float)$region['w'];
+  $h = (float)$region['h'];
+
+  if ($x < 0 or $x > 1 or $y < 0 or $y > 1)
+  {
+    return null;
+  }
+
+  if ($w <= 0 or $h <= 0)
+  {
+    return null;
+  }
+
+  $corner = persons_center_to_corner($x, $y, $w, $h);
+
+  $left   = max(0, $corner['left']);
+  $top    = max(0, $corner['top']);
+  $right  = min(1, $corner['left'] + $corner['w']);
+  $bottom = min(1, $corner['top'] + $corner['h']);
+
+  $centred = persons_corner_to_center($left, $top, $right - $left, $bottom - $top);
+
+  return array_merge($region, $centred);
+}
+
+/**
+ * Rotates a normalized centre-origin region by an images.rotation code.
+ *
+ * images.rotation is a code 0..3 meaning quarter turns clockwise, not degrees -
+ * see include/derivative.inc.php:74-92, which reads it the same way and swaps
+ * width and height for the odd codes. Anything outside 0..3 is taken modulo 4,
+ * matching core; a negative code is treated as no rotation, because core never
+ * produces one and guessing a direction for it would be inventing behaviour.
+ *
+ * @param array $region x, y, w, h (plus any other keys, preserved)
+ * @param int $rotation_code
+ * @return array
+ */
+function persons_rotate_region($region, $rotation_code)
+{
+  $code = (int)$rotation_code;
+
+  if ($code < 0)
+  {
+    $code = 0;
+  }
+  $code = $code % 4;
+
+  $x = (float)$region['x'];
+  $y = (float)$region['y'];
+  $w = (float)$region['w'];
+  $h = (float)$region['h'];
+
+  for ($turn = 0; $turn < $code; $turn++)
+  {
+    // One quarter turn clockwise: (x, y) -> (1 - y, x), and the axes swap.
+    $rotated = array('x' => 1 - $y, 'y' => $x, 'w' => $h, 'h' => $w);
+    $x = $rotated['x'];
+    $y = $rotated['y'];
+    $w = $rotated['w'];
+    $h = $rotated['h'];
+  }
+
+  return array_merge($region, array('x' => $x, 'y' => $y, 'w' => $w, 'h' => $h));
+}
+
+/**
+ * Whether a region's recorded AppliedToDimensions no longer describes the image.
+ *
+ * Compared as an aspect ratio, not as pixel counts: a proportional downscale
+ * leaves every region correct and must not be flagged, while a crop moves every
+ * region and must be. Unknown applied dimensions are never called stale -
+ * digiKam omits AppliedToDimensions entirely (bug 429219), and treating absent
+ * as wrong would flag every file it wrote.
+ *
+ * @param int|null $applied_w
+ * @param int|null $applied_h
+ * @param int|null $image_w
+ * @param int|null $image_h
+ * @return bool
+ */
+function persons_region_is_stale($applied_w, $applied_h, $image_w, $image_h)
+{
+  $applied_w = (float)$applied_w;
+  $applied_h = (float)$applied_h;
+  $image_w   = (float)$image_w;
+  $image_h   = (float)$image_h;
+
+  if ($applied_w <= 0 or $applied_h <= 0 or $image_w <= 0 or $image_h <= 0)
+  {
+    return false;
+  }
+
+  $applied_ratio = $applied_w / $applied_h;
+  $image_ratio   = $image_w / $image_h;
+
+  return abs($applied_ratio - $image_ratio) > PERSONS_STALE_RATIO_TOLERANCE;
+}
+
+/**
+ * The rotation the stored regions must be corrected by, or 0 for none.
+ *
+ * Two different events look alike in the database and must not be conflated:
+ *
+ *   images.rotation changed but the file's dimensions still match what the
+ *   regions were written against - only the DISPLAY transform changed. MWG
+ *   stores regions prior to Exif Orientation, so the stored regions are still
+ *   correct and rewriting them would corrupt them.
+ *
+ *   the file's dimensions are the TRANSPOSE of applied_w/applied_h - the file
+ *   was physically rotated by something outside Piwigo, and every region has to
+ *   turn with it.
+ *
+ * Anything else (a crop, a non-proportional resize) is left alone; staleness
+ * already covers it.
+ *
+ * @param int|null $stored_rotation images.rotation when the regions were written
+ * @param int|null $current_rotation images.rotation now
+ * @param int|null $applied_w AppliedToDimensions width at write time
+ * @param int|null $applied_h AppliedToDimensions height at write time
+ * @param int|null $file_w the file's width now
+ * @param int|null $file_h the file's height now
+ * @return int 0..3
+ */
+function persons_rotation_delta($stored_rotation, $current_rotation,
+                                $applied_w, $applied_h, $file_w, $file_h)
+{
+  $applied_w = (int)$applied_w;
+  $applied_h = (int)$applied_h;
+  $file_w    = (int)$file_w;
+  $file_h    = (int)$file_h;
+
+  if ($applied_w <= 0 or $applied_h <= 0 or $file_w <= 0 or $file_h <= 0)
+  {
+    return 0;
+  }
+
+  // A square image transposes onto itself, so a physical rotation of one is
+  // indistinguishable from no rotation at all. Reporting a delta here would be
+  // a guess, and a wrong guess rewrites correct data.
+  if ($applied_w === $applied_h)
+  {
+    return 0;
+  }
+
+  if (!($file_w === $applied_h and $file_h === $applied_w))
+  {
+    return 0;
+  }
+
+  $delta = ((int)$current_rotation - (int)$stored_rotation) % 4;
+  if ($delta < 0)
+  {
+    $delta += 4;
+  }
+
+  return $delta;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Names and input validation.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * A person's name as it may be stored: no markup, no newlines, single spaces,
+ * and short enough for the column.
+ *
+ * Newlines are flattened rather than rejected because the name reaches exiftool
+ * inside a JSON argfile, where a raw newline is a different value than the one
+ * the user typed.
+ *
+ * @param string $raw
+ * @return string the cleaned name, or '' when nothing usable is left
+ */
+function persons_clean_name($raw)
+{
+  $name = strip_tags((string)$raw);
+  $name = preg_replace('/\s+/u', ' ', $name);
+  $name = trim((string)$name);
+
+  if ($name === '')
+  {
+    return '';
+  }
+
+  if (strlen($name) > PERSONS_NAME_MAX_BYTES)
+  {
+    // Cut on a character boundary, never mid-sequence: a truncated UTF-8
+    // sequence is not a shorter name, it is an invalid string.
+    $name = mb_strcut($name, 0, PERSONS_NAME_MAX_BYTES, 'UTF-8');
+    $name = trim($name);
+  }
+
+  return $name;
+}
+
+/**
+ * Whether a value is usable as one of the normalized coordinates.
+ *
+ * @param mixed $value
+ * @return bool
+ */
+function persons_is_valid_normalized($value)
+{
+  if (is_bool($value) or is_array($value) or $value === null or $value === '')
+  {
+    return false;
+  }
+
+  if (!is_numeric($value))
+  {
+    return false;
+  }
+
+  $number = (float)$value;
+
+  if (!is_finite($number))
+  {
+    return false;
+  }
+
+  return $number >= 0 and $number <= 1;
+}
+
+/**
+ * Whether a drawn box is large enough to be a deliberate box rather than a
+ * stray click. Both axes must clear the minimum, not either one.
+ *
+ * @param float $w
+ * @param float $h
+ * @return bool
+ */
+function persons_minimum_box_ok($w, $h)
+{
+  return (float)$w >= PERSONS_MIN_BOX_FRACTION and (float)$h >= PERSONS_MIN_BOX_FRACTION;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Working-area paths. Pure string builders; nothing here touches the disk.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * The lock file guarding one image against a concurrent exiftool write.
+ *
+ * A separate file, never the image itself: exiftool replaces the image by
+ * rename, so a lock held on the old inode would exclude nothing from the second
+ * writer onwards.
+ *
+ * @param string $image_path the path as piwigo_images stores it
+ * @return string
+ */
+function persons_lock_path($image_path)
+{
+  return PERSONS_LOCK_DIR . sha1($image_path) . '.lock';
+}
+
+/**
+ * The directory holding one write operation's exiftool argfiles.
+ *
+ * Per operation rather than per file, so a crashed run leaves at most one
+ * directory behind instead of orphan files nobody can attribute.
+ *
+ * @param string $operation_id
+ * @return string
+ */
+function persons_operation_dir($operation_id)
+{
+  return PERSONS_ARGS_DIR . $operation_id . '/';
+}

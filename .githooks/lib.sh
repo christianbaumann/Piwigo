@@ -15,4 +15,5 @@ VACUOUS_PATTERN='|| true'
 UNIT_SUITES=(
   "plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml"
   "plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml"
+  "plugins/persons/vendor/bin/phpunit --testsuite unit --configuration plugins/persons/phpunit.xml"
 )

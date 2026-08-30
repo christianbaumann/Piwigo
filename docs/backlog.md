@@ -1,4 +1,4 @@
-- build a person tagging system
+- search function by: tag, person
 - save labels/ tags in the image meta data
 - enforce a 1:1 photo-album relationship (core allows many-to-many via `piwigo_image_category`; freetext-per-album assumes 1:1)
 - (low prio) provenance: make `owner` a reference to a people table, so "all photos provided by X" is queryable — distinct from person tagging (who is depicted)

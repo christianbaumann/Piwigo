@@ -4,6 +4,7 @@
 !/plugins/index.php
 !/plugins/typetags
 !/plugins/provenance
+!/plugins/persons
 /themes/*
 !/themes/index.php
 !/themes/default

@@ -1,0 +1,6 @@
+{
+  "name": "christianbaumann/piwigo-persons",
+  "description": "Person / face tagging plugin for Piwigo",
+  "require-dev": { "phpunit/phpunit": "^13.3" },
+  "config": { "sort-packages": true }
+}
