@@ -34,7 +34,7 @@ ddev mysql                 # DB shell (database/user/password all `db`, host `db
 ddev logs -f
 ```
 
-No build step for the application itself — PHP is served directly from the repo root. The only dependency managers are the per-plugin `composer.json` / `package.json` files in `plugins/typetags` and `plugins/provenance`, all dev-only (test runners; see Testing).
+No build step for the application itself — PHP is served directly from the repo root. The only dependency managers are the per-plugin `composer.json` / `package.json` files in `plugins/typetags`, `plugins/provenance` and `plugins/persons`, all dev-only (test runners; see Testing).
 
 `exiftool` is available in the web container via `webimage_extra_packages` in `.ddev/config.yaml`
 (the provenance plugin's write-back needs it); production has it preinstalled.
@@ -84,7 +84,7 @@ non-coverage table, the unit suite's mutant table, and the hand-check ledger of 
 oracle. Check it before adding a test — an omission there may be a recorded decision rather
 than a gap.
 
-Piwigo core has no test suite. Both plugins carry a PHPUnit suite and a Playwright suite of their own (`plugins/typetags/`, `plugins/provenance/`). The typetags commands:
+Piwigo core has no test suite. All three plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`); the first two also carry a Playwright suite. The typetags commands:
 
 ```bash
 # Unit — pure functions, no DDEV, no DB, no HTTP
@@ -99,7 +99,7 @@ ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
   cd plugins/typetags && npx playwright test'
 ```
 
-Neither plugin's suite takes a human's login. Each creates its own accounts with generated passwords — see *Test accounts* in `.claude/rules/testing.md`:
+No plugin's suite takes a human's login. Each creates its own accounts with generated passwords — see *Test accounts* in `.claude/rules/testing.md`:
 
 ```bash
 # once per install (also rotates the passwords)
@@ -124,12 +124,32 @@ ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   cd plugins/provenance && npx playwright test'
 ```
 
-Both plugins share one pinned browser cache: `PLAYWRIGHT_BROWSERS_PATH` in `.ddev/config.yaml`
+All three plugins share one pinned browser cache: `PLAYWRIGHT_BROWSERS_PATH` in `.ddev/config.yaml`
 points at `plugins/typetags/.playwright-browsers`, so a fresh clone installs browsers once.
 
 That script writes the git-ignored `local/config/provenance-test.env` and creates
 `provenance_webmaster` and `provenance_normal`. It writes users directly and is never safe
 against a production database.
+
+The persons suite works the same way:
+
+```bash
+# once per install (also rotates the passwords)
+ddev exec php plugins/persons/tests/Support/create-test-users.php
+
+ddev exec plugins/persons/vendor/bin/phpunit --testsuite unit --configuration plugins/persons/phpunit.xml
+ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
+  plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'
+```
+
+It writes the git-ignored `local/config/persons-test.env` and creates `persons_webmaster` and
+`persons_normal`, and marks the install with a `persons_throwaway_install` config row that
+`FixtureBuilder` refuses to run without. Never point it at a production database.
+
+`plugins/persons` has **no** Playwright specs yet — it renders nothing a browser can observe
+until the public overlay lands. `npx playwright test` there exits 1 with `No tests found`, which
+is the correct output rather than a broken harness; see
+`docs/agents/decisions/0017-no-e2e-tests-for-persons-phases-1-to-4.md`.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
 
@@ -152,7 +172,7 @@ Browser-level verification is done with `uvx rodney` (drive Chrome) and `uvx sho
 
 ### No lint, no CI
 
-Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags` and `plugins/provenance` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
+Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags`, `plugins/provenance` and `plugins/persons` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
 
 The mechanical checks available are:
 
@@ -259,7 +279,7 @@ Generated on demand by `i.php`, cached in `_data/i/`. Size definitions and defau
 
 ### Git-ignored working state
 
-`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
+`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
 
 `local/config/config.inc.php` and `local/config/database.inc.php` are git-ignored and hold the install's overrides and DB credentials.
 

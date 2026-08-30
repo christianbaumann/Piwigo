@@ -343,9 +343,9 @@ like the other two plugins. `bash tools/test-hooks.sh` must still pass.
 - [x] `git status` shows the plugin directory as tracked (the `.gitignore` `!` entry works)
 
 #### Manual Verification:
-- [ ] Plugin appears in Admin > Plugins, activates without error, and `SHOW TABLES LIKE 'piwigo_person%'` returns both tables
-- [ ] Deactivate then activate again — no error (install is re-entrant)
-- [ ] Uninstall drops both tables
+- [x] Plugin appears in Admin > Plugins, activates without error, and `SHOW TABLES LIKE 'piwigo_person%'` returns both tables
+- [x] Deactivate then activate again — no error (install is re-entrant)
+- [x] Uninstall drops both tables
 
 **Implementation Note**: pause for manual confirmation before Phase 2.
 
@@ -570,11 +570,12 @@ localStorage. Persons are personal data and the list is not bounded by a smallin
 of them to every browser is the wrong trade.
 
 #### [ ] 4. Decision file
-**File**: `docs/agents/decisions/0017-person-region-permission-model.md`
+**File**: `docs/agents/decisions/NNNN-person-region-permission-model.md`
 **Changes**: record that person writes gate on non-guest + `pwg_token` + per-image visibility,
 that this deliberately goes beyond decision 0005, that a hidden image answers 404 not 403, and that
 rename/delete/rescan are `admin_only` because they affect every photo at once.
-(Confirm the next free number against `docs/agents/decisions/` at implementation time.)
+(Confirm the next free number against `docs/agents/decisions/` at implementation time. Phase 1
+took 0017 and 0018.)
 
 ### Success Criteria:
 

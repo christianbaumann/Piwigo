@@ -148,6 +148,12 @@ ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
 ddev exec php plugins/provenance/tests/Support/create-test-users.php
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
+# persons: create the test accounts once, then source them
+ddev exec php plugins/persons/tests/Support/create-test-users.php
+ddev exec plugins/persons/vendor/bin/phpunit --testsuite unit --configuration plugins/persons/phpunit.xml
+ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
+  plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'
+# persons has no E2E specs yet - see decisions/0017
 # provenance E2E (DDEV up; the album properties screen is admin-only)
 ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   cd plugins/provenance && npx playwright test'
