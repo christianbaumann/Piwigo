@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS `' . $this->region_table . '` (
     // CREATE TABLE IF NOT EXISTS never touches one.
     $this->add_missing_columns($this->persons_table, persons_person_columns());
     $this->add_missing_columns($this->region_table, persons_region_columns());
+
+    $this->add_display_info_key();
   }
 
   function update($old_version, $new_version, &$errors=array())
@@ -74,10 +76,89 @@ CREATE TABLE IF NOT EXISTS `' . $this->region_table . '` (
    */
   function uninstall()
   {
+    $this->drop_display_info_key();
     $this->drop_orphan_mirrored_tags();
 
     pwg_query('DROP TABLE IF EXISTS `' . $this->region_table . '`;');
     pwg_query('DROP TABLE IF EXISTS `' . $this->persons_table . '`;');
+  }
+
+  /*
+   * -------------------------------------------------------------------------
+   * Visibility of the public person row.
+   *
+   * Core's own picture-page rows are switched by $conf['picture_informations'],
+   * a serialized map edited on Administration > Configuration > Display. One
+   * more key is seeded into that map on install and taken out again on
+   * uninstall, so the row is switchable where an administrator already looks -
+   * the same trade plugins/provenance makes, recorded in
+   * docs/agents/decisions/0010-provenance-row-visibility-key.md.
+   *
+   * An install that already carries the key is left alone: it holds the
+   * administrator's choice, and a reinstall must not switch the row back on
+   * behind their back.
+   * -------------------------------------------------------------------------
+   */
+
+  private function add_display_info_key()
+  {
+    $map = $this->display_info();
+
+    if ($map === null or array_key_exists(PERSONS_DISPLAY_INFO_KEY, $map))
+    {
+      return;
+    }
+
+    $map[PERSONS_DISPLAY_INFO_KEY] = true;
+    $this->save_display_info($map);
+  }
+
+  /** Takes the key out again, so an uninstall leaves core's map as it found it. */
+  private function drop_display_info_key()
+  {
+    $map = $this->display_info();
+
+    if ($map === null or !array_key_exists(PERSONS_DISPLAY_INFO_KEY, $map))
+    {
+      return;
+    }
+
+    unset($map[PERSONS_DISPLAY_INFO_KEY]);
+    $this->save_display_info($map);
+  }
+
+  /**
+   * The visibility map, or null when this install has none to extend.
+   *
+   * @return array|null
+   */
+  private function display_info()
+  {
+    global $conf;
+
+    if (!isset($conf[PERSONS_DISPLAY_INFO_PARAM]))
+    {
+      return null;
+    }
+
+    $map = unserialize($conf[PERSONS_DISPLAY_INFO_PARAM]);
+
+    return is_array($map) ? $map : null;
+  }
+
+  /**
+   * @param array $map
+   */
+  private function save_display_info($map)
+  {
+    global $conf;
+
+    conf_update_param(PERSONS_DISPLAY_INFO_PARAM, $map);
+
+    // $conf holds the serialized string, which is what picture.php unserializes;
+    // letting conf_update_param() put the array there instead would break the
+    // page for the rest of this request.
+    $conf[PERSONS_DISPLAY_INFO_PARAM] = serialize($map);
   }
 
   /**

@@ -44,6 +44,14 @@ if (!isset($conf['persons_exiftool_path']))
 
 add_event_handler('ws_add_methods', 'persons_add_methods');
 
+// The public overlay and person row. Registered only on the picture page, and
+// the file behind them is pulled in only when the event actually fires.
+if (script_basename() == 'picture')
+{
+  add_event_handler('loc_end_picture', 'persons_picture_overlay',
+    EVENT_HANDLER_PRIORITY_NEUTRAL, PERSONS_PATH . 'include/events_public.inc.php');
+}
+
 /**
  * Registers the plugin's web-service methods.
  *

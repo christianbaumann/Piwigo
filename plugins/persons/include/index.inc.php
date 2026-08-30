@@ -240,6 +240,29 @@ function persons_touch_persons($regions)
 }
 
 /**
+ * This image's indexed regions, newest person data joined in.
+ *
+ * The one place the region rows are read. Both the web-service payload and the
+ * public picture page go through it, so a column added here reaches both and
+ * neither can drift into reading a different set.
+ *
+ * @param int $image_id
+ * @return array rows, ordered by region id
+ */
+function persons_indexed_regions($image_id)
+{
+  return query2array('
+SELECT r.id, r.person_id, p.name, p.url_name, p.tag_id,
+       r.area_x, r.area_y, r.area_w, r.area_h,
+       r.applied_w, r.applied_h, r.region_type, r.source
+  FROM '.PERSONS_REGION_TABLE.' AS r
+  JOIN '.PERSONS_TABLE.' AS p ON p.id = r.person_id
+  WHERE r.image_id = '.(int)$image_id.'
+  ORDER BY r.id
+;');
+}
+
+/**
  * images.rotation for an image, as the code 0..3 core stores.
  *
  * @param int $image_id

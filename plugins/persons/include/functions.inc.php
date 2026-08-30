@@ -65,6 +65,40 @@ define('PERSONS_LOCK_DIR',
 define('PERSONS_ARGS_DIR',
   dirname(dirname(rtrim(PERSONS_PATH, '/'))) . '/_data/persons/args/');
 
+/*
+ * ---------------------------------------------------------------------------
+ * The public picture page.
+ *
+ * Two prefilter anchors, both plain string matches against
+ * themes/default/template/picture.tpl. tests/Unit/PicturePageAnchorTest.php is
+ * the guard: a moved anchor injects nothing and the page renders perfectly
+ * without the feature, which no other layer would report.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * The overlay's anchor: the photo element itself.
+ *
+ * The prefilter *wraps* this one rather than prepending to it. Nothing above
+ * #theMainImage declares position: relative, so the wrapper is what gives the
+ * absolutely positioned boxes a box to be positioned in.
+ */
+define('PERSONS_TPL_INJECT_POINT', '{$ELEMENT_CONTENT}');
+
+/**
+ * The person row's anchor: the close of <dl id="standard">.
+ *
+ * The same point plugins/provenance injects at. Both prepend and keep the
+ * anchor, so whichever prefilter runs second still finds it.
+ */
+define('PERSONS_TPL_ROW_INJECT_POINT', "{/strip}\n</dl>");
+
+/** The config parameter holding the picture page's row-visibility map. */
+define('PERSONS_DISPLAY_INFO_PARAM', 'picture_informations');
+
+/** This plugin's key inside that map. */
+define('PERSONS_DISPLAY_INFO_KEY', 'persons');
+
 /**
  * The person index table, as column name => SQL definition.
  *
@@ -945,6 +979,21 @@ function persons_prepare_region_for_write($region)
     'h'    => $clipped['h'],
     'type' => $type,
     );
+}
+
+/**
+ * A normalized fraction as the CSS percentage the box is laid out with.
+ *
+ * Fixed precision rather than PHP's float-to-string: 0.4 - 0.1 / 2 prints as
+ * 34.999999999999996, and four decimals of a percent is a hundredth of a pixel
+ * on a 1000px photo - far below what the 2px E2E tolerance can see.
+ *
+ * @param float $fraction
+ * @return string
+ */
+function persons_percent($fraction)
+{
+  return sprintf('%.4F', $fraction * 100) . '%';
 }
 
 /**

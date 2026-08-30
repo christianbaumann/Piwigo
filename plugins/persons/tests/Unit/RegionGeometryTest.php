@@ -374,4 +374,43 @@ final class RegionGeometryTest extends TestCase
     {
         $this->assertSame(0, persons_rotation_delta(0, 1, null, null, 3000, 4000));
     }
+
+    // ── fraction to CSS percentage ────────────────────────────────────────
+
+    /** [HAPPY] A fraction becomes a percentage with a unit CSS accepts. */
+    public function testAFractionBecomesACssPercentage(): void
+    {
+        $this->assertSame('25.0000%', persons_percent(0.25));
+    }
+
+    /** [BVA] Zero and one are the ends of the range and keep the unit. */
+    public function testZeroAndOneKeepTheUnit(): void
+    {
+        $this->assertSame('0.0000%', persons_percent(0));
+        $this->assertSame('100.0000%', persons_percent(1));
+    }
+
+    /**
+     * [ERR] The float artefact this helper exists for.
+     *
+     * 0.4 - 0.2 / 2 is 0.30000000000000004 in binary floating point, and PHP's
+     * own float-to-string would put all of it into the style attribute. Fixed
+     * precision is what keeps the markup readable and the page source stable
+     * enough to assert on.
+     */
+    public function testAFloatArtefactIsRoundedAway(): void
+    {
+        $corner = persons_center_to_corner(0.4, 0.5, 0.2, 0.2);
+
+        $this->assertSame('30.0000%', persons_percent($corner['left']));
+    }
+
+    /**
+     * [BVA] Four decimals of a percent is a hundredth of a pixel on a 1000px
+     * photo - two boxes a pixel apart still round to different percentages.
+     */
+    public function testTwoFractionsOnePixelApartDoNotRoundTogether(): void
+    {
+        $this->assertNotSame(persons_percent(0.5), persons_percent(0.5 + 1 / 1000));
+    }
 }

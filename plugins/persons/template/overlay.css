@@ -1,0 +1,94 @@
+/*
+ * The person region overlay on the public picture page.
+ *
+ * #persons-stage is injected around {$ELEMENT_CONTENT} by the picture-page
+ * prefilter. It exists for one reason: nothing above #theMainImage declares
+ * position: relative, so without it the absolutely positioned overlay would be
+ * placed against the viewport.
+ */
+
+#persons-stage {
+	position: relative;
+	display: block;
+}
+
+/*
+ * Sized and offset in pixels by overlay.js from the photo's measured box, never
+ * by CSS: the displayed size changes with the derivative rvas_choose() picks.
+ *
+ * pointer-events: none keeps the theme's click-to-navigate handler and the
+ * <area> map underneath working untouched - a click anywhere on the photo,
+ * including on a box, reaches the image exactly as it did before the plugin.
+ * The cost is that a box cannot be hovered; the name label opts back in below,
+ * and is what triggers the dimming.
+ *
+ * overflow: hidden clips the dimming shadow to the photo instead of letting it
+ * darken the whole page.
+ */
+#persons-overlay {
+	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.person-box {
+	position: absolute;
+	box-sizing: border-box;
+	border: 2px solid rgba(255, 255, 255, 0.9);
+	border-radius: 2px;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+	opacity: 0;
+	transition: opacity 0.15s ease-in-out;
+}
+
+/* Boxes stay out of the way until the visitor looks at the photo. */
+#persons-stage:hover .person-box {
+	opacity: 1;
+}
+
+/*
+ * A region whose AppliedToDimensions no longer matches the image. MWG says a
+ * consumer SHOULD ignore such a region; a gallery owner is better served by
+ * seeing it flagged than by having it silently disappear.
+ */
+.person-box-stale {
+	border-style: dashed;
+	opacity: 0;
+}
+
+#persons-stage:hover .person-box-stale {
+	opacity: 0.5;
+}
+
+.person-box-label {
+	position: absolute;
+	left: 50%;
+	bottom: 0;
+	transform: translateX(-50%);
+	max-width: 100%;
+	padding: 1px 6px;
+	background: rgba(0, 0, 0, 0.65);
+	color: #fff;
+	font-size: 0.8em;
+	line-height: 1.5;
+	white-space: nowrap;
+	text-decoration: none;
+	pointer-events: auto;
+}
+
+.person-box-label:hover {
+	background: rgba(0, 0, 0, 0.85);
+	color: #fff;
+}
+
+/*
+ * Everything outside the hovered box goes dark. One shadow with a spread larger
+ * than any photo, clipped by the overlay - no second element to keep in sync
+ * with the box it belongs to.
+ */
+.person-box:has(.person-box-label:hover) {
+	opacity: 1;
+	box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+}

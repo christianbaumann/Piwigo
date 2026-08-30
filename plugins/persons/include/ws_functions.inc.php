@@ -111,15 +111,7 @@ function persons_regions_payload($image_id)
     return persons_no_such_image();
   }
 
-  $rows = query2array('
-SELECT r.id, r.person_id, p.name, p.url_name, p.tag_id,
-       r.area_x, r.area_y, r.area_w, r.area_h,
-       r.applied_w, r.applied_h, r.region_type, r.source
-  FROM '.PERSONS_REGION_TABLE.' AS r
-  JOIN '.PERSONS_TABLE.' AS p ON p.id = r.person_id
-  WHERE r.image_id = '.(int)$image_id.'
-  ORDER BY r.id
-;');
+  $rows = persons_indexed_regions($image_id);
 
   $regions = array();
   foreach ($rows as $row)

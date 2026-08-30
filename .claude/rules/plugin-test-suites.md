@@ -17,7 +17,7 @@ non-coverage table, the unit suite's mutant table, and the hand-check ledger of 
 oracle. Check it before adding a test — an omission there may be a recorded decision rather
 than a gap.
 
-Piwigo core has no test suite. All three plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`); the first two also carry a Playwright suite. The typetags commands:
+Piwigo core has no test suite. All three plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`), and all three carry a Playwright suite. The typetags commands:
 
 ```bash
 # Unit — pure functions, no DDEV, no DB, no HTTP
@@ -73,6 +73,10 @@ ddev exec php plugins/persons/tests/Support/create-test-users.php
 ddev exec plugins/persons/vendor/bin/phpunit --testsuite unit --configuration plugins/persons/phpunit.xml
 ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
   plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'
+
+# E2E - drives Chromium in the container against the public picture page
+ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
+  cd plugins/persons && npx playwright test'
 ```
 
 It writes the git-ignored `local/config/persons-test.env` and creates `persons_webmaster` and
@@ -87,10 +91,19 @@ would pass for the wrong reason. `FixtureBuilder::invalidateUserCache()` does it
 the rows on the next request, so nothing is left broken, but every user's cached tag and photo
 counts are rebuilt once after a run.
 
-`plugins/persons` has **no** Playwright specs yet — it renders nothing a browser can observe
-until the public overlay lands. `npx playwright test` there exits 1 with `No tests found`, which
-is the correct output rather than a broken harness; see
-`docs/agents/decisions/0017-no-e2e-tests-for-persons-phases-1-to-4.md`.
+`plugins/persons` got its first Playwright specs with the public overlay in Phase 5;
+`docs/agents/decisions/0017-no-e2e-tests-for-persons-phases-1-to-4.md` records why the four phases
+before it had none, and still holds for them. Unlike the other two suites, persons' `auth.setup.js`
+logs in as `persons_normal` rather than the webmaster: the overlay is shown to any logged-in
+non-guest, and running it as an administrator would hide a permission mistake only a normal
+account can find.
+
+`tests/e2e/support/seed.php --scenario=overlay` creates a throwaway album and a copied photo,
+writes two MWG regions into that photo's file with a plain exiftool call, indexes them, and prints
+the box corners the specs assert against — computed with the same pure helpers the page uses, so
+no spec carries a second copy of the conversion. `--restore` deletes the album, the photo row, the
+copied file and exiftool's `_original` sidecar. It rewrites an image file in place, so it is never
+pointed at a real scan.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
 

@@ -16,10 +16,16 @@ final class CleanCheckoutTest extends TestCase
         'main.inc.php',
         'maintain.class.php',
         'include/functions.inc.php',
+        'include/events_public.inc.php',
         'include/exiftool.inc.php',
         'include/index.inc.php',
         'include/rescan.inc.php',
         'include/ws_functions.inc.php',
+        'template/public_overlay.tpl',
+        'template/public_persons.tpl',
+        'template/overlay.css',
+        'template/overlay.js',
+        'language/en_UK/plugin.lang.php',
     );
 
     /** [HAPPY] Each runtime file exists where the includes point. */

@@ -621,7 +621,7 @@ underneath them. No editing.
 
 ### Changes Required:
 
-#### [ ] 1. Injection
+#### [x] 1. Injection
 **File**: `plugins/persons/include/events_public.inc.php`
 
 ```php
@@ -648,7 +648,7 @@ The wrapper is what supplies `position: relative` — no ancestor of `#theMainIm
 CSS and JS load from inside the injected `.tpl` via `{combine_css}` / `{combine_script}`, not from
 PHP, matching `provenance`.
 
-#### [ ] 2. The overlay module
+#### [x] 2. The overlay module
 **File**: `plugins/persons/template/overlay.js`, `overlay.css`
 
 Positioning rule, stated once in the file header and implemented once:
@@ -671,14 +671,14 @@ mode so the existing click-to-navigate handler
 are hidden until hover over the stage, and hovering one box dims the area outside it — the two
 refinements research found worth copying (Immich PR #26667, #27402).
 
-#### [ ] 3. Read-only person row
+#### [x] 3. Read-only person row
 **File**: `plugins/persons/template/public_persons.tpl`
 **Changes**: a `<div id="Persons" class="imageInfo">` row inside `dl#standard`, listing the names
 as links to the mirrored tag's gallery page. Gated on core's `picture_informations` map with a
 `persons` key seeded by `maintain.class.php`, the same pattern and the same "leave an existing key
 alone" rule as `provenance`.
 
-#### [ ] 4. Structural guard
+#### [x] 4. Structural guard
 **File**: `plugins/persons/tests/Unit/PicturePageAnchorTest.php`
 **Changes**: assert `{$ELEMENT_CONTENT}` occurs **exactly once** in
 `themes/default/template/picture.tpl` and that `themes/modus/template/picture.tpl` does not exist.
@@ -688,12 +688,12 @@ exists to catch.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit + integration suites pass
-- [ ] Integration: the rendered page source contains `#persons-stage` and one `.person-box` per region
-- [ ] Integration: a guest sees no overlay markup
-- [ ] E2E: box geometry matches the region within a 2px tolerance at two different window widths,
+- [x] Unit + integration suites pass
+- [x] Integration: the rendered page source contains `#persons-stage` and one `.person-box` per region
+- [x] Integration: a guest sees no overlay markup
+- [x] E2E: box geometry matches the region within a 2px tolerance at two different window widths,
       proving the redraw survives `rvas_choose()`
-- [ ] E2E: clicking outside a box still navigates prev/next (the core handler is not broken)
+- [x] E2E: clicking outside a box still navigates prev/next (the core handler is not broken)
 
 #### Manual Verification:
 - [ ] Resize the window slowly across a derivative-switch threshold and confirm boxes track the image
@@ -1053,7 +1053,7 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [ ] `testANameContainingANewlineIsFlattened` — it reaches a JSON file `[NEG]`
 
 #### Structural guards
-- [ ] `tests/Unit/PicturePageAnchorTest.php` — `{$ELEMENT_CONTENT}` occurs exactly once in
+- [x] `tests/Unit/PicturePageAnchorTest.php` — `{$ELEMENT_CONTENT}` occurs exactly once in
       `themes/default/template/picture.tpl`, and `themes/modus/template/picture.tpl` is absent
 - [ ] `tests/Unit/PhotoTemplateAnchorTest.php` — the admin `picture_modify` anchor occurs once
 - [ ] `tests/Unit/SchemaDefinitionTest.php` — `maintain.class.php` creates exactly the columns the
@@ -1111,8 +1111,8 @@ Conditions: **E** in file, **A** in add, **R** in remove.
       `RegionInfo` are byte-identical afterwards `[ST]` `[NEG]`
 - [x] `testRemovingTheLastRegionRemovesTheImageTagRow` `[ST]` — landed in `DeleteRegionTest`
 - [x] `testRemovingOneOfTwoRegionsForTheSamePersonKeepsTheImageTagRow` `[ST]` — landed in `DeleteRegionTest`
-- [ ] `PicturePageSourceTest::testTheOverlayIsInjectedExactlyOnce` — the sub-template guard `[BVA]`
-- [ ] `PicturePageSourceTest::testAGuestSeesNoOverlay` `[NEG]`
+- [x] `PicturePageSourceTest::testTheOverlayIsInjectedExactlyOnce` — the sub-template guard `[BVA]` — landed as `testTheStageIsInjectedExactlyOnce`
+- [x] `PicturePageSourceTest::testAGuestSeesNoOverlay` `[NEG]`
 - [ ] `PluginActivationTest` — install / activate / deactivate / uninstall driven through
       `pwg.plugins.performAction`, so what is asserted is what clicking Activate actually does `[ST]`
 
@@ -1123,8 +1123,8 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [ ] `tag-person.spec.js` — Esc cancels and writes nothing `[NEG]`
 - [ ] `tag-person.spec.js` — a box below the minimum is refused with a visible message `[NEG]`
 - [ ] `tag-person.spec.js` — picking an existing person from the list writes that person `[HAPPY]`
-- [ ] `overlay.spec.js` — box geometry within tolerance at two window widths `[ST]`
-- [ ] `overlay.spec.js` — clicking outside a box still navigates (core handler intact) `[NEG]`
+- [x] `overlay.spec.js` — box geometry within tolerance at two window widths `[ST]`
+- [x] `overlay.spec.js` — clicking outside a box still navigates (core handler intact) `[NEG]`
 - [ ] `overlay.spec.js` — a stale region renders dashed and dimmed `[ECP]`
 - [ ] `overlay.spec.js` — a guest sees no button and no boxes `[NEG]`
 - [ ] `admin-persons.spec.js` — rename propagates to the gallery link and the file `[HAPPY]`
