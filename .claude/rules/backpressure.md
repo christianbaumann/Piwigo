@@ -47,6 +47,30 @@ either cites it or reads it programmatically (see "do not transcribe production 
 a test" in `test-design.md`). When two files can both plausibly hold the same fact, one of
 them is stale already; delete the copy, don't maintain two.
 
+## Documentation files have a length budget
+
+`CLAUDE.md` stays under **100 lines**; a file in `.claude/rules/` stays under **500**. These are
+hard caps, not targets — a file that exceeds one is split in the same change that made it too
+long, not later.
+
+The cap exists because `CLAUDE.md` is loaded into every session's context whether the task needs
+it or not, while a rules file is loaded only when its read-trigger matches. Length in the root
+file is therefore a tax on every task; length in a rules file is paid only by the tasks that
+need it.
+
+When a section outgrows the cap:
+
+- Move it to `.claude/rules/<topic>.md`, one topic per file, kebab-case, **verbatim** — a command
+  string reworded in transit is a command that no longer runs.
+- Link it from `CLAUDE.md` under `## Additional rules` with a **read-trigger** naming the task,
+  not the content ("read before running or adding a test in `plugins/*`"). A link with no trigger
+  is a file the agent has no cue to open — content deleted with extra steps.
+- Leave no copy behind. Two homes for one fact is the *single source of truth* violation above,
+  and the copy is always the one that goes stale.
+
+What stays in `CLAUDE.md`: what is genuinely repo-wide and needed on most tasks — the project
+overview, how to start the environment, where agent artifacts go, and the rules index itself.
+
 ## Meta-rule: keep instructions honest
 
 When something recorded in project instructions or rule files stops being true — a

@@ -6,7 +6,8 @@
 #   1. php -l on the staged content of staged *.php files (host PHP, for speed)
 #   2. no newly added vacuous assertion in staged test files - added lines only,
 #      so pre-existing occurrences are grandfathered
-#   3. every plugin's unit suite, skipped with a printed warning when DDEV is down
+#   3. the documentation length budget on staged CLAUDE.md / .claude/rules files
+#   4. every plugin's unit suite, skipped with a printed warning when DDEV is down
 #
 # Installed for the superproject *and* for plugins/typetags: a superproject
 # core.hooksPath does not apply to submodule commits. See tools/install-hooks.sh.
@@ -71,7 +72,41 @@ then
   fi
 fi
 
-# --- 3. unit suite ----------------------------------------------------------
+# --- 3. documentation length budget ----------------------------------------
+#
+# Measured on the *staged* content, like the syntax check above: what is being
+# committed is what has to fit, not whatever the working tree happens to hold.
+# awk counts a final unterminated line, which `wc -l` would silently drop.
+
+check_doc_length()
+{
+  local file="$1" cap="$2" lines
+
+  lines=$(git show ":$file" | awk 'END { print NR }')
+
+  if [ "$lines" -gt "$cap" ]
+  then
+    note "$file is $lines lines, over the $cap-line cap"
+    note "  move a section into .claude/rules/<topic>.md and link it from CLAUDE.md"
+    note "  with a read-trigger - see .claude/rules/backpressure.md"
+    failed=1
+  fi
+}
+
+while IFS= read -r file
+do
+  [ -n "$file" ] || continue
+
+  if printf '%s\n' "$file" | grep -Eq "$CLAUDE_MD_PATTERN"
+  then
+    check_doc_length "$file" "$CLAUDE_MD_MAX_LINES"
+  elif printf '%s\n' "$file" | grep -Eq "$RULES_MD_PATTERN"
+  then
+    check_doc_length "$file" "$RULES_MD_MAX_LINES"
+  fi
+done <<< "$staged"
+
+# --- 4. unit suite ----------------------------------------------------------
 
 if ! command -v ddev >/dev/null 2>&1
 then

@@ -137,44 +137,6 @@ never loosen one to get a run green.
 
 ## This repo's commands
 
-```bash
-# Unit
-ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml
-# typetags: create the test accounts once, then source them
-ddev exec php plugins/typetags/tests/Support/create-test-users.php
-ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
-  plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'
-# provenance: create the test accounts once, then source them
-ddev exec php plugins/provenance/tests/Support/create-test-users.php
-ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
-  plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'
-# persons: create the test accounts once, then source them
-ddev exec php plugins/persons/tests/Support/create-test-users.php
-ddev exec plugins/persons/vendor/bin/phpunit --testsuite unit --configuration plugins/persons/phpunit.xml
-ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
-  plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'
-# persons has no E2E specs yet - see decisions/0017
-# provenance E2E (DDEV up; the album properties screen is admin-only)
-ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
-  cd plugins/provenance && npx playwright test'
-# Both
-ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
-  plugins/typetags/vendor/bin/phpunit --configuration plugins/typetags/phpunit.xml'
-# E2E (DDEV up; the assignment UI only renders for a logged-in user)
-ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; \
-  cd plugins/typetags && npx playwright test'
-# Syntax check at container PHP version
-ddev exec php -l <file>
-# Hook self-test
-bash tools/test-hooks.sh
-```
-
-A fresh clone needs `ddev exec composer install -d plugins/typetags` and
-`ddev exec bash -c 'cd plugins/typetags && npm install'` first. Dependency and run output
-(`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser
-cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by the submodule's own
-`.gitignore`.
-
-The E2E suite mutates the database like the integration suite does. It seeds through
-`tests/e2e/support/seed.php`, which snapshots the original state to
-`tests/e2e/.state/snapshot.json` and restores it in `afterEach`.
+Every suite command, the account-creation scripts, the fresh-clone steps and what each suite
+mutates live in one place: [plugin-test-suites.md](plugin-test-suites.md). They are not repeated
+here — a second copy would rot the day only one is updated.

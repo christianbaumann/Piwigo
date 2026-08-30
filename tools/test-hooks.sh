@@ -7,8 +7,8 @@
 # against a temporary index, runs the hook, and asserts the exit code. It never
 # creates a commit and never touches the real index.
 #
-# Three cases, two red and one green, so the hook is proven able to both block
-# and let a clean change through.
+# Cases run red and green, so the hook is proven able to both block and let a
+# clean change through - never only one of the two.
 
 set -uo pipefail
 
@@ -149,6 +149,107 @@ else
 fi
 
 run_case "vacuous assertion blocks in a plugin suite" 1 "$PLUGIN_PROBE"
+
+# --- documentation length budget --------------------------------------------
+#
+# Boundary pair per cap: a file at exactly the cap must pass and one line more
+# must block. A cap tested only far from its edge says nothing about whether the
+# comparison is `>` or `>=`.
+#
+# The probes are generated from the caps in lib.sh rather than from typed line
+# counts, so raising a cap cannot leave a probe testing the old one.
+
+DOC_PROBE_DIR="$PROJECT_ROOT/.hook-selftest/doc"
+mkdir -p "$DOC_PROBE_DIR/.claude/rules"
+
+# A markdown file of exactly $1 lines.
+write_doc_probe()
+{
+  local path="$1" count="$2" i
+  : > "$path"
+  for (( i = 1; i <= count; i++ ))
+  do
+    printf 'line %d\n' "$i" >> "$path"
+  done
+}
+
+write_doc_probe "$DOC_PROBE_DIR/CLAUDE.md"                    "$CLAUDE_MD_MAX_LINES"
+write_doc_probe "$DOC_PROBE_DIR/CLAUDE-over.md"               "$((CLAUDE_MD_MAX_LINES + 1))"
+write_doc_probe "$DOC_PROBE_DIR/.claude/rules/at-cap.md"      "$RULES_MD_MAX_LINES"
+write_doc_probe "$DOC_PROBE_DIR/.claude/rules/over-cap.md"    "$((RULES_MD_MAX_LINES + 1))"
+
+# The over-cap probe is renamed into place per case: the block only fires for a
+# path the pattern matches, and CLAUDE-over.md is not such a path.
+cp "$DOC_PROBE_DIR/CLAUDE-over.md" "$TMP_DIR/CLAUDE-over.md"
+
+# Anti-vacuity: the probes must really carry the line counts the cases assume,
+# or every assertion below passes on a file that was never long enough to block.
+for probe_check in \
+  "CLAUDE.md:$CLAUDE_MD_MAX_LINES" \
+  "CLAUDE-over.md:$((CLAUDE_MD_MAX_LINES + 1))" \
+  ".claude/rules/at-cap.md:$RULES_MD_MAX_LINES" \
+  ".claude/rules/over-cap.md:$((RULES_MD_MAX_LINES + 1))"
+do
+  probe_path="${probe_check%:*}"
+  probe_want="${probe_check##*:}"
+  probe_got=$(awk 'END { print NR }' "$DOC_PROBE_DIR/$probe_path")
+  if [ "$probe_got" -eq "$probe_want" ]
+  then
+    pass "doc probe $probe_path is $probe_got lines"
+  else
+    fail "doc probe $probe_path is $probe_got lines, expected $probe_want - the case would prove nothing"
+  fi
+done
+
+# The patterns must actually match the probe paths, or the cases below stage a
+# file the hook never looks at and pass for the wrong reason.
+if printf '%s\n' ".hook-selftest/doc/CLAUDE.md" | grep -Eq "$CLAUDE_MD_PATTERN"
+then
+  pass "CLAUDE_MD_PATTERN matches a nested CLAUDE.md"
+else
+  fail "CLAUDE_MD_PATTERN does not match the probe path - the cases below prove nothing"
+fi
+
+if printf '%s\n' ".hook-selftest/doc/.claude/rules/at-cap.md" | grep -Eq "$RULES_MD_PATTERN"
+then
+  pass "RULES_MD_PATTERN matches a .claude/rules file"
+else
+  fail "RULES_MD_PATTERN does not match the probe path - the cases below prove nothing"
+fi
+
+run_case "CLAUDE.md at the cap passes"      0 ".hook-selftest/doc/CLAUDE.md"
+run_case "rules file at the cap passes"     0 ".hook-selftest/doc/.claude/rules/at-cap.md"
+run_case "rules file over the cap blocks"   1 ".hook-selftest/doc/.claude/rules/over-cap.md"
+
+# One line over the CLAUDE.md cap, staged at a path the pattern matches.
+mv "$DOC_PROBE_DIR/CLAUDE.md" "$DOC_PROBE_DIR/CLAUDE-at-cap.bak"
+cp "$TMP_DIR/CLAUDE-over.md" "$DOC_PROBE_DIR/CLAUDE.md"
+run_case "CLAUDE.md over the cap blocks"    1 ".hook-selftest/doc/CLAUDE.md"
+mv "$DOC_PROBE_DIR/CLAUDE-at-cap.bak" "$DOC_PROBE_DIR/CLAUDE.md"
+
+# The real files must be inside the budget too - the caps are worth nothing if
+# the repository they govern already breaks them.
+for tracked in "$PROJECT_ROOT/CLAUDE.md"
+do
+  tracked_lines=$(awk 'END { print NR }' "$tracked")
+  if [ "$tracked_lines" -le "$CLAUDE_MD_MAX_LINES" ]
+  then
+    pass "$(basename "$tracked") is $tracked_lines lines (cap $CLAUDE_MD_MAX_LINES)"
+  else
+    fail "$(basename "$tracked") is $tracked_lines lines, over the $CLAUDE_MD_MAX_LINES-line cap"
+  fi
+done
+
+for tracked in "$PROJECT_ROOT"/.claude/rules/*.md
+do
+  tracked_lines=$(awk 'END { print NR }' "$tracked")
+  if [ "$tracked_lines" -le "$RULES_MD_MAX_LINES" ]
+  then
+    pass "rules/$(basename "$tracked") is $tracked_lines lines (cap $RULES_MD_MAX_LINES)"
+  else
+    fail "rules/$(basename "$tracked") is $tracked_lines lines, over the $RULES_MD_MAX_LINES-line cap"
+  fi
+done
 
 # --- installation -----------------------------------------------------------
 #

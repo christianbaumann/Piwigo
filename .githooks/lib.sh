@@ -17,3 +17,23 @@ UNIT_SUITES=(
   "plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml"
   "plugins/persons/vendor/bin/phpunit --testsuite unit --configuration plugins/persons/phpunit.xml"
 )
+
+# --- documentation length budget -------------------------------------------
+#
+# CLAUDE.md is loaded into every session's context whether the task needs it or
+# not; a .claude/rules/ file is loaded only when its read-trigger matches. Length
+# in the root file is therefore a tax on every task, which is why its cap is the
+# tighter one. The rationale and the "how to split" procedure live in
+# .claude/rules/backpressure.md.
+#
+# These are hard caps, not a growth ratchet: as of 2026-08-30 no tracked file
+# exceeds either, so there is no inherited backlog to grandfather. If that ever
+# stops being true, convert this to a ratchet rather than raising the cap.
+
+# Files the caps apply to, as extended-regex patterns matched against the staged
+# path, each with the cap that applies to it.
+CLAUDE_MD_PATTERN='(^|/)CLAUDE\.md$'
+CLAUDE_MD_MAX_LINES=100
+
+RULES_MD_PATTERN='(^|/)\.claude/rules/[^/]+\.md$'
+RULES_MD_MAX_LINES=500

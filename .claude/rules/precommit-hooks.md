@@ -55,3 +55,29 @@ silently stops blocking is worse than no hook. Ship a self-test that:
 
 Before trusting a hook in the workflow, watch it fail once by hand, not only via the
 self-test script.
+
+## This repo's commit gate
+
+`.githooks/pre-commit` is version-controlled and installed with `bash tools/install-hooks.sh`, which sets `core.hooksPath` on **both** the superproject and `plugins/typetags` — a superproject `core.hooksPath` does not apply to submodule commits, and every plugin commit is one. Run it after a fresh clone.
+
+It runs four checks:
+
+1. `php -l` on the staged content of staged `*.php` files.
+2. No newly *added* `|| true` in a staged test file — added lines only, so pre-existing code is
+   grandfathered.
+3. The documentation length budget: a staged `CLAUDE.md` over 100 lines, or a staged
+   `.claude/rules/*.md` over 500, blocks with a message naming the split procedure. Measured on
+   the staged content, not the working tree. Unlike checks 1 and 2 this is a **hard cap, not a
+   ratchet** — no tracked file exceeded either limit when it was introduced (2026-08-30), so
+   there was no inherited backlog to grandfather. The rationale for the caps is in
+   `backpressure.md`.
+4. Every plugin's unit suite. If DDEV is down these are skipped with a printed warning rather
+   than a silent pass.
+
+`git commit --no-verify` bypasses all of it.
+
+`.githooks/lib.sh` holds every shared constant — the test-path and vacuous-assertion patterns,
+`UNIT_SUITES` (one command per gated plugin), and the two length caps with the path patterns
+they apply to — so the hook and its self-test cannot drift apart. `tools/test-hooks.sh` builds
+its probes from those constants rather than from typed copies, which is why raising a cap cannot
+leave a probe testing the old one.
