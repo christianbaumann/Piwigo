@@ -234,6 +234,119 @@ class FixtureBuilder
         $this->testAlbums = $objects['albums'] ?? array();
     }
 
+    /**
+     * Writes MWG regions into a fixture photo with a plain exiftool call.
+     *
+     * Deliberately not the plugin's own writer: a test that seeded through the
+     * code under test could only prove the writer agrees with itself. This is
+     * the independent producer, the way WriteBackTest uses an independent
+     * reader.
+     *
+     * @param array $image a row from createTestImage()
+     * @param array $regions list of array(name, x, y, w, h, type)
+     * @param int|null $appliedW null omits AppliedToDimensions entirely, which
+     *   is what digiKam writes (KDE bug 429219)
+     * @param int|null $appliedH
+     */
+    public function writeRegionsWithExiftool(array $image, array $regions, ?int $appliedW, ?int $appliedH): void
+    {
+        if (count($regions) === 0)
+        {
+            throw new RuntimeException('anti-vacuity: seeding no regions would make every assertion trivial');
+        }
+
+        $list = array();
+        foreach ($regions as $region)
+        {
+            $list[] = array(
+                'Area' => array(
+                    'X' => $region['x'],
+                    'Y' => $region['y'],
+                    'W' => $region['w'],
+                    'H' => $region['h'],
+                    'Unit' => 'normalized',
+                ),
+                'Name' => $region['name'],
+                'Type' => $region['type'] ?? 'Face',
+            );
+        }
+
+        $names = array();
+        foreach ($regions as $region)
+        {
+            if (($region['type'] ?? 'Face') === 'Face')
+            {
+                $names[$region['name']] = true;
+            }
+        }
+
+        $info = array('RegionList' => $list);
+        if ($appliedW !== null && $appliedH !== null)
+        {
+            $info = array('AppliedToDimensions' => array('W' => $appliedW, 'H' => $appliedH, 'Unit' => 'pixel'))
+                + $info;
+        }
+
+        $payload = array(array(
+            'RegionInfo' => $info,
+            'PersonInImage' => array_keys($names),
+        ));
+
+        $jsonFile = $image['file'] . '.seed.json';
+        file_put_contents($jsonFile, json_encode($payload, JSON_UNESCAPED_UNICODE));
+
+        $output = array();
+        $status = 1;
+        exec(
+            'exiftool -overwrite_original -charset filename=UTF8 -json=' . escapeshellarg($jsonFile)
+            . ' ' . escapeshellarg($image['file']) . ' 2>&1',
+            $output,
+            $status
+        );
+        @unlink($jsonFile);
+
+        if ($status !== 0)
+        {
+            throw new RuntimeException('seeding regions failed: ' . implode(' ', $output));
+        }
+    }
+
+    /**
+     * Removes the person rows a test created, and the tags mirrored from them.
+     *
+     * By name rather than by id: the indexer creates them, so a test cannot know
+     * the ids in advance without reading them back from the code under test.
+     *
+     * @param array $names
+     */
+    public function destroyPersons(array $names): void
+    {
+        foreach ($names as $name)
+        {
+            $escaped = $this->db->escape($name);
+
+            if ($this->tableExists('piwigo_persons'))
+            {
+                $tagId = $this->db->scalar("SELECT tag_id FROM piwigo_persons WHERE name = '$escaped'");
+                if ($tagId !== null)
+                {
+                    $this->db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$tagId);
+                    $this->db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$tagId);
+                }
+
+                $personId = $this->db->scalar("SELECT id FROM piwigo_persons WHERE name = '$escaped'");
+                if ($personId !== null)
+                {
+                    $this->db->query('DELETE FROM piwigo_person_region WHERE person_id = ' . (int)$personId);
+                }
+
+                $this->db->query("DELETE FROM piwigo_persons WHERE name = '$escaped'");
+            }
+
+            $this->db->query("DELETE FROM piwigo_tags WHERE name = '$escaped'");
+        }
+    }
+
     /** Removes every photo this fixture created, its file and exiftool's leftovers. */
     public function destroyTestImages(): void
     {

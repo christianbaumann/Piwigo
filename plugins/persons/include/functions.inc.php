@@ -469,3 +469,207 @@ function persons_operation_dir($operation_id)
 {
   return PERSONS_ARGS_DIR . $operation_id . '/';
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * Reading what a file says. Pure: exiftool.inc.php shells out and hands the
+ * decoded JSON here, so every shape a writer can produce is unit-testable with
+ * no exiftool present.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * Turns exiftool's decoded -json -struct output into this plugin's shape.
+ *
+ * Reports what the file says; it does not decide what is worth keeping. A
+ * region this plugin cannot index - one with no name, coordinates in a unit it
+ * does not understand, or a Type outside the MWG schema - comes back verbatim
+ * under 'unusable' so a later merge writes it out again untouched. Dropping it
+ * here would delete another tool's data on the first write persons makes.
+ *
+ * @param mixed $decoded json_decode(..., true) of the exiftool output: the
+ *   top-level list, a single file's object, or null when the decode failed
+ * @return array array(
+ *   'applied'  => array('w' => int|null, 'h' => int|null),
+ *   'regions'  => list of array(name, x, y, w, h, type, source),
+ *   'unusable' => the raw RegionList entries that could not be indexed,
+ *   'names'    => XMP-iptcExt:PersonInImage as the file holds it,
+ *   )
+ */
+function persons_parse_regioninfo($decoded)
+{
+  $empty = array(
+    'applied'  => array('w' => null, 'h' => null),
+    'regions'  => array(),
+    'unusable' => array(),
+    'names'    => array(),
+    );
+
+  if (!is_array($decoded))
+  {
+    return $empty;
+  }
+
+  // -json emits a list of one object per file; a caller that already unwrapped
+  // it hands over the object itself.
+  if (isset($decoded[0]) and is_array($decoded[0]))
+  {
+    $decoded = $decoded[0];
+  }
+
+  $result = $empty;
+
+  if (isset($decoded['PersonInImage']))
+  {
+    // A single value arrives as a bare string rather than a one-element list.
+    $names = is_array($decoded['PersonInImage'])
+      ? $decoded['PersonInImage']
+      : array($decoded['PersonInImage']);
+
+    foreach ($names as $name)
+    {
+      if (is_scalar($name) and (string)$name !== '')
+      {
+        $result['names'][] = (string)$name;
+      }
+    }
+  }
+
+  if (!isset($decoded['RegionInfo']) or !is_array($decoded['RegionInfo']))
+  {
+    return $result;
+  }
+  $info = $decoded['RegionInfo'];
+
+  if (isset($info['AppliedToDimensions']) and is_array($info['AppliedToDimensions']))
+  {
+    $applied = $info['AppliedToDimensions'];
+    $width  = persons_positive_int_or_null(isset($applied['W']) ? $applied['W'] : null);
+    $height = persons_positive_int_or_null(isset($applied['H']) ? $applied['H'] : null);
+
+    // Known only as a pair: everything downstream compares the two as a ratio,
+    // so half of it is not half an answer, it is a misleading one. Absent stays
+    // null - a zero would make every digiKam-written file look infinitely stale
+    // (KDE bug 429219 omits AppliedToDimensions entirely).
+    if ($width !== null and $height !== null)
+    {
+      $result['applied']['w'] = $width;
+      $result['applied']['h'] = $height;
+    }
+  }
+
+  if (!isset($info['RegionList']) or !is_array($info['RegionList']))
+  {
+    return $result;
+  }
+  $list = $info['RegionList'];
+
+  // One region written as a bare object rather than a one-element list.
+  if (isset($list['Area']) or isset($list['Name']))
+  {
+    $list = array($list);
+  }
+
+  foreach ($list as $raw)
+  {
+    if (!is_array($raw))
+    {
+      continue;
+    }
+
+    $region = persons_region_from_regionlist_entry($raw);
+
+    if ($region === null)
+    {
+      $result['unusable'][] = $raw;
+    }
+    else
+    {
+      $result['regions'][] = $region;
+    }
+  }
+
+  return $result;
+}
+
+/**
+ * One RegionList entry as an indexable region, or null when it is not one.
+ *
+ * @param array $raw
+ * @return array|null
+ */
+function persons_region_from_regionlist_entry($raw)
+{
+  $name = isset($raw['Name']) && is_scalar($raw['Name']) ? trim((string)$raw['Name']) : '';
+  if ($name === '')
+  {
+    // A detected but unconfirmed face. This plugin has no unconfirmed state.
+    return null;
+  }
+
+  // MWG makes Type optional and Face the default. A type outside the schema is
+  // left alone rather than coerced: the region_type column is an ENUM of the
+  // four MWG types, and MySQL turns anything else into '' - a row that claims
+  // nothing at all.
+  $type = isset($raw['Type']) && is_scalar($raw['Type']) ? (string)$raw['Type'] : 'Face';
+  if (!in_array($type, persons_region_types(), true))
+  {
+    return null;
+  }
+
+  if (!isset($raw['Area']) or !is_array($raw['Area']))
+  {
+    return null;
+  }
+  $area = $raw['Area'];
+
+  // MWG's default unit is normalized; anything else is in a coordinate system
+  // this plugin cannot convert without knowing the writer's reference frame.
+  $unit = isset($area['Unit']) && is_scalar($area['Unit']) ? (string)$area['Unit'] : 'normalized';
+  if ($unit !== 'normalized')
+  {
+    return null;
+  }
+
+  $coordinates = array();
+  foreach (array('x' => 'X', 'y' => 'Y', 'w' => 'W', 'h' => 'H') as $key => $tag)
+  {
+    // Values arrive as JSON strings from some writers - the bug Immich fixed in
+    // PR #29333. is_numeric() accepts both; a string comparison would not.
+    if (!isset($area[$tag]) or !is_numeric($area[$tag]))
+    {
+      return null;
+    }
+    $coordinates[$key] = (float)$area[$tag];
+  }
+
+  return array(
+    'name'   => $name,
+    'x'      => $coordinates['x'],
+    'y'      => $coordinates['y'],
+    'w'      => $coordinates['w'],
+    'h'      => $coordinates['h'],
+    'type'   => $type,
+    // 'piwigo' is what this plugin may rewrite. Every other MWG type belongs to
+    // whatever wrote it, and a merge leaves it alone.
+    'source' => $type === 'Face' ? 'piwigo' : 'foreign',
+    );
+}
+
+/**
+ * A dimension as a positive int, or null when it is absent or unusable.
+ *
+ * @param mixed $value
+ * @return int|null
+ */
+function persons_positive_int_or_null($value)
+{
+  if (!is_numeric($value))
+  {
+    return null;
+  }
+
+  $number = (int)$value;
+
+  return $number > 0 ? $number : null;
+}

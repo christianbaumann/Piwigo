@@ -16,6 +16,9 @@ final class CleanCheckoutTest extends TestCase
         'main.inc.php',
         'maintain.class.php',
         'include/functions.inc.php',
+        'include/exiftool.inc.php',
+        'include/index.inc.php',
+        'include/rescan.inc.php',
     );
 
     /** [HAPPY] Each runtime file exists where the includes point. */

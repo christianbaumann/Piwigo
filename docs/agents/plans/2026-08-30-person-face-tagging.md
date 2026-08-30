@@ -360,7 +360,7 @@ result. Read-only: no file is modified.
 
 ### Changes Required:
 
-#### [ ] 1. exiftool read
+#### [x] 1. exiftool read
 **File**: `plugins/persons/include/exiftool.inc.php`
 
 ```php
@@ -389,7 +389,7 @@ as strings (the bug Immich PR #29333 fixed); `AppliedToDimensions` absent entire
 429219) — treat as unknown, never as stale; `Unit` absent or not `normalized`; a region with an
 `Area` but no `Name` (an unnamed detected face — skip, this plugin has no unconfirmed state).
 
-#### [ ] 2. Index rebuild
+#### [x] 2. Index rebuild
 **File**: `plugins/persons/include/index.inc.php`
 
 ```php
@@ -406,7 +406,7 @@ function persons_sync_image_tags($image_id);
 `persons_person_id_from_name()` includes `admin/include/functions.php` itself before calling
 `tag_id_from_tag_name()` — `ws.php` does not include it.
 
-#### [ ] 3. Rescan entry point
+#### [x] 3. Rescan entry point
 **File**: `plugins/persons/include/rescan.inc.php`
 **Changes**: `persons_rescan_images(array $image_ids)` looping `persons_reindex_image()`, chunked
 by `PERSONS_WRITEBACK_MAX_CHUNK`, returning `array('scanned'=>int, 'failed'=>array(id=>message))`.
@@ -416,12 +416,16 @@ loop continues — it never aborts the batch.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit suite passes (parser fixtures)
-- [ ] Integration suite passes: `ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'`
-- [ ] An integration test writes a two-region file with `exiftool -json=`, calls `persons_reindex_image()`, and asserts both `persons` rows, both `person_region` rows and both `image_tag` rows exist
+- [x] Unit suite passes (parser fixtures)
+- [x] Integration suite passes: `ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'`
+- [x] An integration test writes a two-region file with `exiftool -json=`, calls `persons_reindex_image()`, and asserts both `persons` rows, both `person_region` rows and both `image_tag` rows exist
 
 #### Manual Verification:
-- [ ] Point the rescan at a photo tagged in digiKam and confirm the names land in `piwigo_persons`
+- [x] Point the rescan at a photo tagged in digiKam and confirm the names land in `piwigo_persons` —
+      **automated**, no longer a manual box: `ReindexTest::testARescanIndexesAFileTaggedByAThirdPartyToolWithNoAppliedToDimensions`
+      seeds the file in digiKam's shape (no `AppliedToDimensions`, KDE bug 429219) with a plain exiftool
+      call and drives `persons_rescan_images()`. Watched red against two mutants. Running an actual
+      digiKam binary is not automatable and is recorded in the open table of `docs/agents/TESTING.md`
 
 **Implementation Note**: pause for manual confirmation before Phase 3.
 
@@ -991,18 +995,18 @@ enumerated below.
 
 #### RegionInfo parsing (`tests/Unit/ParseRegionInfoTest.php`)
 
-- [ ] `testASingleRegionIsParsed` `[HAPPY]`
-- [ ] `testTwoRegionsAreParsedInOrder` `[HAPPY]`
-- [ ] `testARegionListArrivingAsAnObjectIsTreatedAsOneRegion` `[ERR]`
-- [ ] `testNumericFieldsArrivingAsStringsAreParsed` — Immich PR #29333 `[ERR]`
-- [ ] `testHighPrecisionCoordinatesDoNotLosePosition` `[BVA]`
-- [ ] `testAMissingAppliedToDimensionsYieldsUnknownNotZero` `[NEG]`
-- [ ] `testARegionWithNoNameIsSkipped` `[NEG]`
-- [ ] `testARegionWithANonNormalizedUnitIsSkipped` `[NEG]`
-- [ ] `testAnEmptyRegionListYieldsNoRegions` `[BVA]`
-- [ ] `testMalformedJsonYieldsNoRegionsAndNoWarning` `[NEG]`
-- [ ] `testANonFaceRegionTypeIsKeptAsForeign` — Pet/Focus/BarCode must survive a later merge `[ECP]`
-- [ ] `testAUnicodeNameSurvivesParsing` `[ERR]`
+- [x] `testASingleRegionIsParsed` `[HAPPY]`
+- [x] `testTwoRegionsAreParsedInOrder` `[HAPPY]`
+- [x] `testARegionListArrivingAsAnObjectIsTreatedAsOneRegion` `[ERR]`
+- [x] `testNumericFieldsArrivingAsStringsAreParsed` — Immich PR #29333 `[ERR]`
+- [x] `testHighPrecisionCoordinatesDoNotLosePosition` `[BVA]`
+- [x] `testAMissingAppliedToDimensionsYieldsUnknownNotZero` `[NEG]`
+- [x] `testARegionWithNoNameIsSkipped` `[NEG]`
+- [x] `testARegionWithANonNormalizedUnitIsSkipped` `[NEG]`
+- [x] `testAnEmptyRegionListYieldsNoRegions` `[BVA]`
+- [x] `testMalformedJsonYieldsNoRegionsAndNoWarning` `[NEG]`
+- [x] `testANonFaceRegionTypeIsKeptAsForeign` — Pet/Focus/BarCode must survive a later merge `[ECP]`
+- [x] `testAUnicodeNameSurvivesParsing` `[ERR]`
 
 #### Merge (`tests/Unit/MergeRegionsTest.php`) — the decision table
 
@@ -1059,7 +1063,7 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 
 **Happy path:**
 - [ ] `WriteRegionTest::testARegionWrittenByThePluginIsReadBackByAnIndependentExiftoolRun` `[HAPPY]`
-- [ ] `ReindexTest::testTheIndexMatchesWhatTheFileHolds` `[HAPPY]`
+- [x] `ReindexTest::testTheIndexMatchesWhatTheFileHolds` `[HAPPY]`
 - [ ] `AddRegionTest::testAddingARegionCreatesThePersonTheRegionAndTheMirroredTag` `[HAPPY]`
 - [ ] `SearchTest::testGetListWithNoQueryReturnsRecentPersonsMostRecentFirst` `[HAPPY]`
 - [ ] `SearchTest::testGetListWithAPartialQueryMatchesInTheMiddleOfAName` `[HAPPY]`
@@ -1074,7 +1078,7 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [ ] `AdminOnlyTest::testANormalUserCannotRenameDeleteOrRescan` — 403 ×3 `[NEG]`
 - [ ] `WriteRegionTest::testAReadOnlyFileIsReportedFailedAndLeftUnchanged` `[NEG]`
 - [ ] `WriteRegionTest::testAFileExiftoolCannotWriteIsReportedNotCrashed` `[NEG]`
-- [ ] `RescanTest::testOneUnreadableFileDoesNotAbortTheBatch` `[NEG]`
+- [x] `RescanTest::testOneUnreadableFileDoesNotAbortTheBatch` `[NEG]` — landed as `ReindexTest::testOneUnreadableFileDoesNotAbortTheBatch`
 
 **Boundary / edge:**
 - [ ] `WriteRegionTest::testAForeignRegionInTheFileSurvivesOurWrite` `[BVA]`
