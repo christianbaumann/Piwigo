@@ -124,3 +124,167 @@ function persons_read_regions($file)
 
   return array_merge(persons_parse_regioninfo($decoded), array('ok' => true, 'message' => ''));
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * The write. The one operation in this plugin that can destroy data.
+ *
+ * Three rules, the same three plugins/provenance follows.
+ *
+ * No value reaches a command line. The whole payload goes into a JSON file read
+ * with -json=, which sidesteps exiftool's escaping rules entirely - the brace
+ * syntax and the flattened -RegionName= form both need quoting this plugin
+ * would have to reimplement, and the flattened form additionally deletes every
+ * other region name on the way past.
+ *
+ * exiftool's default mode is kept, so the pre-write bytes survive beside the
+ * image as <name>_original and the new file appears atomically by rename.
+ *
+ * Two exiftool processes writing one file destroy it (measured while building
+ * the provenance plugin), so every invocation first takes an exclusive lock on
+ * a SEPARATE lock file - never on the image, whose inode the rename replaces.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * Writes one file's complete region list and person names.
+ *
+ * $regioninfo and $names come from persons_merge_regions() and are complete:
+ * exiftool replaces both tags wholesale, so a partial structure here is data
+ * loss. An empty array for either asks exiftool to delete that tag.
+ *
+ * Takes no lock of its own. The critical section is the whole read-merge-write
+ * in persons_apply_change(), not this invocation - two writers that each read
+ * the file before either wrote it would both produce a "complete" list missing
+ * the other's region, and locking only the exec would let that happen with
+ * every lock behaving correctly.
+ *
+ * @param string $file the image on disk
+ * @param array $regioninfo the XMP-mwg-rs:RegionInfo structure
+ * @param array $names XMP-iptcExt:PersonInImage
+ * @return array array('ok' => bool, 'message' => string)
+ */
+function persons_write_regions($file, $regioninfo, $names)
+{
+  if (!is_file($file) or !is_writable($file))
+  {
+    return array('ok' => false, 'message' => 'File is missing or not writable');
+  }
+
+  if (!persons_exiftool_available())
+  {
+    return array('ok' => false, 'message' => 'exiftool is not available on this server');
+  }
+
+  $operation_dir = persons_operation_dir(persons_operation_id());
+
+  try
+  {
+    persons_make_dir($operation_dir);
+
+    $payload = array(array(
+      'RegionInfo'    => $regioninfo,
+      'PersonInImage' => $names,
+      ));
+
+    $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
+
+    if ($encoded === false)
+    {
+      return array('ok' => false, 'message' => 'Could not encode the regions: '.json_last_error_msg());
+    }
+
+    $json_file = $operation_dir.'regions.json';
+    file_put_contents($json_file, $encoded);
+
+    $command =
+      escapeshellcmd(persons_exiftool_binary()).
+      ' -charset filename=UTF8'.
+      ' -json='.escapeshellarg($json_file).
+      ' '.escapeshellarg($file).
+      ' 2>&1';
+
+    $output = array();
+    $status = 1;
+    exec($command, $output, $status);
+
+    return $status === 0
+      ? array('ok' => true, 'message' => '')
+      : array('ok' => false, 'message' => trim(implode(' ', $output)) ?: 'exiftool exited with status '.$status);
+  }
+  finally
+  {
+    persons_remove_dir($operation_dir);
+  }
+}
+
+/**
+ * Takes the exclusive lock guarding one image, or gives up.
+ *
+ * Non-blocking with a deadline rather than a blocking flock: a wedged writer
+ * must not hold a request open until the server's own timeout kills it halfway
+ * through.
+ *
+ * @param string $db_path the stored path, which names the lock
+ * @return resource|null the locked handle, or null on timeout
+ */
+function persons_lock_acquire($db_path)
+{
+  persons_make_dir(PERSONS_LOCK_DIR);
+
+  $handle = @fopen(persons_lock_path($db_path), 'c');
+  if ($handle === false)
+  {
+    return null;
+  }
+
+  $deadline = microtime(true) + PERSONS_LOCK_TIMEOUT_SECONDS;
+
+  do
+  {
+    if (flock($handle, LOCK_EX | LOCK_NB))
+    {
+      return $handle;
+    }
+
+    usleep(PERSONS_LOCK_RETRY_MICROSECONDS);
+  }
+  while (microtime(true) < $deadline);
+
+  fclose($handle);
+
+  return null;
+}
+
+/**
+ * @param string $dir
+ * @return void
+ */
+function persons_make_dir($dir)
+{
+  if (!is_dir($dir) and !@mkdir($dir, 0755, true) and !is_dir($dir))
+  {
+    throw new RuntimeException('Cannot create '.$dir);
+  }
+}
+
+/**
+ * Removes an operation directory and the payload in it.
+ *
+ * @param string $dir
+ * @return void
+ */
+function persons_remove_dir($dir)
+{
+  if (!is_dir($dir))
+  {
+    return;
+  }
+
+  foreach (glob($dir.'*') as $file)
+  {
+    @unlink($file);
+  }
+
+  @rmdir($dir);
+}

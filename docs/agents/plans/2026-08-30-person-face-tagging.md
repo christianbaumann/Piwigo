@@ -441,7 +441,7 @@ exiftool's `_original` sidecar.
 
 ### Changes Required:
 
-#### [ ] 1. The merge, as a pure function
+#### [x] 1. The merge, as a pure function
 **File**: `plugins/persons/include/functions.inc.php`
 
 ```php
@@ -455,7 +455,7 @@ This is the review point that closed Immich's write-back PR and the reason the P
 Editor rewrote its writer. It is pure, so it is unit-tested exhaustively rather than through the
 file system.
 
-#### [ ] 2. The write
+#### [x] 2. The write
 **File**: `plugins/persons/include/exiftool.inc.php`
 
 ```php
@@ -479,14 +479,16 @@ into `_data/persons/args/<operation id>/` and removed in a `finally`; a `flock` 
 `-overwrite_original`, so the `_original` sidecar is the pre-write copy; a per-image failure is
 recorded and the batch continues.
 
-#### [ ] 3. Write-then-reindex
+#### [x] 3. Write-then-reindex
 **File**: `plugins/persons/include/index.inc.php`
 **Changes**: `persons_apply_change($image_id, $add, $remove)` = read file → merge → write → **re-read
 the file** → reindex. The re-read is not redundant: it is the only thing that proves the DB index
 matches the bytes on disk.
 
-#### [ ] 4. `_data/persons/` documentation
-**File**: `CLAUDE.md`
+#### [x] 4. `_data/persons/` documentation
+**File**: `.claude/rules/piwigo-dev-environment.md` (not `CLAUDE.md`: that file is capped at
+100 lines and the `_data/provenance/` subsection this one mirrors already lives in the rules file —
+two homes for one fact is the copy that goes stale)
 **Changes**: a subsection mirroring the existing `_data/provenance/` one — what `locks/` and
 `args/` are, that both are safe to delete when nothing is writing, and that the `_original`
 sidecars sit beside the image and are the only copy of the pre-write bytes.
@@ -494,18 +496,25 @@ sidecars sit beside the image and are the only copy of the pre-write bytes.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Unit suite passes, including the merge table
-- [ ] Integration: writing person B into a file that already holds person A leaves both
-- [ ] Integration: a foreign region (`Type=Pet`, or a region this plugin never wrote) survives a write
-- [ ] Integration: an independent reader confirms the write — `exiftool -json -struct` run as a
+- [x] Unit suite passes, including the merge table
+- [x] Integration: writing person B into a file that already holds person A leaves both
+- [x] Integration: a foreign region (`Type=Pet`, or a region this plugin never wrote) survives a write
+- [x] Integration: an independent reader confirms the write — `exiftool -json -struct` run as a
       separate process, the same technique as `provenance`'s `WriteBackTest`
-- [ ] Integration: N concurrent writers to the same file (the `write-back-worker.php` pattern) all
+- [x] Integration: N concurrent writers to the same file (the `write-back-worker.php` pattern) all
       succeed and the final file holds every region
-- [ ] Integration: a read-only file is reported as failed, the file is unchanged, and no `_original` is left
+- [x] Integration: a read-only file is reported as failed, the file is unchanged, and no `_original` is left
 
 #### Manual Verification:
-- [ ] Open a written file in digiKam or exiftool GUI and confirm the face shows in the right place
-- [ ] Confirm an `_original` sidecar exists beside the written image
+- [x] Open a written file in digiKam or exiftool GUI and confirm the face shows in the right place —
+      falsifiable half **automated**: `WriteRegionsTest::testAnIndependentLibraryFindsTheRegionInTheStandardXmpPacket`
+      extracts the XMP packet with ImageMagick, which has no MWG support at all, and asserts the
+      namespace, the element names and all four coordinates as text. Watched red against a write
+      with `RegionInfo` emptied; it found the `persons_clip_region()` float defect on its first
+      run. Whether a GUI *draws* the box where a human expects has no oracle — open table in
+      `docs/agents/TESTING.md`
+- [x] Confirm an `_original` sidecar exists beside the written image — **automated**:
+      `WriteRegionsTest::testTheOriginalBytesAreKeptAsASidecar`
 
 **Implementation Note**: pause for manual confirmation before Phase 4.
 

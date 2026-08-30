@@ -77,6 +77,39 @@ final class RegionGeometryTest extends TestCase
     }
 
     /**
+     * [BVA] A box that fits inside the frame comes back with exactly the
+     * coordinates it went in with - not merely close ones.
+     *
+     * assertSame, not assertEqualsWithDelta, and that is the point. Clipping a
+     * region that needs no clipping used to round-trip it through the corner
+     * form and back, and 0.5 +/- 0.1/2 does not come out of that arithmetic as
+     * 0.1 again: the merge wrote 0.10000000000000003 into every file, for every
+     * box anybody drew. Found 2026-08-30 by the ImageMagick reader in
+     * WriteRegionsTest, which reads the packet as text and so cannot be talked
+     * out of it by a tolerance.
+     */
+    public function testARegionInsideTheFrameIsReturnedByteForByteUnchanged(): void
+    {
+        $clipped = persons_clip_region(array('x' => 0.5, 'y' => 0.4, 'w' => 0.1, 'h' => 0.2));
+
+        $this->assertNotNull($clipped);
+        $this->assertSame(0.5, $clipped['x']);
+        $this->assertSame(0.4, $clipped['y']);
+        $this->assertSame(0.1, $clipped['w']);
+        $this->assertSame(0.2, $clipped['h']);
+    }
+
+    /** [BVA] A box touching an edge exactly is still not perturbed. */
+    public function testABoxFlushWithAnEdgeIsReturnedUnchanged(): void
+    {
+        $clipped = persons_clip_region(array('x' => 0.05, 'y' => 0.5, 'w' => 0.1, 'h' => 0.2));
+
+        $this->assertNotNull($clipped);
+        $this->assertSame(0.05, $clipped['x']);
+        $this->assertSame(0.1, $clipped['w']);
+    }
+
+    /**
      * [BVA] A box whose centre is inside but which overruns an edge is clipped,
      * per MWG - the subject is in the picture, the recorded box was just larger
      * than the frame.

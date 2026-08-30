@@ -31,11 +31,13 @@ No build step for the application itself — PHP is served directly from the rep
 `exiftool` is available in the web container via `webimage_extra_packages` in `.ddev/config.yaml`
 (the provenance plugin's write-back needs it); production has it preinstalled.
 
-ImageMagick's `identify` is also used, but only by the provenance integration suite, as an
-**independent** reader of what the write-back produced — reading back with exiftool cannot tell a
-caption written to the standard slots apart from one only exiftool knows about. It comes from the
-DDEV web image itself rather than `webimage_extra_packages`; if a future image drops it,
-`WriteBackTest::testAnIndependentReaderFindsTheCaption` fails loudly naming it.
+ImageMagick is also used, but only by two integration suites, as an **independent** reader of what
+a write-back produced — reading back with exiftool cannot tell data written to the standard slots
+apart from data only exiftool knows about. `identify` in provenance's
+`WriteBackTest::testAnIndependentReaderFindsTheCaption`; `convert <file> xmp:-` in persons'
+`WriteRegionsTest::testAnIndependentLibraryFindsTheRegionInTheStandardXmpPacket`, which extracts
+the raw XMP packet and reads the MWG region out of it as text. It comes from the DDEV web image
+itself rather than `webimage_extra_packages`; if a future image drops it, both fail loudly naming it.
 
 ## Agent working conventions
 

@@ -31,6 +31,29 @@ the root `.gitignore`'s `_data` entry, so nothing there is ever committed. Note 
 the image in `upload/` or `galleries/` and are the only copy of the pre-write bytes.
 
 
+## `_data/persons/` — the region write-back working area
+
+The persons plugin keeps the same shape of scratch space, defined once in
+`plugins/persons/include/functions.inc.php`:
+
+- `_data/persons/locks/` — one `<sha1(image path)>.lock` file per image (`persons_lock_path()`).
+  A **separate** file for the same reason as provenance's: exiftool replaces the image by rename.
+  Unlike provenance's, this lock is held across the whole read-merge-write in
+  `persons_apply_change()`, not just the exiftool invocation — regions live only in the file, so
+  two writers that each read it before either wrote would both produce a complete, valid region
+  list with the other's face missing. Measured 2026-08-30 with the lock narrowed to the write:
+  eight concurrent writers all reported success and the file came back holding one face.
+- `_data/persons/args/<operation id>/` — the `-json=` payload of one write
+  (`persons_operation_dir()`), removed whole in a `finally`.
+
+Both are created on demand and are safe to delete when nothing is writing, and the root
+`.gitignore`'s `_data` entry covers them. The `_original` sidecars are again **not** here — they
+sit beside the image and are the only copy of the pre-write bytes.
+
+`persons_merge_regions()` asks exiftool to delete a tag by handing it an empty JSON array.
+Measured 2026-08-30 against exiftool 13.25: `[]` deletes, `""` writes an empty structure, and
+`null` writes a literal null into the name list.
+
 ## Git-ignored working state
 
 `.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.

@@ -51,6 +51,9 @@ define('PERSONS_WRITEBACK_MAX_CHUNK', 10);
 /** Seconds a writer waits for another writer's lock on the same file. */
 define('PERSONS_LOCK_TIMEOUT_SECONDS', 30);
 
+/** How often a waiting writer retries the lock it could not take. */
+define('PERSONS_LOCK_RETRY_MICROSECONDS', 50000);
+
 /*
  * Scratch space, mirroring plugins/provenance. Both are safe to delete when
  * nothing is writing. Derived from PERSONS_PATH rather than PHPWG_ROOT_PATH so
@@ -215,6 +218,18 @@ function persons_clip_region($region)
   $top    = max(0, $corner['top']);
   $right  = min(1, $corner['left'] + $corner['w']);
   $bottom = min(1, $corner['top'] + $corner['h']);
+
+  // A box that fits is returned untouched rather than recomputed. The round
+  // trip through the corner form is not the identity in binary floating point -
+  // 0.5 +/- 0.1/2 comes back as 0.10000000000000003 - and since these numbers
+  // are written into the file as text, recomputing a region nobody clipped puts
+  // a different value on disk than the one the user drew, in every file.
+  if ($left === $corner['left'] and $top === $corner['top']
+      and $right === $corner['left'] + $corner['w']
+      and $bottom === $corner['top'] + $corner['h'])
+  {
+    return array_merge($region, array('x' => $x, 'y' => $y, 'w' => $w, 'h' => $h));
+  }
 
   $centred = persons_corner_to_center($left, $top, $right - $left, $bottom - $top);
 
@@ -457,6 +472,17 @@ function persons_lock_path($image_path)
 }
 
 /**
+ * A name for one write operation, unique enough that two requests never share
+ * a working directory.
+ *
+ * @return string
+ */
+function persons_operation_id()
+{
+  return bin2hex(random_bytes(8));
+}
+
+/**
  * The directory holding one write operation's exiftool argfiles.
  *
  * Per operation rather than per file, so a crashed run leaves at most one
@@ -672,4 +698,304 @@ function persons_positive_int_or_null($value)
   $number = (int)$value;
 
   return $number > 0 ? $number : null;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * The merge. Regions live in the image file and nowhere else, so this is the
+ * one function here whose bug loses data outright: a write that rebuilt the
+ * region list out of what this plugin understands would delete every region it
+ * does not. Pure, so the whole table of cases is a unit test.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * How close two coordinates must be to describe the same box.
+ *
+ * Two orders of magnitude below the smallest box that may be drawn, so no two
+ * distinct boxes can collide, and far above the error of a JSON round trip
+ * through exiftool.
+ */
+define('PERSONS_REGION_MATCH_EPSILON', 1e-6);
+
+/**
+ * Builds the complete RegionInfo and PersonInImage to write into a file.
+ *
+ * Everything the file already holds is carried across untouched unless $remove
+ * names it - including the entries the parser could not index, which are
+ * written back verbatim. The only regions this function invents are the ones in
+ * $add.
+ *
+ * @param array $existing the persons_parse_regioninfo() shape read from the file
+ * @param array $add list of array(name, x, y, w, h, type) to add
+ * @param array $remove list of matchers: array(name) removes every box of that
+ *   person, array(name, x, y, w, h) removes just that box
+ * @param int|null $applied_w the image's current width, or null when unknown
+ * @param int|null $applied_h
+ * @return array array('regioninfo' => array, 'names' => array). An empty array
+ *   for either means "delete this tag", which is what exiftool's -json= reads a
+ *   JSON [] as. A file carrying a RegionInfo with an empty RegionList claims to
+ *   have been examined and found nobody - a different statement from a file
+ *   that was never tagged, and one every other reader would have to
+ *   special-case. Measured 2026-08-30 with exiftool 13.25: "" writes an empty
+ *   structure rather than deleting, and null writes a literal null into the
+ *   name list.
+ */
+function persons_merge_regions($existing, $add, $remove, $applied_w, $applied_h)
+{
+  $existing_regions = isset($existing['regions']) ? $existing['regions'] : array();
+  $unusable         = isset($existing['unusable']) ? $existing['unusable'] : array();
+  $existing_names   = isset($existing['names']) ? $existing['names'] : array();
+
+  $kept = array();
+  $dropped_names = array();
+
+  foreach ($existing_regions as $region)
+  {
+    if (persons_region_matches_any($region, $remove))
+    {
+      $dropped_names[$region['name']] = true;
+      continue;
+    }
+    $kept[] = $region;
+  }
+
+  foreach ($add as $region)
+  {
+    $region = persons_prepare_region_for_write($region);
+    if ($region === null)
+    {
+      continue;
+    }
+
+    // The same box for the same person, added twice, is one region. Replacing
+    // rather than skipping lets an add correct a region's type.
+    $kept = array_values(array_filter(
+      $kept,
+      function ($existing_region) use ($region)
+      {
+        return !persons_region_matches($existing_region, $region);
+      }
+      ));
+
+    $kept[] = $region;
+  }
+
+  $list = array();
+  foreach ($kept as $region)
+  {
+    $list[] = array(
+      'Area' => array(
+        'X'    => $region['x'],
+        'Y'    => $region['y'],
+        'W'    => $region['w'],
+        'H'    => $region['h'],
+        'Unit' => 'normalized',
+        ),
+      'Name' => $region['name'],
+      'Type' => $region['type'],
+      );
+  }
+
+  // Verbatim, and last: MWG gives the list no meaningful order, and the parser
+  // did not record where in the file these sat.
+  foreach ($unusable as $entry)
+  {
+    $list[] = $entry;
+  }
+
+  return array(
+    'regioninfo' => persons_build_regioninfo($list, $applied_w, $applied_h),
+    'names'      => persons_merge_person_names($existing_names, $kept, $dropped_names),
+    );
+}
+
+/**
+ * The RegionInfo structure for a region list, or the empty array that asks
+ * exiftool to delete the tag when there is none.
+ *
+ * @param array $list the RegionList entries
+ * @param int|null $applied_w
+ * @param int|null $applied_h
+ * @return array
+ */
+function persons_build_regioninfo($list, $applied_w, $applied_h)
+{
+  if (count($list) == 0)
+  {
+    return array();
+  }
+
+  $info = array();
+
+  $width  = persons_positive_int_or_null($applied_w);
+  $height = persons_positive_int_or_null($applied_h);
+
+  // Known only as a pair, and omitted rather than zeroed when unknown: a 0
+  // would make every reader treat the regions as infinitely stale.
+  if ($width !== null and $height !== null)
+  {
+    $info['AppliedToDimensions'] = array('W' => $width, 'H' => $height, 'Unit' => 'pixel');
+  }
+
+  $info['RegionList'] = $list;
+
+  return $info;
+}
+
+/**
+ * The PersonInImage list to write.
+ *
+ * A name the file carries that no region backs is left alone - some tools write
+ * the list on its own, and it is not this plugin's to delete. A name is dropped
+ * only when the regions carrying it were the ones just removed.
+ *
+ * @param array $existing_names PersonInImage as the file holds it
+ * @param array $kept the regions that survive the merge
+ * @param array $dropped_names name => true for every region removed
+ * @return array empty asks exiftool to delete the tag
+ */
+function persons_merge_person_names($existing_names, $kept, $dropped_names)
+{
+  $final = array();
+  foreach ($kept as $region)
+  {
+    if ($region['type'] === 'Face')
+    {
+      $final[$region['name']] = true;
+    }
+  }
+
+  $names = array();
+  foreach ($existing_names as $name)
+  {
+    if (isset($dropped_names[$name]) and !isset($final[$name]))
+    {
+      continue;
+    }
+    if (!in_array($name, $names, true))
+    {
+      $names[] = $name;
+    }
+  }
+
+  foreach (array_keys($final) as $name)
+  {
+    if (!in_array($name, $names, true))
+    {
+      $names[] = $name;
+    }
+  }
+
+  return $names;
+}
+
+/**
+ * A caller's region as it may be written, or null when it may not be.
+ *
+ * @param array $region name, x, y, w, h and optionally type
+ * @return array|null
+ */
+function persons_prepare_region_for_write($region)
+{
+  $name = persons_clean_name(isset($region['name']) ? $region['name'] : '');
+  if ($name === '')
+  {
+    return null;
+  }
+
+  foreach (array('x', 'y', 'w', 'h') as $key)
+  {
+    if (!isset($region[$key]) or !persons_is_valid_normalized($region[$key]))
+    {
+      return null;
+    }
+  }
+
+  $type = isset($region['type']) ? (string)$region['type'] : 'Face';
+  if (!in_array($type, persons_region_types(), true))
+  {
+    return null;
+  }
+
+  $clipped = persons_clip_region(array(
+    'x' => (float)$region['x'],
+    'y' => (float)$region['y'],
+    'w' => (float)$region['w'],
+    'h' => (float)$region['h'],
+    ));
+
+  if ($clipped === null)
+  {
+    return null;
+  }
+
+  // Checked after clipping: a box that is only large enough because it runs off
+  // the edge of the photo is not large enough.
+  if (!persons_minimum_box_ok($clipped['w'], $clipped['h']))
+  {
+    return null;
+  }
+
+  return array(
+    'name' => $name,
+    'x'    => $clipped['x'],
+    'y'    => $clipped['y'],
+    'w'    => $clipped['w'],
+    'h'    => $clipped['h'],
+    'type' => $type,
+    );
+}
+
+/**
+ * Whether a region is the one a matcher describes.
+ *
+ * A matcher with no coordinates matches every box of that person - which is how
+ * "this person is not in this photo" is expressed. One with coordinates matches
+ * a single box, so two boxes of the same person on one photo stay distinct.
+ *
+ * @param array $region
+ * @param array $matcher
+ * @return bool
+ */
+function persons_region_matches($region, $matcher)
+{
+  if (!isset($matcher['name']) or (string)$matcher['name'] !== (string)$region['name'])
+  {
+    return false;
+  }
+
+  foreach (array('x', 'y', 'w', 'h') as $key)
+  {
+    if (!isset($matcher[$key]))
+    {
+      // A name-only matcher. Every coordinate is a wildcard, not just this one.
+      return true;
+    }
+
+    if (abs((float)$matcher[$key] - (float)$region[$key]) > PERSONS_REGION_MATCH_EPSILON)
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @param array $region
+ * @param array $matchers
+ * @return bool
+ */
+function persons_region_matches_any($region, $matchers)
+{
+  foreach ($matchers as $matcher)
+  {
+    if (persons_region_matches($region, $matcher))
+    {
+      return true;
+    }
+  }
+
+  return false;
 }

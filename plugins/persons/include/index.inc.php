@@ -196,3 +196,77 @@ function persons_image_rotation($image_id)
 
   return ($row and $row['rotation'] !== null) ? (int)$row['rotation'] : null;
 }
+
+/**
+ * Applies one change to a photo: read the file, merge, write, re-read, reindex.
+ *
+ * The whole sequence runs under the image's exclusive lock, not just the
+ * exiftool invocation. The file is the only store of the regions, so a writer
+ * that read it before another writer's write and wrote afterwards would produce
+ * a complete, valid region list with the other writer's face silently missing -
+ * a lock around the exec alone prevents the two exiftool processes colliding
+ * and nothing else.
+ *
+ * The re-read at the end is not redundant either: persons_reindex_image() opens
+ * the file again rather than being handed the structure that was just written,
+ * so a write exiftool accepted but stored differently shows up as an index that
+ * disagrees, instead of staying invisible until the next rescan.
+ *
+ * @param int $image_id
+ * @param array $add list of array(name, x, y, w, h, type) to add
+ * @param array $remove list of matchers, per persons_merge_regions()
+ * @return array array('ok' => bool, 'regions' => int, 'message' => string)
+ */
+function persons_apply_change($image_id, $add, $remove)
+{
+  $image_id = (int)$image_id;
+
+  $image = pwg_db_fetch_assoc(pwg_query(
+    'SELECT path, width, height FROM '.IMAGES_TABLE.' WHERE id = '.$image_id.';'
+    ));
+
+  if (!$image)
+  {
+    return array('ok' => false, 'regions' => 0, 'message' => 'No such photo');
+  }
+
+  $file = persons_image_file_path($image['path']);
+
+  $lock = persons_lock_acquire($image['path']);
+  if ($lock === null)
+  {
+    return array('ok' => false, 'regions' => 0,
+      'message' => 'Timed out waiting for another change to this photo');
+  }
+
+  try
+  {
+    $read = persons_read_regions($file);
+    if (!$read['ok'])
+    {
+      return array('ok' => false, 'regions' => 0, 'message' => $read['message']);
+    }
+
+    // images.width/height are the RAW file dimensions - SrcImage::__construct()
+    // (include/derivative.inc.php:74-92) swaps them for the odd rotation codes
+    // rather than core storing them swapped. AppliedToDimensions is a fact about
+    // the file, so the raw pair is the right one.
+    $applied_w = persons_positive_int_or_null(isset($image['width']) ? $image['width'] : null);
+    $applied_h = persons_positive_int_or_null(isset($image['height']) ? $image['height'] : null);
+
+    $merged = persons_merge_regions($read, $add, $remove, $applied_w, $applied_h);
+
+    $write = persons_write_regions($file, $merged['regioninfo'], $merged['names']);
+    if (!$write['ok'])
+    {
+      return array('ok' => false, 'regions' => 0, 'message' => $write['message']);
+    }
+
+    return persons_reindex_image($image_id, $file);
+  }
+  finally
+  {
+    flock($lock, LOCK_UN);
+    fclose($lock);
+  }
+}
