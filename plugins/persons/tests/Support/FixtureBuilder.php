@@ -173,11 +173,16 @@ class FixtureBuilder
      *
      * @return int the new album's id
      */
-    public function createTestAlbum(string $name): int
+    public function createTestAlbum(string $name, string $status = 'public'): int
     {
+        if (!in_array($status, array('public', 'private'), true))
+        {
+            throw new RuntimeException("album status must be public or private, not '$status'");
+        }
+
         $this->db->query(
             "INSERT INTO `piwigo_categories` (name, id_uppercat, uppercats, rank, global_rank, status, visible) " .
-            "VALUES ('" . $this->db->escape($name) . "', NULL, '', 1, '1', 'public', 'true')"
+            "VALUES ('" . $this->db->escape($name) . "', NULL, '', 1, '1', '" . $status . "', 'true')"
         );
         $id = $this->db->insertId();
         if ($id <= 0)
@@ -198,6 +203,27 @@ class FixtureBuilder
         $this->testAlbums[] = $id;
 
         return $id;
+    }
+
+    /**
+     * Discards every user's cached permission summary.
+     *
+     * $user['forbidden_categories'] is read out of piwigo_user_cache, which is
+     * computed once per user and reused across logins. A private album created
+     * after that computation is invisible to the gate under test until the cache
+     * is thrown away, so a [NEG] visibility test would pass for the wrong reason.
+     */
+    public function invalidateUserCache(): void
+    {
+        $this->db->query("UPDATE `piwigo_user_cache` SET need_update = 'true'");
+
+        $stale = (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM `piwigo_user_cache` WHERE need_update = 'false'"
+        );
+        if ($stale !== 0)
+        {
+            throw new RuntimeException("$stale user cache rows survived invalidation");
+        }
     }
 
     /** Puts one photo in one album, asserting the link took effect. */

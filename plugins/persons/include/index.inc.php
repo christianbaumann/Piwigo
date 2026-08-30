@@ -180,6 +180,63 @@ DELETE FROM '.IMAGE_TAG_TABLE.'
     }
     mass_inserts(IMAGE_TAG_TABLE, array('image_id', 'tag_id'), $inserts);
   }
+
+  if (count($obsolete) or count($missing))
+  {
+    persons_invalidate_tag_cache();
+  }
+}
+
+/**
+ * Discards every user's cached count of available tags.
+ *
+ * Unscoped on purpose - which users a tag became visible to depends on album
+ * permissions this function would have to recompute. Over-invalidation costs one
+ * recount per user and is always safe; under-invalidation shows a wrong count
+ * with no way to notice. See
+ * docs/agents/decisions/0004-unscoped-tag-cache-invalidation-accepted.md.
+ *
+ * @return void
+ */
+function persons_invalidate_tag_cache()
+{
+  pwg_query('UPDATE '.USER_CACHE_TABLE.' SET nb_available_tags = NULL;');
+}
+
+/**
+ * Marks persons as just used, so the picker's recency ordering means what it says.
+ *
+ * piwigo_persons.lastmodified is ON UPDATE CURRENT_TIMESTAMP, and a person row
+ * is inserted once and never updated again - so without this it records when a
+ * person was first *created*, and pwg.persons.getList's "most recently used"
+ * would silently be "most recently added".
+ *
+ * @param array $regions the regions just added, each with a name
+ * @return void
+ */
+function persons_touch_persons($regions)
+{
+  $names = array();
+  foreach ($regions as $region)
+  {
+    $name = persons_clean_name(isset($region['name']) ? $region['name'] : '');
+    if ($name !== '')
+    {
+      $names[$name] = "'".pwg_db_real_escape_string($name)."'";
+    }
+  }
+
+  if (count($names) == 0)
+  {
+    return;
+  }
+
+  // lastmodified is ON UPDATE, so it only moves when a column actually changes -
+  // assigning name to itself would be a no-op row and leave the timestamp alone.
+  pwg_query(
+    'UPDATE '.PERSONS_TABLE.' SET lastmodified = NOW()'
+    .' WHERE name IN ('.implode(',', $names).');'
+    );
 }
 
 /**
@@ -262,11 +319,229 @@ function persons_apply_change($image_id, $add, $remove)
       return array('ok' => false, 'regions' => 0, 'message' => $write['message']);
     }
 
-    return persons_reindex_image($image_id, $file);
+    $outcome = persons_reindex_image($image_id, $file);
+
+    // Only the names this call added, and only after the write succeeded. The
+    // reindex resolves every name in the file, so touching there would count a
+    // person as "used" because somebody else was tagged on the same photo.
+    if ($outcome['ok'])
+    {
+      persons_touch_persons($add);
+    }
+
+    return $outcome;
   }
   finally
   {
     flock($lock, LOCK_UN);
     fclose($lock);
   }
+}
+
+/**
+ * One person's row, or null.
+ *
+ * @param int $person_id
+ * @return array|null id, name, url_name, tag_id
+ */
+function persons_person_row($person_id)
+{
+  $row = pwg_db_fetch_assoc(pwg_query(
+    'SELECT id, name, url_name, tag_id FROM '.PERSONS_TABLE.' WHERE id = '.(int)$person_id.';'
+    ));
+
+  return $row ? $row : null;
+}
+
+/**
+ * The photos carrying at least one region for a person.
+ *
+ * @param int $person_id
+ * @return array list of image ids
+ */
+function persons_person_images($person_id)
+{
+  $ids = array();
+  $result = pwg_query(
+    'SELECT DISTINCT image_id FROM '.PERSONS_REGION_TABLE.' WHERE person_id = '.(int)$person_id.';'
+    );
+  while ($row = pwg_db_fetch_assoc($result))
+  {
+    $ids[] = (int)$row['image_id'];
+  }
+
+  return $ids;
+}
+
+/**
+ * Renames a person everywhere the name is stored.
+ *
+ * The database moves first and the files afterwards, and the order is not
+ * arbitrary: persons_reindex_image() resolves each name it reads through
+ * persons_person_id_from_name(), so a file rewritten while the row still said
+ * the old name would come back indexed against a second, newly created person.
+ *
+ * A file this cannot rewrite is reported against its photo and the rest go on -
+ * one unwritable file must not leave the rename half-applied everywhere else.
+ * The photos it could not reach keep the old name until a later rescan, which is
+ * visible in 'failed' rather than silent.
+ *
+ * @param int $person_id
+ * @param string $new_name already the caller's raw input; cleaned here
+ * @return array array('ok' => bool, 'message' => string, 'photos' => int,
+ *   'failed' => array(image id => message))
+ */
+function persons_rename_person($person_id, $new_name)
+{
+  $person_id = (int)$person_id;
+  $failure = function ($message)
+  {
+    return array('ok' => false, 'message' => $message, 'photos' => 0, 'failed' => array());
+  };
+
+  $new_name = persons_clean_name($new_name);
+  if ($new_name === '')
+  {
+    return $failure('A person needs a name');
+  }
+
+  $person = persons_person_row($person_id);
+  if ($person === null)
+  {
+    return $failure('No such person');
+  }
+
+  if ($person['name'] === $new_name)
+  {
+    return array('ok' => true, 'message' => '', 'photos' => 0, 'failed' => array());
+  }
+
+  $taken = pwg_db_fetch_assoc(pwg_query(
+    'SELECT id FROM '.PERSONS_TABLE
+    ." WHERE name = '".pwg_db_real_escape_string($new_name)."' AND id <> ".$person_id.';'
+    ));
+  if ($taken)
+  {
+    // Merging two persons is deliberately not offered - see the plan's
+    // "What We're NOT Doing". Silently folding one into the other here would be
+    // that feature, minus the chance to undo it.
+    return $failure('Another person already has that name');
+  }
+
+  $url_name = trigger_change('render_tag_url', $new_name);
+
+  pwg_query(
+    'UPDATE '.PERSONS_TABLE
+    ." SET name = '".pwg_db_real_escape_string($new_name)."',"
+    ." url_name = '".pwg_db_real_escape_string($url_name)."'"
+    .' WHERE id = '.$person_id.';'
+    );
+
+  if ($person['tag_id'] !== null)
+  {
+    pwg_query(
+      'UPDATE '.TAGS_TABLE
+      ." SET name = '".pwg_db_real_escape_string($new_name)."',"
+      ." url_name = '".pwg_db_real_escape_string($url_name)."'"
+      .' WHERE id = '.(int)$person['tag_id'].';'
+      );
+  }
+
+  persons_invalidate_tag_cache();
+
+  $failed = array();
+  $photos = 0;
+
+  foreach (persons_person_images($person_id) as $image_id)
+  {
+    $add = array();
+    $result = pwg_query('
+SELECT area_x, area_y, area_w, area_h, region_type
+  FROM '.PERSONS_REGION_TABLE.'
+  WHERE image_id = '.$image_id.' AND person_id = '.$person_id.'
+;');
+    while ($row = pwg_db_fetch_assoc($result))
+    {
+      $add[] = array(
+        'name' => $new_name,
+        'x'    => (float)$row['area_x'],
+        'y'    => (float)$row['area_y'],
+        'w'    => (float)$row['area_w'],
+        'h'    => (float)$row['area_h'],
+        'type' => $row['region_type'],
+        );
+    }
+
+    $outcome = persons_apply_change($image_id, $add, array(array('name' => $person['name'])));
+
+    if ($outcome['ok'])
+    {
+      $photos++;
+    }
+    else
+    {
+      $failed[$image_id] = $outcome['message'];
+    }
+  }
+
+  return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed);
+}
+
+/**
+ * Removes a person: their regions leave every file, then the index rows and the
+ * person row go.
+ *
+ * The mirrored tag is left behind for core's orphan-tag mechanism
+ * (get_orphan_tags(), admin/include/functions.php:430) rather than dropped here:
+ * an administrator may have applied that tag by hand to photos that never
+ * carried a region, and those assignments are not this plugin's to delete.
+ *
+ * @param int $person_id
+ * @return array array('ok' => bool, 'message' => string, 'photos' => int,
+ *   'failed' => array(image id => message))
+ */
+function persons_delete_person($person_id)
+{
+  $person_id = (int)$person_id;
+
+  $person = persons_person_row($person_id);
+  if ($person === null)
+  {
+    return array('ok' => false, 'message' => 'No such person', 'photos' => 0, 'failed' => array());
+  }
+
+  $failed = array();
+  $photos = 0;
+
+  foreach (persons_person_images($person_id) as $image_id)
+  {
+    $outcome = persons_apply_change($image_id, array(), array(array('name' => $person['name'])));
+
+    if ($outcome['ok'])
+    {
+      $photos++;
+    }
+    else
+    {
+      $failed[$image_id] = $outcome['message'];
+    }
+  }
+
+  // Unconditional, including for the files that could not be rewritten: the
+  // person is gone from the gallery either way, and the next rescan of an
+  // unwritten file puts its regions back under a fresh person rather than
+  // leaving rows pointing at a row that no longer exists.
+  pwg_query('DELETE FROM '.PERSONS_REGION_TABLE.' WHERE person_id = '.$person_id.';');
+  pwg_query('DELETE FROM '.PERSONS_TABLE.' WHERE id = '.$person_id.';');
+
+  if ($person['tag_id'] !== null)
+  {
+    pwg_query(
+      'DELETE FROM '.IMAGE_TAG_TABLE.' WHERE tag_id = '.(int)$person['tag_id'].';'
+      );
+  }
+
+  persons_invalidate_tag_cache();
+
+  return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed);
 }

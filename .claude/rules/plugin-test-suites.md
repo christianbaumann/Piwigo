@@ -79,6 +79,14 @@ It writes the git-ignored `local/config/persons-test.env` and creates `persons_w
 `persons_normal`, and marks the install with a `persons_throwaway_install` config row that
 `FixtureBuilder` refuses to run without. Never point it at a production database.
 
+The persons integration suite also creates a **private** album, to prove the per-image visibility
+gate ([decision 0019](../../docs/agents/decisions/0019-person-region-permission-model.md)). That
+needs `piwigo_user_cache` thrown away — `$user['forbidden_categories']` is cached per user, so a
+private album created after the cache was computed is invisible to the gate and the `[NEG]` case
+would pass for the wrong reason. `FixtureBuilder::invalidateUserCache()` does it; core recomputes
+the rows on the next request, so nothing is left broken, but every user's cached tag and photo
+counts are rebuilt once after a run.
+
 `plugins/persons` has **no** Playwright specs yet — it renders nothing a browser can observe
 until the public overlay lands. `npx playwright test` there exits 1 with `No tests found`, which
 is the correct output rather than a broken harness; see

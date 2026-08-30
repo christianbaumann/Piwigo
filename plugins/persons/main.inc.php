@@ -51,6 +51,101 @@ add_event_handler('ws_add_methods', 'persons_add_methods');
  */
 function persons_add_methods($arr)
 {
-  // Registered from Phase 4 on. The handler exists now so the event this plugin
-  // subscribes to is real, and so activation is exercised end to end.
+  $service = &$arr[0];
+  $file = PERSONS_PATH . 'include/ws_functions.inc.php';
+
+  $service->addMethod(
+    'pwg.persons.getList',
+    'ws_persons_getList',
+    array(
+      'q' => array('flags' => WS_PARAM_OPTIONAL, 'info' => 'Substring of a name; omit for the most recently used'),
+      'image_id' => array('flags' => WS_PARAM_OPTIONAL, 'type' => WS_TYPE_ID,
+        'info' => 'Leaves out whoever is already on this photo'),
+      'per_page' => array(
+        'default' => PERSONS_PICKER_RECENT_LIMIT,
+        'maxValue' => PERSONS_SEARCH_MAX_RESULTS,
+        'type' => WS_TYPE_INT | WS_TYPE_POSITIVE,
+        ),
+      ),
+    'Lists persons for a picker: the most recently used, or those matching a query.',
+    $file
+  );
+
+  $service->addMethod(
+    'pwg.persons.getRegions',
+    'ws_persons_getRegions',
+    array(
+      'image_id' => array('type' => WS_TYPE_ID),
+      ),
+    'Reads the person regions indexed for one photo.',
+    $file
+  );
+
+  $service->addMethod(
+    'pwg.persons.addRegion',
+    'ws_persons_addRegion',
+    array(
+      'image_id' => array('type' => WS_TYPE_ID),
+      'name' => array(),
+      'x' => array('info' => 'Normalized [0..1], centre of the box, before rotation'),
+      'y' => array('info' => 'Normalized [0..1], centre of the box, before rotation'),
+      'w' => array('info' => 'Normalized [0..1]'),
+      'h' => array('info' => 'Normalized [0..1]'),
+      'type' => array('default' => 'Face', 'info' => 'One of: ' . implode(', ', persons_region_types())),
+      'pwg_token' => array(),
+      ),
+    'Writes one named region into a photo\'s image file and reindexes it.',
+    $file
+  );
+
+  $service->addMethod(
+    'pwg.persons.deleteRegion',
+    'ws_persons_deleteRegion',
+    array(
+      'region_id' => array('type' => WS_TYPE_ID),
+      'pwg_token' => array(),
+      ),
+    'Removes one region from a photo\'s image file and reindexes it.',
+    $file
+  );
+
+  // The three below reach past a single photo - a rename or a delete rewrites
+  // every file carrying the person - so the per-image visibility gate cannot
+  // bound them and they are administrator-only instead.
+  $service->addMethod(
+    'pwg.persons.rename',
+    'ws_persons_rename',
+    array(
+      'person_id' => array('type' => WS_TYPE_ID),
+      'name' => array(),
+      'pwg_token' => array(),
+      ),
+    'Renames a person in the index, the mirrored tag and every image file.',
+    $file,
+    array('admin_only' => true)
+  );
+
+  $service->addMethod(
+    'pwg.persons.delete',
+    'ws_persons_delete',
+    array(
+      'person_id' => array('type' => WS_TYPE_ID),
+      'pwg_token' => array(),
+      ),
+    'Removes a person and their regions from the index and from every image file.',
+    $file,
+    array('admin_only' => true)
+  );
+
+  $service->addMethod(
+    'pwg.persons.rescan',
+    'ws_persons_rescan',
+    array(
+      'image_ids' => array('info' => 'At most ' . PERSONS_WRITEBACK_MAX_CHUNK . ' comma-separated photo ids'),
+      'pwg_token' => array(),
+      ),
+    'Rebuilds the person index of one chunk of photos from what their files say.',
+    $file,
+    array('admin_only' => true)
+  );
 }

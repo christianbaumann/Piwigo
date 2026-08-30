@@ -528,7 +528,7 @@ The API the two browser surfaces will use, with the permission gate research ans
 
 ### Changes Required:
 
-#### [ ] 1. Method registration
+#### [x] 1. Method registration
 **File**: `plugins/persons/main.inc.php`
 
 | Method | Params | Gate |
@@ -545,7 +545,7 @@ Implementations live in `include/ws_functions.inc.php`, passed as `addMethod()`'
 the file loads lazily. No `post_only` on the non-admin methods, per
 `docs/agents/decisions/0003-no-post-only-on-ws-methods.md`.
 
-#### [ ] 2. The visibility gate
+#### [x] 2. The visibility gate
 **File**: `plugins/persons/include/ws_functions.inc.php`
 
 ```php
@@ -571,7 +571,7 @@ An image the caller cannot see returns `PwgError(404)`, not 403 — a 403 would 
 exists, which is exactly what the gate is hiding. Faces are personal data; this asymmetry is
 deliberate and gets a comment saying so.
 
-#### [ ] 3. Search
+#### [x] 3. Search
 **Changes**: `pwg.persons.getList` with no `q` returns the `PERSONS_PICKER_RECENT_LIMIT` most
 recently used persons (`ORDER BY persons.lastmodified DESC`), matching the Facebook patent's
 "list of previously used tags" that is visible *before* typing. With `q`, it is a
@@ -582,7 +582,7 @@ This is a **server-side** search, unlike core's tag picker, which ships the whol
 localStorage. Persons are personal data and the list is not bounded by a smallint, so shipping all
 of them to every browser is the wrong trade.
 
-#### [ ] 4. Decision file
+#### [x] 4. Decision file
 **File**: `docs/agents/decisions/NNNN-person-region-permission-model.md`
 **Changes**: record that person writes gate on non-guest + `pwg_token` + per-image visibility,
 that this deliberately goes beyond decision 0005, that a hidden image answers 404 not 403, and that
@@ -593,14 +593,20 @@ took 0017 and 0018.)
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Integration suite passes
-- [ ] Guest is rejected 401 on every non-admin method
-- [ ] `persons_normal` succeeds on a visible image and gets 404 on an image in a forbidden album
-- [ ] `persons_normal` gets 403 from `rename`/`delete`/`rescan` (`admin_only`)
-- [ ] Bad token 403, empty token 1002, missing token 1002, `image_id` of 0/-1 gives 1003
+- [x] Integration suite passes
+- [x] Guest is rejected 401 on every non-admin method
+- [x] `persons_normal` succeeds on a visible image and gets 404 on an image in a forbidden album
+- [x] `persons_normal` is refused by `rename`/`delete`/`rescan` (`admin_only`). Core answers **401**,
+      not 403 (`include/ws_core.inc.php:515`); `AdminOnlyTest` records that as `[ERR]`, see
+      [decision 0019](../decisions/0019-person-region-permission-model.md)
+- [x] Bad token 403, empty token 1002, missing token 1002, `image_id` of 0/-1 gives 1003
 
 #### Manual Verification:
-- [ ] Call `pwg.persons.getList` from the browser as a normal user and confirm the recency ordering
+- [x] Call `pwg.persons.getList` from the browser as a normal user and confirm the recency ordering —
+      **automated 2026-08-30** by `SearchTest::testGetListWithNoQueryReturnsRecentPersonsMostRecentFirst`
+      and `testTaggingAnExistingPersonAgainMovesThemToTheFrontOfTheRecentList`, both called over
+      ws.php as `persons_normal` with a session cookie — the same request a browser issues. The
+      second found a real defect; see the hand-check ledger in `docs/agents/TESTING.md`
 
 **Implementation Note**: pause for manual confirmation before Phase 5.
 
@@ -1073,18 +1079,20 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 **Happy path:**
 - [ ] `WriteRegionTest::testARegionWrittenByThePluginIsReadBackByAnIndependentExiftoolRun` `[HAPPY]`
 - [x] `ReindexTest::testTheIndexMatchesWhatTheFileHolds` `[HAPPY]`
-- [ ] `AddRegionTest::testAddingARegionCreatesThePersonTheRegionAndTheMirroredTag` `[HAPPY]`
-- [ ] `SearchTest::testGetListWithNoQueryReturnsRecentPersonsMostRecentFirst` `[HAPPY]`
-- [ ] `SearchTest::testGetListWithAPartialQueryMatchesInTheMiddleOfAName` `[HAPPY]`
+- [x] `AddRegionTest::testAddingARegionCreatesThePersonTheRegionAndTheMirroredTag` `[HAPPY]`
+- [x] `SearchTest::testGetListWithNoQueryReturnsRecentPersonsMostRecentFirst` `[HAPPY]`
+- [x] `SearchTest::testGetListWithAPartialQueryMatchesInTheMiddleOfAName` `[HAPPY]`
+- [x] `SearchTest::testTaggingAnExistingPersonAgainMovesThemToTheFrontOfTheRecentList` `[ST]` — the
+      one case that separates "most recently used" from "most recently created"
 
 **Negative / error propagation:**
-- [ ] `AddRegionTest::testGuestIsRejected` — 401 `[NEG]`
-- [ ] `AddRegionTest::testBadTokenIsRejected` — 403 `[NEG]`
-- [ ] `AddRegionTest::testEmptyTokenIsRejectedByTheDispatcher` — 1002 `[NEG]`
-- [ ] `VisibilityTest::testANormalUserGets404ForAnImageInAForbiddenAlbum` `[NEG]`
-- [ ] `VisibilityTest::testTheRefusalDoesNotRevealWhetherTheImageExists` — a nonexistent id and a
+- [x] `AddRegionTest::testGuestIsRejected` — 401 `[NEG]`
+- [x] `AddRegionTest::testBadTokenIsRejected` — 403 `[NEG]`
+- [x] `AddRegionTest::testEmptyTokenIsRejectedByTheDispatcher` — 1002 `[NEG]`
+- [x] `VisibilityTest::testANormalUserGets404ForAnImageInAForbiddenAlbum` `[NEG]`
+- [x] `VisibilityTest::testTheRefusalDoesNotRevealWhetherTheImageExists` — a nonexistent id and a
       forbidden id return the same code and message `[NEG]`
-- [ ] `AdminOnlyTest::testANormalUserCannotRenameDeleteOrRescan` — 403 ×3 `[NEG]`
+- [x] `AdminOnlyTest::testANormalUserCannotRenameDeleteOrRescan` — 401 ×3 `[NEG]` `[ERR]` (core's code, not 403)
 - [ ] `WriteRegionTest::testAReadOnlyFileIsReportedFailedAndLeftUnchanged` `[NEG]`
 - [ ] `WriteRegionTest::testAFileExiftoolCannotWriteIsReportedNotCrashed` `[NEG]`
 - [x] `RescanTest::testOneUnreadableFileDoesNotAbortTheBatch` `[NEG]` — landed as `ReindexTest::testOneUnreadableFileDoesNotAbortTheBatch`
@@ -1101,8 +1109,8 @@ Conditions: **E** in file, **A** in add, **R** in remove.
       lands on the same feature `[ST]`
 - [ ] `RotationTest::testChangingOnlyImagesRotationRewritesNothing` — the file's mtime and its
       `RegionInfo` are byte-identical afterwards `[ST]` `[NEG]`
-- [ ] `TagMirrorTest::testRemovingTheLastRegionRemovesTheImageTagRow` `[ST]`
-- [ ] `TagMirrorTest::testRemovingOneOfTwoRegionsForTheSamePersonKeepsTheImageTagRow` `[ST]`
+- [x] `testRemovingTheLastRegionRemovesTheImageTagRow` `[ST]` — landed in `DeleteRegionTest`
+- [x] `testRemovingOneOfTwoRegionsForTheSamePersonKeepsTheImageTagRow` `[ST]` — landed in `DeleteRegionTest`
 - [ ] `PicturePageSourceTest::testTheOverlayIsInjectedExactlyOnce` — the sub-template guard `[BVA]`
 - [ ] `PicturePageSourceTest::testAGuestSeesNoOverlay` `[NEG]`
 - [ ] `PluginActivationTest` — install / activate / deactivate / uninstall driven through
