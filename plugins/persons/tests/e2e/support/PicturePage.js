@@ -295,6 +295,41 @@ class PicturePage {
     );
   }
 
+  /**
+   * The picker entry for a person who already exists, as opposed to the
+   * create-new escape hatch, which carries the same name in the same attribute.
+   * Telling them apart is the whole point of the reuse spec: committing the
+   * create entry would make a second person of the same name.
+   *
+   * @param {string} name
+   */
+  existingPickerOption(name) {
+    return this.page.locator(
+      `#persons-picker-list .persons-picker-option[data-persons-name="${name}"]:not(.persons-picker-create)`
+    );
+  }
+
+  /**
+   * Types a search fragment and waits for the existing person it should match.
+   *
+   * Separate from typeName(): that one types a whole name and accepts either
+   * entry, which is right when the person is being created.
+   *
+   * @param {string} fragment
+   * @param {string} name
+   */
+  async searchForExisting(fragment, name) {
+    await this.pickerInput.fill(fragment);
+    await this.existingPickerOption(name).waitFor();
+  }
+
+  /** The region ids of the boxes the server has saved, in DOM order. */
+  async savedRegionIds() {
+    return this.savedBoxes.evaluateAll((els) =>
+      els.map((el) => el.getAttribute('data-person-region'))
+    );
+  }
+
   /** The names currently rendered on the saved boxes. */
   async savedNames() {
     return this.savedBoxes.locator('.person-box-label').allTextContents();

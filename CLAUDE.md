@@ -14,6 +14,7 @@ Piwigo — open-source photo gallery web application. Procedural PHP, Smarty tem
 - Two fork-local `trigger_notify()` calls have been added to core so the provenance plugin can hook the paths that create album links. Upstream has neither:
   - `associate_images_to_categories` in `admin/include/functions.php`, inside the `if (count($inserts))` block — the funnel every virtual link goes through (API, Batch Manager, upload). Payload: `image_ids`, `category_ids`
   - `site_update_associate_images` in `admin/site_update.php`, after the `$insert_links` `mass_inserts()` — the filesystem sync inserts its storage links directly without calling the helper. Payload: the `$insert_links` rows. This is the **only** trigger in that file; anything claiming it fires none is out of date
+- `plugins/persons` needed **no** core change at all — don't assume symmetry with provenance. It reaches everything it needs through existing events (`ws_add_methods`, `loc_end_picture`, `loc_begin_admin_page`, `delete_elements`) and Smarty prefilters. The image file is the source of truth for regions; its two tables are a rebuildable index ([decision 0020](docs/agents/decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md))
 
 ## Development Environment
 

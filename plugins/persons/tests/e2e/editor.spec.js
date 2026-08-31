@@ -1,6 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-const { seed, restore, readFileRegions, setExiftool } = require('./support/seed');
+const { seed, restore, readFileRegions, setExiftool, personCounts } = require('./support/seed');
 const { PicturePage } = require('./support/PicturePage');
 
 /**
@@ -234,6 +234,57 @@ test.describe('tagging a person', () => {
 
     const inFile = readFileRegions(seeded.photo_id);
     expect(inFile.regions.map((region) => region.name).sort()).toEqual([ADA, GRACE].sort());
+  });
+
+  /**
+   * The other half of the picker: a person the gallery already knows is picked
+   * out of the list rather than typed again, and the region lands on that
+   * person's existing row.
+   *
+   * The box is drawn, named, and removed again first, because getList
+   * deliberately never offers somebody already on this photo
+   * (ws_functions.inc.php) - so the person has to exist and be absent from the
+   * picture, which is exactly the state a person tagged on another photo is in.
+   */
+  test('picking an existing person from the list tags that same person', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await picture.enterTaggingMode();
+
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(1);
+
+    const [firstRegion] = await picture.savedRegionIds();
+    expect(firstRegion, 'the committed box carries no region id').toBeTruthy();
+    await picture.deleteButton(firstRegion).click();
+    await expect(picture.savedBoxes).toHaveCount(0);
+
+    // A fragment out of the middle of the name, so what comes back is a search
+    // hit on the index rather than an echo of what was typed.
+    await picture.dragBox(SECOND_BOX);
+    await picture.searchForExisting(ADA.slice(6, 12), ADA);
+    await picture.existingPickerOption(ADA).click();
+    await expect(picture.savedBoxes).toHaveCount(1);
+
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    expect(await picture.savedNames()).toEqual([ADA]);
+
+    const inFile = readFileRegions(seeded.photo_id);
+    expect(inFile.regions.map((region) => region.name)).toEqual([ADA]);
+
+    // What a second person row would take is not on trial here - piwigo_persons
+    // carries a UNIQUE index on name, so the database forbids one outright
+    // (measured 2026-08-31). What is on trial is that the picked entry commits
+    // the person the index already holds: the region has to hang off that row.
+    const counts = personCounts();
+    expect(counts[ADA], 'the person the box was tagged with is not in the index').toBeDefined();
+    expect(counts[ADA].regions, 'the region did not land on the existing person').toBe(1);
+    expect(counts[ADA].photos).toBe(1);
   });
 
   /**

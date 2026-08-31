@@ -799,8 +799,12 @@ that pattern leaves open.
 ## Open Questions — answered 2026-08-30
 
 These were put to the user as a numbered list with three ranked options each; the answers below
-are the ones chosen. They are decisions of direction recorded here, not yet implemented, and not
-yet written up as `docs/agents/decisions/` files.
+are the ones chosen. All of them are implemented as of 2026-08-31
+(`docs/agents/plans/2026-08-30-person-face-tagging.md`, Phases 1-9). The two that constrain future
+work rather than just this plugin are written up as decision files: answer 1 as
+[decision 0020](../decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md), and
+answer 3 as [decision 0019](../decisions/0019-person-region-permission-model.md). The rest are
+recorded by the code and its tests, and answer 9's two deferrals are carried in `docs/backlog.md`.
 
 1. **Where do the regions live? → File-only.** Regions are stored in the image's XMP; the database
    holds only bookkeeping. This is what both *maintained* Piwigo extensions do (Face Tag, Face Tag

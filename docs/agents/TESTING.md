@@ -207,6 +207,9 @@ So a later reader can tell a considered omission from an oversight.
 | A `[NEG]` E2E spec for the overlay when JavaScript is disabled | The boxes are rendered and laid out in percent by the server; `overlay.js` only sizes `#persons-overlay`, so with no JavaScript the overlay is a zero-sized element and the boxes are simply invisible — no error, no broken layout | There is no failure mode to assert. The design choice that produces it (no region math in the browser) is what `PicturePageSourceTest` covers by finding the geometry in the page source |
 | `MP:RegionInfo` (Microsoft/Picasa) and `.picasa.ini` regions | Deliberately not read or written — MWG plus `XMP-iptcExt:PersonInImage` only, per the plan's *What We're NOT Doing* | Would assert an import path that does not exist |
 | `owner` as a reference to a people table | Free text in v1 (decision 3a); the reference-table item is in `docs/backlog.md` | Would assert a data model that does not exist |
+| Touch and pen input on the region editor | `editor.js` binds `mousedown`/`mousemove`/`mouseup` only — measured 2026-08-31, there is no `touch*` or `pointer*` listener in the plugin — so there is no touch behaviour to assert. Carried in `docs/backlog.md` | A test would have to assert the *absence* of a feature. Playwright's touch emulation would drive events nothing listens for and fail for a reason that is not a defect |
+| Stored regions after an administrator changes `images.coi` | `coi` is a display hint; it changes neither the file's bytes nor its `AppliedToDimensions`, so no stored region moves. Carried in `docs/backlog.md` against the day a crop is driven from it | Nothing changes, so any assertion would be a tautology. What *would* move regions — a physical rotation — is asserted instead, by `RotationTest` and `persons_rotation_delta()`'s unit cases |
+| An external tool editing a file's regions behind Piwigo's back | The index is derived and nothing detects the drift; see [decision 0020](decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md). The candidate signal, `images.date_metadata_update`, is in `docs/backlog.md` | No behaviour exists to test. The repair that does exist is asserted: `IndexRebuildTest::testDroppingTheTablesAndRescanningRebuildsTheIndex` rebuilds the whole index from the files |
 
 ## Mutant table — unit suite
 
@@ -343,6 +346,74 @@ This is the same shape as the two typetags findings above: a mutant that dies wh
 watching it is weaker than it looks. It is the reason the pass is worth running once even when
 every mutant is killed.
 
+## Mutant table — `plugins/persons` unit suite
+
+Run 2026-08-31 against the persons unit suite (112 tests, 354 assertions at the time of the run;
+399 after the finding below was fixed), by hand, one mutant at
+a time, at the end of the plan rather than per-commit. Scope and method per
+[decision 0001](decisions/0001-mutation-testing-unit-only.md) and
+`.claude/rules/mutation-testing.md`. Every mutant targets
+`plugins/persons/include/functions.inc.php`, the coordinate and merge math — the only substantial
+persons logic that loads with no database and no Piwigo bootstrap, and the place where a silent
+regression would be worst: a wrong box is still a box, and nobody notices until the faces are in
+the wrong places in every file written since.
+
+**Method.** Same as the provenance table above, for the same reason: after each apply and each
+revert the container's `md5sum` was polled until it matched the host's before any suite ran, and
+each edit was asserted to have changed the file at all (a replacement matching nothing produces
+the same false "survived"). The file was restored with `git checkout` after every mutant and the
+suite confirmed green again before the next.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `persons_center_to_corner()`: `$x - $w / 2` → `$x + $w / 2` | the centre↔corner round-trip test | killed: `testCenterToCornerConvertsACenteredBox`, `testCornerToCenterIsTheInverseOfCenterToCorner`, `testABoxOverrunningTheLeftEdgeIsClippedNotDropped`, `testABoxOverrunningTwoEdgesIsClippedOnBoth`, `testAWidthOfExactlyOneCoversTheWholeImage`, `testAFloatArtefactIsRoundedAway`, `MergeRegionsTest::testAnAddThatOverrunsAnEdgeIsClipped` |
+| `persons_clip_region()`: `$x > 1` → `$x >= 1` on the centre bound | the boundary pair at exactly 0 and 1 | killed: `testACenterAtExactlyOneIsKept` — and nothing else, which is the point: the mutant moves exactly one boundary and exactly one test watches it |
+| `persons_rotate_region()`: `% 4` → `% 3` | the rotation-code equivalence classes | killed: `testRotationCodeThreeSwapsTheAxesTheOtherWay`, `testRotationCodeFourIsTreatedAsZero` |
+| `persons_region_is_stale()`: `> PERSONS_STALE_RATIO_TOLERANCE` → `<` | the just-inside / just-outside boundary pair | killed: `testIdenticalDimensionsAreNotStale`, `testAProportionalResizeIsNotStale`, `testACropIsStale`, `testARatioDifferenceJustInsideToleranceIsNotStale`, `testARatioDifferenceJustOutsideToleranceIsStale` |
+| `persons_merge_regions()`: the `$kept[] = $region;` that carries existing regions forward, removed — a merge turned into a replace | the "foreign region survives" test | killed: `testAddingASecondPersonKeepsTheFirst`, `testAForeignRegionSurvivesAnAdd`, `testRemovingOneRegionLeavesTheRest`, `testAMatcherWithoutABoxRemovesEveryRegionOfThatPerson`, `testRemovingSomethingThatIsNotThereIsANoOp`, `testAnAddWhoseCentreIsOutsideTheFrameIsDropped`, `testRemovingOneOfTwoBoxesForTheSamePersonKeepsTheOther` |
+| `persons_minimum_box_ok()`: `and` → `or` | the one-axis-too-small case | killed: `testABoxTooSmallOnOneAxisOnlyIsRejected`, `testABoxOneEpsilonBelowTheMinimumIsRejected` |
+| `persons_rotation_delta()`: the transpose check `$file_w === $applied_h` → `!==` | the display-only vs. physical pair | killed: `testAPhysicalRotationYieldsTheDelta`, `testAPhysicalRotationTheOtherWayYieldsTheOppositeDelta` |
+
+**No mutant survived, and nothing else moved.** Each killed the tests that watch it and left the
+rest of the 112 green. Two notes worth keeping rather than a finding:
+
+- The plan's table named the merge mutant `array_merge` → replace. There is no `array_merge` in
+  `persons_merge_regions()` — the function builds `$kept` in a loop — so the mutant was applied
+  where the behaviour actually lives: the line that carries an existing region forward. Recorded
+  rather than quietly swapped, per `.claude/rules/mutation-testing.md`.
+- That mutant is the only one of the seven that killed by *error* as well as by assertion, and
+  that is the pass's one finding — see below.
+
+### The finding: one test died of a `TypeError`, not of an assertion
+
+Under the merge mutant, `MergeRegionsTest::testRemovingOneOfTwoBoxesForTheSamePersonKeepsTheOther`
+did not fail — it **errored**: `assertCount(): Argument #2 ($haystack) must be of type
+Countable|Traversable|array, null given`. A merge that loses every region returns the *delete the
+tag* shape, where `RegionInfo` carries no `RegionList` at all, so `['RegionList']` was `null` and
+the count never ran. The kill was real and the behavioural kills came from the six siblings in the
+same row, but this watchman was asleep: it reports "the shape changed", not "the wrong region
+survived", and a subtler change to the same line would have found it silent.
+
+Fixed the way the provenance table's finding was, and the way `.claude/rules/test-design.md`
+(*anti-vacuity*) prescribes — every count assertion gets a guard proving the thing counted exists.
+The ten `$merged['regioninfo']['RegionList']` accesses in the file now go through one helper:
+
+```php
+private function regionListOf(array $merged): array
+{
+    $this->assertIsArray($merged['regioninfo'], 'the merge returned no RegionInfo at all');
+    $this->assertArrayHasKey('RegionList', $merged['regioninfo'],
+        'the merge returned the "delete the tag" shape, not a region list');
+    $this->assertIsArray($merged['regioninfo']['RegionList']);
+
+    return $merged['regioninfo']['RegionList'];
+}
+```
+
+The guard was then **watched reporting**: the mutant re-applied, the run came back with 7 failures
+and 0 errors where it had been 6 failures and 1 error, then reverted. Suite after the fix:
+112 tests / 399 assertions (was 354), green.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
@@ -377,6 +448,9 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-08-31 | Phase 7 of the persons plan opened one manual box: confirm the admin tagging screen and the public page place an identical region identically. | **Replaced 2026-08-31** by `plugins/persons/tests/e2e/admin.spec.js` → `a region drawn here sits where the public page draws it`. It tags a face on the admin screen, then measures the same region on both surfaces as fractions of the photo's rendered box — the only frame of reference they share, since they render different derivatives at different sizes — and asserts the two agree within 0.01 of the photo. Watched red against `$image['rotation'] = 1` forced on the admin screen, which also killed `an administrator draws a box and the file carries it`. The link injection got its own spec for the same reason: `PhotoModifyAnchorTest` guards the anchor string, but only `the photo properties screen links to it` witnesses the prefilter actually running — watched red against a removed `set_prefilter()` call. |
 | 2026-08-31 | Phase 7 build: the first admin spec run turned three green editor specs red. | Not a regression in the phase's code — two defects the phase's own leftovers exposed. `PicturePage.typeName()` waited for *an* option rather than the one it typed, and the picker opens on the most recently used persons, so on an install with any, Enter committed a stranger; it now waits for the option carrying that name. And `seed.php --restore` did its person cleanup only after finding a snapshot, so a person created through the UI outlived every later restore. Both fixed in the same commit; the leftover row that found them was deleted by hand. Recorded because the suite passed twice in a row before this phase and would have kept passing — the flake needed a second spec creating a person to become visible. |
 | 2026-08-31 | Phase 7 verification pass: the two refusal branches of the admin screen its own criteria never named — a photo id that no longer exists, and an id that is not a usable one. | **Covered 2026-08-31** by `plugins/persons/tests/Integration/AdminPhotoScreenTest.php`: `testAPhotoThatNoLongerExistsRendersAMessageRatherThanAnError` and `testAnUnusableImageIdIsRefusedBeforeTheScreenIsReached` (`0`, `-1`, `abc`). Integration rather than E2E: no browser is needed to witness a page that renders a message instead of a diagnostic, and the E2E layer already owns the screen's editor. Both watched red — the first against the `pwg_db_num_rows()` guard removed, the second against the dispatcher's bound loosened to `< 0`, which answered **HTTP 500** on `image_id=abc`. That 500 is the finding: the dispatcher's int cast is what stands between a hand-edited admin URL and a fatal error, and nothing had been asserting it. |
+| 2026-08-31 | Phase 8 of the persons plan opened one manual box: delete the two tables, run a full rescan, and confirm the index comes back. | **Replaced 2026-08-31** by `plugins/persons/tests/Integration/IndexRebuildTest.php` → `testDroppingTheTablesAndRescanningRebuildsTheIndex`, which uninstalls the plugin through `pwg.plugins.performAction` (dropping both tables), reinstalls, rescans the whole gallery through `pwg.persons.rescan` in chunks, and snapshots both tables verbatim first so a failure — exactly the case where the rescan did *not* restore everything — puts the install back. It asserts **nothing the index held is missing**, and that its own two fixture photos come back exactly; it deliberately does not assert the rebuilt index is byte-identical, because a rescan reads every file and a file whose regions were never indexed contributes new rows. Demanding otherwise would assert a fact about this gallery rather than about this code. That is also why the test is the one destructive outlier of the persons suite, flagged as such in `.claude/rules/plugin-test-suites.md`. |
+| 2026-08-31 | Phase 9 verification pass: four items the plan's own Testing Strategy listed and that had never landed — reconciling every bullet against the suite is what found them. | **All four closed 2026-08-31.** (1) The last cell of the merge decision table, E=1 A=1 R=1, is now `MergeRegionsTest::testARegionInBothAddAndRemoveIsKept` — and the plan's predicted outcome was **wrong**: the add wins, because `persons_rename_person()` removes the old name and re-adds the same boxes under the new one in one call, so remove-wins would delete a renamed person's regions. (2) The anti-vacuity byte floor moved into `PicturePageSourceTest::page()` and `markup()`, so all 13 scans carry it instead of the three that had it by hand; watched red with the constant raised past the page size. (3) `testTheColoredTagsInjectionAndTheOverlayCoexistOnOnePage` is the only place both plugins' picture-page prefilters are observed on one rendered page; it skips loudly rather than passing vacuously when the install renders no Colored Tags markup, and was watched red with `PERSONS_TPL_INJECT_POINT` broken. (4) `editor.spec.js` → `picking an existing person from the list tags that same person`, which has to draw, name and delete a box first: `ws_persons_getList()` never offers somebody already on this photo. Watched red with the reuse lookup in `persons_person_id_from_name()` disabled — which also surfaced that `piwigo_persons.name` carries a UNIQUE index, so a duplicate person row is impossible by schema and the spec asserts reuse rather than non-duplication. |
+| 2026-08-31 | Phase 9 of the persons plan left one manual box: the `CLAUDE.md` commands copy-paste and run on a fresh checkout. | **Executed 2026-08-31, and it found two things.** A real clone was made inside the web container (`git clone --local --no-hardlinks /var/www/html /tmp/freshclone`) and the documented fresh-clone steps run against it: `composer install -d plugins/persons` and `npm install` both succeeded and `plugins/persons/vendor/bin/phpunit --testsuite unit` came back green (112 tests at that HEAD); the same for `plugins/provenance` (138). **Finding 1**: the documented steps omitted `git submodule update --init --recursive`, so on a fresh clone `plugins/typetags` is an empty directory and every typetags command fails on a missing `composer.json` — `.claude/rules/plugin-test-suites.md` now says so, in the same change that measured it. **Finding 2**: that init cannot succeed today — the superproject records submodule commit `44fdd06`, which is not on `github.com/christianbaumann/Piwigo-Colored-Tags` (the submodule is one commit ahead of its own origin), so git reports `not our ref`. Pushing it is an outward-facing action and is carried in `docs/backlog.md` rather than done here. The part that a suite can keep watching is now `CleanCheckoutTest::testEverySuiteEntryPointIsCommitted`, which asserts every file a documented command names is tracked — `git ls-files --error-unmatch`, not just unignored, because a file can be unignored and still never added. Watched red against `vendor/autoload.php` added to the list. |
 
 ### Open — no oracle, so no test
 
@@ -387,4 +461,5 @@ than accumulating. Nothing is marked done on prose alone.
 | The hover opacity transition *feels* right | Subjective. The opacity values themselves are asserted; the perception is not. |
 | A written file's caption *reads* correctly in a GUI viewer (macOS Preview, a phone gallery) | Subjective, and the falsifiable half is already automated: `WriteBackTest::testAnIndependentReaderFindsTheCaption` proves an independent library finds the caption in three standard slots. Whether a given viewer chooses to *show* that slot, and whether it looks right, is a judgment no assertion settles. Recorded while automating it: ImageMagick's EXIF reader replaces every non-ASCII byte with a dot while its IPTC and XMP readers do not — the file's bytes are correct, the reader is not. |
 | A file produced by a **real** digiKam (or Picasa, or Apple Photos) rather than by exiftool in that tool's shape | No such binary is installed in the DDEV web image and none of these tools is scriptable from a container. The falsifiable half — that a file carrying MWG regions this plugin did not write is indexed, names and all, including the no-`AppliedToDimensions` shape digiKam produces — is automated (see the ledger). What stays is whether a given release of a given tool writes the shape recorded here; a fixture cannot settle that, only a file from that release can. |
+| The **integration and E2E** suites on a fresh clone | They need the clone to be a served Piwigo with its own database, and this repository has one install and no way to provision another — the same limit already recorded above for a first-time `install()` against an empty schema. What a clone can be asked, it now is: the unit suites run in one, and the files the documented commands name are guarded by `CleanCheckoutTest`. |
 | Committing does not *feel* slow with the pre-commit hook installed | Subjective, and a wall-clock assertion would violate *assert the causal fact, not a wall-clock figure*. |

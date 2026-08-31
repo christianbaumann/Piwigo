@@ -913,7 +913,7 @@ The strength check and the record. No new behaviour.
 
 ### Changes Required:
 
-#### [ ] 1. Mutation pass over the unit suite
+#### [x] 1. Mutation pass over the unit suite
 **Changes**: one table, per `.claude/rules/mutation-testing.md` — prose, not a script, and each
 mutant verified to have reached the container (checksum poll) before the suite runs. Target the
 coordinate math, which is where a silent regression would be worst:
@@ -928,7 +928,7 @@ coordinate math, which is where a silent regression would be worst:
 | `persons_minimum_box_ok`: `and` → `or` | the one-axis-too-small case |
 | `persons_rotation_delta`: transpose check `==` → `!=` | the display-only vs. physical pair |
 
-#### [ ] 2. Documentation
+#### [x] 2. Documentation
 **Files**: `CLAUDE.md`, `docs/agents/TESTING.md`, `docs/agents/decisions/`
 **Changes**:
 - `CLAUDE.md`: the plugin in the overview, its four test commands, its `create-test-users.php`, the
@@ -945,7 +945,7 @@ coordinate math, which is where a silent regression would be worst:
 - `docs/backlog.md`: the deferred items — face crops, `images.coi` invalidation, touch support,
   person merge, Microsoft `MP` write.
 
-#### [ ] 3. Research document status
+#### [x] 3. Research document status
 **File**: `docs/agents/research/2026-08-29-person-face-tagging.md`
 **Changes**: its "Open Questions" section says the answers are "not yet written up as decision
 files". Once Phase 9 writes them, update that sentence to cite the files. Stale process
@@ -954,12 +954,18 @@ documentation is worse than none.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Every mutant in the table is killed, or its survival is recorded with the reason
-- [ ] Full suite passes twice in a row and in reverse order
-- [ ] `bash tools/test-hooks.sh` passes
+- [x] Every mutant in the table is killed, or its survival is recorded with the reason — all seven killed, 2026-08-31; table in `docs/agents/TESTING.md`
+- [x] Full suite passes twice in a row and in reverse order — 2026-08-31: persons unit 113/408, integration 104 (1 skipped), E2E 31; typetags 56+44, provenance 138+128 (3 skipped)
+- [x] `bash tools/test-hooks.sh` passes
 
 #### Manual Verification:
-- [ ] `CLAUDE.md` commands copy-paste and run on a fresh checkout
+- [x] `CLAUDE.md` commands copy-paste and run on a fresh checkout — executed 2026-08-31 against a real
+      clone inside the web container: persons and provenance `composer install`, persons `npm install` and
+      both unit suites all ran green. Two findings, both recorded: the fresh-clone steps were missing
+      `git submodule update --init --recursive` (fixed in `.claude/rules/plugin-test-suites.md`), and that
+      init cannot succeed until the typetags submodule commit is pushed (`docs/backlog.md`). The integration
+      and E2E halves need a second served install and stay unautomatable — see the ledger in
+      `docs/agents/TESTING.md`
 
 ---
 
@@ -980,47 +986,47 @@ enumerated below.
 #### Coordinate math (`tests/Unit/RegionGeometryTest.php`)
 
 **Happy path:**
-- [ ] `testCenterToCornerConvertsACenteredBox` — center `(0.5,0.5,0.2,0.2)` → corner `(0.4,0.4,0.2,0.2)` `[HAPPY]`
-- [ ] `testCornerToCenterIsTheInverseOfCenterToCorner` — round-trip over a table of boxes `[HAPPY]`
+- [x] `testCenterToCornerConvertsACenteredBox` — center `(0.5,0.5,0.2,0.2)` → corner `(0.4,0.4,0.2,0.2)` `[HAPPY]`
+- [x] `testCornerToCenterIsTheInverseOfCenterToCorner` — round-trip over a table of boxes `[HAPPY]`
 
 **Boundary values (each normalized field: below 0, exactly 0, just inside, just below 1, exactly 1, above 1):**
-- [ ] `testACenterAtExactlyZeroIsKept` `[BVA]`
-- [ ] `testACenterAtExactlyOneIsKept` `[BVA]`
-- [ ] `testACenterBelowZeroIsDropped` `[BVA]` `[NEG]`
-- [ ] `testACenterAboveOneIsDropped` `[BVA]` `[NEG]`
-- [ ] `testABoxOverrunningTheLeftEdgeIsClippedNotDropped` `[BVA]`
-- [ ] `testABoxOverrunningTwoEdgesIsClippedOnBoth` `[BVA]`
-- [ ] `testAZeroWidthBoxIsRejected` `[BVA]` `[NEG]`
-- [ ] `testABoxAtExactlyTheMinimumFractionIsAccepted` `[BVA]`
-- [ ] `testABoxOneEpsilonBelowTheMinimumIsRejected` `[BVA]` `[NEG]`
-- [ ] `testAWidthOfExactlyOneCoversTheWholeImage` `[BVA]`
+- [x] `testACenterAtExactlyZeroIsKept` `[BVA]`
+- [x] `testACenterAtExactlyOneIsKept` `[BVA]`
+- [x] `testACenterBelowZeroIsDropped` `[BVA]` `[NEG]`
+- [x] `testACenterAboveOneIsDropped` `[BVA]` `[NEG]`
+- [x] `testABoxOverrunningTheLeftEdgeIsClippedNotDropped` `[BVA]`
+- [x] `testABoxOverrunningTwoEdgesIsClippedOnBoth` `[BVA]`
+- [x] `testAZeroWidthBoxIsRejected` `[BVA]` `[NEG]`
+- [x] `testABoxAtExactlyTheMinimumFractionIsAccepted` `[BVA]`
+- [x] `testABoxOneEpsilonBelowTheMinimumIsRejected` `[BVA]` `[NEG]`
+- [x] `testAWidthOfExactlyOneCoversTheWholeImage` `[BVA]`
 
 **Equivalence classes on `rotation`:**
-- [ ] `testRotationCodeZeroLeavesTheRegionUnchanged` `[ECP]`
-- [ ] `testRotationCodeOneSwapsTheAxes` `[ECP]`
-- [ ] `testRotationCodeTwoMirrorsBothAxes` `[ECP]`
-- [ ] `testRotationCodeThreeSwapsTheAxesTheOtherWay` `[ECP]`
-- [ ] `testRotationCodeFourIsTreatedAsZero` — the `% 4` in `derivative.inc.php:74-92` `[BVA]`
-- [ ] `testANegativeRotationCodeIsTreatedAsZero` `[NEG]`
-- [ ] `testFourSuccessiveRotationsReturnTheOriginalRegion` — property test `[ECP]`
+- [x] `testRotationCodeZeroLeavesTheRegionUnchanged` `[ECP]`
+- [x] `testRotationCodeOneSwapsTheAxes` `[ECP]`
+- [x] `testRotationCodeTwoMirrorsBothAxes` `[ECP]`
+- [x] `testRotationCodeThreeSwapsTheAxesTheOtherWay` `[ECP]`
+- [x] `testRotationCodeFourIsTreatedAsZero` — the `% 4` in `derivative.inc.php:74-92` `[BVA]`
+- [x] `testANegativeRotationCodeIsTreatedAsZero` `[NEG]`
+- [x] `testFourSuccessiveRotationsReturnTheOriginalRegion` — property test `[ECP]`
 
 **Rotation change detection (`persons_rotation_delta`):**
-- [ ] `testAnUnchangedRotationYieldsNoDelta` `[HAPPY]`
-- [ ] `testADisplayOnlyRotationChangeYieldsNoDelta` — code changed, dimensions still match `[DT]`
-- [ ] `testAPhysicalRotationYieldsTheDelta` — dimensions transposed `[DT]`
-- [ ] `testAPhysicalRotationTheOtherWayYieldsTheOppositeDelta` `[DT]`
-- [ ] `testASquareImageIsNeverReportedPhysicallyRotated` — transpose is indistinguishable `[BVA]` `[NEG]`
-- [ ] `testACropYieldsNoDelta` — dimensions differ but are not a transpose `[DT]`
-- [ ] `testUnknownAppliedDimensionsYieldNoDelta` `[NEG]`
+- [x] `testAnUnchangedRotationYieldsNoDelta` `[HAPPY]`
+- [x] `testADisplayOnlyRotationChangeYieldsNoDelta` — code changed, dimensions still match `[DT]`
+- [x] `testAPhysicalRotationYieldsTheDelta` — dimensions transposed `[DT]`
+- [x] `testAPhysicalRotationTheOtherWayYieldsTheOppositeDelta` `[DT]`
+- [x] `testASquareImageIsNeverReportedPhysicallyRotated` — transpose is indistinguishable `[BVA]` `[NEG]`
+- [x] `testACropYieldsNoDelta` — dimensions differ but are not a transpose `[DT]`
+- [x] `testUnknownAppliedDimensionsYieldNoDelta` `[NEG]`
 
 **Staleness (`persons_region_is_stale`):**
-- [ ] `testIdenticalDimensionsAreNotStale` `[HAPPY]`
-- [ ] `testARatioDifferenceAtExactlyTheToleranceIsNotStale` `[BVA]`
-- [ ] `testARatioDifferenceOneEpsilonPastToleranceIsStale` `[BVA]`
-- [ ] `testAProportionalResizeIsNotStale` — 4000x3000 → 2000x1500, the common case `[ECP]`
-- [ ] `testACropIsStale` — 4000x3000 → 4000x2000 `[ECP]`
-- [ ] `testUnknownAppliedDimensionsAreNotReportedStale` — digiKam bug 429219 `[ERR]` `[NEG]`
-- [ ] `testZeroAppliedDimensionsDoNotDivideByZero` `[BVA]` `[NEG]`
+- [x] `testIdenticalDimensionsAreNotStale` `[HAPPY]`
+- [x] `testARatioDifferenceAtExactlyTheToleranceIsNotStale` `[BVA]` — landed as `testARatioDifferenceJustInsideToleranceIsNotStale`
+- [x] `testARatioDifferenceOneEpsilonPastToleranceIsStale` `[BVA]` — landed as `testARatioDifferenceJustOutsideToleranceIsStale`
+- [x] `testAProportionalResizeIsNotStale` — 4000x3000 → 2000x1500, the common case `[ECP]`
+- [x] `testACropIsStale` — 4000x3000 → 4000x2000 `[ECP]`
+- [x] `testUnknownAppliedDimensionsAreNotReportedStale` — digiKam bug 429219 `[ERR]` `[NEG]`
+- [x] `testZeroAppliedDimensionsDoNotDivideByZero` `[BVA]` `[NEG]`
 
 #### RegionInfo parsing (`tests/Unit/ParseRegionInfoTest.php`)
 
@@ -1041,57 +1047,60 @@ enumerated below.
 
 Conditions: **E** in file, **A** in add, **R** in remove.
 
-- [ ] `testERegionOnlyInTheFileIsKept` — E=1 A=0 R=0 `[DT]`
-- [ ] `testANewRegionIsAdded` — E=0 A=1 R=0 `[DT]`
-- [ ] `testARemovalOfSomethingAbsentIsANoOp` — E=0 A=0 R=1 `[DT]` `[NEG]`
-- [ ] `testReAddingAnExistingRegionDoesNotDuplicateIt` — E=1 A=1 R=0 `[DT]`
-- [ ] `testARegionInTheFileAndInRemoveIsDropped` — E=1 A=0 R=1 `[DT]`
-- [ ] `testAddAndRemoveOfTheSameRegionResolvesToRemove` — E=1 A=1 R=1 `[DT]` `[NEG]`
-- [ ] `testAForeignPetRegionSurvivesAFaceWrite` `[DT]`
-- [ ] `testAppliedToDimensionsIsAlwaysWritten` — MWG normative `[HAPPY]`
-- [ ] `testMergingIntoAFileWithNoRegionInfoProducesAValidStructure` `[BVA]`
-- [ ] `testTheSamePersonTwiceInOneImageIsAllowed` — the case `image_tag`'s PK forbids `[ECP]`
-- [ ] `testPersonInImageListsEachNameOnce` `[ECP]`
+- [x] `testERegionOnlyInTheFileIsKept` — E=1 A=0 R=0 `[DT]` — landed as `testAddingASecondPersonKeepsTheFirst`
+- [x] `testANewRegionIsAdded` — E=0 A=1 R=0 `[DT]` — landed as `testAddingToAFileWithNoRegionsYieldsThatOneRegion`
+- [x] `testARemovalOfSomethingAbsentIsANoOp` — E=0 A=0 R=1 `[DT]` `[NEG]` — landed as `testRemovingSomethingThatIsNotThereIsANoOp`
+- [x] `testReAddingAnExistingRegionDoesNotDuplicateIt` — E=1 A=1 R=0 `[DT]` — landed as `testAddingARegionThatIsAlreadyThereDoesNotDuplicateIt`
+- [x] `testARegionInTheFileAndInRemoveIsDropped` — E=1 A=0 R=1 `[DT]` — landed as `testRemovingOneRegionLeavesTheRest`
+- [x] `testAddAndRemoveOfTheSameRegionResolvesToRemove` — E=1 A=1 R=1 `[DT]` `[NEG]` — landed as `testARegionInBothAddAndRemoveIsKept`, with the **opposite** outcome. The add wins, and it has to: `persons_rename_person()` removes every box of the old name and re-adds the same boxes under the new one in a single call (`index.inc.php:712`), so a remove-wins merge would delete a renamed person's regions. Watched red 2026-08-31 against a mutant that applied the removal to the adds
+- [x] `testAForeignPetRegionSurvivesAFaceWrite` `[DT]` — landed as `testAForeignRegionSurvivesAnAdd`
+- [x] `testAppliedToDimensionsIsAlwaysWritten` — MWG normative `[HAPPY]` — landed as `testTheWrittenAppliedDimensionsAreTheOnesPassedIn`, plus `testUnknownAppliedDimensionsAreOmittedEntirely` for the case where they are not known
+- [x] `testMergingIntoAFileWithNoRegionInfoProducesAValidStructure` `[BVA]` — landed as `testAddingToAFileWithNoRegionsYieldsThatOneRegion`
+- [x] `testTheSamePersonTwiceInOneImageIsAllowed` — the case `image_tag`'s PK forbids `[ECP]` — landed as `testRemovingOneOfTwoBoxesForTheSamePersonKeepsTheOther`
+- [x] `testPersonInImageListsEachNameOnce` `[ECP]` — landed as `testAddingARegionThatIsAlreadyThereDoesNotDuplicateIt`
 
 #### Name handling (`tests/Unit/PersonNameTest.php`)
 
-- [ ] `testATypicalNameIsUnchanged` `[HAPPY]`
-- [ ] `testMarkupIsStripped` `[NEG]`
-- [ ] `testSurroundingWhitespaceIsTrimmed` `[ECP]`
-- [ ] `testInternalWhitespaceIsCollapsed` `[ECP]`
-- [ ] `testAnEmptyNameIsRejected` `[BVA]` `[NEG]`
-- [ ] `testANameOfOnlyWhitespaceIsRejected` `[BVA]` `[NEG]`
-- [ ] `testANameAtExactlyTheByteCapIsAccepted` `[BVA]`
-- [ ] `testANameOneByteOverTheCapIsTruncatedOnAUtf8Boundary` `[BVA]`
-- [ ] `testAMultibyteNameCountsBytesNotCharacters` `[ERR]`
-- [ ] `testANameContainingANewlineIsFlattened` — it reaches a JSON file `[NEG]`
+- [x] `testATypicalNameIsUnchanged` `[HAPPY]`
+- [x] `testMarkupIsStripped` `[NEG]`
+- [x] `testSurroundingWhitespaceIsTrimmed` `[ECP]`
+- [x] `testInternalWhitespaceIsCollapsed` `[ECP]`
+- [x] `testAnEmptyNameIsRejected` `[BVA]` `[NEG]`
+- [x] `testANameOfOnlyWhitespaceIsRejected` `[BVA]` `[NEG]`
+- [x] `testANameAtExactlyTheByteCapIsAccepted` `[BVA]`
+- [x] `testANameOneByteOverTheCapIsTruncatedOnAUtf8Boundary` `[BVA]` — landed as `testANameOneByteOverTheCapIsTruncated` and `testANameOverTheCapIsTruncatedOnAUtf8Boundary`
+- [x] `testAMultibyteNameCountsBytesNotCharacters` `[ERR]`
+- [x] `testANameContainingANewlineIsFlattened` — it reaches a JSON file `[NEG]`
 
 #### Structural guards
 - [x] `tests/Unit/PicturePageAnchorTest.php` — `{$ELEMENT_CONTENT}` occurs exactly once in
       `themes/default/template/picture.tpl`, and `themes/modus/template/picture.tpl` is absent
-- [ ] `tests/Unit/PhotoTemplateAnchorTest.php` — the admin `picture_modify` anchor occurs once
-- [ ] `tests/Unit/SchemaDefinitionTest.php` — `maintain.class.php` creates exactly the columns the
+- [x] `tests/Unit/PhotoTemplateAnchorTest.php` — the admin `picture_modify` anchor occurs once — landed as `tests/Unit/PhotoModifyAnchorTest.php`
+- [x] `tests/Unit/SchemaDefinitionTest.php` — `maintain.class.php` creates exactly the columns the
       two column functions declare
-- [ ] `tests/Unit/CleanCheckoutTest.php` — every runtime include target is committed and none is
+- [x] `tests/Unit/CleanCheckoutTest.php` — every runtime include target is committed and none is
       git-ignored (the `.gitignore` `!` entry is easy to forget)
 
 #### Anti-vacuity
-- [ ] Every test that counts regions asserts the fixture yields a non-zero count first
-- [ ] Every page-source scan asserts `strlen($html) > MIN_BYTES` before its `substr_count`
+- [x] Every test that counts regions asserts the fixture yields a non-zero count first — held: `PicturePageSourceTest::testOneBoxIsRenderedPerRegion` / `testEachBoxCarriesADeleteControl` guard with `assertCount(2, $this->regionIds(), 'anti-vacuity: …')`, `IndexRebuildTest` and `PluginActivationTest` likewise
+- [x] Every page-source scan asserts `strlen($html) > MIN_BYTES` before its `substr_count` — closed 2026-08-31: the `MIN_PAGE_BYTES` floor moved into `PicturePageSourceTest::page()` and `markup()`, so every scan in the file carries it rather than the three tests that had it by hand. Watched red (13/13 tests reported the guard) with the constant raised past the page size
 
 #### Regression — affected existing functionality
-- [ ] `plugins/typetags` unit + integration suites still pass — the plugin injects into the same
+- [x] `plugins/typetags` unit + integration suites still pass — verified 2026-08-31 (56 unit / 44 integration) — the plugin injects into the same
       picture template and the mirrored tags land in the same `piwigo_tags` / `piwigo_image_tag`
       tables typetags reads
-- [ ] `plugins/provenance` unit + integration suites still pass — it injects into the same
+- [x] `plugins/provenance` unit + integration suites still pass — verified 2026-08-31 (138 unit / 128 integration) — it injects into the same
       `dl#standard` and the same `picture_informations` config map
-- [ ] New: an integration test asserting typetags' and persons' picture-page injections coexist,
-      because nothing else would notice one prefilter eating the other's anchor
+- [x] New: an integration test asserting typetags' and persons' picture-page injections coexist,
+      because nothing else would notice one prefilter eating the other's anchor — landed as
+      `PicturePageSourceTest::testTheColoredTagsInjectionAndTheOverlayCoexistOnOnePage`, which skips
+      loudly rather than passing vacuously if the install renders no Colored Tags markup. Watched red
+      2026-08-31 with `PERSONS_TPL_INJECT_POINT` pointed at a string the template does not contain
 
 ### Integration Tests
 
 **Happy path:**
-- [ ] `WriteRegionTest::testARegionWrittenByThePluginIsReadBackByAnIndependentExiftoolRun` `[HAPPY]`
+- [x] `WriteRegionTest::testARegionWrittenByThePluginIsReadBackByAnIndependentExiftoolRun` `[HAPPY]` — landed as `WriteRegionsTest::testAnIndependentReaderFindsTheWrittenRegion`
 - [x] `ReindexTest::testTheIndexMatchesWhatTheFileHolds` `[HAPPY]`
 - [x] `AddRegionTest::testAddingARegionCreatesThePersonTheRegionAndTheMirroredTag` `[HAPPY]`
 - [x] `SearchTest::testGetListWithNoQueryReturnsRecentPersonsMostRecentFirst` `[HAPPY]`
@@ -1107,45 +1116,45 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [x] `VisibilityTest::testTheRefusalDoesNotRevealWhetherTheImageExists` — a nonexistent id and a
       forbidden id return the same code and message `[NEG]`
 - [x] `AdminOnlyTest::testANormalUserCannotRenameDeleteOrRescan` — 401 ×3 `[NEG]` `[ERR]` (core's code, not 403)
-- [ ] `WriteRegionTest::testAReadOnlyFileIsReportedFailedAndLeftUnchanged` `[NEG]`
-- [ ] `WriteRegionTest::testAFileExiftoolCannotWriteIsReportedNotCrashed` `[NEG]`
+- [x] `WriteRegionTest::testAReadOnlyFileIsReportedFailedAndLeftUnchanged` `[NEG]` — landed as `WriteRegionsTest::testAReadOnlyFileIsReportedAndLeftUntouched`
+- [x] `WriteRegionTest::testAFileExiftoolCannotWriteIsReportedNotCrashed` `[NEG]` — landed as `WriteRegionsTest::testAReadOnlyFileIsReportedAndLeftUntouched`, the same case: it asserts the failure is reported and nothing crashed
 - [x] `RescanTest::testOneUnreadableFileDoesNotAbortTheBatch` `[NEG]` — landed as `ReindexTest::testOneUnreadableFileDoesNotAbortTheBatch`
 
 **Boundary / edge:**
-- [ ] `WriteRegionTest::testAForeignRegionInTheFileSurvivesOurWrite` `[BVA]`
-- [ ] `WriteRegionTest::testConcurrentWritersAllSucceedAndNoRegionIsLost` — the
+- [x] `WriteRegionTest::testAForeignRegionInTheFileSurvivesOurWrite` `[BVA]` — landed as `WriteRegionsTest::testAForeignRegionSurvivesAWrite`
+- [x] `WriteRegionTest::testConcurrentWritersAllSucceedAndNoRegionIsLost` — landed as `WriteRegionsTest::testConcurrentWritersEachLandTheirOwnFace` — the
       `write-back-worker.php` pattern, `[ERR]`
-- [ ] `WriteRegionTest::testAnOriginalSidecarIsLeftBesideTheImage` `[HAPPY]`
+- [x] `WriteRegionTest::testAnOriginalSidecarIsLeftBesideTheImage` `[HAPPY]` — landed as `WriteRegionsTest::testTheOriginalBytesAreKeptAsASidecar`
 - [x] `IndexRebuildTest::testDroppingTheTablesAndRescanningRebuildsTheIndex` `[ST]` — landed in its
       own file rather than in `ReindexTest`: it uninstalls the plugin, so it needs a teardown that
       restores both tables verbatim, which no other test in that file wants
-- [ ] `ReindexTest::testAnImageWithNoRegionsProducesNoRows` `[BVA]`
+- [x] `ReindexTest::testAnImageWithNoRegionsProducesNoRows` `[BVA]` — landed as `ReindexTest::testAFileWithNoRegionsYieldsNoRows`
 - [x] `RotationTest::testAPhysicallyRotatedFileHasItsRegionsCorrectedOnReindex` — rotate a tagged
       fixture with `exiftool`/ImageMagick outside the plugin, reindex, and assert the region still
       lands on the same feature `[ST]`
-- [ ] `RotationTest::testChangingOnlyImagesRotationRewritesNothing` — the file's mtime and its
+- [x] `RotationTest::testChangingOnlyImagesRotationRewritesNothing` — landed as `RotationTest::testADisplayOnlyRotationChangeRewritesNothing` — the file's mtime and its
       `RegionInfo` are byte-identical afterwards `[ST]` `[NEG]`
 - [x] `testRemovingTheLastRegionRemovesTheImageTagRow` `[ST]` — landed in `DeleteRegionTest`
 - [x] `testRemovingOneOfTwoRegionsForTheSamePersonKeepsTheImageTagRow` `[ST]` — landed in `DeleteRegionTest`
 - [x] `PicturePageSourceTest::testTheOverlayIsInjectedExactlyOnce` — the sub-template guard `[BVA]` — landed as `testTheStageIsInjectedExactlyOnce`
 - [x] `PicturePageSourceTest::testAGuestSeesNoOverlay` `[NEG]`
-- [ ] `PluginActivationTest` — install / activate / deactivate / uninstall driven through
+- [x] `PluginActivationTest` — install / activate / deactivate / uninstall driven through
       `pwg.plugins.performAction`, so what is asserted is what clicking Activate actually does `[ST]`
 
 ### End-to-End Tests
 
-- [ ] `tag-person.spec.js` — drag, type a new name, Enter, reload, the box is named `[HAPPY]`
-- [ ] `tag-person.spec.js` — the region is confirmed in the file by `support/metadata.js` `[HAPPY]`
-- [ ] `tag-person.spec.js` — Esc cancels and writes nothing `[NEG]`
-- [ ] `tag-person.spec.js` — a box below the minimum is refused with a visible message `[NEG]`
-- [ ] `tag-person.spec.js` — picking an existing person from the list writes that person `[HAPPY]`
+- [x] `tag-person.spec.js` — drag, type a new name, Enter, reload, the box is named `[HAPPY]` — landed as `editor.spec.js` → `a drawn box survives a reload with its name on it`
+- [x] `tag-person.spec.js` — the region is confirmed in the file by `support/metadata.js` `[HAPPY]` — landed as `editor.spec.js` → `the region is in the file, where an independent reader finds it`, reading the file through `seed.php --read-file-regions`
+- [x] `tag-person.spec.js` — Esc cancels and writes nothing `[NEG]` — landed as `editor.spec.js` → `Esc removes the drawn box and writes nothing`
+- [x] `tag-person.spec.js` — a box below the minimum is refused with a visible message `[NEG]` — landed as `editor.spec.js` → `a box below the minimum is refused with a visible message`
+- [x] `tag-person.spec.js` — picking an existing person from the list writes that person `[HAPPY]` — landed as `editor.spec.js` → `picking an existing person from the list tags that same person`. It draws, names and **deletes** a box first: `ws_persons_getList()` deliberately never offers somebody already on this photo, so the person has to exist and be absent — the state a person tagged on another photo is in. Watched red against `persons_person_id_from_name()`'s reuse lookup disabled
 - [x] `overlay.spec.js` — box geometry within tolerance at two window widths `[ST]`
 - [x] `overlay.spec.js` — clicking outside a box still navigates (core handler intact) `[NEG]`
 - [x] `overlay.spec.js` — a stale region renders dashed and dimmed `[ECP]`
-- [ ] `overlay.spec.js` — a guest sees no button and no boxes `[NEG]`
-- [ ] `admin-persons.spec.js` — rename propagates to the gallery link and the file `[HAPPY]`
-- [ ] `admin-persons.spec.js` — rescan completes, `data-done` reaches `data-total` `[HAPPY]`
-- [ ] `browse.spec.js` — clicking a person's name lists that person's photos `[HAPPY]`
+- [x] `overlay.spec.js` — a guest sees no button and no boxes `[NEG]`
+- [x] `admin-persons.spec.js` — rename propagates to the gallery link and the file `[HAPPY]`
+- [x] `admin-persons.spec.js` — rescan completes, `data-done` reaches `data-total` `[HAPPY]`
+- [x] `browse.spec.js` — clicking a person's name lists that person's photos `[HAPPY]` — landed as `overlay.spec.js` → `clicking a person name lands on a gallery page listing their photos`
 
 Every locator lives in a page object under `tests/e2e/support/` — `PicturePage.js`,
 `PersonOverlay.js`, `AdminPersonsPage.js` — and a locator in a spec file is a bug. `retries: 0`,

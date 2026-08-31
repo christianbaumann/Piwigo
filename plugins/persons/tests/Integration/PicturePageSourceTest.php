@@ -119,6 +119,32 @@ final class PicturePageSourceTest extends TestCase
         $this->assertGreaterThan($imageAt, $overlayAt, 'the overlay must come after the photo it covers');
     }
 
+    /**
+     * [HAPPY] Two plugins prefilter the same `picture` handle, and both
+     * injections survive on one rendered page.
+     *
+     * `plugins/typetags` registers `typetags_picture_prefilter` on the same
+     * template handle this plugin registers `persons_picture_prefilter` on. The
+     * anchors are different strings, but nothing in either plugin knows that -
+     * a future edit to one anchor that made it span the other's would silently
+     * drop an injection, and every single-plugin test in this file would stay
+     * green. This is the only place both are observed together.
+     */
+    public function testTheColoredTagsInjectionAndTheOverlayCoexistOnOnePage(): void
+    {
+        $this->seed($this->twoFaces());
+        $markup = $this->markup($this->page());
+
+        if (strpos($markup, 'typetag-badge') === false)
+        {
+            $this->markTestSkipped('anti-vacuity: this install rendered no Colored Tags markup on the picture page, so coexistence cannot be observed here');
+        }
+
+        $this->assertStringContainsString('id="persons-stage"', $markup, 'the overlay lost its stage while another prefilter ran');
+        $this->assertStringContainsString('id="persons-overlay"', $markup);
+        $this->assertNotSame('', $this->row($markup), 'the persons row was dropped while another prefilter ran');
+    }
+
     /** [BVA] The stage is injected once, not once per compiled sub-template. */
     public function testTheStageIsInjectedExactlyOnce(): void
     {
@@ -374,7 +400,15 @@ final class PicturePageSourceTest extends TestCase
     {
         $res = $this->ws->fetchPage($this->picturePath);
         $this->assertSame(200, $res['http_code'], 'picture page must load before its source can be asserted on');
-        return (string)$res['body'];
+        $body = (string)$res['body'];
+
+        // Anti-vacuity, once, for every scan in this file: a substr_count() over
+        // an empty or truncated body reports "0 occurrences" and passes every
+        // negative test in here for the wrong reason. HTTP 200 does not rule
+        // that out - Piwigo answers 200 with a short error page.
+        $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body), 'the picture page did not render');
+
+        return $body;
     }
 
     /**
@@ -387,7 +421,13 @@ final class PicturePageSourceTest extends TestCase
      */
     private function markup(string $html): string
     {
-        return (string)preg_replace('#<script\b.*?</script>#is', '', $html);
+        $markup = (string)preg_replace('#<script\b.*?</script>#is', '', $html);
+
+        // The floor again: everything asserted on this file's scans runs on the
+        // stripped markup, not on what page() checked.
+        $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($markup), 'stripping the scripts left no page');
+
+        return $markup;
     }
 
     /** The rendered person row, or '' when it is absent. */

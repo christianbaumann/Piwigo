@@ -28,8 +28,8 @@ final class MergeRegionsTest extends TestCase
             self::APPLIED_H
         );
 
-        $this->assertCount(1, $merged['regioninfo']['RegionList']);
-        $entry = $merged['regioninfo']['RegionList'][0];
+        $this->assertCount(1, $this->regionListOf($merged));
+        $entry = $this->regionListOf($merged)[0];
         $this->assertSame('Jane', $entry['Name']);
         $this->assertSame('Face', $entry['Type']);
         $this->assertSame('normalized', $entry['Area']['Unit']);
@@ -116,7 +116,7 @@ final class MergeRegionsTest extends TestCase
         );
 
         $this->assertSame(array('Rex', 'Jane'), $this->namesOf($merged));
-        $this->assertSame('Pet', $merged['regioninfo']['RegionList'][0]['Type']);
+        $this->assertSame('Pet', $this->regionListOf($merged)[0]['Type']);
         $this->assertSame(array('Jane'), $merged['names'], 'a pet is not a person and never reaches PersonInImage');
     }
 
@@ -149,8 +149,8 @@ final class MergeRegionsTest extends TestCase
             self::APPLIED_H
         );
 
-        $this->assertContains($foreign, $merged['regioninfo']['RegionList']);
-        $this->assertCount(2, $merged['regioninfo']['RegionList']);
+        $this->assertContains($foreign, $this->regionListOf($merged));
+        $this->assertCount(2, $this->regionListOf($merged));
     }
 
     /** [HAPPY] A removal takes out the named region and leaves the others. */
@@ -192,9 +192,42 @@ final class MergeRegionsTest extends TestCase
             self::APPLIED_H
         );
 
-        $this->assertCount(1, $merged['regioninfo']['RegionList']);
-        $this->assertEqualsWithDelta(0.8, $merged['regioninfo']['RegionList'][0]['Area']['X'], 1e-9);
+        $this->assertCount(1, $this->regionListOf($merged));
+        $this->assertEqualsWithDelta(0.8, $this->regionListOf($merged)[0]['Area']['X'], 1e-9);
         $this->assertSame(array('Jane'), $merged['names'], 'the person is still in the photo');
+    }
+
+    /**
+     * [DT] The last uncovered cell of the merge decision table: a region that is
+     * in the file, in $add and in $remove at once (E=1 A=1 R=1). The add wins.
+     *
+     * The plan predicted the opposite ("resolves to remove"). It is wrong, and
+     * the rename path is why: persons_rename_person() removes every box of the
+     * old name and re-adds the same boxes under the new one, in one call
+     * (index.inc.php:712). A rename whose matcher also matches what is being
+     * added - renaming to a name that differs only where the matcher does not
+     * look - would delete the person's regions outright if remove won. Removals
+     * are therefore applied to what the FILE held, and adds are applied after.
+     */
+    public function testARegionInBothAddAndRemoveIsKept(): void
+    {
+        $existing = $this->parsedFile(array(
+            $this->fileEntry('Jane', 0.5, 0.4, 0.1, 0.2),
+            $this->fileEntry('John', 0.2, 0.3, 0.1, 0.1),
+        ));
+
+        $merged = persons_merge_regions(
+            $existing,
+            array($this->region('Jane', 0.5, 0.4, 0.1, 0.2)),
+            array($this->region('Jane', 0.5, 0.4, 0.1, 0.2)),
+            self::APPLIED_W,
+            self::APPLIED_H
+        );
+
+        $this->assertSame(array('John', 'Jane'), $this->namesOf($merged),
+            'the add is applied after the removal, so the region survives');
+        $this->assertCount(2, $this->regionListOf($merged));
+        $this->assertSame(array('Jane', 'John'), $merged['names']);
     }
 
     /** [ECP] A matcher with a name and no box removes every box of that person. */
@@ -242,7 +275,7 @@ final class MergeRegionsTest extends TestCase
             self::APPLIED_H
         );
 
-        $this->assertCount(1, $merged['regioninfo']['RegionList']);
+        $this->assertCount(1, $this->regionListOf($merged));
         $this->assertSame(array('Jane'), $merged['names']);
     }
 
@@ -260,7 +293,7 @@ final class MergeRegionsTest extends TestCase
             self::APPLIED_H
         );
 
-        $area = $merged['regioninfo']['RegionList'][0]['Area'];
+        $area = $this->regionListOf($merged)[0]['Area'];
         $this->assertEqualsWithDelta(0.075, $area['X'], 1e-9);
         $this->assertEqualsWithDelta(0.15, $area['W'], 1e-9);
     }
@@ -386,11 +419,30 @@ final class MergeRegionsTest extends TestCase
         )));
     }
 
+    /**
+     * The merged RegionList, guarded.
+     *
+     * Anti-vacuity (`.claude/rules/test-design.md`): a merge that lost every
+     * region returns the "delete the tag" shape, where RegionList is absent.
+     * Counting that directly makes the test die of a TypeError instead of
+     * reporting the behaviour it names - which is what the 2026-08-31 merge
+     * mutant exposed.
+     */
+    private function regionListOf(array $merged): array
+    {
+        $this->assertIsArray($merged['regioninfo'], 'the merge returned no RegionInfo at all');
+        $this->assertArrayHasKey('RegionList', $merged['regioninfo'],
+            'the merge returned the "delete the tag" shape, not a region list');
+        $this->assertIsArray($merged['regioninfo']['RegionList']);
+
+        return $merged['regioninfo']['RegionList'];
+    }
+
     /** The names in the merged RegionList, in list order. */
     private function namesOf(array $merged): array
     {
         $names = array();
-        foreach ($merged['regioninfo']['RegionList'] as $entry)
+        foreach ($this->regionListOf($merged) as $entry)
         {
             $names[] = $entry['Name'];
         }
