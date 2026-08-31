@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS `' . $this->region_table . '` (
     $this->drop_display_info_key();
     $this->drop_orphan_mirrored_tags();
 
+    conf_delete_param(PERSONS_LAST_RESCAN_PARAM);
+
     pwg_query('DROP TABLE IF EXISTS `' . $this->region_table . '`;');
     pwg_query('DROP TABLE IF EXISTS `' . $this->persons_table . '`;');
   }

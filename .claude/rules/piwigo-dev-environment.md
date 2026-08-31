@@ -43,6 +43,11 @@ The persons plugin keeps the same shape of scratch space, defined once in
   two writers that each read it before either wrote would both produce a complete, valid region
   list with the other's face missing. Measured 2026-08-30 with the lock narrowed to the write:
   eight concurrent writers all reported success and the file came back holding one face.
+  The lock is also **re-entrant within one process** (`persons_lock_acquire()` /
+  `persons_lock_release()` count the depth): a reindex that corrects a physically rotated file
+  writes it, and that reindex can already be running under `persons_apply_change()`'s lock.
+  `flock()` attaches to the open file description, so a nested `fopen()` would have spun out the
+  30 s timeout and reported a failure the caller could not act on.
 - `_data/persons/args/<operation id>/` — the `-json=` payload of one write
   (`persons_operation_dir()`), removed whole in a `finally`.
 

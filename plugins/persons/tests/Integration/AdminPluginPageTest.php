@@ -119,15 +119,17 @@ final class AdminPluginPageTest extends TestCase
     }
 
     /**
-     * [NEG] The plugin's admin entry point, reached with no photo, renders.
+     * [HAPPY] The plugin's admin entry point, reached with no photo, renders
+     * the persons list.
      *
      * main.inc.php declares `Has Settings: true`, so the plugin list offers a
      * link to admin.php?page=plugin-persons with nothing else on the query
-     * string. The only screen behind it so far wants an image_id, and the URL
-     * has to answer with a page saying so rather than a PHP error or a blank
-     * response - which is exactly what a missing dispatcher produced before.
+     * string. That URL has to answer with a rendered screen rather than a PHP
+     * error or a blank response - which is exactly what a missing dispatcher
+     * produced before. What it renders is the persons list; the list's own
+     * content is AdminPersonsScreenTest's subject, not this one's.
      */
-    public function testTheSettingsLinkRendersWithoutAnImageId(): void
+    public function testTheSettingsLinkRendersThePersonsList(): void
     {
         $res = $this->ws->fetchPage('/admin.php?page=plugin-persons');
 
@@ -139,8 +141,7 @@ final class AdminPluginPageTest extends TestCase
         );
 
         $this->assertSame(array(), $this->diagnosticsIn($res['body']));
-        $this->assertStringContainsString('class="errors"', $res['body'],
-            'the screen renders, but says nothing about the photo it is missing');
+        $this->assertStringContainsString('id="persons-admin"', $res['body']);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────

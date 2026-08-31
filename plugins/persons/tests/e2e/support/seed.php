@@ -213,7 +213,41 @@ function read_file_regions(Db $db, int $imageId): array
         );
 }
 
-$args = getopt('', array('scenario::', 'restore', 'read-file-regions::', 'exiftool::'));
+/**
+ * Every person in the index with the photo and region counts the database holds.
+ *
+ * The oracle for the admin screen's own numbers. Read here rather than in the
+ * spec because a browser cannot reach MariaDB, and computed with the same two
+ * aggregate forms the screen uses so that a mistake in one of them shows up as
+ * a disagreement rather than as two matching wrong numbers - the query lives in
+ * admin/persons.php and this one has to be written separately for it to be a
+ * check at all.
+ *
+ * @return array name => array(photos, regions)
+ */
+function person_counts(Db $db): array
+{
+    $counts = array();
+
+    $result = $db->query('
+SELECT p.name,
+       (SELECT COUNT(*) FROM piwigo_person_region WHERE person_id = p.id) AS regions,
+       (SELECT COUNT(DISTINCT image_id) FROM piwigo_person_region WHERE person_id = p.id) AS photos
+  FROM piwigo_persons AS p
+');
+
+    while ($row = $result->fetch_assoc())
+    {
+        $counts[$row['name']] = array(
+            'photos' => (int)$row['photos'],
+            'regions' => (int)$row['regions'],
+            );
+    }
+
+    return $counts;
+}
+
+$args = getopt('', array('scenario::', 'restore', 'read-file-regions::', 'exiftool::', 'person-counts'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -249,6 +283,12 @@ if (isset($args['restore']))
 if (isset($args['exiftool']))
 {
     echo json_encode(set_exiftool_state($db, (string)$args['exiftool'])), "\n";
+    exit(0);
+}
+
+if (isset($args['person-counts']))
+{
+    echo json_encode(person_counts($db), JSON_UNESCAPED_UNICODE), "\n";
     exit(0);
 }
 

@@ -13,6 +13,23 @@ $lang['This server cannot write metadata into image files'] = 'This server canno
 $lang['Remove this person from the photo'] = 'Remove this person from the photo';
 $lang['Back to the photo'] = 'Back to the photo';
 $lang['This photo no longer exists'] = 'This photo no longer exists';
-$lang['Open a photo and use "Tag people" to reach this screen'] = 'Open a photo and use "Tag people" to reach this screen';
+
+$lang['Search'] = 'Search';
+$lang['Name'] = 'Name';
+$lang['Photos'] = 'Photos';
+$lang['Regions'] = 'Regions';
+$lang['Rename'] = 'Rename';
+$lang['Delete'] = 'Delete';
+$lang['Rescan all files'] = 'Rescan all files';
+$lang['New name for %s'] = 'New name for %s';
+$lang['Remove %s from every photo? The regions leave the image files too.'] = 'Remove %s from every photo? The regions leave the image files too.';
+$lang['That did not work'] = 'That did not work';
+$lang['Rescanning %d photos...'] = 'Rescanning %d photos...';
+$lang['Rescanned %d photos'] = 'Rescanned %d photos';
+$lang['%d could not be read'] = '%d could not be read';
+$lang['%d persons, %d regions'] = '%d persons, %d regions';
+$lang['Index last rebuilt %s'] = 'Index last rebuilt %s';
+$lang['Nobody is tagged yet'] = 'Nobody is tagged yet';
+$lang['No person matches that search'] = 'No person matches that search';
 
 ?>

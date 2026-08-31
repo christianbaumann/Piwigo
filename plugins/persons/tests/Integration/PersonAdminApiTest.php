@@ -109,6 +109,16 @@ final class PersonAdminApiTest extends TestCase
         $this->add(self::OTHER, 0.75, 0.75);
         $personId = $this->personId(self::OLD_NAME);
 
+        // Read before the delete: afterwards the person row is gone and with it
+        // the only pointer to the tag whose assignments must have been cleared.
+        $tagId = (int)$this->db->scalar(
+            'SELECT tag_id FROM piwigo_persons WHERE id = ' . $personId
+        );
+        $this->assertGreaterThan(0, $tagId, 'anti-vacuity: the person was never mirrored as a tag');
+        $this->assertGreaterThan(0, (int)$this->db->scalar(
+            'SELECT COUNT(*) FROM piwigo_image_tag WHERE tag_id = ' . $tagId
+            ), 'anti-vacuity: the tag was never applied, so removing it proves nothing');
+
         $res = $this->admin->call('pwg.persons.delete', array(
             'person_id' => $personId,
             'pwg_token' => $this->admin->token(),
@@ -122,6 +132,14 @@ final class PersonAdminApiTest extends TestCase
         $this->assertSame(0, (int)$this->db->scalar(
             'SELECT COUNT(*) FROM piwigo_person_region WHERE person_id = ' . $personId
             ));
+
+        // The mirrored tag row itself is left for core's orphan-tag mechanism -
+        // an administrator may have applied it by hand - but the assignments
+        // this plugin made must go, or the photo keeps a tag naming somebody
+        // the gallery no longer knows.
+        $this->assertSame(0, (int)$this->db->scalar(
+            'SELECT COUNT(*) FROM piwigo_image_tag WHERE tag_id = ' . $tagId
+            ), 'the deleted person is still tagged on their photos');
     }
 
     /** [HAPPY] A rescan rebuilds the index from the file it is pointed at. */

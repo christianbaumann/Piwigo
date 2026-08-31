@@ -825,7 +825,7 @@ rebuild.
 
 ### Changes Required:
 
-#### [ ] 1. Tag-mirror maintenance
+#### [x] 1. Tag-mirror maintenance
 **File**: `plugins/persons/include/index.inc.php`
 **Changes**:
 - `pwg.persons.rename` renames both the `persons` row and the mirrored tag, refreshes `url_name`
@@ -839,14 +839,14 @@ rebuild.
   no `WHERE`, per `docs/agents/decisions/0004-unscoped-tag-cache-invalidation-accepted.md`.
 - Register a `delete_elements` handler so deleting a photo removes its region rows.
 
-#### [ ] 2. The admin screen
+#### [x] 2. The admin screen
 **File**: `plugins/persons/admin/persons.php` + `template/admin_persons.tpl` / `.js`
 **Changes**: the list mocked above — search, photo/region counts, rename, delete, and a chunked
 "Rescan all files" driven the way `provenance`'s apply/write-back runner is, publishing
 `data-done` / `data-total` on the progress element so the E2E suite reads state rather than
 measuring an animation.
 
-#### [ ] 3. React to a changed rotation
+#### [x] 3. React to a changed rotation
 **File**: `plugins/persons/include/index.inc.php`
 
 This Piwigo has **no rotate action**: `images.rotation` is written only by sync and upload
@@ -872,7 +872,7 @@ Two distinct events have to be told apart, and conflating them is what would cor
 `rotation_at_write` exists solely to make the first row detectable; without it a rotation change and
 a no-op are indistinguishable.
 
-#### [ ] 4. Person links
+#### [x] 4. Person links
 **File**: `plugins/persons/template/public_persons.tpl`, `overlay.js`
 **Changes**: a person's name links to `make_index_url(array('tags' => array(...)))` for the mirrored
 tag. No new routing, per research answer 5.
@@ -880,15 +880,15 @@ tag. No new routing, per research answer 5.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Integration: renaming a person updates the tag, the index and the file
-- [ ] Integration: deleting a photo removes its region rows
-- [ ] Integration: a physically rotated file has its regions corrected on reindex; a display-only
+- [x] Integration: renaming a person updates the tag, the index and the file
+- [x] Integration: deleting a photo removes its region rows
+- [x] Integration: a physically rotated file has its regions corrected on reindex; a display-only
       rotation change rewrites nothing
-- [ ] Integration: deleting every region for a person leaves no `image_tag` row behind
-- [ ] Integration: `persons_rescan_images()` over a set with one unreadable file reports one
+- [x] Integration: deleting every region for a person leaves no `image_tag` row behind
+- [x] Integration: `persons_rescan_images()` over a set with one unreadable file reports one
       failure and still indexes the rest
-- [ ] E2E: clicking a person's name lands on a gallery page listing that person's photos
-- [ ] E2E: the rescan button completes and the counts on the admin screen match the database
+- [x] E2E: clicking a person's name lands on a gallery page listing that person's photos
+- [x] E2E: the rescan button completes and the counts on the admin screen match the database
 
 #### Manual Verification:
 - [ ] Delete the two tables, run a full rescan, and confirm the index comes back identical — this
@@ -1111,7 +1111,7 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [ ] `WriteRegionTest::testAnOriginalSidecarIsLeftBesideTheImage` `[HAPPY]`
 - [ ] `ReindexTest::testDeletingTheTablesAndRescanningRebuildsAnIdenticalIndex` `[ST]`
 - [ ] `ReindexTest::testAnImageWithNoRegionsProducesNoRows` `[BVA]`
-- [ ] `RotationTest::testAPhysicallyRotatedFileHasItsRegionsCorrectedOnReindex` — rotate a tagged
+- [x] `RotationTest::testAPhysicallyRotatedFileHasItsRegionsCorrectedOnReindex` — rotate a tagged
       fixture with `exiftool`/ImageMagick outside the plugin, reindex, and assert the region still
       lands on the same feature `[ST]`
 - [ ] `RotationTest::testChangingOnlyImagesRotationRewritesNothing` — the file's mtime and its

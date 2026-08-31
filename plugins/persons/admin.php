@@ -9,8 +9,9 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  * of the plugin lands on. admin/plugin.php has already run
  * check_status(ACCESS_ADMINISTRATOR) before including it.
  *
- * One screen so far: the tagging screen for a single photo, reached with an
- * image_id.
+ * Two screens: the persons list, which is what the plugin's Settings link
+ * leads to, and the tagging screen for a single photo, which is the same URL
+ * with an image_id on it.
  */
 
 include_once(PERSONS_PATH.'include/functions.inc.php');
@@ -19,10 +20,11 @@ load_language('plugin.lang', PERSONS_PATH);
 
 $image_id = isset($_GET['image_id']) ? (int)$_GET['image_id'] : 0;
 
-if ($image_id <= 0)
+if ($image_id > 0)
 {
-  $page['errors'][] = l10n('Open a photo and use "Tag people" to reach this screen');
-  return;
+  include(PERSONS_PATH.'admin/photo.php');
 }
-
-include(PERSONS_PATH.'admin/photo.php');
+else
+{
+  include(PERSONS_PATH.'admin/persons.php');
+}

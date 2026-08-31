@@ -137,30 +137,3 @@ function persons_display_box($row, $rotation)
     'H'    => persons_percent($corner['h']),
     );
 }
-
-/**
- * Where a person's name links to: the gallery page of their mirrored tag.
- *
- * That mirror is the whole reason browsing needs no new code. A person whose
- * tag row is gone - an administrator may delete a tag by hand - gets no link
- * rather than a broken one.
- *
- * @param array $row a persons_indexed_regions() row
- * @return string '' when there is nowhere to link to
- */
-function persons_person_gallery_url($row)
-{
-  if (empty($row['tag_id']))
-  {
-    return '';
-  }
-
-  return make_index_url(array(
-    'tags' => array(
-      array(
-        'id'       => (int)$row['tag_id'],
-        'url_name' => $row['url_name'],
-        ),
-      ),
-    ));
-}

@@ -36,19 +36,20 @@ module.exports = defineConfig({
     {
       name: 'chromium',
       testMatch: /.*\.spec\.js/,
-      testIgnore: /admin\.spec\.js/,
+      testIgnore: /admin.*\.spec\.js/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'tests/e2e/.state/auth.json',
       },
     },
-    /* The admin tagging screen is behind ACCESS_ADMINISTRATOR, so its specs
-       need the webmaster session rather than the normal one. The spec that
-       proves a normal account is refused overrides the state for itself. */
+    /* The admin screens are behind ACCESS_ADMINISTRATOR, so their specs need
+       the webmaster session rather than the normal one - every spec whose file
+       name starts with `admin`. The spec that proves a normal account is
+       refused overrides the state for itself. */
     {
       name: 'chromium-admin',
-      testMatch: /admin\.spec\.js/,
+      testMatch: /admin.*\.spec\.js/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],

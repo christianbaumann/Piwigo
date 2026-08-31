@@ -48,6 +48,14 @@ define('PERSONS_SEARCH_MAX_RESULTS', 25);
 /** Photos one write-back or rescan request handles, so none can time out. */
 define('PERSONS_WRITEBACK_MAX_CHUNK', 10);
 
+/**
+ * The config row recording when the index was last rebuilt from the files.
+ *
+ * The admin screen's only answer to "is what I am looking at current?". Written
+ * by every rescan call, dropped on uninstall.
+ */
+define('PERSONS_LAST_RESCAN_PARAM', 'persons_last_rescan');
+
 /** Seconds a writer waits for another writer's lock on the same file. */
 define('PERSONS_LOCK_TIMEOUT_SECONDS', 30);
 

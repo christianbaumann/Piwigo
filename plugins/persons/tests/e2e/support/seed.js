@@ -56,4 +56,16 @@ function setExiftool(state) {
   );
 }
 
-module.exports = { seed, restore, readFileRegions, setExiftool };
+/**
+ * Every person in the index with the counts the database holds.
+ *
+ * The oracle the admin screen's own numbers are compared against - a browser
+ * cannot reach MariaDB, so the comparison needs a second process that can.
+ *
+ * @returns {Record<string, {photos: number, regions: number}>}
+ */
+function personCounts() {
+  return JSON.parse(execFileSync('php', [SEED_SCRIPT, '--person-counts'], { encoding: 'utf8' }));
+}
+
+module.exports = { seed, restore, readFileRegions, setExiftool, personCounts };

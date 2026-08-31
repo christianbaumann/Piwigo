@@ -491,5 +491,9 @@ function ws_persons_rescan($params, &$service)
 
   $outcome = persons_rescan_images($ids);
 
+  // Every call, not only a run that reached every photo: the row answers "when
+  // did anything last re-read a file", and a chunked run has no other end.
+  conf_update_param(PERSONS_LAST_RESCAN_PARAM, date('Y-m-d H:i:s'));
+
   return array('scanned' => $outcome['scanned'], 'failed' => $outcome['failed']);
 }

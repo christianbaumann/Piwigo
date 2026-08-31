@@ -239,6 +239,34 @@ test.describe('person region overlay', () => {
       await expect(picture.personRow.getByRole('link', { name: region.name })).toHaveCount(1);
     }
   });
+
+  /**
+   * Following one of those links reaches the person's photos.
+   *
+   * The mirrored tag is what makes browsing by person work with no routing of
+   * this plugin's own, so the claim is only worth anything end to end: the link
+   * has to resolve to a real gallery page that lists the photo it came from.
+   */
+  test('clicking a person name lands on a gallery page listing their photos', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+
+    const region = seeded.regions[0];
+    // Anti-vacuity: no seeded region means no link to click and nothing below
+    // asserts anything.
+    expect(region).toBeTruthy();
+
+    await picture.personRow.getByRole('link', { name: region.name }).click();
+    await page.waitForLoadState('domcontentloaded');
+
+    expect(page.url()).toContain('/tags/');
+
+    const thumbnails = page.locator('#thumbnails a[href*="/tags/"]');
+    expect(await thumbnails.count()).toBeGreaterThan(0);
+    await expect(
+      page.locator(`#thumbnails a[href^="picture.php?/${seeded.photo_id}/tags/"]`)
+    ).toHaveCount(1);
+  });
 });
 
 /**

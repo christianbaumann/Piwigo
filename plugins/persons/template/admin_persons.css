@@ -1,0 +1,57 @@
+#persons-admin-actions {
+	display: flex;
+	align-items: center;
+	gap: 1em;
+}
+
+#persons-rescan-progress {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6em;
+}
+
+#persons-rescan-bar {
+	display: inline-block;
+	width: 12em;
+	height: 0.6em;
+	border: 1px solid currentColor;
+	border-radius: 0.3em;
+	overflow: hidden;
+}
+
+#persons-rescan-bar-fill {
+	display: block;
+	width: 0;
+	height: 100%;
+	background: currentColor;
+}
+
+#persons-search {
+	margin: 1em 0;
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+}
+
+#persons-table {
+	width: 100%;
+}
+
+#persons-table .persons-number {
+	text-align: right;
+	width: 6em;
+}
+
+#persons-table .persons-row-actions {
+	width: 12em;
+	text-align: right;
+}
+
+#persons-table .persons-row-actions a {
+	margin-left: 1em;
+}
+
+#persons-admin-summary {
+	margin-top: 1em;
+	opacity: 0.8;
+}

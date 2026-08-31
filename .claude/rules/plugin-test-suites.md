@@ -98,9 +98,9 @@ logs in as `persons_normal` rather than the webmaster: the overlay is shown to a
 non-guest, and running it as an administrator would hide a permission mistake only a normal
 account can find. It saves a second, webmaster session to `tests/e2e/.state/auth-admin.json` as
 well, because the admin tagging screen added in Phase 7 sits behind `ACCESS_ADMINISTRATOR`. The
-`chromium` project runs every spec but `admin.spec.js` as the normal account, `chromium-admin`
-runs `admin.spec.js` as the webmaster, and the one spec there that proves a normal account is
-refused overrides the storage state for itself.
+`chromium` project runs as the normal account every spec whose file name does **not** start with
+`admin`; `chromium-admin` runs the `admin*.spec.js` ones as the webmaster, and the one spec there
+that proves a normal account is refused overrides the storage state for itself.
 
 `tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
 into that photo's file with a plain exiftool call, indexes them, and prints the box corners the
@@ -111,7 +111,10 @@ could have, which is what a region written before a re-crop looks like; `--scena
 nothing into the file at all, which is what the editor specs start from — anything found in that
 file afterwards was put there by the browser. `seed.php --read-file-regions=<id>` reads one photo's
 regions back with a plain exiftool call in its own process, which is how a spec asserts a write
-landed without asking the plugin's own parser. `seed.php --exiftool=missing|present` writes or
+landed without asking the plugin's own parser. `seed.php --person-counts` prints every person's
+photo and region counts straight from the database, which is the oracle the persons admin
+screen's own numbers are compared against - a browser cannot reach MariaDB, and a screen that
+agreed only with itself would prove nothing. `seed.php --exiftool=missing|present` writes or
 removes a `persons_exiftool_path` config row pointing at a directory holding no binary, which is
 how the disabled-editor spec forces a host without exiftool rather than waiting for one.
 `--restore` deletes the album, the photo row and the
@@ -121,6 +124,12 @@ unconditional because both outlive a snapshot: a spec killed mid-run would other
 later page without an editor, and a leftover person puts a stranger at the top of the next run's
 picker, where `PicturePage.typeName()` would commit them. It rewrites an image file in place, so it
 is never pointed at a real scan.
+
+`admin-persons.spec.js` presses **Rescan all files**, which re-reads every photo in the gallery -
+the seeded one and the install's own alike - because that is what the button does. The index is
+derived from the files, so the run rebuilds it; on an install whose photos carry regions written
+elsewhere it also indexes those, and `--restore` does not remove them. One more reason none of
+these suites is safe against a production install.
 
 `PicturePage.settle()` is the one to reuse after a viewport change, not `waitForPlacement()`: after
 a resize the theme may swap in another derivative — which only changes the rendered size once that
