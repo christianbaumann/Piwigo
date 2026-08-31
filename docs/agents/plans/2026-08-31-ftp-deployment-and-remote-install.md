@@ -332,7 +332,7 @@ confirmation before Phase 2.
 
 ---
 
-## Phase 2: The file set — what "needed" means
+## Phase 2: The file set — what "needed" means — IMPLEMENTED 2026-08-31
 
 ### Overview
 
@@ -342,7 +342,7 @@ repository.
 
 ### Changes Required
 
-#### [ ] 1. Git enumeration adapter
+#### [x] 1. Git enumeration adapter
 
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
@@ -355,7 +355,7 @@ def git_tracked_paths(repo_root: Path, run=subprocess.run) -> list[str]:
 Raises `GitError` naming the command when git exits non-zero or the output is empty — an empty
 file set must fail loudly rather than deploy nothing.
 
-#### [ ] 2. Pure exclusion filter
+#### [x] 2. Pure exclusion filter
 
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
@@ -380,7 +380,36 @@ Notes on scope, each a deliberate call:
 - `tools/deploy/` excludes itself. The tool has no business on the web space.
 - `docs/` and `.claude/` are agent/working artifacts, not application files.
 
-#### [ ] 3. Always-created directories
+#### [x] 4. Completeness guard — added during Phase 2, not in the original plan
+
+**File**: `tools/deploy/pwgdeploy/fileset.py`
+
+```python
+MIN_EXPECTED_PATHS = 3000
+SUBMODULE_INIT_HINT = "git submodule update --init --recursive"
+
+def declared_submodule_paths(repo_root, run=subprocess.run) -> list[str]:
+    """git config --file .gitmodules --get-regexp ^submodule\..*\.path$"""
+
+def check_complete(paths, submodule_paths, min_expected=MIN_EXPECTED_PATHS) -> None:
+    """Pure. Raise GitError when the enumeration is obviously partial."""
+
+def verified_tracked_paths(repo_root, run=subprocess.run) -> list[str]:
+    """Enumerate, then prove the enumeration is whole. The entry point a deploy uses."""
+```
+
+Why it was needed: an **uninitialised submodule is dropped from `--recurse-submodules`
+silently** — neither its 157 files nor its gitlink appear, and the total stays plausible
+(3376 here), so the plan's empty-set `GitError` never fires. A deploy would publish a gallery
+whose Colored Tags plugin has no code and report success. The submodule paths are read from
+`.gitmodules` rather than hardcoded, so a future submodule is covered without an edit.
+
+**Phase 5/6 must call `verified_tracked_paths()`, not `git_tracked_paths()`.** The raw
+enumerator stays public only because the characterization tests need a list that is *not*
+gated. `test_verified_tracked_paths_refuses_an_incomplete_working_copy` is what holds the
+wiring in place.
+
+#### [x] 3. Always-created directories
 
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
@@ -392,16 +421,44 @@ WRITABLE_REMOTE_PATHS = ("local", "_data", "upload", "plugins", "themes")
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_fileset.py` passes
-- [ ] A characterization test asserts `select()` over the **real** tracked list keeps
+- [x] `cd tools/deploy && uv run pytest tests/test_fileset.py` passes — 44 tests; whole suite
+      115 passed, 2 skipped, measured 2026-08-31, green twice in a row and with the shuffle
+      disabled. The 2 skips are the submodule characterizations described below
+- [x] A characterization test asserts `select()` over the **real** tracked list keeps
       `plugins/persons/main.inc.php` and drops `plugins/persons/tests/Support/create-test-users.php`
-- [ ] Anti-vacuity: the real-list test asserts the input has > 3000 entries and the output > 2500
+- [x] Anti-vacuity: the real-list test asserts the input has > 3000 entries and the output > 2500
       before any exclusion count is asserted
 
 #### Manual Verification
 - [ ] `pwg-deploy --list-files` output contains no `vendor/`, `node_modules/`, `tests/` or
-      `.playwright-browsers/` path
-- [ ] `plugins/typetags/` files appear individually, not as one entry
+      `.playwright-browsers/` path — **the `vendor/` half of this criterion was wrong as written
+      and has been corrected.** `themes/default/vendor/fontello/` (15 files) is a *tracked core
+      asset* — the gallery's icon font — and must ship. The dependency-manager `vendor/`
+      directories are each plugin's own composer output, which that plugin's `.gitignore` already
+      keeps out of the tracked list, so they can never reach the enumeration. The automated
+      successor, `test_real_repository_file_set`, therefore excludes `plugins/*/vendor/` by name
+      and asserts the fontello asset **is** present, which is that loop's anti-vacuity guard.
+      `node_modules/`, `/tests/` and `.playwright-browsers/`: 0 hits, measured 2026-08-31.
+      `pwg-deploy --list-files` itself cannot run until the CLI lands in Phase 6.
+- [x] `plugins/typetags/` files appear individually, not as one entry — **automated** as
+      `test_every_declared_submodule_contributes_its_files` (asserts the submodule contributed
+      > `MIN_SUBMODULE_PATHS` paths and that `select()` does not drop it wholesale), and the
+      failure mode it cannot observe from an uninitialised working copy is now a hard deploy-time
+      error rather than a manual check — see task 4 above. The characterization test *skips*, with
+      the fix command in its reason, when the submodule is absent; it has therefore **not yet been
+      observed green**, and doing so needs one run from a checkout with the submodule initialised.
+      Original finding, kept for the record: **not satisfiable from a
+      worktree with an uninitialised submodule, and this is a silent-data-loss gap, not a local
+      inconvenience.** In `.claude/worktrees/ftp-deploy`, `plugins/typetags` is an empty
+      directory, and `git ls-files -z --recurse-submodules` then omits the submodule *entirely* —
+      neither the 157 files nor the gitlink appear. Enumeration still returns 3376 paths, so
+      `GitError`'s empty-set guard does not fire and a deploy would silently publish a gallery
+      whose Colored Tags plugin has no code. Measured 2026-08-31: 3376 tracked, 3209 selected,
+      134.4 MB, **0** `plugins/typetags/` files.
+
+**Deviation from the plan, decided and implemented**: Phase 2 as written had no guard against a
+partially-enumerated file set. A `MIN_EXPECTED_PATHS` floor **and** a per-submodule contribution
+check now raise `GitError` naming `git submodule update --init --recursive`. See task 4.
 
 **Implementation Note**: Pause for manual confirmation before Phase 3.
 
@@ -899,21 +956,88 @@ Tags per `.claude/rules/test-design.md`: `[HAPPY]` `[NEG]` `[ECP]` `[BVA]` `[ST]
 
 #### `tests/test_fileset.py`
 
-- [ ] `test_keeps_an_ordinary_plugin_file` `[HAPPY]`
-- [ ] `test_drops_a_tests_segment_anywhere_in_the_path` `[ECP]`
-- [ ] `test_keeps_a_file_named_tests_js` — `tests` matches a **segment**, not a substring `[BVA]`
-- [ ] `test_drops_each_excluded_basename` — parametrised over `EXCLUDED_BASENAMES` `[ECP]`
-- [ ] `test_drops_each_excluded_prefix` — parametrised over `EXCLUDED_PREFIXES` `[ECP]`
-- [ ] `test_keeps_local_index_php_guards` — `local/**/index.php` survives while
+- [x] `test_keeps_an_ordinary_plugin_file` `[HAPPY]`
+- [x] `test_drops_a_tests_segment_anywhere_in_the_path` `[ECP]`
+- [x] `test_keeps_a_file_named_tests_js` — `tests` matches a **segment**, not a substring `[BVA]`
+- [x] `test_drops_each_excluded_basename` — parametrised over `EXCLUDED_BASENAMES` `[ECP]`
+- [x] `test_drops_each_excluded_prefix` — parametrised over `EXCLUDED_PREFIXES` `[ECP]`
+- [x] `test_keeps_local_index_php_guards` — `local/**/index.php` survives while
       `local/config/*` does not `[BVA]`
-- [ ] `test_excludes_the_deploy_tool_itself` `[NEG]`
-- [ ] `test_empty_git_output_raises_git_error` — an empty file set must fail, never deploy
+- [x] `test_excludes_the_deploy_tool_itself` `[NEG]`
+- [x] `test_empty_git_output_raises_git_error` — an empty file set must fail, never deploy
       nothing `[NEG]`
-- [ ] `test_git_failure_names_the_command` `[NEG]`
-- [ ] `test_real_repository_file_set` — runs `git ls-files --recurse-submodules` against this
+- [x] `test_git_failure_names_the_command` `[NEG]`
+- [x] `test_real_repository_file_set` — runs `git ls-files --recurse-submodules` against this
       checkout; asserts input > 3000 entries **before** asserting anything about the output, and
-      that the output contains no `vendor/`, `node_modules/` or `tests/` path `[ERR]`
-      *(characterization: its oracle is the current repository contents, not a requirement)*
+      that the output contains no dependency-manager `vendor/`, `node_modules/` or `tests/` path
+      `[ERR]` *(characterization: its oracle is the current repository contents, not a
+      requirement)*
+
+**Added during Phase 2** (not in the original list):
+- [x] `test_an_excluded_basename_is_not_matched_as_a_substring` — parametrised over
+      `EXCLUDED_BASENAMES`; `not-a-composer.json` stays. The obvious `endswith` implementation
+      passes every other basename test and fails only this one `[BVA]`
+- [x] `test_select_preserves_input_order_and_drops_nothing_else` — anti-vacuity for every
+      `== []` assertion above, each of which a filter returning `[]` for everything would satisfy
+      `[HAPPY]`
+- [x] `test_git_tracked_paths_runs_recurse_submodules` — asserts the exact argv, so decision 7's
+      flag cannot be dropped silently `[HAPPY]`
+- [x] `test_the_created_directories_are_the_two_the_release_script_creates` — structural guard
+      against `tools/pwg_rel_create.sh:123-127` drifting apart `[HAPPY]`
+
+**The completeness guard** (task 4):
+- [x] `test_check_complete_accepts_a_whole_enumeration` — anti-vacuity for every rejection case
+      below, each of which a guard that raised unconditionally would satisfy `[HAPPY]`
+- [x] `test_check_complete_accepts_a_repository_with_no_submodules` `[ECP]`
+- [x] `test_check_complete_path_floor` — `MIN_EXPECTED_PATHS` minus one / exactly / plus one; the
+      floor is inclusive `[BVA]`
+- [x] `test_check_complete_rejects_an_uninitialised_submodule` — message names the submodule
+      *and* the fix command `[NEG]`
+- [x] `test_check_complete_is_not_fooled_by_a_prefix_match` — `plugins/typetags-backup/` does not
+      count as `plugins/typetags` having contributed `[BVA]`
+- [x] `test_declared_submodule_paths_parses_git_config` — `.gitmodules` is the source of truth;
+      the path is never hardcoded `[HAPPY]`
+- [x] `test_declared_submodule_paths_is_empty_without_gitmodules` — exit 1 means "no match", not
+      failure `[NEG]` `[ECP]`
+- [x] `test_declared_submodule_paths_raises_on_a_real_git_failure` `[NEG]`
+- [x] `test_verified_tracked_paths_refuses_an_incomplete_working_copy` — proves the guard is
+      *wired into* the deploy entry point, on a scripted double so it holds regardless of this
+      working copy `[NEG]`
+- [x] `test_verified_tracked_paths_returns_a_whole_enumeration` — anti-vacuity for the above
+      `[HAPPY]`
+- [x] `test_every_declared_submodule_contributes_its_files` — characterization; **skips**, naming
+      the fix command, where the submodule is not checked out `[ERR]`
+- [x] `test_verified_tracked_paths_agrees_with_the_raw_enumeration` — same, skips likewise `[ERR]`
+
+**Mutation spot-check** (`.claude/rules/mutation-testing.md` — Phase 2's rules are the whole
+point of the phase, so its five exclusion decisions were audited rather than deferred; run on the
+host, no DDEV, so the Mutagen caveat does not apply. Each `sed` was verified to have changed the
+file before the suite ran):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `tests` segment match → substring match | `test_keeps_a_file_named_tests_js` | killed |
+| `_is_local_guard` exception removed | `test_keeps_local_index_php_guards` | killed |
+| empty-output `GitError` guard disabled | `test_empty_git_output_raises_git_error` | killed |
+| basename equality → `endswith` | `test_an_excluded_basename_is_not_matched_as_a_substring` | killed |
+| `--recurse-submodules` dropped from argv | `test_git_tracked_paths_runs_recurse_submodules` | killed |
+
+And over the completeness guard added as task 4:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| floor `<` → `<=` | `test_check_complete_path_floor` at exactly the floor | killed |
+| submodule contribution check removed | `test_check_complete_rejects_an_uninitialised_submodule` | killed |
+| prefix match loses its trailing `/` | `test_check_complete_is_not_fooled_by_a_prefix_match` | killed |
+| `git config` exit 1 treated as a hard failure | `test_declared_submodule_paths_is_empty_without_gitmodules` | killed |
+| `verified_tracked_paths` skips `check_complete` | `test_verified_tracked_paths_refuses_an_incomplete_working_copy` | **survived on the first pass, then killed** |
+
+The last row is the one worth keeping. The guard's *wiring* was initially witnessed only by a
+characterization test that skips on an uninitialised submodule — so in this worktree the mutant
+that disabled the whole check passed the suite. The successor test drives the entry point with a
+scripted double and is independent of the working copy. Recorded per `mutation-testing.md`: a
+survivor is a finding, and this one showed a guard that would have been silently inert exactly
+where it was needed.
 
 #### `tests/test_manifest.py`
 
