@@ -696,8 +696,10 @@ exists to catch.
 - [x] E2E: clicking outside a box still navigates prev/next (the core handler is not broken)
 
 #### Manual Verification:
-- [ ] Resize the window slowly across a derivative-switch threshold and confirm boxes track the image
-- [ ] Check on a HiDPI display, where `rvas_choose()` removes `usemap` and takes a different branch
+- [x] Resize the window slowly across a derivative-switch threshold and confirm boxes track the image —
+      **automated 2026-08-31**: `overlay.spec.js` → `the boxes track the photo across a stepped resize`
+- [x] Check on a HiDPI display, where `rvas_choose()` removes `usemap` and takes a different branch —
+      **automated 2026-08-31**: the `deviceScaleFactor: 2` block in `overlay.spec.js` (2 specs)
 
 **Implementation Note**: pause for manual confirmation before Phase 6.
 
@@ -1125,7 +1127,7 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [ ] `tag-person.spec.js` — picking an existing person from the list writes that person `[HAPPY]`
 - [x] `overlay.spec.js` — box geometry within tolerance at two window widths `[ST]`
 - [x] `overlay.spec.js` — clicking outside a box still navigates (core handler intact) `[NEG]`
-- [ ] `overlay.spec.js` — a stale region renders dashed and dimmed `[ECP]`
+- [x] `overlay.spec.js` — a stale region renders dashed and dimmed `[ECP]`
 - [ ] `overlay.spec.js` — a guest sees no button and no boxes `[NEG]`
 - [ ] `admin-persons.spec.js` — rename propagates to the gallery link and the file `[HAPPY]`
 - [ ] `admin-persons.spec.js` — rescan completes, `data-done` reaches `data-total` `[HAPPY]`

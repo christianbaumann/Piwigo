@@ -16,6 +16,7 @@
  *
  * Usage:
  *   php tests/e2e/support/seed.php --scenario=overlay
+ *   php tests/e2e/support/seed.php --scenario=stale
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -43,9 +44,23 @@ const SEEDED_REGIONS = array(
     array('name' => 'E2E Overlay John', 'x' => 0.70, 'y' => 0.35, 'w' => 0.16, 'h' => 0.12),
 );
 
-/** AppliedToDimensions matching the fixture photo's own ratio, so nothing is stale. */
-function applied_dimensions(array $image): array
+/**
+ * The AppliedToDimensions the regions are written against.
+ *
+ * 'overlay' writes the photo's own, so nothing is stale. 'stale' writes a ratio
+ * no crop of this photo could have - four times as wide as it is tall - which is
+ * far outside PERSONS_STALE_RATIO_TOLERANCE and is what a region written before
+ * a re-crop looks like.
+ *
+ * @return array W, H
+ */
+function applied_dimensions(string $scenario, array $image): array
 {
+    if ($scenario === 'stale')
+    {
+        return array(4000, 1000);
+    }
+
     return array((int)$image['width'], (int)$image['height']);
 }
 
@@ -108,9 +123,9 @@ if (isset($args['restore']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if ($scenario !== 'overlay')
+if (!in_array($scenario, array('overlay', 'stale'), true))
 {
-    fail('--scenario must be: overlay');
+    fail('--scenario must be one of: overlay, stale');
 }
 
 if (!$builder->tableExists('piwigo_person_region'))
@@ -123,7 +138,7 @@ $catId = $builder->createTestAlbum('Persons E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
 
-list($appliedW, $appliedH) = applied_dimensions($image);
+list($appliedW, $appliedH) = applied_dimensions($scenario, $image);
 $builder->writeRegionsWithExiftool($image, SEEDED_REGIONS, $appliedW, $appliedH);
 
 $outcome = persons_reindex_image((int)$image['id'], $image['file']);
@@ -158,6 +173,11 @@ foreach (persons_indexed_regions((int)$image['id']) as $row)
     $expected[] = array(
         'region_id' => (int)$row['id'],
         'name' => $row['name'],
+        // Computed with the same helper the page uses, so the spec asserts
+        // against what the page will really decide rather than against the
+        // scenario name.
+        'stale' => persons_region_is_stale(
+            $row['applied_w'], $row['applied_h'], (int)$image['width'], (int)$image['height']),
         'left' => $corner['left'],
         'top' => $corner['top'],
         'w' => $corner['w'],

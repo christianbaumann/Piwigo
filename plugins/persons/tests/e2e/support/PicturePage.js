@@ -7,6 +7,14 @@
  * bug.
  */
 class PicturePage {
+  /**
+   * Consecutive unchanged animation frames settle() demands.
+   *
+   * Comfortably more than overlay.js's RESIZE_DEBOUNCE_MS at 60fps, so a redraw
+   * that is still queued cannot be mistaken for a layout that has stopped moving.
+   */
+  static SETTLE_FRAMES = 12;
+
   /** @param {import('@playwright/test').Page} page */
   constructor(page) {
     this.page = page;
@@ -96,6 +104,110 @@ class PicturePage {
       const width = image.getBoundingClientRect().width;
       return width > 1 && width < limit;
     }, px);
+  }
+
+  /**
+   * Waits until the photo has stopped changing size and the overlay has caught up.
+   *
+   * After a viewport change two things are in flight: the theme's resize handler
+   * may pick another derivative - which only changes the rendered size once that
+   * file has loaded - and overlay.js debounces its own redraw by
+   * RESIZE_DEBOUNCE_MS. A check that merely asks "does the overlay match the
+   * photo right now" is satisfied by the layout from *before* the resize, and
+   * every measurement after it is one step stale.
+   *
+   * So stability is required to hold across a run of consecutive frames long
+   * enough to outlast the debounce, and the run is reset by any change. Still
+   * causal rather than a sleep: what is waited for is the layout not moving, not
+   * a duration.
+   */
+  async settle() {
+    await this.page.evaluate(() => {
+      window.__personsSettle = { width: null, frames: 0 };
+    });
+
+    await this.page.waitForFunction(
+      (needed) => {
+        const state = window.__personsSettle;
+        const image = document.getElementById('theMainImage');
+        const overlay = document.getElementById('persons-overlay');
+        if (!state || !image || !overlay) {
+          return false;
+        }
+
+        const imageRect = image.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+
+        const matched =
+          imageRect.width > 1 &&
+          Math.abs(imageRect.width - overlayRect.width) < 1 &&
+          Math.abs(imageRect.height - overlayRect.height) < 1 &&
+          Math.abs(imageRect.left - overlayRect.left) < 1 &&
+          Math.abs(imageRect.top - overlayRect.top) < 1;
+
+        if (!matched || state.width !== imageRect.width) {
+          state.width = imageRect.width;
+          state.frames = matched ? 1 : 0;
+          return false;
+        }
+
+        state.frames += 1;
+        return state.frames >= needed;
+      },
+      PicturePage.SETTLE_FRAMES,
+      { polling: 'raf' }
+    );
+  }
+
+  /**
+   * Hovers the photo, which is what reveals the boxes.
+   *
+   * They are held at opacity 0 until the visitor looks at the picture, so every
+   * assertion about how a box *looks* has to go through here first.
+   */
+  async hoverStage() {
+    await this.image.hover();
+  }
+
+  /** @param {number} regionId */
+  async boxStyle(regionId) {
+    return this.box(regionId).evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return {
+        opacity: Number(style.opacity),
+        borderStyle: style.borderTopStyle,
+        title: el.getAttribute('title') || '',
+      };
+    });
+  }
+
+  /** @param {number} regionId */
+  label(regionId) {
+    return this.box(regionId).locator('.person-box-label');
+  }
+
+  /**
+   * The spread of a box's dimming shadow, in pixels.
+   *
+   * How "everything outside this box goes dark" is implemented: one shadow
+   * larger than any photo, clipped by the overlay. Zero when nothing is dimmed.
+   *
+   * @param {number} regionId
+   */
+  async dimSpread(regionId) {
+    return this.box(regionId).evaluate((el) => {
+      const shadow = window.getComputedStyle(el).boxShadow;
+      const lengths = shadow.match(/-?\d+(\.\d+)?px/g) || [];
+      // parseFloat, not Number: Number('1280px') is NaN, and Math.max of a NaN
+      // is NaN, which crosses the bridge as null and compares false against
+      // everything - a check that silently stops checking.
+      return lengths.length ? Math.max(...lengths.map(parseFloat)) : 0;
+    });
+  }
+
+  /** Whether the photo still carries the <area> map; rvas_choose() removes it on a HiDPI screen. */
+  async hasImageMap() {
+    return this.image.evaluate((el) => el.hasAttribute('usemap'));
   }
 
   /** The photo's rendered box, which is the only truthful source of its on-screen size. */

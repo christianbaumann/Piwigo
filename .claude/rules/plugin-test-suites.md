@@ -98,12 +98,20 @@ logs in as `persons_normal` rather than the webmaster: the overlay is shown to a
 non-guest, and running it as an administrator would hide a permission mistake only a normal
 account can find.
 
-`tests/e2e/support/seed.php --scenario=overlay` creates a throwaway album and a copied photo,
-writes two MWG regions into that photo's file with a plain exiftool call, indexes them, and prints
-the box corners the specs assert against — computed with the same pure helpers the page uses, so
-no spec carries a second copy of the conversion. `--restore` deletes the album, the photo row, the
+`tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
+into that photo's file with a plain exiftool call, indexes them, and prints the box corners the
+specs assert against — computed with the same pure helpers the page uses, so no spec carries a
+second copy of the conversion. Two scenarios: `--scenario=overlay` writes the photo's own
+`AppliedToDimensions`, so nothing is stale; `--scenario=stale` writes a ratio no crop of the photo
+could have, which is what a region written before a re-crop looks like. `--restore` deletes the album, the photo row, the
 copied file and exiftool's `_original` sidecar. It rewrites an image file in place, so it is never
 pointed at a real scan.
+
+`PicturePage.settle()` is the one to reuse after a viewport change, not `waitForPlacement()`: after
+a resize the theme may swap in another derivative — which only changes the rendered size once that
+file has loaded — while `overlay.js` debounces its own redraw, so a check that merely asks whether
+the overlay matches the photo *right now* is satisfied by the layout from before the resize. It
+demands the layout hold still across `PicturePage.SETTLE_FRAMES` consecutive animation frames.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
 

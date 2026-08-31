@@ -12,7 +12,7 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * not, so a spec never runs over a state it merely hoped for. The returned
  * object - including the expected box corners - is what a spec asserts against.
  *
- * @param {'overlay'} scenario
+ * @param {'overlay'|'stale'} scenario
  */
 function seed(scenario) {
   return JSON.parse(execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`], { encoding: 'utf8' }));
