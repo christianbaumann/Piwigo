@@ -130,7 +130,7 @@ has to be deleted over FTP by hand.
 cd tools/deploy && uv run pytest
 ```
 
-288 tests, measured 2026-08-31. Everything that decides *what* to do is a pure function and is
+304 tests, measured 2026-08-31. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

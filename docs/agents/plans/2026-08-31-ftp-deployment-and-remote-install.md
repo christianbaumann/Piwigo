@@ -1162,7 +1162,7 @@ to be checked with a listing, not with `exists()`.
 
 ---
 
-## Phase 7: Documentation and decisions — IMPLEMENTED 2026-08-31
+## Phase 7: Documentation and decisions — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -1235,9 +1235,23 @@ server and no remote web space in CI, because there is no CI).
       shuffles), after the `.gitignore` fix below
 
 #### Manual Verification
-- [ ] A fresh reader can deploy from `tools/deploy/README.md` alone
+- [-] A fresh reader can deploy from `tools/deploy/README.md` alone — **the falsifiable half is
+      automated 2026-08-31** as `tools/deploy/tests/test_readme.py` (16 tests): every flag, exit
+      code, credential field, default, exclusion prefix and relative link the README names is
+      compared against the code that defines it, in **both** directions, so a flag added later
+      cannot ship undocumented either. All 16 watched red against a mutation of what they watch;
+      two survived their first mutant, were found to assert only that a string appears somewhere,
+      and were strengthened. Ledger entry recorded. What stays manual is whether the prose is
+      *followable* by a person who has not read the code — no assertion reaches that, and it needs
+      a human who is not the author.
 - [x] Each decision file states what was decided, why, and what would reverse it — 0021, 0022 and
       0023 each carry a *What would reverse this* section naming the concrete trigger
+
+**Verification round, 2026-08-31.** `cd tools/deploy && uv run pytest` — **304 passed**, twice in
+a row (pytest-randomly shuffles, so those are two orderings). The README's and the rules file's
+dated test count was corrected from 288 to 304 in the same change. `bash tools/test-hooks.sh` was
+run once for this phase and is recorded above; it was not re-run for the README tests, which touch
+neither the gate nor any line-count cap.
 
 **A defect found while writing the how-to.** `README.md` tells an operator to copy the example
 next to itself, and `tools/deploy/deploy.local.json` **was not git-ignored** — the root rule
