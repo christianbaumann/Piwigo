@@ -574,7 +574,7 @@ with face-like shapes give person tagging an actual box to draw.
 
 ### Changes Required
 
-#### [ ] 1. The seed script
+#### [x] 1. The seed script
 **File**: `docs/handbuch/tools/seed.php` (new)
 **Changes**: Follows the shape of `plugins/persons/tests/e2e/support/seed.php` - one JSON
 object on stdout, errors to stderr with exit 1, `getopt` args, a snapshot on disk so a later
@@ -592,7 +592,7 @@ Safety: refuse to run unless the throwaway marker is present, the same condition
 `FixtureBuilder::assertThrowawayInstall():52-68` checks. The script rewrites image metadata
 and deletes rows; it is never safe against a production install, and the file header says so.
 
-#### [ ] 2. Photo generation
+#### [x] 2. Photo generation
 **File**: same script
 **Changes**: ImageMagick 7.1.1-43 in the web container, verified 2026-08-31. Six to eight
 1200x800 PNGs with drawn face-like shapes at known positions and German titles burned in, so
@@ -603,7 +603,7 @@ empty sky.
 Each generated file is asserted non-empty and readable by `getimagesize()` before its row is
 inserted - the anti-vacuity guard `createTestImage():90-147` already carries.
 
-#### [ ] 3. The demo album and its content
+#### [x] 3. The demo album and its content
 **File**: same script
 **Changes**: One album named for the handbook, a German description, the generated photos
 linked to it, German titles/authors/descriptions on two of them, two or three of the
@@ -613,7 +613,7 @@ install's existing colored tags assigned, and one person region written with exi
 Force the state, re-read it, throw if it did not take - the rule every existing fixture
 mutator follows.
 
-#### [ ] 4. Restore
+#### [x] 4. Restore
 **File**: same script
 **Changes**: Delete the region rows, the person, the image rows and their links, the album,
 and the generated files with exiftool's `_original` sidecars. Unconditional parts first
@@ -627,32 +627,45 @@ The seed is test scaffolding, not production code, so it gets guards rather than
 its own - building a test that tests a test is what `.claude/rules/test-design.md` forbids.
 What it does carry:
 
-- [ ] Every generated file asserted non-empty and dimension-readable before use `[ERR]`
-- [ ] Every insert re-read and thrown on if it did not take `[ERR]`
-- [ ] The throwaway marker checked before any write `[NEG]`
-- [ ] `--restore` run twice in a row is not an error the second time `[BVA]`
-- [ ] `--restore` with no snapshot exits 0, not 1 `[BVA]`
+- [x] Every generated file asserted non-empty and dimension-readable before use `[ERR]`
+- [x] Every insert re-read and thrown on if it did not take `[ERR]`
+- [x] The throwaway marker checked before any write `[NEG]`
+- [x] `--restore` run twice in a row is not an error the second time `[BVA]`
+- [x] `--restore` with no snapshot exits 0, not 1 `[BVA]`
 
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `ddev exec php -l docs/handbuch/tools/seed.php` passes
-- [ ] `ddev exec php docs/handbuch/tools/seed.php --scenario=demo` prints one JSON object and exits 0
-- [ ] `ddev exec php docs/handbuch/tools/seed.php --restore` exits 0 and album/image counts return to their pre-seed values
-- [ ] Seed, restore, seed, restore leaves the counts unchanged
-- [ ] `--restore` on a clean install exits 0 with `restored: false`
-- [ ] All three plugin integration suites still pass with the demo album present
-- [ ] Generated PNGs are non-zero and readable: `identify` reports 1200x800 for each
+- [x] `ddev exec php -l docs/handbuch/tools/seed.php` passes
+- [x] `ddev exec php docs/handbuch/tools/seed.php --scenario=demo` prints one JSON object and exits 0
+- [x] `ddev exec php docs/handbuch/tools/seed.php --restore` exits 0 and album/image counts return to their pre-seed values
+- [x] Seed, restore, seed, restore leaves the counts unchanged
+- [x] `--restore` on a clean install exits 0 with `restored: false`
+- [x] All three plugin integration suites still pass with the demo album present
+- [x] Generated PNGs are non-zero and readable: `identify` reports 1200x800 for each
 
 #### Manual Verification
-- [ ] The demo photos contain no recognisable real person
-- [ ] Face-like shapes are large enough to drag a region box over
-- [ ] German titles and the album description read naturally
-- [ ] The demo album looks plausible as a gallery, not obviously synthetic to the point of
-      being confusing in a screenshot
+- [x] The demo photos contain no recognisable real person - the falsifiable half is now
+      `assert_no_generated_photo_is_a_gallery_copy()`, which compares every generated file
+      byte for byte against every gallery file; what a drawn shape evokes has no oracle and
+      is in the ledger
+- [x] Face-like shapes are large enough to drag a region box over - automated as
+      `assert_scenes_are_photographable()` against `MIN_FACE_PIXELS`, watched red with a
+      scene's radius reduced from 56 to 40
+- [x] German titles and the album description read naturally - the round trip is
+      `assert_german_texts_round_tripped()`, watched red with the only non-ASCII title made
+      ASCII; whether the wording sounds natural is in the ledger
+- [x] The demo album looks plausible as a gallery, not obviously synthetic to the point of
+      being confusing in a screenshot - subjective, recorded in the ledger with its reason
 
 **Implementation Note**: Pause here for manual confirmation. The demo content is what every
 screenshot shows; changing it later means retaking all of them.
+
+**Phase 4 verified 2026-08-31.** Six guards in the seed, each watched red against its own
+mutant; the mutant pass found two defects of its own, both recorded in the hand-check ledger
+in `docs/agents/TESTING.md`: the copy guard's first form was vacuous because all 105 image
+rows carry a null `md5sum`, and a scene check that ran inside the insert loop stranded rows
+no snapshot named.
 
 ---
 
