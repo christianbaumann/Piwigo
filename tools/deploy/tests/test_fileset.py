@@ -28,7 +28,7 @@ MIN_SELECTED_PATHS = 2500
 MIN_SUBMODULE_PATHS = 100
 
 # The payload a deploy actually pushes: 128.4 MiB (134.7 MB decimal, which is the figure
-# the plan's Phase 2 records) over 3332 selected paths, measured
+# the plan's Phase 2 records) over 3307 selected paths, measured
 # 2026-08-31 with the typetags submodule checked out. The band is wide on purpose — a
 # figure this test pinned exactly would go red on the next photo added to galleries/ —
 # but a file set that shrank to a third of it is the silent-partial-deploy failure the
@@ -116,7 +116,6 @@ def test_keeps_local_index_php_guards():
 def test_excludes_the_deploy_tool_itself():
     """[NEG] The tool has no business on the web space."""
     assert fileset.select(["tools/deploy/pwgdeploy/config.py"]) == []
-    assert fileset.select(["tools/remote_sync.pl"]) == ["tools/remote_sync.pl"]
 
 
 def test_excludes_the_local_dev_environment():
@@ -126,15 +125,27 @@ def test_excludes_the_local_dev_environment():
     assert fileset.select([".ddev/web-build/Dockerfile.playwright"]) == []
 
 
-def test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools():
-    """[BVA] The boundary inside tools/: upstream ships the whole directory in its
-    release (tools/pwg_rel_create.sh strips only .git), so a stock install has these
-    files and matching it is the safer default. The two hook scripts are this fork's
-    own developer tooling and correspond to nothing on the server."""
+def test_excludes_the_whole_tools_directory():
+    """[ECP] Successor to test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools,
+    which asserted the opposite for everything but the two hook scripts. Core loads
+    nothing from tools/ at runtime — its only two mentions in core are comments
+    (include/config_default.inc.php:18,353) — so publishing it puts dev and maintenance
+    PHP on a public host for no benefit. See
+    docs/agents/decisions/0022-the-tools-directory-is-not-published.md."""
     assert fileset.select(["tools/install-hooks.sh"]) == []
     assert fileset.select(["tools/test-hooks.sh"]) == []
-    assert fileset.select(["tools/piwigo_remote.pl"]) == ["tools/piwigo_remote.pl"]
-    assert fileset.select(["tools/index.php"]) == ["tools/index.php"]
+    assert fileset.select(["tools/piwigo_remote.pl"]) == []
+    assert fileset.select(["tools/index.php"]) == []
+    assert fileset.select(["tools/pwg_rel_create.sh"]) == []
+
+
+def test_a_toolsish_path_outside_the_directory_is_kept():
+    """[BVA] tools/ is a path prefix, not a substring: the exclusion must not reach a
+    sibling directory whose name merely starts the same way."""
+    assert fileset.select(["toolstrap/main.php"]) == ["toolstrap/main.php"]
+    assert fileset.select(["plugins/persons/tools/helper.php"]) == [
+        "plugins/persons/tools/helper.php"
+    ]
 
 
 def test_the_generated_config_is_not_part_of_the_tracked_file_set():
@@ -350,6 +361,11 @@ def test_real_repository_file_set():
     # Anti-vacuity for the loop above: the core asset that a bare "vendor/" rule would
     # have wrongly excluded is present, so the loop is discriminating, not empty.
     assert any(p.startswith("themes/default/vendor/fontello/") for p in selected)
+
+    # A prefix match, not a substring one: plugins/*/tools/ would survive a rule this
+    # loop cannot express (decision 0022).
+    assert any(p.startswith("tools/") for p in tracked), "tools/ is tracked here"
+    assert not [p for p in selected if p.startswith("tools/")]
 
 
 def test_the_selected_file_set_weighs_what_a_deploy_expects():

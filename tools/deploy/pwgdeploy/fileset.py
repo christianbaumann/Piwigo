@@ -54,9 +54,10 @@ EXCLUDED_PREFIXES = (
     ".githooks/",
     ".ddev/",
     "local/config/",
-    "tools/deploy/",
-    "tools/install-hooks.sh",
-    "tools/test-hooks.sh",
+    # decision 0022: core loads nothing from tools/ at runtime — its only two mentions
+    # in core are comments (include/config_default.inc.php:18,353) — so the whole
+    # directory stays off the web space, upstream's release script notwithstanding.
+    "tools/",
     ".gitignore",
     ".gitmodules",
 )
