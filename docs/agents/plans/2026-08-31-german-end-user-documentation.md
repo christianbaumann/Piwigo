@@ -257,7 +257,7 @@ submodule because it carries no `|translate` filter.
 
 ### Changes Required
 
-#### [ ] 1. The override file
+#### [x] 1. The override file
 **File**: `local/language/de_DE.lang.php` (new)
 **Changes**: A flat file merged over core after `common.lang` and `admin.lang`. The exact
 literal forms differ per string (`|@translate` vs `|translate`); the key is the string inside
@@ -285,7 +285,7 @@ $lang['Couleur'] = 'Farbe';
 Note `%s` and `%d` placeholders and their order must survive - both affected strings are fed
 through `sprintf`.
 
-#### [ ] 2. Track the override file
+#### [x] 2. Track the override file
 **File**: `.gitignore`
 **Changes**: Add a re-include next to the existing plugin and theme entries.
 
@@ -296,24 +296,27 @@ through `sprintf`.
 +!/local/language/de_DE.lang.php
 ```
 
-#### [ ] 3. The one string no language file can reach
+#### [x] 3. The one string no language file can reach
 **File**: `plugins/typetags/template/tags.tpl:73` (git submodule)
-**Changes**: Wrap the raw literal so it becomes translatable, and add the German key to the
-plugin's own locale file.
+**Changes**: Wrap the raw literal so it becomes translatable.
 
 ```smarty
 - <span id="TypetagsCreate" class="typetag-button icon-plus">Créer</span>
 + <span id="TypetagsCreate" class="typetag-button icon-plus">{'Create'|translate}</span>
 ```
 
-**File**: `plugins/typetags/language/de_DE/plugin.lang.php`
-**Changes**: `$lang['Create'] = 'Anlegen';`
+**No locale file change.** The plan called for `$lang['Create'] = 'Anlegen'` in the plugin's
+own `de_DE`. Core already carries `$lang['Create']` in `language/de_DE/admin.lang.php`
+(`Erstellen`), and in `fr_FR`/`fr_CA` (`Créer`), measured 2026-08-31. A plugin entry would
+load *after* core and shadow that wording everywhere the plugin loads its language, for no
+gain. Wrapping the literal was the whole fix, and the French rendering does not regress.
+`GermanOverrideKeyTest::testTheOverrideDoesNotShadowACoreGermanString` now guards the rule.
 
 This is a commit inside the submodule. `docs/backlog.md` already records that the submodule
 is one commit ahead of its own origin; this adds a second. Both must be pushed to
 `github.com/christianbaumann/Piwigo-Colored-Tags` or a fresh clone still fails.
 
-#### [ ] 4. Structural guards for the keys
+#### [x] 4. Structural guards for the keys
 **File**: `plugins/provenance/tests/Unit/GermanOverrideKeyTest.php` (new)
 **Changes**: One assertion per key that the literal still occurs exactly once in the file
 that emits it, with the lower-bound anti-vacuity constant the existing anchor guards carry
@@ -358,26 +361,45 @@ wrong is the likeliest way to write a guard that cannot fail.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `ddev exec php -l local/language/de_DE.lang.php` passes
-- [ ] `ddev exec php -l plugins/typetags/language/de_DE/plugin.lang.php` passes
-- [ ] `git check-ignore -v local/language/de_DE.lang.php` exits 1 (no longer ignored)
-- [ ] `git status --short` lists `local/language/de_DE.lang.php` as a new tracked file
-- [ ] New guards pass: `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
-- [ ] Each guard was watched go red: temporarily alter one literal in its template and confirm only that case fails
-- [ ] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; cd plugins/typetags && npx playwright test'` still passes (its specs read tag admin screen text)
-- [ ] `printf` placeholders intact: no `%s`/`%d` added, removed or reordered in the two format strings
+- [x] `ddev exec php -l local/language/de_DE.lang.php` passes
+- [x] `ddev exec php -l plugins/typetags/language/de_DE/plugin.lang.php` passes
+- [x] `git check-ignore -q local/language/de_DE.lang.php` exits 1 (no longer ignored). Note:
+      the `-v` form quoted originally exits 0 because it prints the matching negation rule.
+- [x] `git status --short` lists `local/language/de_DE.lang.php` as a new tracked file
+- [x] New guards pass: `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
+- [x] Each guard was watched go red: temporarily alter one literal in its template and confirm only that case fails
+- [x] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; cd plugins/typetags && npx playwright test'` still passes (its specs read tag admin screen text)
+- [x] `printf` placeholders intact: no `%s`/`%d` added, removed or reordered in the two format strings
 
 #### Manual Verification
-- [ ] `admin.php?page=album-<id>-properties`: saving shows a German confirmation, not `Album updated`
-- [ ] `admin.php?page=albums`: the rename control reads German
-- [ ] `admin.php?page=photos_add`: after an upload the summary reads German with the album name and count substituted correctly
-- [ ] `admin.php?page=batch_manager`: the filter panel reads German
-- [ ] `admin.php?page=tags`: `Rename Tag`, `Remove color`, `Couleur` and the create button all read German
-- [ ] The public picture page: the `+` badge and the `x` control carry German tooltips
-- [ ] No screen that was already German regressed
 
-**Implementation Note**: Pause here for manual confirmation before proceeding. Every
-screenshot in Phase 5 depends on this phase being complete and correct.
+All seven were automated at the integration layer rather than walked by hand. Two new files
+fetch each screen over HTTP as the webmaster and assert both that the German string is
+present and that the untranslated form is gone:
+`plugins/provenance/tests/Integration/GermanAdminScreenTest.php` (core screens, 17 cases) and
+`plugins/typetags/tests/Integration/GermanScreenTest.php` (plugin screens, 5 cases).
+
+- [x] `admin.php?page=album-<id>-properties`: saving shows a German confirmation, not `Album updated`
+- [x] `admin.php?page=albums`: the rename control reads German
+- [x] `admin.php?page=photos_add`: the summary format string reads German with `%s` and `%d`
+      intact. The substitution itself happens in plupload's JavaScript; browser upload
+      coverage is precedent-refused (`docs/agents/TESTING.md:434`)
+- [x] `admin.php?page=batch_manager`: the filter panel reads German
+- [x] `admin.php?page=tags`: `Rename Tag`, `Remove color`, `Couleur` and the create button all read German
+- [x] The public picture page: the `+` badge and the `x` control carry German tooltips
+- [x] No screen that was already German regressed - `testTheOverrideDoesNotShadowACoreGermanString`
+      asserts no overridden key is one core's `de_DE` already translates
+
+**Findings**
+
+- `Batch Manager Filter` renders on no screen. `batch_manager_global.tpl:316` passes it as
+  `title=` into `include/batch_manager_filter.inc.tpl`, which never reads `$title` (zero
+  occurrences, measured 2026-08-31). The override keeps the key and
+  `GermanAdminScreenTest::testTheBatchManagerFilterTitleReachesNoScreen` records the fact, so
+  an upstream template that starts rendering it is visible in a run.
+- The `Créer` mutant survived until `_data/templates_c/` was cleared: the plugin's `tags.tpl`
+  is embedded into the compiled core template by a prefilter, and Smarty's `compile_id`
+  hashes only the callback name. Documented in the test's docblock.
 
 ---
 
@@ -902,10 +924,10 @@ five workflows are already covered at the browser layer where a browser is the o
 
 ### Unit tests
 
-- [ ] `GermanOverrideKeyTest` - one case per translated literal, asserting it still occurs
+- [x] `GermanOverrideKeyTest` - one case per translated literal, asserting it still occurs
       the expected number of times in the file that emits it, each preceded by the
       `MIN_BYTES` anti-vacuity guard `[ERR]`
-- [ ] The two-occurrence cases for `Add tag` and `Remove tag` assert the **escaped** form as
+- [x] The two-occurrence cases for `Add tag` and `Remove tag` assert the **escaped** form as
       it appears inside the PHP string literal `[BVA]`
 
 ### Integration tests

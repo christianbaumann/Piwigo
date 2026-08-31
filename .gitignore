@@ -23,6 +23,8 @@
 /_temp
 /local/*
 !/local/**/index.php
+!/local/language
+!/local/language/de_DE.lang.php
 
 # IntelliJ
 .idea
