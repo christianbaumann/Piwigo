@@ -25,6 +25,8 @@ final class CleanCheckoutTest extends TestCase
         'template/public_persons.tpl',
         'template/overlay.css',
         'template/overlay.js',
+        'template/editor.css',
+        'template/editor.js',
         'language/en_UK/plugin.lang.php',
     );
 

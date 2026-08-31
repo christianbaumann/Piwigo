@@ -29,6 +29,20 @@ class PicturePage {
     this.personRow = page.locator('#standard #Persons');
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
+
+    /* ── the editor ─────────────────────────────────────────────────── */
+
+    this.tagToggle = page.locator('#persons-tag-toggle');
+    this.editorMessage = page.locator('#persons-editor-message');
+    this.picker = page.locator('#persons-picker');
+    this.pickerInput = page.locator('#persons-picker-input');
+    this.pickerOptions = page.locator('#persons-picker-list .persons-picker-option');
+    /** The box being drawn, before it has been named and saved. */
+    this.draft = page.locator('#persons-overlay .person-draft');
+    /** Only the boxes that exist on the server; a draft has no region id yet. */
+    this.savedBoxes = page.locator('#persons-overlay .person-box[data-person-region]');
+    /** The stage only while tagging mode is on; waiting for it is how the mode is confirmed. */
+    this.taggingStage = page.locator('#persons-stage.persons-tagging');
   }
 
   /** @param {string} path the picture_path the seed printed */
@@ -213,6 +227,69 @@ class PicturePage {
   /** The photo's rendered box, which is the only truthful source of its on-screen size. */
   async imageRect() {
     return this.image.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    });
+  }
+
+  /** @param {number} regionId */
+  deleteButton(regionId) {
+    return this.box(regionId).locator('.person-box-delete');
+  }
+
+  /** Turns the photo into a drawing surface, and waits until it really is one. */
+  async enterTaggingMode() {
+    await this.tagToggle.click();
+    await this.taggingStage.waitFor();
+  }
+
+  /**
+   * Drags a rectangle over the photo.
+   *
+   * The box is given in fractions of the photo's *rendered* size, which is the
+   * only frame of reference that survives the theme swapping derivatives
+   * underneath - a pixel offset would mean a different part of the picture at
+   * every window width.
+   *
+   * @param {{left: number, top: number, w: number, h: number}} box
+   */
+  async dragBox(box) {
+    const image = await this.imageRect();
+
+    const fromX = image.left + box.left * image.width;
+    const fromY = image.top + box.top * image.height;
+    const toX = image.left + (box.left + box.w) * image.width;
+    const toY = image.top + (box.top + box.h) * image.height;
+
+    await this.page.mouse.move(fromX, fromY);
+    await this.page.mouse.down();
+    // Stepped, so the drag produces mousemove events rather than one jump.
+    await this.page.mouse.move(toX, toY, { steps: 10 });
+    await this.page.mouse.up();
+  }
+
+  /** Types a name into the picker and waits for the list to answer. */
+  async typeName(name) {
+    await this.pickerInput.fill(name);
+    await this.pickerOptions.first().waitFor();
+  }
+
+  /** The names currently rendered on the saved boxes. */
+  async savedNames() {
+    return this.savedBoxes.locator('.person-box-label').allTextContents();
+  }
+
+  /** The rendered box of the rectangle being drawn, before it is saved. */
+  async draftRect() {
+    return this.draft.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    });
+  }
+
+  /** The rendered box of the name picker. */
+  async pickerRect() {
+    return this.picker.evaluate((el) => {
       const r = el.getBoundingClientRect();
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     });

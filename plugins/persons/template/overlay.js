@@ -36,9 +36,9 @@
 			return;
 		}
 
-		if (!overlay.querySelector('.person-box')) {
-			return;
-		}
+		/* No early return on an empty overlay: with the editor on the page it is
+		   the surface the first box is drawn on, and an unplaced overlay has no
+		   size to draw in. */
 
 		function place() {
 			var imageRect = image.getBoundingClientRect();

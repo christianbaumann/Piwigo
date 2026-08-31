@@ -1,0 +1,140 @@
+/*
+ * The tagging editor on the public picture page.
+ *
+ * Everything here is scoped to #persons-stage.persons-tagging, the class
+ * editor.js sets while the mode lasts. Outside it the page keeps the read-only
+ * behaviour overlay.css defines: boxes revealed on hover, no pointer events, no
+ * controls.
+ */
+
+#persons-editor {
+	margin: 6px 0;
+	text-align: right;
+}
+
+#persons-tag-toggle {
+	cursor: pointer;
+}
+
+#persons-tag-toggle[disabled] {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+#persons-editor-message {
+	margin-left: 8px;
+	font-size: 0.9em;
+}
+
+.persons-editor-error {
+	color: #c00;
+	font-weight: bold;
+}
+
+/*
+ * In tagging mode the overlay becomes the drawing surface, so it takes the
+ * pointer events it refuses the rest of the time, and every box is shown rather
+ * than waiting for a hover - a box you cannot see is a box you cannot delete.
+ */
+#persons-stage.persons-tagging #persons-overlay {
+	pointer-events: auto;
+	cursor: crosshair;
+}
+
+#persons-stage.persons-tagging .person-box {
+	opacity: 1;
+}
+
+#persons-stage.persons-tagging .person-box-stale {
+	opacity: 0.5;
+}
+
+/* The box being drawn, before it has a name. */
+.person-draft {
+	border-style: dashed;
+	border-color: #fff;
+	opacity: 1;
+}
+
+/*
+ * The delete affordance exists in the markup at all times so the editor has
+ * something to bind to, and is only reachable while tagging.
+ */
+.person-box-delete {
+	display: none;
+	position: absolute;
+	right: -1px;
+	top: -1px;
+	padding: 0 5px;
+	border: 0;
+	background: rgba(0, 0, 0, 0.7);
+	color: #fff;
+	font-size: 0.9em;
+	line-height: 1.4;
+	cursor: pointer;
+	pointer-events: auto;
+}
+
+#persons-stage.persons-tagging .person-box[data-person-region] .person-box-delete {
+	display: block;
+}
+
+/*
+ * Positioned by editor.js in stage coordinates, from four candidates, so it
+ * covers as little as possible of the face being named.
+ */
+#persons-picker {
+	position: absolute;
+	z-index: 10;
+	width: 220px;
+	padding: 8px;
+	background: #222;
+	color: #fff;
+	border: 1px solid #555;
+	border-radius: 3px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+	text-align: left;
+}
+
+.persons-picker-title {
+	margin-bottom: 4px;
+	font-weight: bold;
+}
+
+#persons-picker-input {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+#persons-picker-list {
+	margin: 6px 0 0;
+	padding: 0;
+	max-height: 160px;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.persons-picker-option {
+	padding: 2px 4px;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.persons-picker-highlighted {
+	background: #0a6;
+	color: #fff;
+}
+
+.persons-picker-create {
+	border-top: 1px solid #555;
+	margin-top: 4px;
+	padding-top: 4px;
+}
+
+.persons-picker-hint {
+	margin-top: 6px;
+	font-size: 0.8em;
+	opacity: 0.7;
+}

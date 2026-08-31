@@ -5,8 +5,9 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  * Public-side injection. Pulled in only on the picture page, so the rest of the
  * gallery never loads it.
  *
- * Two things land on the page: a positioning wrapper around the photo carrying
- * the region boxes, and one row of names in the photo's information list.
+ * Three things land on the page: a positioning wrapper around the photo carrying
+ * the region boxes, the editor that draws new ones onto it, and one row of names
+ * in the photo's information list.
  *
  * ---------------------------------------------------------------------------
  * Where the coordinate work happens.
@@ -23,6 +24,7 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  */
 
 include_once(PERSONS_PATH.'include/index.inc.php');
+include_once(PERSONS_PATH.'include/exiftool.inc.php');
 
 /**
  * Puts the region overlay and the person row on the public photo page.
@@ -48,11 +50,9 @@ function persons_picture_overlay()
     return;
   }
 
+  // Not bailing on an empty region list: the first face on a photo is drawn
+  // onto an empty stage, so a page without one is a photo nobody can ever tag.
   $rows = persons_indexed_regions($image_id);
-  if (count($rows) == 0)
-  {
-    return;
-  }
 
   // picture.php has already loaded the photo's row; no query of our own for it.
   $image = isset($picture['current']) ? $picture['current'] : array();
@@ -89,11 +89,6 @@ function persons_picture_overlay()
     }
   }
 
-  if (count($boxes) == 0)
-  {
-    return;
-  }
-
   load_language('plugin.lang', PERSONS_PATH);
 
   $template->assign(array(
@@ -101,6 +96,15 @@ function persons_picture_overlay()
     'PERSONS_BOXES'       => array_values($boxes),
     'PERSONS_NAMES'       => array_values($names),
     'PERSONS_STALE_TITLE' => l10n('Region may be out of date: the image was resized since it was tagged'),
+    'PERSONS_IMAGE_ID'    => $image_id,
+    'PERSONS_TOKEN'       => get_pwg_token(),
+    'PERSONS_ROTATION'    => $rotation,
+    'PERSONS_MIN_FRACTION' => PERSONS_MIN_BOX_FRACTION,
+    // Probed here rather than discovered on the first failed save: an action
+    // that can only fail should not be offered. One memoised subprocess per
+    // picture-page render for a logged-in visitor is the price, and it is the
+    // same trade plugins/provenance makes on its album screen.
+    'PERSONS_EXIFTOOL'    => persons_exiftool_available(),
     ));
 
   $template->set_prefilter('picture', 'persons_picture_prefilter');

@@ -187,6 +187,7 @@ final class PicturePageSourceTest extends TestCase
         $this->assertStringNotContainsString('persons-stage', $html);
         $this->assertStringNotContainsString('person-box', $html);
         $this->assertStringNotContainsString('id="Persons"', $html);
+        $this->assertStringNotContainsString('persons-tag-toggle', $html);
 
         // The *names* are a different matter and are deliberately not asserted
         // absent: every person is mirrored as an ordinary Piwigo tag, which is
@@ -195,14 +196,65 @@ final class PicturePageSourceTest extends TestCase
         // changing core's row, not this plugin's.
     }
 
-    /** [NEG] A photo with no regions gets no stage at all, rather than an empty one. */
-    public function testAPhotoWithNoRegionsGetsNoOverlay(): void
+    /**
+     * [BVA] A photo with no regions still gets the stage, and no boxes.
+     *
+     * Phase 5 rendered nothing here, because there was nothing to draw. The
+     * editor changed that: the first face on a photo is drawn onto an empty
+     * stage, so a page without one is a photo that can never be tagged.
+     */
+    public function testAPhotoWithNoRegionsStillGetsAnEmptyStage(): void
     {
         $markup = $this->markup($this->page());
 
         $this->assertSame(0, $this->regionCount(), 'anti-vacuity: this photo was expected to carry no region');
         $this->assertStringContainsString('id="theMainImage"', $markup, 'anti-vacuity: this is not the photo page');
-        $this->assertStringNotContainsString('persons-stage', $markup);
+        $this->assertStringContainsString('id="persons-stage"', $markup);
+        $this->assertSame(0, substr_count($markup, 'data-person-region='));
+    }
+
+    // ── the editor ───────────────────────────────────────────────────
+
+    /** [HAPPY] A logged-in visitor is offered the editor, on a photo with regions and without. */
+    public function testTheTagButtonIsRenderedForALoggedInVisitor(): void
+    {
+        $withoutRegions = $this->markup($this->page());
+        $this->assertStringContainsString('id="persons-tag-toggle"', $withoutRegions);
+
+        $this->seed($this->twoFaces());
+        $withRegions = $this->markup($this->page());
+        $this->assertStringContainsString('id="persons-tag-toggle"', $withRegions);
+    }
+
+    /**
+     * [HAPPY] The editor's configuration reaches the browser on the element
+     * itself, not through a script block whose evaluation order would matter.
+     */
+    public function testTheEditorCarriesItsConfiguration(): void
+    {
+        $markup = $this->markup($this->page());
+
+        $this->assertMatchesRegularExpression(
+            '/data-persons-image="' . $this->image['id'] . '"/',
+            $markup,
+            'the editor does not know which photo it is on'
+        );
+        $this->assertMatchesRegularExpression('/data-persons-token="[0-9a-f]{4,}"/', $markup);
+        $this->assertStringContainsString(
+            'data-persons-min-fraction="' . PERSONS_MIN_BOX_FRACTION . '"',
+            $markup,
+            'the minimum box size must come from the one constant, not a second copy in JavaScript'
+        );
+    }
+
+    /** [HAPPY] Every box offers a delete affordance the editor can bind to. */
+    public function testEachBoxCarriesADeleteControl(): void
+    {
+        $this->seed($this->twoFaces());
+        $markup = $this->markup($this->page());
+
+        $this->assertCount(2, $this->regionIds(), 'anti-vacuity: the fixture indexed no regions');
+        $this->assertSame(2, substr_count($markup, 'class="person-box-delete"'));
     }
 
     // ── the person row ────────────────────────────────────────────────────

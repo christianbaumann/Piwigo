@@ -101,11 +101,20 @@ account can find.
 `tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
 into that photo's file with a plain exiftool call, indexes them, and prints the box corners the
 specs assert against — computed with the same pure helpers the page uses, so no spec carries a
-second copy of the conversion. Two scenarios: `--scenario=overlay` writes the photo's own
+second copy of the conversion. Three scenarios: `--scenario=overlay` writes the photo's own
 `AppliedToDimensions`, so nothing is stale; `--scenario=stale` writes a ratio no crop of the photo
-could have, which is what a region written before a re-crop looks like. `--restore` deletes the album, the photo row, the
-copied file and exiftool's `_original` sidecar. It rewrites an image file in place, so it is never
-pointed at a real scan.
+could have, which is what a region written before a re-crop looks like; `--scenario=empty` writes
+nothing into the file at all, which is what the editor specs start from — anything found in that
+file afterwards was put there by the browser. `seed.php --read-file-regions=<id>` reads one photo's
+regions back with a plain exiftool call in its own process, which is how a spec asserts a write
+landed without asking the plugin's own parser. `seed.php --exiftool=missing|present` writes or
+removes a `persons_exiftool_path` config row pointing at a directory holding no binary, which is
+how the disabled-editor spec forces a host without exiftool rather than waiting for one.
+`--restore` deletes the album, the photo row, the
+copied file and exiftool's `_original` sidecar, the persons the editor specs created through the
+UI, and that config row unconditionally — a spec killed between forcing the state and restoring it
+would otherwise leave every later page without an editor. It rewrites an image file in place, so it
+is never pointed at a real scan.
 
 `PicturePage.settle()` is the one to reuse after a viewport change, not `waitForPlacement()`: after
 a resize the theme may swap in another derivative — which only changes the rendered size once that

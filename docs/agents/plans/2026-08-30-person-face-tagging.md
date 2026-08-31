@@ -715,20 +715,20 @@ cancels, and a create-new escape hatch inside the picker.
 
 ### Changes Required:
 
-#### [ ] 1. Tagging mode
+#### [x] 1. Tagging mode
 **File**: `plugins/persons/template/editor.js`
 **Changes**: a "Tag people" button toggles a mode, exactly as Facebook does. Entering the mode sets
 `pointer-events: auto` on the overlay, hides the `<map>` by removing `usemap` (restored on exit),
 and shows all boxes rather than hover-only. This is what keeps the editor from fighting the two
 click consumers already bound to that element.
 
-#### [ ] 2. Drag-to-draw
+#### [x] 2. Drag-to-draw
 **Changes**: `mousedown`/`mousemove`/`mouseup` on the overlay produce a rectangle in element pixels,
 converted to normalized center-origin against `stageRect()` and rejected below
 `PERSONS_MIN_BOX_FRACTION` on either axis (PhotoPrism's 16px minimum, expressed as a fraction so it
 is resolution-independent).
 
-#### [ ] 3. The picker
+#### [x] 3. The picker
 **Changes**: anchored to the drawn box, auto-focused, pre-populated from `pwg.persons.getList` with
 no `q`, re-queried (debounced) as the user types. Position is chosen from four candidates —
 below, above, right, left — picking the one that overlaps the drawn box least; Immich's
@@ -740,10 +740,10 @@ Arrow-key navigation of the list is implemented even though the research found i
 none of the six products — it is standard autocomplete behaviour and its absence is a real
 accessibility gap, not a convention.
 
-#### [ ] 4. Delete
+#### [x] 4. Delete
 **Changes**: an `x` affordance on a box, in tagging mode only, calling `pwg.persons.deleteRegion`.
 
-#### [ ] 5. Failure handling
+#### [x] 5. Failure handling
 **Changes**: `PwgError` arrives as HTTP 200 with `stat:"fail"`, so a refused save lands in
 `success()`, not `error()` — the convention both existing plugins document. A failed save restores
 the box to its pre-save state and surfaces the message; it never silently drops the drawn box.
@@ -753,18 +753,21 @@ than offering an action that can only fail (the `PROVENANCE_EXIFTOOL` precedent)
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] E2E: drag a box, type a new name, press Enter; the box appears named after a reload
-- [ ] E2E: the written region is read back out of the file by exiftool in a separate process
-- [ ] E2E: Esc removes the drawn box and writes nothing
-- [ ] E2E: a second person on the same photo does not remove the first
-- [ ] E2E: a box smaller than the minimum is rejected with a visible message
-- [ ] E2E: a guest sees no "Tag people" button
-- [ ] Integration: `pwg.persons.addRegion` on a fixture photo produces the region, the person, the
+- [x] E2E: drag a box, type a new name, press Enter; the box appears named after a reload
+- [x] E2E: the written region is read back out of the file by exiftool in a separate process
+- [x] E2E: Esc removes the drawn box and writes nothing
+- [x] E2E: a second person on the same photo does not remove the first
+- [x] E2E: a box smaller than the minimum is rejected with a visible message
+- [x] E2E: a guest sees no "Tag people" button
+- [x] Integration: `pwg.persons.addRegion` on a fixture photo produces the region, the person, the
       mirrored tag and the `image_tag` row
 
 #### Manual Verification:
-- [ ] Tag a face on a real photo and confirm the box sits where it was drawn after reload
-- [ ] Confirm the picker never covers the face being tagged, at several box positions
+- [x] Tag a face on a real photo and confirm the box sits where it was drawn after reload —
+      **automated 2026-08-31**: `editor.spec.js` → the geometry tail of `a drawn box survives a reload
+      with its name on it`
+- [x] Confirm the picker never covers the face being tagged, at several box positions —
+      **automated 2026-08-31**: `editor.spec.js` → `the picker never covers the box being named`
 
 **Implementation Note**: pause for manual confirmation before Phase 7.
 

@@ -17,6 +17,9 @@
  * Usage:
  *   php tests/e2e/support/seed.php --scenario=overlay
  *   php tests/e2e/support/seed.php --scenario=stale
+ *   php tests/e2e/support/seed.php --scenario=empty
+ *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
+ *   php tests/e2e/support/seed.php --exiftool=missing|present
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -31,6 +34,14 @@ const SNAPSHOT_FILE = __DIR__ . '/../.state/snapshot.json';
 
 /** The names this suite tags with. Distinctive, so a leftover row is obvious. */
 const SEEDED_PERSONS = array('E2E Overlay Jane', 'E2E Overlay John');
+
+/**
+ * The names the editor specs create through the UI.
+ *
+ * Removed by --restore alongside the seeded ones: they are created by the code
+ * under test rather than by this script, so nothing else knows they exist.
+ */
+const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace');
 
 /**
  * The regions written into the fixture photo.
@@ -96,7 +107,113 @@ function save_snapshot(array $snapshot): void
     file_put_contents(SNAPSHOT_FILE, json_encode($snapshot, JSON_PRETTY_PRINT));
 }
 
-$args = getopt('', array('scenario::', 'restore'));
+/** The config row that points the plugin at its exiftool binary. */
+const EXIFTOOL_PATH_PARAM = 'persons_exiftool_path';
+
+/** A directory holding no exiftool, so the probe fails the way a bare host does. */
+const EXIFTOOL_MISSING_DIR = '/nonexistent-persons-e2e/';
+
+/**
+ * Makes the server look as though it has no exiftool, and puts it back.
+ *
+ * load_conf_from_db() copies every piwigo_config row into $conf before plugins
+ * load, and main.inc.php only defaults the path when nothing set it - so one row
+ * is enough to send the probe at a binary that is not there. Forced rather than
+ * hoped for: a spec about the disabled state must not pass on a host that simply
+ * happens to lack exiftool for some other reason.
+ */
+function set_exiftool_state(Db $db, string $state): array
+{
+    if (!in_array($state, array('missing', 'present'), true))
+    {
+        fail('--exiftool must be one of: missing, present');
+    }
+
+    $db->query("DELETE FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
+
+    if ($state === 'missing')
+    {
+        $db->query(
+            "INSERT INTO piwigo_config (param, value) VALUES ('" . EXIFTOOL_PATH_PARAM . "', '"
+            . $db->escape(EXIFTOOL_MISSING_DIR) . "')"
+        );
+    }
+
+    $stored = $db->scalar("SELECT value FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
+    $expected = $state === 'missing' ? EXIFTOOL_MISSING_DIR : null;
+
+    if ($stored !== $expected)
+    {
+        fail("could not force the exiftool state to $state");
+    }
+
+    return array('exiftool' => $state);
+}
+
+/**
+ * What the image file itself says, read by a plain exiftool call.
+ *
+ * Deliberately not through the plugin's own reader: a spec asserting that a
+ * write really landed in the file must not be satisfied by the same parser that
+ * produced it. This runs in its own process, started after the browser's write
+ * finished.
+ *
+ * @return array regions (name and area) and the PersonInImage names
+ */
+function read_file_regions(Db $db, int $imageId): array
+{
+    $path = $db->scalar('SELECT path FROM piwigo_images WHERE id = ' . $imageId);
+    if ($path === null)
+    {
+        fail("no photo with id $imageId");
+    }
+
+    $file = PIWIGO_ROOT . ltrim((string)$path, './');
+    if (!is_file($file))
+    {
+        fail("photo $imageId has no file at $file");
+    }
+
+    $out = array();
+    $status = 1;
+    exec(
+        'exiftool -json -struct -charset filename=UTF8 -XMP-mwg-rs:RegionInfo'
+        . ' -XMP-iptcExt:PersonInImage ' . escapeshellarg($file) . ' 2>/dev/null',
+        $out,
+        $status
+    );
+
+    if ($status !== 0)
+    {
+        fail('exiftool could not read ' . $file);
+    }
+
+    $decoded = json_decode(implode("\n", $out), true);
+    $info = $decoded[0]['RegionInfo']['RegionList'] ?? array();
+
+    $regions = array();
+    foreach ($info as $entry)
+    {
+        $regions[] = array(
+            'name' => $entry['Name'] ?? '',
+            'type' => $entry['Type'] ?? '',
+            'x' => isset($entry['Area']['X']) ? (float)$entry['Area']['X'] : null,
+            'y' => isset($entry['Area']['Y']) ? (float)$entry['Area']['Y'] : null,
+            'w' => isset($entry['Area']['W']) ? (float)$entry['Area']['W'] : null,
+            'h' => isset($entry['Area']['H']) ? (float)$entry['Area']['H'] : null,
+            );
+    }
+
+    $persons = $decoded[0]['PersonInImage'] ?? array();
+
+    return array(
+        'photo_id' => $imageId,
+        'regions' => $regions,
+        'persons' => is_array($persons) ? $persons : array($persons),
+        );
+}
+
+$args = getopt('', array('scenario::', 'restore', 'read-file-regions::', 'exiftool::'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -115,17 +232,33 @@ if (isset($args['restore']))
     $builder->importTestObjects($snapshot['test_objects'] ?? array());
     $builder->destroyTestImages();
     $builder->destroyTestAlbums();
-    $builder->destroyPersons(SEEDED_PERSONS);
+    $builder->destroyPersons(array_merge(SEEDED_PERSONS, EDITOR_PERSONS));
+
+    // Unconditional: a spec killed between forcing the state and restoring it
+    // would otherwise leave every later page without an editor.
+    $db->query("DELETE FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
 
     @unlink(SNAPSHOT_FILE);
     echo json_encode(array('restored' => true)), "\n";
     exit(0);
 }
 
-$scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('overlay', 'stale'), true))
+if (isset($args['exiftool']))
 {
-    fail('--scenario must be one of: overlay, stale');
+    echo json_encode(set_exiftool_state($db, (string)$args['exiftool'])), "\n";
+    exit(0);
+}
+
+if (isset($args['read-file-regions']))
+{
+    echo json_encode(read_file_regions($db, (int)$args['read-file-regions']), JSON_UNESCAPED_UNICODE), "\n";
+    exit(0);
+}
+
+$scenario = $args['scenario'] ?? '';
+if (!in_array($scenario, array('overlay', 'stale', 'empty'), true))
+{
+    fail('--scenario must be one of: overlay, stale, empty');
 }
 
 if (!$builder->tableExists('piwigo_person_region'))
@@ -138,17 +271,31 @@ $catId = $builder->createTestAlbum('Persons E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
 
-list($appliedW, $appliedH) = applied_dimensions($scenario, $image);
-$builder->writeRegionsWithExiftool($image, SEEDED_REGIONS, $appliedW, $appliedH);
+// 'empty' is the state the editor starts from: a photo nobody has tagged yet.
+// It writes no regions at all rather than writing some and deleting them, so
+// the file really is untouched when the first box is drawn onto it.
+if ($scenario !== 'empty')
+{
+    list($appliedW, $appliedH) = applied_dimensions($scenario, $image);
+    $builder->writeRegionsWithExiftool($image, SEEDED_REGIONS, $appliedW, $appliedH);
 
-$outcome = persons_reindex_image((int)$image['id'], $image['file']);
-if (!$outcome['ok'])
-{
-    fail('seed reindex failed: ' . $outcome['message']);
+    $outcome = persons_reindex_image((int)$image['id'], $image['file']);
+    if (!$outcome['ok'])
+    {
+        fail('seed reindex failed: ' . $outcome['message']);
+    }
+    if ($outcome['regions'] !== count(SEEDED_REGIONS))
+    {
+        fail('seed indexed ' . $outcome['regions'] . ' of ' . count(SEEDED_REGIONS) . ' regions');
+    }
 }
-if ($outcome['regions'] !== count(SEEDED_REGIONS))
+else
 {
-    fail('seed indexed ' . $outcome['regions'] . ' of ' . count(SEEDED_REGIONS) . ' regions');
+    $indexed = (int)$db->scalar('SELECT COUNT(*) FROM piwigo_person_region WHERE image_id = ' . (int)$image['id']);
+    if ($indexed !== 0)
+    {
+        fail("the 'empty' scenario expected an untagged photo, found $indexed regions");
+    }
 }
 
 // The corners the boxes must land on, computed with the same pure helpers the
