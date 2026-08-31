@@ -4,7 +4,7 @@ git_commit: ec41c7293c40326b36fb1f580e8faaa6c4eef1fe
 branch: feat/provenance-metadata
 topic: "FTP deployment script and first-run remote install"
 tags: [plan, deployment, ftp, install, python, tooling]
-status: approved
+status: implemented
 ---
 
 # FTP Deployment and First-Run Remote Install — Implementation Plan
@@ -692,9 +692,12 @@ directories" is the failure this check exists to find.
       the real deploy to `bilder.foerderverein-sefferweich.de`, which is a superset of the probe:
       3332 files went up over `FtplibTransport` and the install that followed was driven over
       HTTP against the same tree, so the FTP root and the document root are the same directory.
-- [ ] Recorded in the hand-check ledger with the date — deferred to Phase 7 on purpose, because
-      the run has not happened and a ledger row for an unperformed check is exactly the "marked
-      done on prose alone" the ledger rule forbids
+- [x] Recorded in the hand-check ledger with the date — the row was deliberately withheld until the
+      run had happened, because a ledger row for an unperformed check is exactly the "marked done on
+      prose alone" the ledger rule forbids. Written in Phase 7 once it had:
+      `docs/agents/TESTING.md`, the 2026-08-31 row for `FtplibTransport` against the real web space
+      (`AUTH TLS`, `PROT P`, one file put / listed / downloaded byte-identical / deleted), with the
+      reason it cannot be automated here
 
 **Defect found while automating this step.** Running `python3 -m pwgdeploy.smoke
 deploy.example.json` against a host that does not resolve produced a raw `socket.gaierror`
@@ -1158,6 +1161,19 @@ to be checked with a listing, not with `exists()`.
   one before the next deploy, since the next install will bake in whatever is in that file.
 - **Phase 7 has not been started.**
 
+**Resolved since, 2026-08-31** (kept above verbatim rather than rewritten, so the state at the
+pause stays readable):
+
+- `tools/` **is now excluded** — the user answered in favour of exclusion; recorded as
+  [decision 0022](../decisions/0022-the-tools-directory-is-not-published.md) and guarded by
+  `test_excludes_the_whole_tools_directory`.
+- `admin.php?page=plugins` **is still unseen in a browser**, and now cannot be: the remote was
+  wiped and the temp admin account with it. The fact itself stands on `pwg.plugins.getList`, which
+  reads the rows that screen renders. Re-checkable on the next real deploy; not a gate on this plan.
+- The `deploy.local.json` password remains the operator's to set before the next deploy — no
+  automation can invent it, and the tool bakes in whatever the file holds.
+- Phase 7 is **implemented and verified**.
+
 **Implementation Note**: Pause for manual confirmation before Phase 7.
 
 ---
@@ -1532,38 +1548,70 @@ Mutagen caveat does not apply — each mutant was verified to have changed the f
 
 #### `tests/test_bootstrap.py`
 
-- [ ] `test_is_installed_true_on_the_marker` — uses `INSTALLED_MARKER`, **read from the module**,
-      never a second copy of the string in the test `[HAPPY]`
-- [ ] `test_is_installed_false_on_the_install_form` `[NEG]`
-- [ ] `test_install_posts_the_ten_expected_fields` — exact field set asserted, read from a
-      module constant rather than typed a second time in the test `[HAPPY]` `[DT]`
-- [ ] `test_install_omits_newsletter_subscribe` — the field is **absent**, not `0`
-      (`install.php:147-151` is an `isset()`) `[NEG]`
-- [ ] `test_install_omits_send_credentials_by_mail` — same reason `[NEG]`
-- [ ] `test_admin_pass2_mirrors_admin_pass1` `[HAPPY]`
-- [ ] `test_install_raises_when_the_marker_never_appears` — a re-rendered form with errors →
-      `InstallError` carrying the scraped errors `[NEG]`
-- [ ] `test_install_is_skipped_when_already_installed` `[ST]`
-- [ ] `test_login_reads_the_token_from_get_status` `[HAPPY]`
-- [ ] `test_login_failure_raises_remote_http_error` — bad credentials `[NEG]`
-- [ ] `test_activate_plugins_posts_action_and_token_per_plugin` `[HAPPY]`
-- [ ] `test_activate_skips_already_active_plugins` — from `pwg.plugins.getList` `[ST]`
-- [ ] `test_activate_error_names_the_plugin` — one plugin fails, the message says which `[NEG]`
-- [ ] `test_sync_posts_the_remote_sync_field_set` — the exact fields from
-      `tools/remote_sync.pl:41-56` `[HAPPY]`
-- [ ] `test_generated_config_contains_the_exiftool_paths` — both plugin keys, from the JSON
-      `[HAPPY]`
-- [ ] `test_generated_config_is_valid_php_open_tag` `[HAPPY]`
-- [ ] `test_bootstrap_step_order` — install → config → login → plugins → sync, asserted on the
-      fake client's call log `[ST]`
+The names that landed differ from the plan's provisional ones: each was rewritten during
+Phase 6 to say what it witnesses. Every behaviour the plan listed is covered and the file
+grew past it — **33 tests, measured 2026-08-31**. Technique tags are read from each test's
+own docstring.
+
+- [x] `test_a_fresh_gallery_reports_not_installed` `[HAPPY]` `[ST]`
+- [x] `test_an_installed_gallery_is_recognised_by_the_marker` `[ST]`
+- [x] `test_install_posts_every_field_the_form_declares` `[HAPPY]` `[DT]`
+- [x] `test_install_omits_the_two_isset_checkboxes` `[NEG]`
+- [x] `test_install_passes_the_language_as_a_get_parameter` `[ECP]`
+- [x] `test_install_confirms_by_asking_the_server_again` `[ST]`
+- [x] `test_a_rejected_install_raises_with_the_server_s_own_errors` `[NEG]`
+- [x] `test_an_install_that_reports_no_error_at_all_still_fails_loudly` `[NEG]`
+- [x] `test_scrape_errors_reads_every_error_list_item` `[HAPPY]`
+- [x] `test_scrape_errors_returns_nothing_for_a_page_without_an_error_block` `[BVA]`
+- [x] `test_generated_config_carries_the_three_settings` `[HAPPY]`
+- [x] `test_generated_config_reflects_assume_https_false` `[ECP]`
+- [x] `test_generated_config_quotes_an_exiftool_path_safely` `[NEG]`
+- [x] `test_config_upload_lands_at_the_remote_config_path` `[HAPPY]`
+- [x] `test_an_unchanged_config_is_not_uploaded_again` `[ST]`
+- [x] `test_a_changed_exiftool_path_re_uploads_the_config` `[ST]`
+- [x] `test_the_config_entry_joins_the_target_s_own_manifest` `[ST]`
+- [x] `test_login_returns_the_pwg_token` `[HAPPY]`
+- [x] `test_a_wrong_password_fails_with_the_server_s_message` `[NEG]`
+- [x] `test_activation_installs_all_three_fork_plugins` `[HAPPY]`
+- [x] `test_an_already_active_plugin_is_left_alone` `[ST]`
+- [x] `test_an_inactive_plugin_is_activated_while_its_neighbour_is_not` `[DT]`
+- [x] `test_activation_sends_the_token_with_every_action` `[NEG]`
+- [x] `test_a_plugin_the_server_does_not_know_is_reported_as_missing` `[NEG]`
+- [x] `test_sync_posts_the_field_set_remote_sync_replays` `[HAPPY]` `[DT]`
+- [x] `test_sync_reports_the_counts_the_summary_carries` `[HAPPY]`
+- [x] `test_a_second_sync_reporting_zero_new_is_a_success` `[BVA]`
+- [x] `test_sync_errors_are_carried_through` `[ECP]`
+- [x] `test_a_sync_answered_by_the_login_page_fails_loudly` `[NEG]`
+- [x] `test_parse_sync_counts_needs_both_added_lines` `[BVA]`
+- [x] `test_a_first_run_installs_activates_and_syncs` `[HAPPY]` `[ST]`
+- [x] `test_a_second_run_installs_nothing_and_activates_nothing` `[ST]`
+- [x] `test_the_config_is_uploaded_after_the_install` `[ST]`
+- [x] `test_the_sync_runs_last` `[ST]`
 
 #### `tests/test_cli.py`
 
-- [ ] `test_missing_config_argument_exits_two` `[NEG]`
-- [ ] `test_each_error_type_maps_to_its_own_exit_code` — parametrised over the `DeployError`
-      subclasses `[DT]`
-- [ ] `test_no_bootstrap_flag_skips_the_http_phase` `[ST]`
-- [ ] `test_list_files_prints_and_exits_without_connecting` `[NEG]`
+**20 tests, measured 2026-08-31**; names as landed, tags read from each test's own docstring.
+
+- [x] `test_a_full_run_uploads_then_bootstraps_and_exits_zero` `[HAPPY]` `[ST]`
+- [x] `test_the_report_names_every_step` `[HAPPY]`
+- [x] `test_the_report_names_the_target_it_deployed_to` `[HAPPY]`
+- [x] `test_list_files_prints_the_published_set_and_stops` `[ECP]`
+- [x] `test_dry_run_connects_to_nothing` `[ST]`
+- [x] `test_dry_run_reports_what_it_would_send` `[HAPPY]`
+- [x] `test_a_second_dry_run_after_a_deploy_reports_nothing_pending` `[ST]`
+- [x] `test_dry_run_reports_what_it_would_delete` `[NEG]`
+- [x] `test_dry_run_with_no_prune_reports_no_deletion` `[DT]`
+- [x] `test_no_bootstrap_uploads_but_leaves_the_gallery_alone` `[DT]`
+- [x] `test_no_prune_keeps_a_file_the_manifest_no_longer_covers` `[DT]`
+- [x] `test_a_pruned_file_is_deleted_by_default` `[DT]`
+- [x] `test_verbose_names_each_uploaded_path` `[ECP]`
+- [x] `test_a_missing_credential_file_exits_with_the_config_code` `[NEG]`
+- [x] `test_a_refused_ftps_handshake_exits_with_its_own_code` `[NEG]`
+- [x] `test_a_failed_upload_stops_before_the_bootstrap` `[NEG]` `[ST]`
+- [x] `test_the_error_goes_to_stderr_and_not_to_the_report` `[NEG]`
+- [x] `test_an_interrupted_run_says_it_can_be_resumed` `[NEG]` `[ST]`
+- [x] `test_an_interrupted_run_keeps_what_it_already_uploaded` `[ST]`
+- [x] `test_the_config_file_argument_is_required` `[NEG]`
 
 ### Integration Tests
 
@@ -1587,9 +1635,12 @@ first real deploy is the manual acceptance run in Phase 6.
 This plan changes **no PHP, no template and no plugin code**, so no existing suite is at risk. The
 only shared files touched are additive:
 
-- [ ] Root `.gitignore` — new rules only. Verify `git status --porcelain` still shows the same
-      tracked set for `plugins/`, `themes/` and `galleries/` after the change
-- [ ] `CLAUDE.md` — one added line; the < 100-line cap is asserted in Phase 7
+- [x] Root `.gitignore` — new rules only. Verified 2026-08-31: `git status --porcelain` is empty,
+      and `git ls-files plugins themes galleries | git check-ignore --stdin` matches **0** paths
+      against 171 / 840 / 106 tracked files, so no previously tracked file became ignored.
+      `tests/test_gitignore.py` is the standing guard on the rules themselves
+- [x] `CLAUDE.md` — one added line; the < 100-line cap is asserted in Phase 7 (**74** lines,
+      re-measured 2026-08-31)
 - [x] `bash tools/test-hooks.sh` — the commit gate is untouched; run it to prove that. Run
       2026-08-31: the gate's two behavioural cases pass (`git rejects a real commit`, `git accepts
       a clean commit`), as do all documentation-cap cases. **4 cases fail for environment reasons
@@ -1599,7 +1650,7 @@ only shared files touched are additive:
       DDEV is bound to the main checkout, so `ddev exec composer install` would install into the
       main checkout rather than here. Phase 2 changed no PHP, no hook and no gate, so the gate is
       untouched as claimed; the 4 failures predate it
-- [ ] The three plugin suites are unaffected and are **not** re-run as part of this plan; saying so
+- [x] The three plugin suites are unaffected and are **not** re-run as part of this plan; saying so
       is more honest than running them to produce a green line that means nothing here
 
 ### Manual Testing Steps
