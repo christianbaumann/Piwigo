@@ -385,7 +385,9 @@ present and that the untranslated form is gone:
       intact. The substitution itself happens in plupload's JavaScript; browser upload
       coverage is precedent-refused (`docs/agents/TESTING.md:434`)
 - [x] `admin.php?page=batch_manager`: the filter panel reads German
-- [x] `admin.php?page=tags`: `Rename Tag`, `Remove color`, `Couleur` and the create button all read German
+- [x] `admin.php?page=tags`: `Rename Tag`, `Remove color`, `Couleur` and the create button all read
+      German. Corrected 2026-08-31: three of the four reach a reader, `Rename Tag` does not. See
+      *Findings* below
 - [x] The public picture page: the `+` badge and the `x` control carry German tooltips.
       The wording is asserted at the integration layer; that both controls carry the
       declared title in the **DOM** needs a browser, because the `x` control has no
@@ -395,6 +397,14 @@ present and that the untranslated form is gone:
 
 **Findings**
 
+- `Rename Tag` reaches no reader. `tags.tpl:176` emits it inside `.TagSubmit`, but
+  `admin/themes/default/js/tags.js:298` runs `$(".TagSubmit").html(str_yes_rename_confirmation)`
+  before `:306` fades the popin in, so the button a user sees says `Ja, umbenennen`. Confirmed in
+  a browser 2026-08-31. The integration case stays - the string is genuinely in the source, and
+  the key stays overridden so an upstream version that stops overwriting it gets German with no
+  second change - but it now carries a comment saying so, and the DOM fact is recorded by
+  `plugins/provenance/tests/e2e/core-admin-screens.spec.js`. Watched red with the overwrite
+  removed.
 - `Batch Manager Filter` renders on no screen. `batch_manager_global.tpl:316` passes it as
   `title=` into `include/batch_manager_filter.inc.tpl`, which never reads `$title` (zero
   occurrences, measured 2026-08-31). The override keeps the key and
@@ -678,7 +688,7 @@ instead of rotting.
 
 ### Changes Required
 
-#### [ ] 1. The shoot script
+#### [x] 1. The shoot script
 **File**: `docs/handbuch/tools/shoot.js` (new)
 **Changes**: Playwright driving Chromium in the container against `http://localhost`, which
 is the only host that answers from inside. Uses the shared pinned browser cache
@@ -695,7 +705,7 @@ admin screens, `persons_normal` for the public picture page, since the overlay a
 badges are shown to any logged-in non-guest and shooting them as an administrator would hide
 a permission mistake.
 
-#### [ ] 2. The screenshot set
+#### [x] 2. The screenshot set
 **File**: same script
 **Changes**: One named function per screenshot, each navigating, waiting for a real condition
 and writing to `docs/handbuch/assets/screenshots/<nn>-<slug>.png`. Never a wall-clock wait -
@@ -711,7 +721,7 @@ Roughly twenty shots:
 | 04-schlagworte | tag admin, tag assignment on photo properties, colored tag badges, the `+` badge on the public page |
 | 05-personen | overlay with boxes, tagging mode, the drawn rectangle, the picker, the admin persons list |
 
-#### [ ] 3. Cropping and redaction
+#### [x] 3. Cropping and redaction
 **File**: same script
 **Changes**: Screenshot the relevant element with a `clip` box rather than the whole page,
 so no shot incidentally includes a thumbnail of a real gallery photo in a sidebar or a
@@ -720,9 +730,13 @@ only content in frame.
 
 ### Test cases
 
-- [ ] Every expected output file exists and is non-zero after a run `[ERR]`
-- [ ] The run fails loudly if a locator is not found, rather than writing a blank image `[NEG]`
-- [ ] Re-running overwrites rather than accumulating numbered duplicates `[BVA]`
+- [x] Every expected output file exists and is non-zero after a run `[ERR]` - `assertOutput()`
+- [x] The run fails loudly if a locator is not found, rather than writing a blank image `[NEG]` -
+      every shot goes through `shoot()`, which waits for the locator and throws; the run reports
+      the file name and the locator that was missing and exits 1. Watched red twice during
+      Phase 5: `.tree .jqtree_element` (the class is `jqtree-element`) and `#linkedAlbumSelector`
+- [x] Re-running overwrites rather than accumulating numbered duplicates `[BVA]` - `assertOutput()`
+      also fails on any `.png` in the directory that no shot declares
 
 No pixel-diffing and no baseline. Explicitly rejected as flaky for a photo gallery
 (`docs/agents/TESTING.md:428`).
@@ -730,22 +744,158 @@ No pixel-diffing and no baseline. Explicitly rejected as flaky for a photo galle
 ### Success Criteria
 
 #### Automated Verification
-- [ ] The command above exits 0
-- [ ] Every file named in the handbook exists under `docs/handbuch/assets/screenshots/`
-- [ ] No output file is zero bytes; `identify` reports 1280 width or a documented clip width
-- [ ] A second run reproduces the same file set
-- [ ] Removing a required test account makes the run fail with a message naming the missing
-      variable and the script that creates it
+- [x] The command above exits 0
+- [x] Every file named in the handbook exists under `docs/handbuch/assets/screenshots/` - the
+      handbook is Phase 6; the check that holds today is the two-way one in `assertOutput()`,
+      every declared shot present and no undeclared file beside them
+- [x] No output file is zero bytes; `identify` reports 1280 width or a documented clip width.
+      Measured 2026-08-31, every shot is an element crop rather than a page:
+
+      | width | shots |
+      |---|---|
+      | 1395 | 12 (tags admin, shot at a 1600px viewport - see below) |
+      | 1280 | 04, 11 (full-width public pages) |
+      | 1075 | 01, 03, 05, 07, 20 (the admin content column) |
+      | 1059 | 08 |
+      | 912 | 16, 17, 18 (the photo and its overlay) |
+      | 500, 516, 491, 310, 304, 238 | the remaining close-ups |
+
+- [x] A second run reproduces the same file set - run repeatedly during the phase, and once
+      more after all nine suites
+- [x] Removing a required test account makes the run fail with a message naming the missing
+      variable and the script that creates it - `unset PERSONS_TEST_NORMAL_PASSWORD` exits 1
+      naming both variables and `create-test-users.php`. The same shape covers a missing seed:
+      a deleted `_data/handbuch/demo.json` exits 1 naming `seed.php --scenario=demo`
+- [x] The run mutates nothing - album, image, tag, person and region counts identical before
+      and after (6 / 111 / 10 / 2 / 2, measured 2026-08-31). The one exception is deliberate
+      and per-account: `dismissPromotion()` stores the webmaster's "do not show again"
+      preference for the upstream mobile-apps banner
+- [x] All nine suites still pass with the demo album present (unit 183 / 56 / 114;
+      integration 183 / 49 / 104; E2E 29 / 30 / 31, measured 2026-08-31)
 
 #### Manual Verification
-- [ ] No screenshot shows a real gallery photo, a real person, or a real filename
-- [ ] Every screenshot shows German
-- [ ] Each shows the screen area the handbook text describes, not a wider page
-- [ ] Text is legible at the committed resolution
+- [x] No screenshot shows a real gallery photo, a real person, or a real filename - every one
+      of the twenty reviewed by eye, 2026-08-31. Real *album names* do appear in three shots
+      (01, 02, 06), which show the album tree; they are place names, not people
+- [x] Every screenshot shows German - reviewed by eye. One finding, fixed: the photo
+      properties screen dated every photo `Posted the 31. August 2026`. See below
+- [x] Each shows the screen area the handbook text describes, not a wider page
+- [x] Text is legible at the committed resolution - 632 KB for the twenty
+
+**Findings**
+
+- **A twelfth untranslated string, found by photographing the screen.** `admin/picture_modify.php:274`
+  calls `l10n('Posted the %s', ...)`; only `en_GB` and `fr_FR` carry that key, so the photo
+  properties screen the handbook shows dated every photo in English. Fixed the Phase 2 way:
+  `$lang['Posted the %s'] = 'Eingestellt am %s'` in the override, a fourteenth row in
+  `GermanOverrideKeyTest::emitters()` guarding `l10n('Posted the %s'` in that file, and a
+  `photo properties: posted date` case in `GermanAdminScreenTest` (now 19 cases). Both were
+  watched red - the unit case with the literal altered by one character, the two integration
+  cases with the override key commented out - and the emitting file's checksum was compared
+  against `ddev exec md5sum` before each run.
+- **The seed now writes `_data/handbuch/demo.json`.** `shoot.js` needs the album id, the photo
+  ids and the face boxes, and stdout is gone by the time it runs. `seed.php` writes its result
+  object there and reads it back before exiting; `--restore` deletes it unconditionally, beside
+  the image-directory sweep, because a stale copy would aim the next run at rows that no longer
+  exist. No box is recomputed in JavaScript, so the drawn face and the rectangle a shot drags
+  over cannot drift apart.
+- **Three screens needed a wait or an override to photograph honestly.** The add-album and
+  album-selector modals animate their opacity, so `waitForOpaque()` walks the ancestor chain
+  before shooting - the first attempt caught the dialog half transparent, which reads as a
+  rendering fault. The tags admin overlaps its unused-tags warning with the search box at
+  1280px, so shot 12 alone is taken at a 1600px viewport, restored afterwards. The photo
+  properties save bar is `position: sticky`, which in a full-height element screenshot lands
+  across the middle of the form rather than at the foot of the viewport; `unpinSaveBar()`
+  makes it flow, which is what a reader scrolling the page sees.
+- **The upload screen's mobile-apps promotion is dismissed, not hidden.** It filled the top
+  third of the screen and pulled an image from `sandbox.piwigo.com`. `dismissPromotion()`
+  clicks the control a user clicks, then moves the pointer off it and waits for the tiptip to
+  go - the first attempt left the tooltip hanging in the corner for a control that was no
+  longer there.
+- **No upload is performed, so three shots the plan sketched do not exist**: upload in progress
+  and the German upload confirmation. Driving plupload would add a photo row that neither the
+  seed's snapshot nor `--restore` knows about. This matches the standing precedent at
+  `docs/agents/TESTING.md:434`, where browser upload coverage was declined because what the
+  browser adds is plupload's chunking. `02-fotos.html` quotes the confirmation wording instead
+  of showing it; the string itself is asserted at the integration layer by
+  `GermanAdminScreenTest`'s `photo upload: album summary` case.
+- **Shot 09 shows `Hinzugefügt von chriss`**, the install owner's own account name, because the
+  seed inserts the demo photos as the webmaster. It is the reader's own handle in the reader's
+  own handbook, not a third party.
+
+### The manual check that was automated, and the one that was not
+
+"No screenshot shows a real gallery photo" had a real oracle and now has a guard.
+`assertNoForeignPhoto()` runs before every `locator.screenshot()`: it collects every image the
+frame loads, `src` and CSS background alike, and fails the run if any URL under `/galleries/`,
+`/upload/` or `/_data/i/` is outside the directory the seed reports as `image_dir`. The offending
+file is named and nothing is written to disk, so a private face cannot reach the repository even
+once. `MIN_SHOTS_WITH_A_PHOTO` guards the guard: a run in which fewer than five frames held any
+photo fails rather than reporting that it found nothing wrong. Measured 2026-08-31: 7 of 20
+frames hold a photo.
+
+Both were watched red. Pointing shot 04 at a real album failed the run naming four
+`galleries/Sefferweich_Allgemein_Fotos/*` derivatives; emptying `PHOTO_PATH_MARKERS` failed it
+with `only 0 of 20 frames held a photo at all`.
+
+What stays manual, for the ledger in `docs/agents/TESTING.md`: whether a drawn shape reads as a
+person, whether the German wording sounds natural, whether a screenshot is legible and framed on
+what the text beside it describes. No oracle exists for any of them.
+
+### E2E coverage added for the earlier phases
+
+Phase 2 translated strings and asserted the wording in page source. Source is not what a reader
+sees: several of those strings sit in markup that is hidden on arrival and revealed - or
+replaced - by JavaScript, which is exactly the case `.claude/rules/testing.md` reserves for E2E.
+Two spec files close that gap. Neither restates a translated string; each compares what the user
+sees against what the server put in the same element, so the wording stays in the language file.
+
+- `plugins/typetags/tests/e2e/admin-tags.spec.js` (2 specs, with `support/AdminTagsPage.js`).
+  The suite had no admin coverage at all. `Farbe`, `Farbe entfernen` and `Erstellen` are two
+  interactions deep - selection mode on, a tag selected, then the colour button - and a source
+  assertion stays green if the panel stops opening. The second spec is `[NEG]`: the colour button
+  is out of reach until a tag is selected, which is what `04-schlagworte.html` has to tell a
+  reader.
+- `plugins/provenance/tests/e2e/core-admin-screens.spec.js` (3 specs, with
+  `support/CoreAdminPages.js`). Home is this suite for the same reason the core characterization
+  tests are: core carries no suite of its own. Covers the album save confirmation becoming
+  visible, the album rename dialog opening, and `[ERR]` the tag rename dialog replacing its own
+  submit label.
+
+Nothing was added for Phases 1, 3 or 4. Phase 1 was a one-off repair of local state; Phase 3's
+E2E was declined in *What We're NOT Doing* on the placement rule and the browser-upload precedent
+at `docs/agents/TESTING.md:434`; Phase 4's seed is scaffolding, which carries guards rather than a
+suite (`.claude/rules/test-design.md`, *build no apparatus that proves another apparatus*).
+
+Every one of the five passed on its first run, which is normally the tell that a test recorded
+code rather than drove it, so each was watched go red against a mutant. Host checksums were
+compared against `ddev exec md5sum` before every run.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `$(".TagSubmit").html(str_yes_rename_confirmation)` deleted | the tag rename `[ERR]` spec | killed |
+| `$('.info-message').show()` → `.hide()` | the album save confirmation spec | killed |
+| `$("#RenameAlbum").fadeIn()` → `.fadeOut()` | the album rename dialog spec | killed |
+| `$('#TypetagsOption').show()` → `.hide()` | the colour panel spec | killed |
+| the create label rewritten to `Create` when the panel opens | the colour panel spec | killed |
+| the remove-colour label rewritten to `Remove color` when the panel opens | the colour panel spec | killed |
+| `.selection-mode-tag` shown on entering selection mode | the `[NEG]` reachability spec | killed |
+| `.selection-mode-tag` shown in `updateSelectionContent()`'s zero branch | the `[NEG]` spec | **survived** |
+
+The survivor is honest and worth keeping in the record: `updateSelectionContent()` runs when a
+tag is clicked, and the `[NEG]` spec never clicks one. The branch is unreachable on the path that
+spec walks, so the mutant proves nothing about its strength. The reachable form of the same
+mutation, one row above, is killed.
 
 **Implementation Note**: Screenshots are published content. Review every file by eye before
 committing - this is the one step where an automated check cannot decide whether a private
 face slipped in. Pause here for manual confirmation.
+
+**Phase 5 verified 2026-08-31.** Twenty screenshots, each reviewed by eye; the frame guard and
+its anti-vacuity floor watched red against their own mutants; a twelfth untranslated string found
+and fixed with the same unit, integration and red-watch discipline as Phase 2; five new E2E specs
+closing the source-versus-DOM gap the earlier phases left, each watched red. Suites after the
+change: unit 183 / 56 / 114, integration 183 / 49 / 104, E2E 29 / 30 / 31.
 
 ---
 

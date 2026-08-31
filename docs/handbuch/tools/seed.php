@@ -194,6 +194,16 @@ define('PHPWG_ROOT_PATH', dirname(__DIR__, 3) . '/');
 /** Snapshot lives under _data/, which .gitignore already excludes. */
 define('SNAPSHOT_FILE', PHPWG_ROOT_PATH . '_data/handbuch/snapshot.json');
 
+/**
+ * The seed's own output, kept on disk for shoot.js.
+ *
+ * The ids and face boxes below are what a screenshot run has to aim at, and
+ * stdout is gone by the time that run starts. Writing them beside the snapshot
+ * keeps one source of truth: shoot.js reads this file and never recomputes a
+ * box from the scene table.
+ */
+define('DEMO_FILE', PHPWG_ROOT_PATH . '_data/handbuch/demo.json');
+
 function fail(string $message): void
 {
     fwrite(STDERR, $message . "\n");
@@ -756,6 +766,11 @@ if (isset($args['restore']))
     }
     @rmdir(PHPWG_ROOT_PATH . DEMO_IMAGE_DIR);
 
+    // Unconditional, like the sweep above: a run that died before the album was
+    // complete still left ids here, and a stale copy would send shoot.js at
+    // rows that no longer exist.
+    @unlink(DEMO_FILE);
+
     $snapshot = load_snapshot();
     if ($snapshot === null)
     {
@@ -987,6 +1002,9 @@ $result = array(
     'album_id' => $albumId,
     'album_name' => DEMO_ALBUM_NAME,
     'album_path' => '/index.php?/category/' . $albumId,
+    // shoot.js refuses to photograph a frame holding an image from outside this
+    // directory. Handed over rather than spelled out again in JavaScript.
+    'image_dir' => DEMO_IMAGE_DIR,
     'region_photo_id' => $regionPhoto['id'],
     'persons' => DEMO_PERSONS,
     'photos' => array(),
@@ -1002,4 +1020,12 @@ foreach ($photos as $slug => $photo)
         );
 }
 
-echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), "\n";
+$encoded = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+file_put_contents(DEMO_FILE, $encoded . "\n");
+if (json_decode((string)file_get_contents(DEMO_FILE), true) !== $result)
+{
+    fail('the demo description did not reach ' . DEMO_FILE);
+}
+
+echo $encoded, "\n";

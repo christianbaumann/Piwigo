@@ -20,11 +20,13 @@ final class GermanAdminScreenTest extends TestCase
     private const MIN_PAGE_BYTES = 2000;
 
     private const ALBUM_PLACEHOLDER = '{album}';
+    private const PHOTO_PLACEHOLDER = '{photo}';
 
     private Db $db;
     private WsClient $ws;
     private FixtureBuilder $fixtures;
     private int $emptyAlbumId;
+    private int $photoId;
 
     protected function setUp(): void
     {
@@ -36,6 +38,10 @@ final class GermanAdminScreenTest extends TestCase
         // fixture forces that state rather than hoping an existing album is empty.
         $this->emptyAlbumId = $this->fixtures->createTestAlbum('Provenance German screen ' . bin2hex(random_bytes(4)));
 
+        // The photo properties screen dates every photo, so the case below needs
+        // a photo of its own rather than whichever row the gallery happens to hold.
+        $this->photoId = (int)$this->fixtures->createTestImage()['id'];
+
         $this->ws->login(Config::username(), Config::password());
     }
 
@@ -46,6 +52,7 @@ final class GermanAdminScreenTest extends TestCase
         // removed by destroyTestAlbums(), and leaving it out leaks one album per
         // test into the gallery tree the handbook screenshots.
         $this->fixtures->destroyTestAlbums();
+        $this->fixtures->destroyTestImages();
         $this->fixtures->restore();
     }
 
@@ -94,6 +101,16 @@ final class GermanAdminScreenTest extends TestCase
                 'Kein Filter, fügen Sie einen hinzu',
                 'No filter, add one',
             ),
+            'photo properties: posted date' => array(
+                '/admin.php?page=photo-' . self::PHOTO_PLACEHOLDER . '-properties',
+                'Eingestellt am ',
+                'Posted the ',
+            ),
+            // Source only. tags.js:298 overwrites .TagSubmit with 'Yes, rename'
+            // before tags.js:306 fades the popin in, so this German never
+            // reaches a reader. Recorded in the DOM by the provenance E2E
+            // suite's core-admin-screens.spec.js; the key stays overridden so
+            // an upstream version that stops overwriting it gets German free.
             'tag admin: rename control' => array(
                 '/admin.php?page=tags',
                 'Schlagwort umbenennen',
@@ -104,7 +121,11 @@ final class GermanAdminScreenTest extends TestCase
 
     private function page(string $path): string
     {
-        $res = $this->ws->fetchPage(str_replace(self::ALBUM_PLACEHOLDER, (string)$this->emptyAlbumId, $path));
+        $res = $this->ws->fetchPage(str_replace(
+            array(self::ALBUM_PLACEHOLDER, self::PHOTO_PLACEHOLDER),
+            array((string)$this->emptyAlbumId, (string)$this->photoId),
+            $path
+            ));
 
         $this->assertSame(200, (int)$res['http_code'], $path . ' did not load');
 

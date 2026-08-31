@@ -66,6 +66,11 @@ final class GermanOverrideKeyTest extends TestCase
                 "{'%d photos updated'|translate|escape:javascript}",
                 1,
             ),
+            'Posted the %s' => array(
+                'admin/picture_modify.php',
+                "l10n('Posted the %s'",
+                1,
+            ),
             'Batch Manager Filter' => array(
                 'admin/themes/default/template/batch_manager_global.tpl',
                 "{'Batch Manager Filter'|@translate}",
@@ -112,7 +117,7 @@ final class GermanOverrideKeyTest extends TestCase
     /**
      * Which language file carries each key's German translation.
      *
-     * Thirteen live in the fork's local override. 'Create' is the exception:
+     * Fourteen live in the fork's local override. 'Create' is the exception:
      * core already translates it, so wrapping the raw French literal in a
      * |translate filter was the whole fix and no fork-local entry exists or
      * should - one would shadow core's wording everywhere the plugin loads.

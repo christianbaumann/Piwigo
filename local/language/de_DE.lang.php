@@ -22,6 +22,9 @@ $lang['Rename album'] = 'Album umbenennen';
 $lang['Album %s now contains %d photos'] = 'Album %s enthält jetzt %d Fotos';
 $lang['%d photos updated'] = '%d Fotos aktualisiert';
 
+// admin/picture_modify.php - the "added on" line of the photo properties screen
+$lang['Posted the %s'] = 'Eingestellt am %s';
+
 // admin/themes/default/template/batch_manager_global.tpl and include/batch_manager_filter.inc.tpl
 $lang['Batch Manager Filter'] = 'Filter der Stapelverarbeitung';
 $lang['No filter, add one'] = 'Kein Filter, fügen Sie einen hinzu';
