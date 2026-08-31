@@ -557,33 +557,39 @@ def diff(current: Mapping[str, str], previous: Mapping[str, str]) -> Diff:
 ### Success Criteria
 
 #### Automated Verification
-- [x] `cd tools/deploy && uv run pytest tests/test_manifest.py` passes — 22 tests; whole suite 139
+- [x] `cd tools/deploy && uv run pytest tests/test_manifest.py` passes — 23 tests; whole suite 140
 - [x] Round-trip test: `save()` then `load()` returns an equal mapping
 - [x] `load()` of a `{"version": 999}` file returns `{}` and does not raise
 
 #### Manual Verification
-- [ ] Deleting `.state/*.json` makes the next `--dry-run` report every file as new — **not
-      checkable in this phase**: there is no `--dry-run` until Phase 5 builds the CLI. Deferred
-      to Phase 5's manual verification, where the same fact is one of its listed checks.
+- [x] Deleting `.state/*.json` makes the next `--dry-run` report every file as new — **automated**
+      as `test_a_deleted_manifest_makes_every_file_new`, which composes `manifest_path` + `load` +
+      `diff` over real files on disk: it saves a manifest, asserts `pending == []`, unlinks the
+      file, and asserts every path comes back as new. Its own anti-vacuity control is that first
+      `pending == []` — a `load()` that always returned `{}` fails there rather than passing the
+      test for the wrong reason, confirmed by mutation. What stays for Phase 5 is only the CLI's
+      `--dry-run` *printing*, which is already one of that phase's listed checks.
 
 **Deviation from the plan, decided and implemented**: `manifest_path()` slugifies host and remote
 root instead of taking the root verbatim, so no separator or `..` can reach the file name — a
 remote root of `/www/../../etc` would otherwise have written outside `.state/`. Covered by
 `test_manifest_path_holds_no_separators`.
 
-Eight tests beyond the plan's list: `test_manifest_path_is_a_json_file_inside_the_state_dir`,
+Nine tests beyond the plan's list: `test_manifest_path_is_a_json_file_inside_the_state_dir`,
 `test_manifest_path_holds_no_separators`, `test_save_creates_the_state_directory` (a fresh clone
 has no `.state/`), `test_load_of_unreadable_json_is_empty`, `test_hash_of_an_empty_file`,
 `test_a_changed_byte_changes_the_hash` (anti-vacuity for the diff cases),
-`test_pending_is_new_and_changed` and `test_removed_is_only_ever_previously_recorded_paths`.
+`test_pending_is_new_and_changed`, `test_removed_is_only_ever_previously_recorded_paths` and
+`test_a_deleted_manifest_makes_every_file_new`.
 
-Both guards were proved killable rather than assumed (host, no DDEV, so the Mutagen caveat in
+The three guards were proved killable rather than assumed (host, no DDEV, so the Mutagen caveat in
 `mutation-testing.md` does not apply; each `sed` was verified to have changed the file first):
 
 | Mutant | Expected killer | Result |
 |---|---|---|
 | version check → always accept | `test_load_of_a_future_version_is_empty` | killed |
 | `save()` writes the target directly, no tmp + `os.replace` | `test_save_is_atomic` | killed |
+| `load()` always returns `{}` | `test_a_deleted_manifest_makes_every_file_new` (its `pending == []` control) | killed |
 
 **Implementation Note**: Pause for manual confirmation before Phase 4.
 

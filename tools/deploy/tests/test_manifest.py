@@ -214,3 +214,34 @@ def test_removed_is_only_ever_previously_recorded_paths():
     result = manifest.diff({}, PREVIOUS)
 
     assert sorted(result.removed) == sorted(PREVIOUS)
+
+
+# --- the three pieces together -----------------------------------------------------
+
+
+def test_a_deleted_manifest_makes_every_file_new(tmp_path):
+    """Throwing the state file away resets the target to a first run. [ST]
+
+    manifest_path + load + diff composed over real files on disk. This is the whole of
+    Phase 3's manual criterion except the CLI's `--dry-run` printing, which does not
+    exist until Phase 5.
+    """
+    state_dir = tmp_path / "state"
+    source = tmp_path / "src"
+    source.mkdir()
+    names = ["index.php", "picture.php", "ws.php"]
+    for name in names:
+        write(source / name, name.encode())
+    current = {name: manifest.file_hash(source / name) for name in names}
+    assert len(current) == len(names) > 0
+
+    path = manifest.manifest_path(state_dir, "a.example", "/www")
+    manifest.save(path, current)
+    assert manifest.diff(current, manifest.load(path)).pending == []
+
+    path.unlink()
+
+    result = manifest.diff(current, manifest.load(path))
+    assert sorted(result.new) == sorted(names)
+    assert result.unchanged == []
+    assert result.pending == sorted(names)
