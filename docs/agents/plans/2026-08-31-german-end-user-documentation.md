@@ -422,7 +422,7 @@ tests already there. Reuses its `WsClient`, `Db` and `FixtureBuilder`.
 
 ### Changes Required
 
-#### [ ] 1. Album creation and description
+#### [x] 1. Album creation and description
 **File**: `plugins/provenance/tests/Integration/CoreAlbumCharacterizationTest.php` (new)
 **Changes**: Drive `pwg.categories.add` and `pwg.categories.setInfo` over `ws.php`, the two
 endpoints `albums.js:219-241` and `cat_modify.js:70-85` call. Follow the docblock pattern of
@@ -437,14 +437,14 @@ final class CoreAlbumCharacterizationTest extends TestCase
 }
 ```
 
-#### [ ] 2. Core photo text fields
+#### [x] 2. Core photo text fields
 **File**: `plugins/provenance/tests/Integration/CorePhotoTextCharacterizationTest.php` (new)
 **Changes**: Drive the real boundary the screen uses - a form POST to
 `admin.php?page=photo-<id>-properties` via `WsClient::postPage():134`, guarded by
 `check_pwg_token()`, written by `single_update()` (`admin/picture_modify.php:81-104`). Not
 `pwg.images.setInfo`: that is a different writer, and the handbook documents the screen.
 
-#### [ ] 3. Core tag CRUD
+#### [x] 3. Core tag CRUD
 **File**: `plugins/provenance/tests/Integration/CoreTagCrudCharacterizationTest.php` (new)
 **Changes**: Drive `pwg.tags.add`, `pwg.tags.rename`, `pwg.tags.delete` and `pwg.tags.merge`,
 which is where `admin/tags.php` puts all of it - the PHP file only renders and deletes
@@ -454,7 +454,7 @@ Note the memoisation trap: `tag_id_from_tag_name()` caches in `$page`, which is 
 `PiwigoRuntime::resetRequestCaches():101-105` exists. Each test crosses a real HTTP boundary
 so it gets a fresh request, but any in-process assertion must reset it.
 
-#### [ ] 4. Upload into an album
+#### [x] 4. Upload into an album
 **File**: extend the album test, or a fourth file
 **Changes**: Drive `pwg.images.upload` with a real file then `pwg.images.uploadCompleted`,
 the exact sequence the upload screen issues (`photos_add_direct.js:106`, `:437`), using
@@ -470,65 +470,65 @@ lounge is emptied.
 Technique legend is in `.claude/rules/test-design.md`.
 
 **`CoreAlbumCharacterizationTest`**
-- [ ] `testAddingAnAlbumReturnsAnIdAndCreatesTheRow` - `pwg.categories.add` with a name only `[HAPPY]`
-- [ ] `testANewTopLevelAlbumTakesItsOwnIdAsUppercats` - the two-step core performs `[ERR]`
-- [ ] `testAddingWithAParentNestsTheAlbum` - `uppercats` is `<parent>,<child>` `[ECP]`
-- [ ] `testANewAlbumHasAnEmptyDescription` - `comment` is null before `setInfo` `[BVA]`
-- [ ] `testSetInfoStoresTheDescription` - round-trip through `pwg.categories.setInfo` `[HAPPY]`
-- [ ] `testSetInfoWithNoTokenStripsMarkup` - `allow_html_descriptions` is true, so markup
+- [x] `testAddingAnAlbumReturnsAnIdAndCreatesTheRow` - `pwg.categories.add` with a name only `[HAPPY]`
+- [x] `testANewTopLevelAlbumTakesItsOwnIdAsUppercats` - the two-step core performs `[ERR]`
+- [x] `testAddingWithAParentNestsTheAlbum` - `uppercats` is `<parent>,<child>` `[ECP]`
+- [x] `testANewAlbumHasAnEmptyDescription` - `comment` is null before `setInfo` `[BVA]`
+- [x] `testSetInfoStoresTheDescription` - round-trip through `pwg.categories.setInfo` `[HAPPY]`
+- [x] `testSetInfoWithNoTokenStripsMarkup` - `allow_html_descriptions` is true, so markup
       survives with a valid `pwg_token` and `strip_tags()` applies without one
       (`pwg.categories.php:954`) `[DT]`
-- [ ] `testAnEmptyNameIsRefused` - `[NEG]` `[BVA]`
-- [ ] `testAGuestCannotAddAnAlbum` - cookie-less `WsClient`, as `AddRegionTest:104-109` does `[NEG]`
-- [ ] `testANormalUserCannotAddAnAlbum` - both methods are `admin_only` `[NEG]`
-- [ ] `testAUnicodeNameSurvivesTheRoundTrip` - umlauts, which the German install needs `[ERR]`
-- [ ] `testALongDescriptionIsStoredWhole` - upper boundary of the `comment` column `[BVA]`
+- [x] `testAnEmptyNameIsRefused` - `[NEG]` `[BVA]`
+- [x] `testAGuestCannotAddAnAlbum` - cookie-less `WsClient`, as `AddRegionTest:104-109` does `[NEG]`
+- [x] `testANormalUserCannotAddAnAlbum` - both methods are `admin_only` `[NEG]`
+- [x] `testAUnicodeNameSurvivesTheRoundTrip` - umlauts, which the German install needs `[ERR]`
+- [x] `testALongDescriptionIsStoredWhole` - upper boundary of the `comment` column `[BVA]`
 
 **`CorePhotoTextCharacterizationTest`**
-- [ ] `testTitleAuthorDateAndDescriptionAreStored` - all four in one POST `[HAPPY]`
-- [ ] `testEachFieldCanBeClearedIndependently` - empty string vs unchanged `[ECP]` `[BVA]`
-- [ ] `testTheFilenameIsNotWritable` - read-only at `picture_modify.tpl:124` `[NEG]`
-- [ ] `testAPostWithoutAValidTokenIsRefused` - `check_pwg_token()` `[NEG]`
-- [ ] `testANormalUserIsRefused` - `check_status(ACCESS_ADMINISTRATOR)` `[NEG]`
-- [ ] `testAnInvalidCreationDateIsRejectedOrNormalised` - records which, since no requirement
+- [x] `testTitleAuthorDateAndDescriptionAreStored` - all four in one POST `[HAPPY]`
+- [x] `testEachFieldCanBeClearedIndependently` - empty string vs unchanged `[ECP]` `[BVA]`
+- [x] `testTheFilenameIsNotWritable` - read-only at `picture_modify.tpl:124` `[NEG]`
+- [x] `testAPostWithoutAValidTokenIsRefused` - `check_pwg_token()` `[NEG]`
+- [x] `testANormalUserIsRefused` - `check_status(ACCESS_ADMINISTRATOR)` `[NEG]`
+- [x] `testAnInvalidCreationDateIsRejectedOrNormalised` - records which, since no requirement
       says `[ERR]`
-- [ ] `testUnicodeAndMarkupInTheDescription` - sanitisation depends on
+- [x] `testUnicodeAndMarkupInTheDescription` - sanitisation depends on
       `allow_html_descriptions` `[DT]`
-- [ ] `testLinkedAlbumsUnlinksAlbumsLeftOutOfTheSelection` - the move-not-associate behaviour
+- [x] `testLinkedAlbumsUnlinksAlbumsLeftOutOfTheSelection` - the move-not-associate behaviour
       at `admin/picture_modify.php:119-126`, which the handbook must warn about `[ERR]`
-- [ ] `testTheStorageAlbumCannotBeUnlinked` - `:354-359` `[NEG]`
+- [x] `testTheStorageAlbumCannotBeUnlinked` - `:354-359` `[NEG]`
 
 **`CoreTagCrudCharacterizationTest`**
-- [ ] `testAddingATagCreatesTheRowAndAUrlName` - `pwg.tags.add` `[HAPPY]`
-- [ ] `testAddingADuplicateNameIsRefused` - `[NEG]`
-- [ ] `testRenamingChangesTheNameAndTheUrlName` - `[HAPPY]` `[ST]`
-- [ ] `testRenamingToAnExistingNameIsRefused` - `[NEG]`
-- [ ] `testDeletingRemovesTheTagAndItsImageLinks` - `[HAPPY]` `[ST]`
-- [ ] `testMergingMovesEveryImageLinkAndRemovesTheSource` - `[HAPPY]` `[ST]`
-- [ ] `testMergingATagIntoItselfIsRefusedOrIsANoOp` - records which `[ERR]` `[BVA]`
-- [ ] `testAssignmentReplacesRatherThanAppends` - `set_tags()` is a full replace, which the
+- [x] `testAddingATagCreatesTheRowAndAUrlName` - `pwg.tags.add` `[HAPPY]`
+- [x] `testAddingADuplicateNameIsRefused` - `[NEG]`
+- [x] `testRenamingChangesTheNameAndTheUrlName` - `[HAPPY]` `[ST]`
+- [x] `testRenamingToAnExistingNameIsRefused` - `[NEG]`
+- [x] `testDeletingRemovesTheTagAndItsImageLinks` - `[HAPPY]` `[ST]`
+- [x] `testMergingMovesEveryImageLinkAndRemovesTheSource` - `[HAPPY]` `[ST]`
+- [x] `testMergingATagIntoItselfIsRefusedOrIsANoOp` - records which `[ERR]` `[BVA]`
+- [x] `testAssignmentReplacesRatherThanAppends` - `set_tags()` is a full replace, which the
       handbook must state `[ERR]`
-- [ ] `testAssigningAnEmptyListRemovesEveryTag` - `[BVA]`
-- [ ] `testAGuestCannotCreateRenameOrDeleteATag` - `[NEG]`
-- [ ] `testANormalUserCannotCreateRenameOrDeleteATag` - all `admin_only` `[NEG]`
-- [ ] `testATagWithAUmlautGetsAUsableUrlName` - the install's 8 tags are German `[ERR]`
-- [ ] `testDeletingAColoredTagLeavesNoOrphanTypetagsRow` - the fork's `piwigo_typetags` and
+- [x] `testAssigningAnEmptyListRemovesEveryTag` - `[BVA]`
+- [x] `testAGuestCannotCreateRenameOrDeleteATag` - `[NEG]`
+- [x] `testANormalUserCannotCreateRenameOrDeleteATag` - all `admin_only` `[NEG]`
+- [x] `testATagWithAUmlautGetsAUsableUrlName` - the install's 8 tags are German `[ERR]`
+- [x] `testDeletingAColoredTagLeavesNoOrphanTypetagsRow` - the fork's `piwigo_typetags` and
       `piwigo_tags.id_typetags` are the coupling core CRUD can break `[NEG]`
 
 **Upload**
-- [ ] `testUploadFollowedByUploadCompletedLinksThePhotoToTheAlbum` - `[HAPPY]`
-- [ ] `testTheLinkMaterialisesOnlyAfterTheLoungeIsEmptied` - `[ST]`
-- [ ] `testAnUnsupportedExtensionIsRefused` - `$conf['picture_ext']` is
+- [x] `testUploadFollowedByUploadCompletedLinksThePhotoToTheAlbum` - `[HAPPY]`
+- [x] `testTheLinkMaterialisesOnlyAfterTheLoungeIsEmptied` - `[ST]`
+- [x] `testAnUnsupportedExtensionIsRefused` - `$conf['picture_ext']` is
       `jpg,jpeg,png,gif,webp` and `upload_form_all_types` is false `[NEG]` `[ECP]`
 
 **Regression, existing suites**
-- [ ] `CoreAssociationCharacterizationTest` still passes - shares the association path
-- [ ] `CoreDeleteCategoriesCharacterizationTest` still passes - shares album deletion
-- [ ] Full provenance integration suite still passes - the new tests share `FixtureBuilder`
+- [x] `CoreAssociationCharacterizationTest` still passes - shares the association path
+- [x] `CoreDeleteCategoriesCharacterizationTest` still passes - shares album deletion
+- [x] Full provenance integration suite still passes - the new tests share `FixtureBuilder`
       and the history table
-- [ ] Full typetags integration suite still passes - core tag CRUD touches `piwigo_tags`,
+- [x] Full typetags integration suite still passes - core tag CRUD touches `piwigo_tags`,
       which typetags extends
-- [ ] Full persons integration suite still passes - persons mirrors each person as an
+- [x] Full persons integration suite still passes - persons mirrors each person as an
       ordinary tag
 
 ### Techniques not applicable
@@ -542,19 +542,19 @@ Technique legend is in `.claude/rules/test-design.md`.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'`
-- [ ] `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
-- [ ] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'`
-- [ ] `ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'`
-- [ ] The suite passes **twice in a row** and **in reverse order** with no manual repair
-- [ ] `failOnRisky` and `failOnWarning` stay on; no test asserts nothing
-- [ ] Every new test was watched go red by breaking the behaviour it claims to watch, recorded
+- [x] `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml'`
+- [x] `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --configuration plugins/provenance/phpunit.xml`
+- [x] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'`
+- [x] `ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; plugins/persons/vendor/bin/phpunit --testsuite integration --configuration plugins/persons/phpunit.xml'`
+- [x] The suite passes **twice in a row** and **in reverse order** with no manual repair
+- [x] `failOnRisky` and `failOnWarning` stay on; no test asserts nothing
+- [x] Every new test was watched go red by breaking the behaviour it claims to watch, recorded
       per test
 
 #### Manual Verification
-- [ ] Album and image counts are unchanged after a full run - every fixture restored
-- [ ] No `Persons E2E` or `persons-test-*` leftovers reappeared
-- [ ] The four real gallery albums are intact
+- [x] Album and image counts are unchanged after a full run - every fixture restored
+- [x] No `Persons E2E` or `persons-test-*` leftovers reappeared
+- [x] The four real gallery albums are intact
 
 **Implementation Note**: These tests create and delete albums, photos and tags on the one
 install this repository has. `FixtureBuilder` fails closed without the throwaway marker;

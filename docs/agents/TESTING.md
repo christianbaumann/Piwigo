@@ -49,6 +49,11 @@ execute them. `plugins/typetags/tests/Support/create-test-users.php` now creates
 `typetags_webmaster` and `typetags_normal`, as the provenance script does. The unit suite's sub-second budget is what makes it eligible for a commit
 gate; the other two are not.
 
+**`plugins/provenance` integration, measured 2026-08-31** after the four core characterization
+files landed: 181 tests / 952 assertions / 3 skipped in 68.7s. Unit unchanged at 180 tests / 502
+assertions in 0.018s. The same run leaves the install at 5 albums, 105 photos, 8 tags and 8
+colours — the values it started from.
+
 **`plugins/provenance`, measured 2026-08-29** (all three layers, after the gallery was
 resynchronised — see *The gallery loss, and what running the suites again exposed* below): unit
 138 tests / 312 assertions in 0.012s; integration 128 tests / 692 assertions / 3 skipped in
@@ -413,6 +418,79 @@ private function regionListOf(array $merged): array
 The guard was then **watched reporting**: the mutant re-applied, the run came back with 7 failures
 and 0 errors where it had been 6 failures and 1 error, then reverted. Suite after the fix:
 112 tests / 399 assertions (was 354), green.
+
+## Core characterization tests — watched go red (2026-08-31)
+
+The four `Core*CharacterizationTest` files in `plugins/provenance/tests/Integration/` cover the
+workflows the German handbook documents that had no test at any layer: core album creation and
+description, the core photo-properties screen, core tag CRUD, and the core upload. Every case is
+`[ERR]` — core carries no requirements document, so the oracle is the current implementation.
+
+They pass on their first run, which is normally the tell that a test recorded code rather than
+drove it. Per *proving a check can actually fail* in `.claude/rules/test-design.md`, each was
+therefore watched go red: one core mutation per behaviour claim, applied on the host, checksum-
+polled against `ddev exec md5sum` until the container saw the new bytes, the named tests run,
+then reverted with `git checkout --` and polled back. **36 of 36 went red.**
+
+This is not the mutation testing of `.claude/rules/mutation-testing.md` — that is a unit-layer
+audit of test strength, and these are integration tests. It is the weaker, mandatory claim that
+each characterization test can fail at all.
+
+| Mutant | Killed |
+|---|---|
+| `create_virtual_category()` writes a fixed `uppercats` | `testANewTopLevelAlbumTakesItsOwnIdAsUppercats`, `testAddingWithAParentNestsTheAlbum` |
+| `create_virtual_category()` stores a mangled name | `testAddingAnAlbumReturnsAnIdAndCreatesTheRow`, `testAUnicodeNameSurvivesTheRoundTrip` |
+| the blank-name guard never fires | `testAnEmptyNameIsRefused` |
+| a new album gets `''` instead of NULL as its description | `testANewAlbumHasAnEmptyDescription` |
+| `pwg.categories.setInfo` drops `comment` from its update columns | `testSetInfoStoresTheDescription`, `testALongDescriptionIsStoredWhole` |
+| `pwg.categories.setInfo` strips markup even with a valid token | `testSetInfoWithNoTokenStripsMarkup` |
+| `pwg.categories.add` loses `admin_only` | `testAGuestCannotAddAnAlbum`, `testANormalUserCannotAddAnAlbum` |
+| `picture_modify.php` stops writing the title | `testTitleAuthorDateAndDescriptionAreStored`, `testEachFieldCanBeClearedIndependently` |
+| `picture_modify.php` writes a posted `file` field | `testTheFilenameIsNotWritable` |
+| the properties form loses `check_pwg_token()` | `testAPostWithoutAValidTokenIsRefused` |
+| `admin.php` **and** `picture_modify.php` both lose `check_status(ACCESS_ADMINISTRATOR)` | `testANormalUserIsRefused` |
+| the `date_creation` pattern accepts anything | `testAnInvalidCreationDateIsRejectedOrNormalised` |
+| the description is stripped whatever `allow_html_descriptions` says | `testUnicodeAndMarkupInTheDescription` |
+| Linked albums associates instead of moving | `testLinkedAlbumsUnlinksAlbumsLeftOutOfTheSelection` |
+| `move_images_to_categories()` stops sparing the storage album | `testTheStorageAlbumCannotBeUnlinked` |
+| `create_tag()` derives no `url_name` | `testAddingATagCreatesTheRowAndAUrlName`, `testATagWithAUmlautGetsAUsableUrlName` |
+| `create_tag()` never finds the tag it would duplicate | `testAddingADuplicateNameIsRefused` |
+| `pwg.tags.rename` stops refusing a name that is taken | `testRenamingToAnExistingNameIsRefused` |
+| `pwg.tags.rename` keeps the old name | `testRenamingChangesTheNameAndTheUrlName` |
+| `delete_tags()` leaves the photo links behind | `testDeletingRemovesTheTagAndItsImageLinks` |
+| `delete_tags()` cascades into `piwigo_typetags` | `testDeletingAColoredTagLeavesNoOrphanTypetagsRow` |
+| `pwg.tags.merge` keeps the tags it merged away | `testMergingMovesEveryImageLinkAndRemovesTheSource` |
+| merging a tag into itself becomes a silent success | `testMergingATagIntoItselfIsRefusedOrIsANoOp` |
+| the properties screen appends tags instead of replacing | `testAssignmentReplacesRatherThanAppends`, `testAssigningAnEmptyListRemovesEveryTag` |
+| `pwg.tags.add` loses `admin_only` | `testAGuestCannotCreateRenameOrDeleteATag`, `testANormalUserCannotCreateRenameOrDeleteATag` |
+| `empty_lounge()` associates nothing | `testUploadFollowedByUploadCompletedLinksThePhotoToTheAlbum`, `testTheLinkMaterialisesOnlyAfterTheLoungeIsEmptied` |
+| the uploader accepts every file type | `testAnUnsupportedExtensionIsRefused` |
+
+### Two mutants that first looked survived, and were not
+
+Both were re-run and both then killed. Neither was a weak test; each was an artefact of the
+apparatus, which is exactly what the checksum discipline exists to catch.
+
+- **`pwg.tags.add` loses `admin_only`** reported the guest case green and the normal-user case
+  red under the same applied mutant. A direct `curl` against the mutated install proved a guest
+  *did* get through, so the test could not have been green for a real reason. Re-running the
+  mutant turned both red. The first run had read the pre-mutation file: the checksum poll answers
+  when the bytes land, not when the running request picked them up.
+- **`delete_tags()` cascades into `piwigo_typetags`** was first written to delete the colour rows
+  just before `trigger_notify("delete_tags", …)`, which runs *after* the tag rows are already
+  gone — so its subquery matched nothing and the mutant was a no-op, not a survivor. Moved ahead
+  of the `TAGS_TABLE` delete, it killed the test.
+
+The colour row the test uses is one it creates and removes itself rather than the install's own,
+so that mutant cannot delete a real colour that reverting the source would not bring back.
+
+### The one thing the pass changed in the tests
+
+Under the mutants, PHP warnings printed by the mutated core land in front of the JSON body, so
+`json_decode()` returns null and the fixture never adopts the album it just created. Six albums
+were left behind across the run and removed by hand afterwards; the install was verified back at
+5 albums, 105 photos, 8 tags and 8 colours. This is a property of the mutants, not of teardown:
+a real regression produces no warning output, and the adopt-then-destroy path runs normally.
 
 ## Hand-check ledger
 

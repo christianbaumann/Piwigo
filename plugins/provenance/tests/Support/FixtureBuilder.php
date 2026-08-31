@@ -443,6 +443,24 @@ class FixtureBuilder
     }
 
     /**
+     * Takes ownership of an album somebody else created, so teardown removes it.
+     *
+     * An album created through pwg.categories.add is a real category row this
+     * fixture never made and would otherwise be left behind in the gallery tree
+     * the handbook screenshots.
+     */
+    public function adoptAlbum(int $catId): void
+    {
+        $exists = (int)$this->db->scalar('SELECT COUNT(*) FROM `piwigo_categories` WHERE id = ' . $catId);
+        if ($exists !== 1)
+        {
+            throw new RuntimeException("no album with id $catId to adopt");
+        }
+
+        $this->testAlbums[] = $catId;
+    }
+
+    /**
      * A physical album: a real directory under galleries/ with a category row
      * pointing at it, so the filesystem-sync path has something to discover.
      *
