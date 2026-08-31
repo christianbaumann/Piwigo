@@ -189,7 +189,7 @@ loader that fails with a typed, actionable error before a single byte is transfe
 
 ### Changes Required
 
-#### [ ] 1. Package skeleton and dev tooling
+#### [x] 1. Package skeleton and dev tooling
 
 **File**: `tools/deploy/pyproject.toml`, `tools/deploy/pwgdeploy/__init__.py`,
 `tools/deploy/pwgdeploy/__main__.py`
@@ -216,7 +216,7 @@ addopts = "-q --strict-markers --strict-config -W error"  # warnings are failure
 testpaths = ["tests"]
 ```
 
-#### [ ] 2. Typed errors
+#### [x] 2. Typed errors
 
 **File**: `tools/deploy/pwgdeploy/errors.py`
 
@@ -233,7 +233,7 @@ class InstallError(RemoteHttpError): ...     # install.php reported field errors
 class GitError(DeployError): ...             # git ls-files failed / not a repo
 ```
 
-#### [ ] 3. Config schema and loader
+#### [x] 3. Config schema and loader
 
 **File**: `tools/deploy/pwgdeploy/config.py`
 
@@ -270,7 +270,7 @@ in milliseconds instead of after a 138 MB upload:
 - `ftp.remote_root` — normalised; `..` segments rejected
 - `ftp.port` — integer in 1..65535
 
-#### [ ] 4. Committed example credential file
+#### [x] 4. Committed example credential file
 
 **File**: `tools/deploy/deploy.example.json`
 
@@ -287,7 +287,7 @@ in milliseconds instead of after a 138 MB upload:
 }
 ```
 
-#### [ ] 5. Keep real credential files and manifests out of git
+#### [x] 5. Keep real credential files and manifests out of git
 
 **File**: `.gitignore`
 
@@ -306,11 +306,11 @@ __pycache__/
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_config.py` passes
-- [ ] `cd tools/deploy && uv sync` resolves with an empty runtime dependency set
-- [ ] `python3 -c "import pwgdeploy"` works with no site-packages beyond stdlib
-- [ ] `git check-ignore -v deploy.local.json` reports the new rule
-- [ ] `git status --porcelain` shows `deploy.example.json` as tracked and no real credential file
+- [x] `cd tools/deploy && uv run pytest tests/test_config.py` passes
+- [x] `cd tools/deploy && uv sync` resolves with an empty runtime dependency set
+- [x] `python3 -c "import pwgdeploy"` works with no site-packages beyond stdlib
+- [x] `git check-ignore -v deploy.local.json` reports the new rule
+- [x] `git status --porcelain` shows `deploy.example.json` as tracked and no real credential file
 
 #### Manual Verification
 - [ ] `deploy.example.json` is copyable to `deploy.local.json` and every field is self-explanatory
@@ -858,25 +858,25 @@ Tags per `.claude/rules/test-design.md`: `[HAPPY]` `[NEG]` `[ECP]` `[BVA]` `[ST]
 #### `tests/test_config.py`
 
 **Happy path**
-- [ ] `test_loads_the_example_file` — `deploy.example.json` itself loads into a `DeployConfig`
+- [x] `test_loads_the_example_file` — `deploy.example.json` itself loads into a `DeployConfig`
       `[HAPPY]` — this doubles as a **structural guard**: the committed example cannot drift out
       of sync with the loader without a red test
-- [ ] `test_defaults_are_applied` — omitting `port`, `prefix`, `language`, `assume_https`,
+- [x] `test_defaults_are_applied` — omitting `port`, `prefix`, `language`, `assume_https`,
       `exiftool_path` yields the documented defaults `[HAPPY]`
 
 **Negative**
-- [ ] `test_missing_section_names_the_section` — no `mysql` key → `ConfigError` naming `mysql` `[NEG]`
-- [ ] `test_unknown_top_level_key_is_rejected` — a typo'd section fails rather than being ignored `[NEG]`
-- [ ] `test_empty_password_is_rejected` `[NEG]` `[ECP]`
-- [ ] `test_admin_username_with_a_quote_is_rejected` — mirrors `install.php:287-291` `[NEG]`
-- [ ] `test_relative_base_url_is_rejected` `[NEG]`
-- [ ] `test_remote_root_with_dotdot_is_rejected` `[NEG]`
+- [x] `test_missing_section_names_the_section` — no `mysql` key → `ConfigError` naming `mysql` `[NEG]`
+- [x] `test_unknown_top_level_key_is_rejected` — a typo'd section fails rather than being ignored `[NEG]`
+- [x] `test_empty_password_is_rejected` `[NEG]` `[ECP]`
+- [x] `test_admin_username_with_a_quote_is_rejected` — mirrors `install.php:287-291` `[NEG]`
+- [x] `test_relative_base_url_is_rejected` `[NEG]`
+- [x] `test_remote_root_with_dotdot_is_rejected` `[NEG]`
 
 **Boundaries**
-- [ ] `test_prefix_length` — 0 / 1 / 20 / 21 chars: reject, accept, accept, reject `[BVA]`
-- [ ] `test_prefix_leading_digit_is_rejected` and `test_prefix_underscore_and_dollar_accepted` `[ECP]`
-- [ ] `test_port_bounds` — 0 / 1 / 65535 / 65536 `[BVA]`
-- [ ] `test_base_url_trailing_slash_is_stripped` and `test_remote_root_is_normalised`
+- [x] `test_prefix_length` — 0 / 1 / 20 / 21 chars: reject, accept, accept, reject `[BVA]`
+- [x] `test_prefix_leading_digit_is_rejected` and `test_prefix_underscore_and_dollar_accepted` `[ECP]`
+- [x] `test_port_bounds` — 0 / 1 / 65535 / 65536 `[BVA]`
+- [x] `test_base_url_trailing_slash_is_stripped` and `test_remote_root_is_normalised`
       (`""`, `"/"`, `"piwigo"`, `"/piwigo/"` all → `"/piwigo"` or `""`) `[ECP]`
 
 #### `tests/test_fileset.py`

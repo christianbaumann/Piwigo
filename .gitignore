@@ -34,6 +34,14 @@
 .settings
 .project
 
+# Deploy tool: real credential files and per-target manifests
+/deploy.*.json
+!/tools/deploy/deploy.example.json
+/tools/deploy/.state/
+__pycache__/
+.pytest_cache/
+.venv/
+
 # Agent working state (local only)
 .rodney/
 .agent-tests/
