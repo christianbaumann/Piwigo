@@ -332,7 +332,7 @@ confirmation before Phase 2.
 
 ---
 
-## Phase 2: The file set — what "needed" means — IMPLEMENTED 2026-08-31
+## Phase 2: The file set — what "needed" means — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -421,17 +421,20 @@ WRITABLE_REMOTE_PATHS = ("local", "_data", "upload", "plugins", "themes")
 ### Success Criteria
 
 #### Automated Verification
-- [x] `cd tools/deploy && uv run pytest tests/test_fileset.py` passes — 44 tests; whole suite
-      115 passed, 2 skipped, measured 2026-08-31, green twice in a row and with the shuffle
-      disabled. The 2 skips are the submodule characterizations described below
+- [x] `cd tools/deploy && uv run pytest tests/test_fileset.py` passes — 46 tests; whole suite
+      **117 passed, 0 skipped**, measured 2026-08-31 with the typetags submodule checked out,
+      green twice in a row and with the shuffle disabled
 - [x] A characterization test asserts `select()` over the **real** tracked list keeps
       `plugins/persons/main.inc.php` and drops `plugins/persons/tests/Support/create-test-users.php`
 - [x] Anti-vacuity: the real-list test asserts the input has > 3000 entries and the output > 2500
       before any exclusion count is asserted
 
 #### Manual Verification
-- [ ] `pwg-deploy --list-files` output contains no `vendor/`, `node_modules/`, `tests/` or
-      `.playwright-browsers/` path — **the `vendor/` half of this criterion was wrong as written
+- [x] `pwg-deploy --list-files` output contains no `vendor/`, `node_modules/`, `tests/` or
+      `.playwright-browsers/` path — **automated** as the last loop of
+      `test_real_repository_file_set`. The `pwg-deploy --list-files` *command* cannot run until the
+      CLI lands in Phase 6; re-confirm it there against the same figures. **The `vendor/` half of
+      this criterion was wrong as written
       and has been corrected.** `themes/default/vendor/fontello/` (15 files) is a *tracked core
       asset* — the gallery's icon font — and must ship. The dependency-manager `vendor/`
       directories are each plugin's own composer output, which that plugin's `.gitignore` already
@@ -444,12 +447,11 @@ WRITABLE_REMOTE_PATHS = ("local", "_data", "upload", "plugins", "themes")
       `test_every_declared_submodule_contributes_its_files` (asserts the submodule contributed
       > `MIN_SUBMODULE_PATHS` paths and that `select()` does not drop it wholesale), and the
       failure mode it cannot observe from an uninitialised working copy is now a hard deploy-time
-      error rather than a manual check — see task 4 above. The characterization test *skips*, with
-      the fix command in its reason, when the submodule is absent; it has therefore **not yet been
-      observed green**, and doing so needs one run from a checkout with the submodule initialised.
-      Original finding, kept for the record: **not satisfiable from a
-      worktree with an uninitialised submodule, and this is a silent-data-loss gap, not a local
-      inconvenience.** In `.claude/worktrees/ftp-deploy`, `plugins/typetags` is an empty
+      error rather than a manual check — see task 4 above. **Observed green 2026-08-31** after the
+      submodule was checked out in this worktree: 157 tracked files under `plugins/typetags/`, 123
+      of them published, 0 skipped tests. Original finding, kept for the record: **not satisfiable
+      from a worktree with an uninitialised submodule, and this is a silent-data-loss gap, not a
+      local inconvenience.** In `.claude/worktrees/ftp-deploy`, `plugins/typetags` is an empty
       directory, and `git ls-files -z --recurse-submodules` then omits the submodule *entirely* —
       neither the 157 files nor the gitlink appear. Enumeration still returns 3376 paths, so
       `GitError`'s empty-set guard does not fire and a deploy would silently publish a gallery
@@ -459,6 +461,37 @@ WRITABLE_REMOTE_PATHS = ("local", "_data", "upload", "plugins", "themes")
 **Deviation from the plan, decided and implemented**: Phase 2 as written had no guard against a
 partially-enumerated file set. A `MIN_EXPECTED_PATHS` floor **and** a per-submodule contribution
 check now raise `GitError` naming `git submodule update --init --recursive`. See task 4.
+
+**Measured 2026-08-31, submodule checked out**: 3535 tracked → 3332 selected, 134.7 MB, 203
+excluded, 123 published `plugins/typetags/` files.
+
+### Blocker found while verifying Phase 2: the typetags submodule pin is unpushed
+
+`git submodule update --init --recursive` **fails from a clean clone of this fork**:
+
+```
+fatal: remote error: upload-pack: not our ref 44fdd062d1ab2f1c19304a4b3987fb2dc2fedfcd
+```
+
+The superproject pins `plugins/typetags` at `44fdd06`, but
+`github.com/christianbaumann/Piwigo-Colored-Tags` only has `e920a3b` — `git submodule status`
+reports `heads/master-1-g44fdd06`, i.e. one local commit that was never pushed. The commit exists
+solely in this machine's `.git/modules/plugins/typetags` object store, which is how it was
+recovered for this verification (`git fetch <local module store> 44fdd06` from inside the
+submodule, then `git submodule update --recursive`).
+
+Consequences for this plan, none of them cosmetic:
+
+- **The deploy cannot run from a fresh clone** until the pin is pushed or moved. The 157 typetags
+  files are simply unobtainable, and Phase 2's `check_complete()` will refuse the run — loudly and
+  correctly, which is the guard doing its job rather than a second bug.
+- **`.claude/rules/plugin-test-suites.md` is now out of date.** It states a fresh clone needs
+  `git submodule update --init --recursive` "(measured 2026-08-31 against a real clone)"; that
+  command cannot presently succeed. Per `backpressure.md`'s *keep instructions honest*, whichever
+  change resolves the pin fixes that sentence in the same commit.
+
+Fix is one push of the Colored Tags repository, or moving the pin to `e920a3b` — an owner
+decision, outside this plan's scope, recorded here rather than worked around.
 
 **Implementation Note**: Pause for manual confirmation before Phase 3.
 
@@ -1152,7 +1185,15 @@ only shared files touched are additive:
 - [ ] Root `.gitignore` — new rules only. Verify `git status --porcelain` still shows the same
       tracked set for `plugins/`, `themes/` and `galleries/` after the change
 - [ ] `CLAUDE.md` — one added line; the < 100-line cap is asserted in Phase 7
-- [ ] `bash tools/test-hooks.sh` — the commit gate is untouched; run it to prove that
+- [x] `bash tools/test-hooks.sh` — the commit gate is untouched; run it to prove that. Run
+      2026-08-31: the gate's two behavioural cases pass (`git rejects a real commit`, `git accepts
+      a clean commit`), as do all documentation-cap cases. **4 cases fail for environment reasons
+      unrelated to this phase**, each naming its own fix: `plugins/typetags` has no
+      `core.hooksPath` (`tools/install-hooks.sh`), and `vendor/bin/phpunit` is absent for all
+      three plugins (`composer install` per plugin). Neither is reachable from this worktree —
+      DDEV is bound to the main checkout, so `ddev exec composer install` would install into the
+      main checkout rather than here. Phase 2 changed no PHP, no hook and no gate, so the gate is
+      untouched as claimed; the 4 failures predate it
 - [ ] The three plugin suites are unaffected and are **not** re-run as part of this plan; saying so
       is more honest than running them to produce a green line that means nothing here
 
