@@ -709,7 +709,7 @@ now exits 5 with a message naming host, port and user.
 
 ---
 
-## Phase 5: The upload run
+## Phase 5: The upload run — IMPLEMENTED 2026-08-31; the two manual steps need credentials
 
 ### Overview
 
@@ -718,7 +718,7 @@ persist the manifest as it goes so an interrupted run resumes instead of restart
 
 ### Changes Required
 
-#### [ ] 1. The run
+#### [x] 1. The run
 
 **File**: `tools/deploy/pwgdeploy/upload.py`
 
@@ -763,17 +763,41 @@ the most expensive kind to find.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_upload.py tests/test_urls.py` passes
-- [ ] Second-run test: running `run()` twice against the same `FakeTransport` uploads N files then
+- [x] `cd tools/deploy && uv run pytest tests/test_upload.py tests/test_urls.py` passes — 40 tests
+      (26 upload, 14 urls); whole suite **210 passed, 0 skipped**, measured 2026-08-31, green
+      three times in a row and with `-p no:randomly`
+- [x] Second-run test: running `run()` twice against the same `FakeTransport` uploads N files then
       0, with `unchanged_count == N` (N asserted > 0 first)
-- [ ] Crash-safety test: `FakeTransport` armed to fail on put #3 leaves a manifest holding exactly
+- [x] Crash-safety test: `FakeTransport` armed to fail on put #3 leaves a manifest holding exactly
       the first two paths, and a re-run uploads only the remainder
-- [ ] Prune test: a path present in the previous manifest and absent from the file set is deleted;
+- [x] Prune test: a path present in the previous manifest and absent from the file set is deleted;
       a path present on the fake but in **neither** manifest is untouched
 
 #### Manual Verification
-- [ ] A full first deploy to the real web space completes and the byte total matches ~138 MB
+- [ ] A full first deploy to the real web space completes and the byte total matches ~138 MB —
+      needs `deploy.local.json`, which does not exist in this checkout; the CLI that runs it
+      lands in Phase 6, so this and the next criterion are performed there
 - [ ] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts
+
+**Deviations from the plan as written, decided and implemented**:
+
+- `run()` takes two keyword arguments the sketch does not name: `prune=True`, because `--no-prune`
+  is a listed CLI flag and the run is where it has to be honoured, and `tracked=
+  fileset.verified_tracked_paths`, the enumeration injected the same way `fileset` injects
+  `run=subprocess.run` — the upload suite is about the transfer, not about git.
+- `UploadResult` carries the whole `Diff` instead of a bare `unchanged_count`; the count stays as
+  a property. A dry run must report what it *would* send, and the CLI's summary line needs
+  new/changed/unchanged/removed — all four already live on `Diff`, so a second copy would rot.
+- `manifest.save()` also runs after each **deletion**, not only after each upload. A prune
+  interrupted halfway would otherwise leave the manifest claiming files that are gone.
+
+**Mutant that survived the first table, and what it cost.** Turning the `chmod` loop's list into a
+generator — `all([...])` → `all(...)` — left the suite green: `all()` then short-circuits at the
+first refusal, so a server without `SITE CHMOD` is asked about one path and the warning names one
+path instead of five. `test_chmod_refusal_is_a_warning_not_a_failure` now asserts the whole call
+list and kills it. Three mutants that died on the first table: dropping the per-file
+`manifest.save()` (9 tests), ignoring the `prune` flag (2), and pruning every manifest entry
+rather than `diff.removed` (9).
 
 **Implementation Note**: Pause for manual confirmation before Phase 6.
 
@@ -1216,21 +1240,21 @@ Mutagen caveat does not apply — each mutant was verified to have changed the f
 
 #### `tests/test_upload.py`
 
-- [ ] `test_first_run_uploads_every_file` — count asserted > 0 first `[HAPPY]`
-- [ ] `test_second_run_uploads_nothing` — `unchanged_count == N`, `uploaded == []` `[ST]`
-- [ ] `test_changed_file_is_re_uploaded_alone` `[ST]`
-- [ ] `test_dry_run_never_touches_the_transport` — `FakeTransport` records zero calls,
+- [x] `test_first_run_uploads_every_file` — count asserted > 0 first `[HAPPY]`
+- [x] `test_second_run_uploads_nothing` — `unchanged_count == N`, `uploaded == []` `[ST]`
+- [x] `test_changed_file_is_re_uploaded_alone` `[ST]`
+- [x] `test_dry_run_never_touches_the_transport` — `FakeTransport` records zero calls,
       `connect` included `[NEG]`
-- [ ] `test_manifest_persists_after_each_file` — armed to fail on put #3, the manifest holds
+- [x] `test_manifest_persists_after_each_file` — armed to fail on put #3, the manifest holds
       exactly the first two paths `[ERR]`
-- [ ] `test_resume_after_failure_uploads_only_the_remainder` `[ST]`
-- [ ] `test_prune_deletes_only_previously_recorded_paths` — a path on the fake that is in
+- [x] `test_resume_after_failure_uploads_only_the_remainder` `[ST]`
+- [x] `test_prune_deletes_only_previously_recorded_paths` — a path on the fake that is in
       neither manifest is untouched `[NEG]`
-- [ ] `test_no_prune_flag_deletes_nothing` `[NEG]`
-- [ ] `test_creates_the_data_and_upload_directories` `[HAPPY]`
-- [ ] `test_chmod_refusal_is_a_warning_not_a_failure` — the run completes with
+- [x] `test_no_prune_flag_deletes_nothing` `[NEG]`
+- [x] `test_creates_the_data_and_upload_directories` `[HAPPY]`
+- [x] `test_chmod_refusal_is_a_warning_not_a_failure` — the run completes with
       `chmod_supported is False` `[NEG]`
-- [ ] `test_parent_directories_are_created_before_their_files` — order assertion on the fake
+- [x] `test_parent_directories_are_created_before_their_files` — order assertion on the fake
       `[ST]`
 
 #### `tests/test_urls.py`
