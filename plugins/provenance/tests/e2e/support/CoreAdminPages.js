@@ -53,6 +53,9 @@ class AlbumListPage {
         reachable: page.locator(`${action.selector}:not(.notClickable)`),
       }));
 
+    // The action anchors of one row, in the order albums.js emitted them.
+    this.firstRowActions = page.locator('.move-cat-action').first().locator('a');
+
     // tipTip moves a `title` into its own tooltip and removes the attribute, so
     // the label a reader sees is only in the tooltip once the anchor is hovered.
     this.tooltip = page.locator('#tiptip_holder');
@@ -75,6 +78,18 @@ class AlbumListPage {
     this.addAlbumCancel = page.locator('.AddAlbumCancel');
   }
 
+  /**
+   * The action classes of one row, in DOM order.
+   *
+   * albums.js:358-367 builds the six anchors as one HTML string, so their order
+   * is whatever that string says. 01-alben.html lists them left to right.
+   */
+  async rowActionOrder() {
+    const classes = await this.firstRowActions.evaluateAll((anchors) =>
+      anchors.map((a) => [...a.classList].find((c) => c.startsWith('move-cat-'))));
+
+    return classes.filter(Boolean);
+  }
   /**
    * The label a row action carries, and the label the template declared for it.
    *

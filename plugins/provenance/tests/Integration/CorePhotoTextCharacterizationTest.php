@@ -246,6 +246,57 @@ final class CorePhotoTextCharacterizationTest extends TestCase
         );
     }
 
+    /**
+     * [ERR] The privacy dropdown labels the five levels cumulatively.
+     *
+     * get_privacy_level_options() (include/functions.inc.php:2227-2249) walks
+     * available_permission_levels in reverse and appends each group name to the
+     * one before, so the options read "Administratoren", then
+     * "Administratoren, Familie", and so on, with "Jeder" for level 0. No option
+     * carries a single group name such as "Familie" on its own.
+     *
+     * docs/handbuch/03-fototexte.html quotes these labels. It said "Kontakte,
+     * Freunde, Familie oder Administratoren" until 2026-08-31, which sent the
+     * reader looking for options that do not exist. This case exists so the
+     * handbook cannot drift from the screen again unnoticed. The oracle is the
+     * implementation, not a requirement.
+     */
+    public function testThePrivacyLevelsAreLabelledCumulatively(): void
+    {
+        $res = $this->ws->fetchPage($this->pagePath());
+        $body = (string)$res['body'];
+
+        $this->assertSame(200, $res['http_code'], 'the properties screen did not answer');
+        $this->assertGreaterThan(
+            self::MIN_PAGE_BYTES,
+            strlen($body),
+            'anti-vacuity: the answer is too short to be the rendered properties screen'
+        );
+
+        $this->assertMatchesRegularExpression(
+            '#<select name="level".*?</select>#s',
+            $body,
+            'the privacy dropdown is not on the screen the handbook documents'
+        );
+        preg_match('#<select name="level".*?</select>#s', $body, $select);
+
+        $count = preg_match_all('#<option[^>]*>([^<]*)</option>#', $select[0], $options);
+        $this->assertGreaterThan(0, $count, 'anti-vacuity: the dropdown holds no option');
+
+        $labels = array_map('trim', $options[1]);
+        $this->assertSame(
+            array(
+                'Administratoren',
+                'Administratoren, Familie',
+                'Administratoren, Familie, Freunde',
+                'Administratoren, Familie, Freunde, Kontakte',
+                'Jeder',
+            ),
+            $labels,
+            'the privacy options no longer read as docs/handbuch/03-fototexte.html says'
+        );
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /**

@@ -4,7 +4,7 @@ git_commit: a37a19cb1f2935fffcca8d9b11e4ab5e5703f14e
 branch: master
 topic: "German end-user documentation with screenshots for albums, photos, text, tags and persons"
 tags: [plan, documentation, german, screenshots, albums, tags, persons, provenance, testing]
-status: draft
+status: implemented
 ---
 
 # German end-user handbook Implementation Plan
@@ -1100,12 +1100,22 @@ proved the `MIN_BYTES` guard reachable, are in `docs/agents/TESTING.md`.
 - [x] Full run of all three plugin suites, all layers, passes
 
 #### Manual Verification
-- [ ] The decision file states what was rejected and why, not only what was chosen
-- [ ] Every count in the updated docs carries the date it was measured
-- [ ] The mutant table records honestly what survived, with the reason
-- [ ] No instruction file now claims something untrue about the repository
+- [x] The decision file states what was rejected and why, not only what was chosen
+- [x] Every count in the updated docs carries the date it was measured
+- [x] The mutant table records honestly what survived, with the reason
+- [x] No instruction file now claims something untrue about the repository
 
 ---
+
+**Phase 7 verified 2026-08-31.** The four manual items were closed by inspection and by a factual
+audit rather than by assertion: every claim added to `CLAUDE.md`, `.claude/rules/handbook.md` and
+`plugin-test-suites.md` was checked against the file, line or command it names.
+
+The same pass read the handbook against the application and found two wrong statements - the privacy
+levels and the reach of the move action - plus one true-but-unwitnessed order claim. All three are
+recorded in *Reading the handbook against the application* in `docs/agents/TESTING.md`, with the two
+tests added to hold them.
+
 
 ## Testing Strategy
 
@@ -1138,11 +1148,11 @@ None added. Recorded as deliberate non-coverage in Phase 7 with the reason.
 
 ### Regression
 
-- [ ] All three plugin unit suites
-- [ ] All three plugin integration suites
-- [ ] All three plugin E2E suites
-- [ ] Suites pass twice in a row and in reverse order
-- [ ] Album, image and tag counts unchanged after a full run
+- [x] All three plugin unit suites - run 2026-08-31: 56 / 183 / 114
+- [x] All three plugin integration suites - 49 / 184 / 104
+- [x] All three plugin E2E suites - 32 / 48 / 31
+- [x] Suites pass twice in a row and in reverse order - done for the two suites this verification changed (provenance integration twice plus `--order-by=reverse`, provenance E2E twice). The other seven were run once; claiming more would be claiming a run that did not happen
+- [x] Album, image and tag counts unchanged after a full run - 5 albums, 105 photos, 8 tags before and after
 
 ### Manual testing steps
 

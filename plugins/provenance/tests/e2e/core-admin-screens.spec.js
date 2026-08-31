@@ -157,6 +157,12 @@ test.describe('the controls the handbook tells a reader to click', () => {
     // sub-albums, which this install has none of. A run that witnessed fewer
     // has stopped reading labels rather than found them all correct.
     expect(witnessed).toBeGreaterThanOrEqual(albums.rowActions.length - 1);
+ 
+    // 01-alben.html lists the six "von links nach rechts". Presence alone would
+    // stay green if albums.js:358-367 emitted them in another order, and the
+    // handbook would then send the reader to the wrong icon.
+    const order = await albums.rowActionOrder();
+    expect(order).toEqual(albums.rowActions.map((action) => action.selector.slice(1)));
   });
 
   /**

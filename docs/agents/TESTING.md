@@ -671,6 +671,56 @@ Named rather than dropped, per *report gaps, don't hide them*:
 - **Persons rename and delete on the admin screen.** `AdminPersonsPage.js` carries no locators
   for them. Pre-existing gap, unrelated to the handbook.
 
+## Reading the handbook against the application (2026-08-31)
+
+Phase 6 reconciled every control the handbook *names* against a spec. This pass asked the other
+question: is what the handbook *says* true. Every German label the pages quote was extracted and
+matched against the locale files and the fork's own templates: 113 labels, 108 resolving verbatim,
+the remaining 5 confirmed by hand (the plupload drop-zone text, which comes from
+`themes/default/js/plugins/plupload/i18n/de.js`; the privacy-level heading, which the page composes
+from two keys; the allowed file types, which come from `$conf['picture_ext']`; and one descriptive
+phrase that is not a label at all).
+
+Then the falsifiable behaviour claims were checked against the code and, where the code was
+ambiguous, against the running screen. Two were wrong.
+
+### The privacy levels were documented as four separate groups
+
+`03-fototexte.html` said the levels other than `Jeder` restrict the photo to
+"Kontakte, Freunde, Familie oder Administratoren". The dropdown does not read that way:
+`get_privacy_level_options()` (`include/functions.inc.php:2227-2249`) walks
+`available_permission_levels` in reverse and appends each name to the one before, so the live screen
+offers `Administratoren`, `Administratoren, Familie`, `Administratoren, Familie, Freunde`,
+`Administratoren, Familie, Freunde, Kontakte` and `Jeder`. No option carries a single group name. A
+reader looking for `Familie` would not have found it.
+
+Fixed, and witnessed by
+`CorePhotoTextCharacterizationTest::testThePrivacyLevelsAreLabelledCumulatively` - integration, not
+E2E, because the options are server-rendered and the placement rule puts the assertion at the lowest
+layer that can express it. Watched red by renaming `Level 4` in `language/de_DE/admin.lang.php`.
+
+### "Ins Album verschieben" was documented as dropping every other link
+
+`02-fotos.html` said the move action "löst alle anderen Verknüpfungen". It keeps one:
+`move_images_to_categories()` (`admin/include/functions.php:2154-2179`) excludes the storage album
+from its `DELETE`. Qualified in the page. Already witnessed by
+`CoreAssociationCharacterizationTest::testMoveKeepsTheStorageLinkAndAddsTheDestination`, so no new
+test was needed - the gap was in the prose, not the suite.
+
+### One claim that looked wrong and was not
+
+`02-fotos.html` states a 1000 MB limit for a single file, while this container's PHP caps
+`upload_max_filesize` at 100M. Not a contradiction: `$conf['upload_form_chunk_size']` is 500 kB, so
+plupload never sends a request near the PHP limit and `$conf['upload_form_max_file_size'] = 1000` is
+the binding one. Recorded because the next reader will have the same doubt.
+
+### One order claim that was true but unwitnessed
+
+`01-alben.html` lists the six album-row actions "von links nach rechts". The existing spec asserted
+each action's presence and label but not their order, so a reordering of `albums.js:358-367` would
+have left it green and the handbook pointing at the wrong icon. `rowActionOrder()` now asserts the
+DOM order; watched red by swapping the last two anchors.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
