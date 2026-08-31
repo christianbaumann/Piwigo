@@ -1099,7 +1099,11 @@ somebody had actually looked at.
    `.git`), `tools/index.php` redirects any request out of it, and matching a stock install is the
    safer default. `local/*/index.php` stays too — those are the directory-listing guards
    `LOCAL_GUARD_*` publishes on purpose. Test:
-   `test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools`.
+   `test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools`. **Superseded in Phase 7**
+   — the user decided the whole of `tools/` is excluded
+   ([decision 0022](../decisions/0022-the-tools-directory-is-not-published.md)), and that test was
+   replaced by `test_excludes_the_whole_tools_directory`, whose docstring names it as its
+   predecessor. The narrative above is the state at the time of the run, kept as such.
 
 **A third weakness, fixed in the same round**: `--dry-run` reported `0 removed` no matter what,
 because a dry run deletes nothing and the figure was read from `deleted`. Prune is the only
@@ -1259,7 +1263,8 @@ server and no remote web space in CI, because there is no CI).
       two survived their first mutant, were found to assert only that a string appears somewhere,
       and were strengthened. Ledger entry recorded. What stays manual is whether the prose is
       *followable* by a person who has not read the code — no assertion reaches that, and it needs
-      a human who is not the author.
+      a human who is not the author. **Extended 2026-08-31 to 19 tests**, see the verification
+      round below.
 - [x] Each decision file states what was decided, why, and what would reverse it — 0021, 0022 and
       0023 each carry a *What would reverse this* section naming the concrete trigger
 
@@ -1286,6 +1291,56 @@ that reason before the rule landed.
   `docs/agents/research/2026-08-30-ftp-deployment-and-remote-install.md` — **exists in no branch**,
   so every "research decision N" reference in the plan is a dead link. The substance survives in
   the plan's own summaries. Recorded rather than reconstructed.
+
+### Second verification round, 2026-08-31 — reconciling the plan against the suite
+
+Every test name the plan cites was extracted and compared against the names the suite actually
+defines. Two citations pointed at tests that do not exist, and both are now fixed in place rather
+than deleted:
+
+- `test_generated_config_is_valid_php_open_tag` (Test Commands) never landed as a test of its own.
+  The assertion did — inside `test_generated_config_carries_the_three_settings`.
+- `test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools` (Phase 6 narrative) was
+  superseded by `test_excludes_the_whole_tools_directory` when decision 0022 landed. The successor's
+  docstring names it, per *a superseded test file is deleted, not kept alongside*.
+
+Everything else resolves. The two remaining unmatched strings are benign and were checked by hand:
+`test_an_empty_remote_root_...` is a deliberate ellipsis in the mutant table, and `test_cache` is
+`.pytest_cache/` quoted from a `.gitignore` listing.
+
+**A real gap this found, now closed.** Both `tools/deploy/README.md` and
+`.claude/rules/deployment.md` quote the suite size as a dated measurement, and **neither was
+guarded** — the number had already rotted once (Phase 7 found both still claiming 288 after the
+suite reached 304, and corrected them by hand). Three tests were added to
+`tools/deploy/tests/test_readme.py`:
+
+- `test_the_documented_test_count_is_the_number_pytest_reports` — parametrised over both documents,
+  compared against what `pytest --collect-only` reports in its own process. Counting `def test_` in
+  the source would be a second, wrong definition: the parametrised cases expand.
+- `test_both_documents_date_the_same_measurement` — one document updated and the other left behind
+  is exactly the state Phase 7 had to fix by hand.
+
+Both carry anti-vacuity guards (`MIN_COLLECTED`, and an assertion that the scan matched a count at
+all). The guard was red on arrival for the right reason — adding three tests moved the count from
+304 to 307 — and each was then watched red against its own mutant: a differing date, and the count
+sentence removed from the rules file, which failed as *"states no dated test count"* rather than
+passing on an empty scan. Both documents now read **307**.
+
+**What was re-run.** `cd tools/deploy && uv run pytest` — **307 passed**, twice under
+pytest-randomly's shuffle and once with `-p no:randomly`. `bash tools/test-hooks.sh` — re-run this
+round and unchanged: every documentation-cap case passes (including `rules/deployment.md is 107
+lines (cap 500)`), both gate-behaviour cases pass (`git rejects a real commit`, `git accepts a clean
+commit`), and the same **4 environmental cases fail** — no `core.hooksPath` in the `plugins/typetags`
+submodule, and no `vendor/bin/phpunit` for any of the three plugins. Neither is reachable from this
+worktree and neither is this plan's to fix; not claimed as green.
+
+**What was deliberately not automated.** A standing test that checks *this plan's* test-name
+citations. `test-design.md` forbids building apparatus that proves other apparatus — "a scan that
+reads a document looking for a word" — and a plan is a dated snapshot, not a living document:
+guarding it forever would freeze a record that is supposed to age. The reconciliation above was run
+once, by hand, and its result is this section. The *living* documents (`README.md`,
+`.claude/rules/deployment.md`) are the ones that carry standing guards, which is where the three
+new tests went.
 
 ---
 
@@ -1695,7 +1750,10 @@ defect (`test-design.md`, anti-vacuity).
 
 No `php -l` run is claimed: this plan adds no PHP file. The generated
 `local/config/config.inc.php` is a string built in Python and is covered by
-`test_generated_config_is_valid_php_open_tag`.
+`test_generated_config_carries_the_three_settings`, which asserts the `<?php` opening tag
+alongside the three settings (the plan's provisional
+`test_generated_config_is_valid_php_open_tag` never landed as a test of its own — the
+assertion did, in that test).
 
 ## Performance Considerations
 

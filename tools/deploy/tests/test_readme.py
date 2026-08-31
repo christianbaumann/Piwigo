@@ -20,6 +20,8 @@ direction (a flag or field that exists but is undocumented), anti-vacuity throug
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -288,3 +290,69 @@ def test_the_rules_file_is_reachable_from_claude_md():
     claude_md = (REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     assert "(.claude/rules/deployment.md)" in claude_md
     assert (REPO_ROOT / ".claude/rules/deployment.md").is_file()
+
+
+# --- the dated test count, which both documents carry ---------------------------------
+
+RULES_FILE = REPO_ROOT / ".claude/rules/deployment.md"
+
+# "304 tests, measured 2026-08-31" — a load-bearing dated measurement (`test-design.md`:
+# numbers in documentation rot). It already rotted once: Phase 7 found both documents still
+# claiming 288 after the suite had reached 304, and fixed them by hand. This is the guard
+# that makes the next drift a red test instead of a hand-check.
+DATED_COUNT = re.compile(r"(\d+) tests, measured (\d{4}-\d{2}-\d{2})")
+
+# Under the 304 the suite carried when this guard was written, 2026-08-31. A collection
+# that comes back with fewer than this has broken, not shrunk, and must not be compared.
+MIN_COLLECTED = 200
+
+COLLECT_TIMEOUT_SECONDS = 120
+
+
+def collected_test_count() -> int:
+    """What `pytest` itself reports, in its own process.
+
+    Counting `def test_` in the source would be a second, wrong definition of the number:
+    the parametrised tests in this suite expand to more cases than they have definitions.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-p", "no:randomly"],
+        cwd=README.parent,
+        capture_output=True,
+        text=True,
+        timeout=COLLECT_TIMEOUT_SECONDS,
+    )
+    match = re.search(r"(\d+) tests collected", result.stdout)
+    assert match, f"could not read a collection count from pytest:\n{result.stdout[-2000:]}"
+    return int(match.group(1))
+
+
+@pytest.fixture(scope="module")
+def real_test_count() -> int:
+    count = collected_test_count()
+    assert count >= MIN_COLLECTED, f"only {count} tests collected; the comparison below is meaningless"
+    return count
+
+
+@pytest.mark.parametrize("path", [README, RULES_FILE], ids=["readme", "rules"])
+def test_the_documented_test_count_is_the_number_pytest_reports(path, real_test_count):
+    """[HAPPY] Both documents quote the suite size, and a reader trusts it to decide
+    whether their own run was complete. Neither is scanned by the other's tests."""
+    text = path.read_text(encoding="utf-8")
+    claims = DATED_COUNT.findall(text)
+    assert claims, f"{path.name} states no dated test count; this guard is scanning nothing"
+    for claimed, _date in claims:
+        assert int(claimed) == real_test_count, (
+            f"{path.name} claims {claimed} tests, pytest collects {real_test_count}"
+        )
+
+
+def test_both_documents_date_the_same_measurement():
+    """[NEG] One document updated and the other left behind is the exact failure Phase 7
+    fixed by hand; two different dates for one number is that state, mid-flight."""
+    dates = set()
+    for path in (README, RULES_FILE):
+        found = DATED_COUNT.findall(path.read_text(encoding="utf-8"))
+        assert found, f"{path.name} states no dated test count"
+        dates.update(date for _count, date in found)
+    assert len(dates) == 1, f"the test count is dated differently across the documents: {sorted(dates)}"
