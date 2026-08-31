@@ -36,6 +36,13 @@ function persons_reindex_image($image_id, $file_path)
 
   $rotation = persons_image_rotation($image_id);
 
+  $correction = persons_correct_for_rotation($image_id, $file_path, $read, $rotation);
+  if (!$correction['ok'])
+  {
+    return array('ok' => false, 'regions' => 0, 'message' => $correction['message']);
+  }
+  $read = $correction['read'];
+
   $rows = array();
   foreach ($read['regions'] as $region)
   {
@@ -72,6 +79,187 @@ function persons_reindex_image($image_id, $file_path)
   persons_sync_image_tags($image_id);
 
   return array('ok' => true, 'regions' => count($rows), 'message' => '');
+}
+
+/**
+ * Turns a file's regions with the file when something outside Piwigo rotated it.
+ *
+ * This Piwigo has no rotate action of its own - images.rotation is written only
+ * by sync and upload, out of Exif Orientation - so there is no event to hook.
+ * The trigger is a detected change, evaluated on every reindex, and the two
+ * changes that look alike from here have to be told apart:
+ *
+ *   - the rotation code moved but the file still has the shape its
+ *     AppliedToDimensions claims: only the display transform changed. MWG stores
+ *     regions before Exif Orientation, so the file is already correct and must
+ *     not be touched. The reindex records the new code and nothing else.
+ *   - the file's dimensions are the transpose of its AppliedToDimensions: the
+ *     bytes were physically turned. Every region turns by the same delta and the
+ *     corrected list goes back into the file.
+ *
+ * Anything else - a crop, a resize - is left to the staleness indicator.
+ *
+ * A photo with no index rows yet is left alone: a first index has no earlier
+ * orientation to compare against, and the file's regions are by definition what
+ * MWG says they are.
+ *
+ * @param int $image_id
+ * @param string $file_path
+ * @param array $read the persons_read_regions() result for that file
+ * @param int|null $rotation images.rotation now
+ * @return array array('ok' => bool, 'message' => string, 'read' => array) - the
+ *   read to index, which is a fresh one when the file was corrected
+ */
+function persons_correct_for_rotation($image_id, $file_path, $read, $rotation)
+{
+  $unchanged = array('ok' => true, 'message' => '', 'read' => $read);
+
+  if (count($read['regions']) == 0)
+  {
+    return $unchanged;
+  }
+
+  $stored = pwg_db_fetch_assoc(pwg_query('
+SELECT rotation_at_write
+  FROM '.PERSONS_REGION_TABLE.'
+  WHERE image_id = '.(int)$image_id.'
+  LIMIT 1
+;'));
+
+  if (!$stored)
+  {
+    return $unchanged;
+  }
+
+  $image = pwg_db_fetch_assoc(pwg_query(
+    'SELECT path, width, height FROM '.IMAGES_TABLE.' WHERE id = '.(int)$image_id.';'
+    ));
+
+  if (!$image)
+  {
+    return $unchanged;
+  }
+
+  $delta = persons_rotation_delta(
+    $stored['rotation_at_write'],
+    $rotation,
+    $read['applied']['w'],
+    $read['applied']['h'],
+    $image['width'],
+    $image['height']
+    );
+
+  if ($delta == 0)
+  {
+    return $unchanged;
+  }
+
+  // The read that decided this happened outside the lock, so the whole
+  // decision is made again inside it against a fresh read of the file.
+  $lock = persons_lock_acquire($image['path']);
+  if ($lock === null)
+  {
+    return array('ok' => false, 'read' => $read,
+      'message' => 'Timed out waiting for another change to this photo');
+  }
+
+  try
+  {
+    $fresh = persons_read_regions($file_path);
+    if (!$fresh['ok'])
+    {
+      return array('ok' => false, 'message' => $fresh['message'], 'read' => $read);
+    }
+
+    $delta = persons_rotation_delta(
+      $stored['rotation_at_write'],
+      $rotation,
+      $fresh['applied']['w'],
+      $fresh['applied']['h'],
+      $image['width'],
+      $image['height']
+      );
+
+    if ($delta == 0)
+    {
+      return array('ok' => true, 'message' => '', 'read' => $fresh);
+    }
+
+    $turned = array();
+    foreach ($fresh['regions'] as $region)
+    {
+      $turned[] = persons_rotate_region($region, $delta);
+    }
+
+    // Merged with no existing regions and no removals: the turned list replaces
+    // the file's own, and the merge is still what builds the payload, so the
+    // names and the entries the parser could not read are handled in one place.
+    $merged = persons_merge_regions(
+      array('regions' => array(), 'unusable' => $fresh['unusable'], 'names' => $fresh['names']),
+      $turned,
+      array(),
+      $image['width'],
+      $image['height']
+      );
+
+    $write = persons_write_regions($file_path, $merged['regioninfo'], $merged['names']);
+    if (!$write['ok'])
+    {
+      return array('ok' => false, 'message' => $write['message'], 'read' => $read);
+    }
+
+    // Re-read rather than indexing the structure just written, for the same
+    // reason persons_apply_change() re-reads: a write exiftool accepted but
+    // stored differently shows up now instead of at the next rescan.
+    $after = persons_read_regions($file_path);
+    if (!$after['ok'])
+    {
+      return array('ok' => false, 'message' => $after['message'], 'read' => $read);
+    }
+
+    return array('ok' => true, 'message' => '', 'read' => $after);
+  }
+  finally
+  {
+    persons_lock_release($lock);
+  }
+}
+
+/**
+ * Drops the index rows of photos core has just deleted.
+ *
+ * Registered on core's delete_elements notification. Core clears
+ * piwigo_image_tag itself, so the mirrored tag assignment needs nothing here;
+ * piwigo_person_region is this plugin's own table and core knows nothing about
+ * it, so without this the rows outlive the photo and every count on the admin
+ * screen is wrong by however many photos have ever been deleted.
+ *
+ * The person rows themselves stay. A person whose last photo was deleted is
+ * still a person somebody named, and deleting them is an explicit action.
+ *
+ * @param array $image_ids the ids core has removed
+ * @return void
+ */
+function persons_delete_elements($image_ids)
+{
+  $ids = array();
+  foreach ((array)$image_ids as $id)
+  {
+    $id = (int)$id;
+    if ($id > 0)
+    {
+      $ids[$id] = $id;
+    }
+  }
+
+  if (count($ids) == 0)
+  {
+    return;
+  }
+
+  pwg_query(
+    'DELETE FROM '.PERSONS_REGION_TABLE.' WHERE image_id IN ('.implode(',', $ids).');'
+    );
 }
 
 /**
@@ -356,8 +544,7 @@ function persons_apply_change($image_id, $add, $remove)
   }
   finally
   {
-    flock($lock, LOCK_UN);
-    fclose($lock);
+    persons_lock_release($lock);
   }
 }
 

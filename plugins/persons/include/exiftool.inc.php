@@ -219,20 +219,51 @@ function persons_write_regions($file, $regioninfo, $names)
 }
 
 /**
+ * The locks this process is holding, by lock file: handle and nesting depth.
+ *
+ * flock() attaches to the open file description, so a second fopen() of the
+ * same lock file in the same process is a second description and blocks against
+ * the first. A nested acquire would therefore not deadlock outright - it would
+ * spin for PERSONS_LOCK_TIMEOUT_SECONDS and then report a timeout the caller
+ * cannot act on. Counting the depth here makes an inner acquire a no-op instead.
+ *
+ * @return array the registry, by reference
+ */
+function &persons_lock_registry()
+{
+  static $held = array();
+
+  return $held;
+}
+
+/**
  * Takes the exclusive lock guarding one image, or gives up.
  *
  * Non-blocking with a deadline rather than a blocking flock: a wedged writer
  * must not hold a request open until the server's own timeout kills it halfway
  * through.
  *
+ * Re-entrant within one process: a caller already holding this image's lock gets
+ * the same handle back, and only the outermost persons_lock_release() lets it go.
+ *
  * @param string $db_path the stored path, which names the lock
  * @return resource|null the locked handle, or null on timeout
  */
 function persons_lock_acquire($db_path)
 {
+  $registry = &persons_lock_registry();
+  $path = persons_lock_path($db_path);
+
+  if (isset($registry[$path]))
+  {
+    $registry[$path]['depth']++;
+
+    return $registry[$path]['handle'];
+  }
+
   persons_make_dir(PERSONS_LOCK_DIR);
 
-  $handle = @fopen(persons_lock_path($db_path), 'c');
+  $handle = @fopen($path, 'c');
   if ($handle === false)
   {
     return null;
@@ -244,6 +275,8 @@ function persons_lock_acquire($db_path)
   {
     if (flock($handle, LOCK_EX | LOCK_NB))
     {
+      $registry[$path] = array('handle' => $handle, 'depth' => 1);
+
       return $handle;
     }
 
@@ -254,6 +287,41 @@ function persons_lock_acquire($db_path)
   fclose($handle);
 
   return null;
+}
+
+/**
+ * Gives back a lock persons_lock_acquire() handed out.
+ *
+ * The file is unlocked only when the outermost holder releases it; an inner
+ * release just decrements. A handle the registry does not know is released
+ * anyway rather than leaked.
+ *
+ * @param resource $handle
+ * @return void
+ */
+function persons_lock_release($handle)
+{
+  $registry = &persons_lock_registry();
+
+  foreach ($registry as $path => $entry)
+  {
+    if ($entry['handle'] !== $handle)
+    {
+      continue;
+    }
+
+    $registry[$path]['depth']--;
+    if ($registry[$path]['depth'] > 0)
+    {
+      return;
+    }
+
+    unset($registry[$path]);
+    break;
+  }
+
+  flock($handle, LOCK_UN);
+  fclose($handle);
 }
 
 /**

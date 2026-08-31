@@ -44,6 +44,12 @@ if (!isset($conf['persons_exiftool_path']))
 
 add_event_handler('ws_add_methods', 'persons_add_methods');
 
+// A deleted photo must not leave region rows behind. Registered everywhere
+// rather than under IN_ADMIN: core's delete_elements() also runs from ws.php,
+// where IN_ADMIN is never defined.
+add_event_handler('delete_elements', 'persons_delete_elements',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PERSONS_PATH . 'include/index.inc.php');
+
 // The public overlay and person row. Registered only on the picture page, and
 // the file behind them is pulled in only when the event actually fires.
 if (script_basename() == 'picture')
