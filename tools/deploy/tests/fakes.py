@@ -7,9 +7,11 @@ was given, and a single ordered call log — the order is the point in several t
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from pwgdeploy.errors import TransportError
+from pwgdeploy.http import Response
 
 
 class FakeTransport:
@@ -84,3 +86,148 @@ class FakeTransport:
 
     def paths(self, operation: str) -> list[str]:
         return [call[1] for call in self.calls if call[0] == operation]
+
+
+class FakeGallery:
+    """The remote gallery as the bootstrap sees it: install marker, ws.php, site_update.
+
+    Stateful on purpose. Every idempotence claim in this suite — an install skipped on a
+    second run, an already-active plugin left alone — is a question about what the
+    *server* remembers, and a client scripted with canned replies could not be asked it.
+
+    Each endpoint mirrors one real one: the marker install.php:156-165 dies with, the
+    JSON envelope include/ws_protocols/json_encoder.php builds, the token and webmaster
+    checks of include/ws_functions/pwg.extensions.php:53-88, and the summary markup of
+    admin/themes/default/template/site_update.tpl:19-24.
+    """
+
+    LOGIN_PAGE = "identification.php"
+    TOKEN = "0123456789abcdef"
+    ALL_PLUGINS = ("typetags", "provenance", "persons")
+
+    def __init__(
+        self,
+        base_url="https://g.example.test",
+        *,
+        installed=False,
+        plugin_states=None,
+        install_errors=(),
+        albums_added=4,
+        photos_added=106,
+        sync_errors=0,
+        admin=("webmaster", "p"),
+    ):
+        self.base_url = base_url
+        self.installed = installed
+        # Every plugin the filesystem knows about, whether or not it has a database row.
+        self.plugin_states = dict(
+            plugin_states or {name: "uninstalled" for name in self.ALL_PLUGINS}
+        )
+        self.install_errors = list(install_errors)
+        self.albums_added = albums_added
+        self.photos_added = photos_added
+        self.sync_errors = sync_errors
+        self.admin = admin
+        self.logged_in = False
+        self.calls: list[tuple] = []
+
+    # --- the port ------------------------------------------------------------------
+
+    def get(self, url, *, timeout=None) -> Response:
+        self.calls.append(("get", url, {}))
+        return self._route(url, {})
+
+    def post(self, url, fields, *, timeout=None) -> Response:
+        self.calls.append(("post", url, dict(fields)))
+        return self._route(url, dict(fields))
+
+    # --- what tests ask it -----------------------------------------------------------
+
+    def methods_called(self) -> list[str]:
+        return [call[2]["method"] for call in self.calls if "method" in call[2]]
+
+    def posts_to(self, needle: str) -> list[dict]:
+        return [call[2] for call in self.calls if call[0] == "post" and needle in call[1]]
+
+    def urls(self) -> list[str]:
+        return [call[1] for call in self.calls]
+
+    # --- the endpoints ---------------------------------------------------------------
+
+    def _route(self, url, fields) -> Response:
+        if "install.php" in url:
+            return Response(url, 200, self._install(fields))
+        if "ws.php" in url:
+            return Response(url, 200, self._ws(fields))
+        if "site_update" in url:
+            if not self.logged_in:
+                return Response(
+                    f"{self.base_url}/{self.LOGIN_PAGE}", 200, "<form>login</form>"
+                )
+            return Response(url, 200, self._sync_page())
+        return Response(url, 404, "not found")
+
+    def _install(self, fields) -> str:
+        if self.installed:
+            return "Piwigo is already installed"
+        if not fields.get("install"):
+            return "<form name='install_form'></form>"
+        if self.install_errors:
+            items = "".join(f"<li>{error}</li>" for error in self.install_errors)
+            return f'<div class="errors"><ul>{items}</ul></div>'
+        self.installed = True
+        return '<div class="infos"><ul><li>ok</li></ul></div>'
+
+    def _ws(self, fields) -> str:
+        method = fields.get("method")
+        if method == "pwg.session.login":
+            if (fields.get("username"), fields.get("password")) != self.admin:
+                return _fail(999, "Invalid username/password")
+            self.logged_in = True
+            return _ok(True)
+        if not self.logged_in:
+            return _fail(401, "Access denied")
+        if method == "pwg.session.getStatus":
+            return _ok(
+                {
+                    "username": self.admin[0],
+                    "status": "webmaster",
+                    "pwg_token": self.TOKEN,
+                }
+            )
+        if method == "pwg.plugins.getList":
+            return _ok(
+                [
+                    {"id": name, "name": name, "version": "1.0", "state": state}
+                    for name, state in sorted(self.plugin_states.items())
+                ]
+            )
+        if method == "pwg.plugins.performAction":
+            if fields.get("pwg_token") != self.TOKEN:
+                return _fail(403, "Invalid security token")
+            if fields.get("plugin") not in self.plugin_states:
+                return _fail(500, f"no such plugin {fields.get('plugin')}")
+            self.plugin_states[fields["plugin"]] = "active"
+            return _ok(True)
+        return _fail(501, f"unknown method {method}")
+
+    def _sync_page(self) -> str:
+        """The six summary lines site_update.tpl:19-24 emits, in that order."""
+        return (
+            "<h3>Resultat</h3><ul>"
+            f'<li class="update_summary_new">{self.albums_added} Alben</li>'
+            f'<li class="update_summary_new">{self.photos_added} Fotos</li>'
+            '<li class="update_summary_del">0 Alben</li>'
+            '<li class="update_summary_del">0 Fotos</li>'
+            "<li>0 Fotos</li>"
+            f'<li class="update_summary_err">{self.sync_errors} Fehler</li>'
+            "</ul>"
+        )
+
+
+def _ok(result) -> str:
+    return json.dumps({"stat": "ok", "result": result})
+
+
+def _fail(code, message) -> str:
+    return json.dumps({"stat": "fail", "err": code, "message": message})

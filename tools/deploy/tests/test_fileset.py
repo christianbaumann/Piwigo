@@ -119,6 +119,32 @@ def test_excludes_the_deploy_tool_itself():
     assert fileset.select(["tools/remote_sync.pl"]) == ["tools/remote_sync.pl"]
 
 
+def test_excludes_the_local_dev_environment():
+    """[NEG] .ddev/ describes a Docker stack that exists only on a developer's machine.
+    Nothing serves it, and publishing it puts the local setup on a public host."""
+    assert fileset.select([".ddev/config.yaml"]) == []
+    assert fileset.select([".ddev/web-build/Dockerfile.playwright"]) == []
+
+
+def test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools():
+    """[BVA] The boundary inside tools/: upstream ships the whole directory in its
+    release (tools/pwg_rel_create.sh strips only .git), so a stock install has these
+    files and matching it is the safer default. The two hook scripts are this fork's
+    own developer tooling and correspond to nothing on the server."""
+    assert fileset.select(["tools/install-hooks.sh"]) == []
+    assert fileset.select(["tools/test-hooks.sh"]) == []
+    assert fileset.select(["tools/piwigo_remote.pl"]) == ["tools/piwigo_remote.pl"]
+    assert fileset.select(["tools/index.php"]) == ["tools/index.php"]
+
+
+def test_the_generated_config_is_not_part_of_the_tracked_file_set():
+    """[ST] It is produced by the bootstrap, never enumerated by git — which is exactly
+    why prune has to be told about it; see tests/test_upload.py."""
+    assert fileset.GENERATED_CONFIG_PATH not in fileset.select(
+        [fileset.GENERATED_CONFIG_PATH]
+    )
+
+
 def test_select_preserves_input_order_and_drops_nothing_else():
     """[HAPPY] Anti-vacuity for every parametrised case above: a filter that returned
     [] for everything would satisfy each `== []` assertion on its own."""

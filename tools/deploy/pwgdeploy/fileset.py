@@ -52,11 +52,24 @@ EXCLUDED_PREFIXES = (
     "docs/",
     ".claude/",
     ".githooks/",
+    ".ddev/",
     "local/config/",
     "tools/deploy/",
+    "tools/install-hooks.sh",
+    "tools/test-hooks.sh",
     ".gitignore",
     ".gitmodules",
 )
+
+# Published by the deploy itself rather than enumerated by git: `bootstrap` generates it
+# after the install (decision 8). It is therefore absent from the file set by
+# construction, which makes it look "removed" to `manifest.diff` on every run after the
+# first — so the prune has to be told about it by name. Found by the second real deploy,
+# 2026-08-31: the full command hid it (prune deleted the file, the bootstrap that followed
+# put it back seconds later), but `--no-bootstrap` would have left the gallery with no
+# config at all.
+GENERATED_CONFIG_PATH = "local/config/config.inc.php"
+GENERATED_REMOTE_PATHS = (GENERATED_CONFIG_PATH,)
 
 # Published despite sitting under an excluded prefix: without them the remote serves a
 # directory listing of the directory that holds the database credentials.

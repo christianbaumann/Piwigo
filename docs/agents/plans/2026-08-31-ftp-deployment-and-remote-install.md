@@ -685,11 +685,13 @@ directories" is the failure this check exists to find.
       the guard is the login that does **not** happen
 
 #### Manual Verification
-- [ ] Against the real web space: connect succeeds, `PROT P` is negotiated, and a single small
+- [x] Against the real web space: connect succeeds, `PROT P` is negotiated, and a single small
       file uploads and reappears over HTTP. **Automated** as
       `python3 -m pwgdeploy.smoke <credential file>` (task 4 above) — what stays manual is
-      supplying `deploy.local.json`, which no automation can invent. Not yet run: no credential
-      file exists in this checkout.
+      supplying `deploy.local.json`, which no automation can invent. **Verified 2026-08-31** by
+      the real deploy to `bilder.foerderverein-sefferweich.de`, which is a superset of the probe:
+      3332 files went up over `FtplibTransport` and the install that followed was driven over
+      HTTP against the same tree, so the FTP root and the document root are the same directory.
 - [ ] Recorded in the hand-check ledger with the date — deferred to Phase 7 on purpose, because
       the run has not happened and a ledger row for an unperformed check is exactly the "marked
       done on prose alone" the ledger rule forbids
@@ -774,7 +776,10 @@ the most expensive kind to find.
       a path present on the fake but in **neither** manifest is untouched
 
 #### Manual Verification
-- [ ] A full first deploy to the real web space completes and the byte total matches ~138 MB.
+- [x] A full first deploy to the real web space completes and the byte total matches ~138 MB.
+      **Verified 2026-08-31**: 3332 files, 128.4 MB, 387 directories created, `SITE CHMOD`
+      accepted on all five writable paths, 823.3 s wall clock. The byte figure the run printed is
+      the one `fileset.total_bytes()` measures, so it agrees with the test below by construction.
       The **byte total half is automated** as `test_the_selected_file_set_weighs_what_a_deploy_expects`,
       which weighs the real selected file set through the new `fileset.total_bytes()` — the same
       function the run reports from, so no second copy of the figure exists. Measured 2026-08-31:
@@ -783,7 +788,18 @@ the most expensive kind to find.
       figure would go red on the next photo added. What stays manual is the *deploy* itself — it
       needs `deploy.local.json`, which does not exist in this checkout, and the CLI that drives it
       lands in Phase 6.
-- [ ] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts.
+- [x] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts.
+      **Verified against the real web space 2026-08-31**, scripted rather than hand-timed: 400
+      non-gallery entries were dropped from the manifest to force a known pending count, a real
+      `--no-bootstrap --no-prune` deploy was started, and SIGINT was sent to its process group
+      once 60 files had gone up. Exit 130, `KeyboardInterrupt` out of `ssl.unwrap`, manifest
+      holding exactly 2931 + 60 = 2991 entries. The re-run reported **340 new, 0 changed, 2988
+      unchanged** — 60 + 340 = 400, the remainder and nothing else. A following full run reported
+      `0 new, 0 changed`, and the gallery still rendered with zero console errors.
+      Two notes from doing it for real: `kill -INT <pid>` on the `uv run` wrapper does **not**
+      reach the Python child — the first attempt ran to completion, and only signalling the
+      process group (`set -m`, `kill -INT -- -$PID`) interrupted anything. And the interrupt
+      surfaced as a bare traceback, fixed below.
       **Automated** as `test_ctrl_c_mid_run_resumes_rather_than_restarts` and
       `test_ctrl_c_still_closes_the_session`: `FakeTransport(interrupt_on_put=N)` raises a real
       `KeyboardInterrupt`, which — being a `BaseException` — reaches the run's `finally` by a
@@ -830,7 +846,7 @@ prints and the test's assertion must not be two separately typed sums.
 
 ---
 
-## Phase 6: Remote bootstrap over HTTP
+## Phase 6: Remote bootstrap over HTTP — IMPLEMENTED 2026-08-31; the manual steps need credentials
 
 ### Overview
 
@@ -839,7 +855,7 @@ step idempotent, so re-running the command is always safe.
 
 ### Changes Required
 
-#### [ ] 1. The HTTP port and adapter
+#### [x] 1. The HTTP port and adapter
 
 **File**: `tools/deploy/pwgdeploy/http.py`
 
@@ -856,7 +872,7 @@ class UrllibClient:
 `HTTP_TIMEOUT_SECONDS = 60`; `SYNC_TIMEOUT_SECONDS = 600` for the `site_update` POST, which scans
 106 photos and reads their metadata.
 
-#### [ ] 2. Install
+#### [x] 2. Install
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -883,7 +899,7 @@ Failure handling: `install.php` re-renders its form with an error list rather th
 non-2xx. So a successful POST is confirmed by a **follow-up** `is_installed()` returning True; if
 it does not, raise `InstallError` carrying the errors scraped from the response.
 
-#### [ ] 3. Generated `local/config/config.inc.php`
+#### [x] 3. Generated `local/config/config.inc.php`
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -905,7 +921,7 @@ what the local install carries, and dropping it is a separate decision from this
 Uploaded **after** install: `install.php` writes `database.inc.php` into the same directory, and
 ordering the two avoids any question about which run created `local/config/`.
 
-#### [ ] 4. Session and plugin activation
+#### [x] 4. Session and plugin activation
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -926,7 +942,7 @@ def activate_plugins(client, base_url, token) -> dict[str, str]:
     is a no-op rather than an error."""
 ```
 
-#### [ ] 5. Filesystem sync
+#### [x] 5. Filesystem sync
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -942,7 +958,7 @@ def sync(client, base_url) -> None:
 Runs last, because it scans the `galleries/` tree the upload just placed. Filenames are already
 known to satisfy `sync_chars_regex` (research §8), so no filtering is needed here.
 
-#### [ ] 6. The CLI
+#### [x] 6. The CLI
 
 **File**: `tools/deploy/pwgdeploy/cli.py`
 
@@ -960,23 +976,187 @@ usage: pwg-deploy [-h] [--dry-run] [--list-files] [--no-bootstrap] [--no-prune]
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes the whole suite
-- [ ] `cd tools/deploy && uv run pytest` passes **twice in a row**, each run in a different
+- [x] `cd tools/deploy && uv run pytest` passes the whole suite — 276 tests, measured 2026-08-31
+- [x] `cd tools/deploy && uv run pytest` passes **twice in a row**, each run in a different
       order — `pytest-randomly` shuffles by default, so two consecutive green runs are two
       different orderings and a hidden inter-test dependency surfaces as a flake
-- [ ] A reported failure reproduces from its printed seed:
+- [x] A reported failure reproduces from its printed seed:
       `uv run pytest --randomly-seed=<n>`
-- [ ] `ddev exec php -l` on nothing — no PHP is changed in this plan; note this explicitly
+- [x] `ddev exec php -l` on nothing — no PHP is changed in this plan; note this explicitly
       rather than claiming a PHP check ran
-- [ ] `bash tools/test-hooks.sh` still passes (the commit gate is untouched)
+- [-] `bash tools/test-hooks.sh` still passes (the commit gate is untouched)
 
 #### Manual Verification
-- [ ] Against the real web space: a first run installs, activates three plugins and syncs; the
-      gallery renders and the four recovered albums are visible
-- [ ] A second run reports `already installed`, `nothing to do`, and 0 pending transfers
-- [ ] `admin.php?page=plugins` shows typetags, provenance and persons active
-- [ ] The pre-install probe (research decision 1) and `admin.php?page=maintenance&action=phpinfo`
-      (decision 12) are run by hand and their `exec`/`imagick` answers recorded
+- [x] Against the real web space: a first run installs, activates three plugins and syncs; the
+      gallery renders and the four recovered albums are visible. **Verified 2026-08-31**:
+      `install installed`, `plugins typetags activated, provenance activated, persons activated`,
+      `sync 105 photos, 4 albums, 0 errors`, then confirmed in a browser (playwright-cli) at
+      `http://bilder.foerderverein-sefferweich.de/` — four album tiles reading 56 + 16 + 18 + 15 =
+      **105**, the same figure the sync reported; derivatives generate (250x250 crops served from
+      `_data/i/`, so that directory is writable and image resizing works on the host); an album
+      page and a picture page both render with **zero console errors**. Note the count: 105
+      photos, not the plan's estimated 106 — 105 is what research §8 measured in the four tracked
+      album directories, so the estimate was the wrong half.
+      Screenshots: `.agent-tests/2026-08-31-ftp-deploy-verification/`.
+- [x] A second run reports `already installed`, `nothing to do`, and 0 pending transfers —
+      **verified 2026-08-31**: `0 new, 0 changed, 3332 unchanged`, `already installed - skipped`,
+      `typetags active, provenance active, persons active`, `sync 0 photos, 0 albums, 0 errors`,
+      2.6 s against the 823.3 s of the first run. It also exposed two defects; see below.
+- [x] `admin.php?page=plugins` shows typetags, provenance and persons active — witnessed through
+      `pwg.plugins.getList`, which reads the same `piwigo_plugins.state` rows that screen renders.
+      The screen itself was not opened in a browser; the API answer is the same fact one layer down.
+- [x] The pre-install probe (research decision 1) and `admin.php?page=maintenance&action=phpinfo`
+      (decision 12) are run by hand and their `exec`/`imagick` answers recorded — **done
+      2026-08-31**, and both decisions resolve in favour of the host. Method: a `phpinfo()` file
+      and a capability file were uploaded through the tool's own `FtplibTransport` under random
+      16-byte names, fetched over HTTP, and deleted in a `finally` that then re-checked the URL no
+      longer answers. Measured on `bilder.foerderverein-sefferweich.de`:
+
+      | Question | Answer |
+      |---|---|
+      | `disable_functions` | **empty** — `exec()` is not disabled |
+      | `exiftool -ver` | **12.76**, at `/usr/bin/exiftool` (rc 0) |
+      | Imagick | **3.7.0**, ImageMagick 6.9.12-98 Q16; `class_exists('Imagick')` true |
+      | ImageMagick CLI | `convert -version` rc 0 |
+      | GD | enabled, JPEG + PNG + WebP |
+      | PHP | 8.4.16-nmm1; `memory_limit` 384M, `max_execution_time` 60, no `open_basedir` |
+
+      So the provenance and persons **write-back works on this host** — the research recorded both
+      `exec()` and Imagick as unresolved, and the plan was written assuming the degraded mode
+      might be the permanent one. `site.exiftool_path` can stay `""`: the binary is on `PATH`.
+      Note the version gap — the host has exiftool 12.76 against the local 13.25. Nothing in
+      either plugin is known to need 13.x, but no suite has ever run against 12.76.
+
+**Deviations from the plan as written, decided and implemented**:
+
+- `HttpClient.get`/`post` take a keyword `timeout`, which the sketch does not name. The sync POST
+  needs `SYNC_TIMEOUT_SECONDS` and every other call needs `HTTP_TIMEOUT_SECONDS`; a client that
+  chose per URL would put a routing decision inside an adapter that is meant to hold none.
+- `Response` carries the URL that **answered**, not the one asked. Without it, `sync()` cannot say
+  that `admin.php` bounced it to `identification.php` — a redirect that returns HTTP 200 and a
+  page holding no summary at all.
+- `sync()` returns a `SyncCounts` rather than `None`. The run's report claims "N photos, M albums",
+  and a number printed by a step that returned nothing would have to be invented.
+- `bootstrap.run()` is the orchestration the sketch implies but does not name; it is what makes
+  "install, then config, then session, then plugins, then sync" one testable ordering rather than
+  an order the CLI happens to call things in.
+- `activate_plugins()` raises when the remote does not list a plugin at all. `getList` reports the
+  **filesystem**, so an absent name means `plugins/<name>/` never reached the web space — a partial
+  deploy, which is worth a loud failure rather than a gallery that quietly lacks a feature.
+- `main()` takes `tracked=` alongside the two adapter factories, matching the seam `upload.run()`
+  already has, so the CLI suite runs without a 3000-file git repository underneath it.
+
+**Verification round, 2026-08-31.** Commands actually run, from `tools/deploy/`:
+
+- `uv run pytest` — **276 passed**, twice in a row (pytest-randomly shuffles, so those are two
+  orderings), plus `--randomly-seed=12345` twice and `-p no:randomly` once.
+- `uv run pwg-deploy --list-files deploy.example.json` — 3332 paths, 123 of them under
+  `plugins/typetags/` (the submodule), and the only `vendor/` hits are core's own
+  `themes/default/vendor/fontello/` icon font.
+- `uv run pwg-deploy --dry-run deploy.example.json` — reports 3332 files, 128.4 MB, 3332 new,
+  0 changed, and opens no socket, against a credential file naming a host that does not exist.
+- `bash tools/test-hooks.sh` — **4 pre-existing failures**, none caused by this phase: the
+  typetags submodule has no `core.hooksPath` in this worktree and no plugin has `vendor/bin/phpunit`
+  installed here. The two cases that exercise the gate itself ("git rejects a real commit",
+  "git accepts a clean commit") both pass. Not claimed as green.
+- No PHP file is touched by this phase (`git status` shows only `tools/deploy/` and the plan), so
+  no `php -l` run is claimed.
+
+Three mutants applied to `bootstrap.py` and reverted, all killed:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `newsletter_subscribe: "0"` added to the install fields | `test_install_omits_the_two_isset_checkboxes` | killed (with 1 more) |
+| the already-`active` short-circuit removed from `activate_plugins` | `test_an_already_active_plugin_is_left_alone` | killed (with 2 more) |
+| `int(value)` → `int(value) + 1` in `parse_sync_counts` | `test_sync_reports_the_counts_the_summary_carries` | killed (with 2 more) |
+
+**Two defects the second real run exposed, both fixed 2026-08-31.** Neither was reachable from
+the fake: one needed a manifest that had survived a previous run, the other needed a file set
+somebody had actually looked at.
+
+1. **The generated config was pruned on every run.** `local/config/config.inc.php` is written by
+   the bootstrap and recorded in the manifest, but it is never in the tracked file set — so
+   `manifest.diff` classified it `removed` on every run after the first. The full command hid it
+   (prune deleted the file, `upload_config` re-uploaded it seconds later, which is why the second
+   run printed `1 removed` and `config ... uploaded` instead of `unchanged`), but under
+   `--no-bootstrap` nothing would have put it back and the gallery would have lost its config.
+   Fixed by naming the generated paths once in `fileset.GENERATED_REMOTE_PATHS` and hiding them
+   from the comparison in `upload.run()` — hidden from all four buckets, not merely spared from
+   the prune, so the report cannot claim a deletion nobody asked for. Regression tests:
+   `test_the_generated_config_is_never_pruned`, `test_the_generated_config_is_absent_from_every_diff_bucket`.
+   The docstring of `test_the_config_entry_joins_the_target_s_own_manifest` had *asserted this
+   property in prose* while testing something weaker — the exact shape of gap that makes a green
+   suite misleading.
+
+2. **`.ddev/` and the fork's hook scripts were being published.** Found by inspecting the real
+   `--list-files` output after a note in `docs/backlog.md` asked why. Now excluded:
+   `.ddev/config.yaml`, `.ddev/web-build/Dockerfile.playwright`, `tools/install-hooks.sh`,
+   `tools/test-hooks.sh` — four files, 3332 -> 3328. The rest of `tools/` **stays**, deliberately:
+   upstream ships the whole directory in its release (`tools/pwg_rel_create.sh` strips only
+   `.git`), `tools/index.php` redirects any request out of it, and matching a stock install is the
+   safer default. `local/*/index.php` stays too — those are the directory-listing guards
+   `LOCAL_GUARD_*` publishes on purpose. Test:
+   `test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools`.
+
+**A third weakness, fixed in the same round**: `--dry-run` reported `0 removed` no matter what,
+because a dry run deletes nothing and the figure was read from `deleted`. Prune is the only
+destructive thing this tool does, so the preview that hides it is the one an operator most needs.
+It now predicts from `diff.removed`, honouring `--no-prune`. Verified against the real manifest:
+the dry run now reports `4 removed`, naming the cost of the exclusion change before it is paid.
+Tests: `test_dry_run_reports_what_it_would_delete`, `test_dry_run_with_no_prune_reports_no_deletion`.
+
+**A fourth fix, from the interrupt run**: Ctrl-C ended the command with a raw
+`KeyboardInterrupt` traceback out of `ssl.unwrap`, which reads like a crash of exactly the kind
+an operator would respond to by starting over. `main()` now catches it, exits 130 (the shell's
+own SIGINT convention) and says the run is resumable — which is true, and is the one fact the
+traceback did not carry. Tests: `test_an_interrupted_run_says_it_can_be_resumed`,
+`test_an_interrupted_run_keeps_what_it_already_uploaded`.
+
+Suite after the round: **288 passed**, twice.
+
+### State of the remote and of this checkout, 2026-08-31 (end of session)
+
+**The web space was wiped by hand** — all files, folders and database tables — after the
+verification above. Everything recorded above was measured before the wipe and stands; the
+gallery is simply not currently deployed. The next run is a first run again.
+
+**The local manifest was deleted to match** (`tools/deploy/.state/bilder…_root.json`). This is
+the single most important operational lesson of the session and it belongs in the README:
+
+> The manifest is the **only** record of remote state — by design, the tool never reads the
+> server back to decide what to send (`upload.py`). So if the remote is emptied by any means
+> other than this tool's own prune, the manifest becomes a lie: the next run reports
+> `0 new, 0 changed`, uploads nothing, and leaves the site broken. **Wiping the remote means
+> deleting that target's manifest**, or the tool will confidently do nothing.
+
+The same asymmetry produced a second, subtler failure during the Ctrl-C experiment. Dropping
+entries from the manifest to force a pending count also dropped `.ddev/…` (it sorts first), which
+made those files **orphans**: present on the server, absent from the manifest, and — once the
+exclusion below landed — absent from the file set too, so no future prune could ever reach them.
+They had to be deleted by hand over FTP. Prune only ever considers what the previous manifest
+recorded, which is what makes it safe for `upload/` and `_data/`, and is also exactly why it
+cannot clean up after anything that bypasses it.
+
+A third trap, worth a line because it cost a wrong conclusion: `FtplibTransport.exists()` asks
+`SIZE`, and a server refuses `SIZE` for a **directory**. It reported `.ddev` as "already gone"
+while the directory was plainly still there. Existence of anything that might be a directory has
+to be checked with a listing, not with `exists()`.
+
+### Still open when this session paused
+
+- **`tools/` is still published** (19 files). Core never loads anything from it at runtime — the
+  only two mentions in core are comments (`include/config_default.inc.php:18,353`) — so it is
+  dev/maintenance PHP reachable over HTTP for no benefit. Recommended for exclusion; **not
+  changed**, because it is a judgment call that was put to the user and not answered. Phase 7
+  should record whichever way it goes as a decision.
+- **`admin.php?page=plugins` has still never been opened in a browser.** All three plugins were
+  witnessed `active` through `pwg.plugins.getList`, which reads the same `piwigo_plugins.state`
+  rows that screen renders, so the fact is established — but the screen itself is unseen. The
+  temp admin account created for that check died with the table wipe.
+- **`deploy.local.json` still carries `admin.password: "REPLACE_ME"`.** The wiped install had a
+  webmaster with that literal password, and the value is in the session transcript. Set a real
+  one before the next deploy, since the next install will bake in whatever is in that file.
+- **Phase 7 has not been started.**
 
 **Implementation Note**: Pause for manual confirmation before Phase 7.
 

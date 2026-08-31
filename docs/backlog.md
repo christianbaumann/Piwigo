@@ -1,3 +1,13 @@
+## ftp deploy
+
+why is are following dirs uploaded via ftp
+- .ddev
+- tools
+- local
+?
+
+## misc
+
 - search function by: tag, person
 - save labels/ tags in the image meta data
 - enforce a 1:1 photo-album relationship (core allows many-to-many via `piwigo_image_category`; freetext-per-album assumes 1:1)

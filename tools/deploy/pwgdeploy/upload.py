@@ -58,7 +58,16 @@ def run(
 
     state_path = manifest.manifest_path(state_dir, config.ftp.host, root)
     entries = manifest.load(state_path)
-    difference = manifest.diff(current, entries)
+
+    # The bootstrap's generated files share this manifest but are not in the file set, so
+    # they are hidden from the comparison entirely — not merely spared from the prune.
+    # Left in, each would show up as `removed` on every run after the first, and the
+    # report would claim a deletion the operator never asked for.
+    generated = {remote_path(root, name) for name in fileset.GENERATED_REMOTE_PATHS}
+    comparable = {
+        path: digest for path, digest in entries.items() if path not in generated
+    }
+    difference = manifest.diff(current, comparable)
 
     if dry_run:
         return UploadResult(

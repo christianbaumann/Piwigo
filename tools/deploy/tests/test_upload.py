@@ -10,7 +10,7 @@ which is what tests/test_smoke.py's procedure covers against a real server.
 
 import pytest
 
-from pwgdeploy import manifest, upload
+from pwgdeploy import fileset, manifest, upload
 from pwgdeploy.config import load
 from pwgdeploy.errors import TransportError
 from pwgdeploy.fileset import REMOTE_DIRS_TO_CREATE, WRITABLE_REMOTE_PATHS
@@ -300,6 +300,45 @@ def test_no_prune_keeps_the_path_in_the_manifest(config, repo, state):
     )
 
     assert "/piwigo/index.php" in stored_manifest(config, state)
+
+
+def test_the_generated_config_is_never_pruned(config, repo, state):
+    """[NEG][ST] Regression, found by the second real deploy on 2026-08-31: the config
+    the bootstrap generates lives in the manifest but never in the tracked file set, so
+    `diff` called it removed on every subsequent run. The full command hid it — prune
+    deleted the file and the bootstrap that followed re-uploaded it seconds later — but
+    under `--no-bootstrap` nothing puts it back, and the gallery loses its config."""
+    generated = f"/piwigo/{fileset.GENERATED_CONFIG_PATH}"
+    transport = FakeTransport()
+    deploy(config, repo, state, transport)
+    entries = stored_manifest(config, state)
+    entries[generated] = "0" * 64
+    manifest.save(manifest.manifest_path(state, config.ftp.host, "/piwigo"), entries)
+    transport.files[generated] = b"<?php generated"
+
+    result = deploy(config, repo, state, transport)
+
+    assert result.deleted == []
+    assert generated in transport.files
+    assert generated in stored_manifest(config, state)
+
+
+def test_the_generated_config_is_absent_from_every_diff_bucket(config, repo, state):
+    """[ST] Not merely un-deleted: it must not be counted as unchanged either, or the
+    run's report would claim a file the upload half never looked at.
+
+    Anti-vacuity: the run still has to see the real file set, asserted below."""
+    generated = f"/piwigo/{fileset.GENERATED_CONFIG_PATH}"
+    deploy(config, repo, state, FakeTransport())
+    entries = stored_manifest(config, state)
+    entries[generated] = "0" * 64
+    manifest.save(manifest.manifest_path(state, config.ftp.host, "/piwigo"), entries)
+
+    result = deploy(config, repo, state, FakeTransport())
+
+    assert result.unchanged_count >= MIN_FIXTURE_FILES
+    for bucket in (result.diff.new, result.diff.changed, result.diff.unchanged, result.diff.removed):
+        assert generated not in bucket
 
 
 # --- directories and permissions ----------------------------------------------------
