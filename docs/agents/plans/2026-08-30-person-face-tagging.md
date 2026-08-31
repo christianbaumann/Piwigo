@@ -4,7 +4,7 @@ git_commit: 0cad900420e132f8fea17f957dc21c2973a26cea
 branch: feat/provenance-metadata
 topic: "Person / face tagging plugin"
 tags: [plan, persons, faces, mwg-regions, exiftool, picture-page, web-services, plugins]
-status: approved
+status: implemented
 ---
 
 # Person / Face Tagging Implementation Plan
@@ -955,7 +955,7 @@ documentation is worse than none.
 
 #### Automated Verification:
 - [x] Every mutant in the table is killed, or its survival is recorded with the reason — all seven killed, 2026-08-31; table in `docs/agents/TESTING.md`
-- [x] Full suite passes twice in a row and in reverse order — 2026-08-31: persons unit 113/408, integration 104 (1 skipped), E2E 31; typetags 56+44, provenance 138+128 (3 skipped)
+- [x] Full suite passes twice in a row and in reverse order — 2026-08-31: persons unit 114/446, integration 104 (1 skipped), E2E 31; typetags 56+44, provenance 138+128 (3 skipped). Re-run against `f9eef23fc` on 2026-08-31 after the plan was closed: same figures, all green, plus `tools/test-hooks.sh`
 - [x] `bash tools/test-hooks.sh` passes
 
 #### Manual Verification:
