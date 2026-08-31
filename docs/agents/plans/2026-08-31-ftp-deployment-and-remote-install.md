@@ -595,7 +595,7 @@ The three guards were proved killable rather than assumed (host, no DDEV, so the
 
 ---
 
-## Phase 4: The Transport port and the FTPS adapter
+## Phase 4: The Transport port and the FTPS adapter — IMPLEMENTED 2026-08-31
 
 ### Overview
 
@@ -604,7 +604,7 @@ whole of Phase 5 is tested against, and an `ftplib` adapter that refuses to spea
 
 ### Changes Required
 
-#### [ ] 1. The port
+#### [x] 1. The port
 
 **File**: `tools/deploy/pwgdeploy/transport.py`
 
@@ -622,7 +622,7 @@ class Transport(Protocol):
 Six operations, no more. `chmod` returns a bool rather than raising because `SITE CHMOD` is an
 optional FTP extension — a server that refuses it is a warning, not a failed deploy.
 
-#### [ ] 2. The FTPS adapter
+#### [x] 2. The FTPS adapter
 
 **File**: `tools/deploy/pwgdeploy/transport.py`
 
@@ -643,7 +643,7 @@ Constants, named rather than magic: `CONNECT_TIMEOUT_SECONDS = 30`,
 `makedirs` walks the path creating one segment at a time and treats "already exists" (550) as
 success — the only way to be idempotent over FTP.
 
-#### [ ] 3. The fake
+#### [x] 3. The fake
 
 **File**: `tools/deploy/tests/fakes.py`
 
@@ -656,10 +656,13 @@ class FakeTransport:
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_transport.py` passes
-- [ ] A `FEAT` response lacking `AUTH TLS` raises `InsecureTransportError` whose message contains
+- [x] `cd tools/deploy && uv run pytest tests/test_transport.py` passes — 17 tests; whole
+      suite 157, twice in a row and with `-p no:randomly`
+- [x] A `FEAT` response lacking `AUTH TLS` raises `InsecureTransportError` whose message contains
       the host and the advertised feature list (asserted with a real substring, not `pytest.raises`
-      alone)
+      alone) — `test_feat_without_auth_tls_raises`, with
+      `test_a_refused_handshake_never_sends_the_password` as its anti-vacuity partner: the point of
+      the guard is the login that does **not** happen
 
 #### Manual Verification
 - [ ] Against the real web space: connect succeeds, `PROT P` is negotiated, and a single small
@@ -1119,13 +1122,37 @@ where it was needed.
 
 #### `tests/test_transport.py`
 
-- [ ] `test_feat_without_auth_tls_raises` — message contains host **and** the advertised
+- [x] `test_feat_without_auth_tls_raises` — message contains host **and** the advertised
       features `[NEG]`
-- [ ] `test_feat_with_auth_tls_logs_in_and_calls_prot_p` — asserts the call order on a
+- [x] `test_a_refused_handshake_never_sends_the_password` — anti-vacuity for the above: no
+      `login` call, and the password appears nowhere in the call log `[NEG]`
+- [x] `test_feat_with_auth_tls_logs_in_and_calls_prot_p` — asserts the call order on a
       scripted double `[HAPPY]` `[ST]`
-- [ ] `test_makedirs_creates_each_segment_once` `[HAPPY]`
-- [ ] `test_makedirs_treats_already_exists_as_success` — 550 on an existing dir `[ERR]`
-- [ ] `test_chmod_returns_false_when_site_chmod_is_refused` — not an exception `[NEG]`
+- [x] `test_prot_p_comes_after_login` — the ordering on its own, so a reordering that keeps
+      both calls present still fails `[ST]`
+- [x] `test_the_connection_is_given_an_explicit_timeout` — `CONNECT_TIMEOUT_SECONDS` read from
+      the module, never retyped `[ERR]`
+- [x] `test_makedirs_creates_each_segment_once` `[HAPPY]`
+- [x] `test_makedirs_treats_already_exists_as_success` — 550 on an existing dir `[ERR]`
+- [x] `test_makedirs_of_the_root_creates_nothing` `[BVA]`
+- [x] `test_makedirs_of_a_relative_path_creates_each_segment` — a remote root of `""` `[ECP]`
+- [x] `test_put_stores_the_file_bytes_under_the_remote_path` `[HAPPY]`
+- [x] `test_delete_removes_the_remote_path` `[HAPPY]`
+- [x] `test_chmod_sends_site_chmod` `[HAPPY]`
+- [x] `test_chmod_returns_false_when_site_chmod_is_refused` — not an exception `[NEG]`
+- [x] `test_exists_is_true_for_a_path_the_server_reports` `[HAPPY]`
+- [x] `test_exists_is_false_when_the_server_refuses_the_path` `[NEG]`
+- [x] `test_close_quits_the_session` `[HAPPY]`
+- [x] `test_close_before_connect_is_a_no_op` — a failed handshake still runs the caller's
+      cleanup `[NEG]` `[BVA]`
+
+**Mutation spot-check** (`.claude/rules/mutation-testing.md`; run on the host, no DDEV, so the
+Mutagen caveat does not apply — each mutant was verified to have changed the file first):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| the `AUTH TLS` condition forced false | `test_feat_without_auth_tls_raises` and its anti-vacuity partner | killed (both) |
+| `makedirs` catches `ZeroDivisionError` instead of `error_perm` | `test_makedirs_treats_already_exists_as_success` | killed |
 
 #### `tests/test_upload.py`
 
