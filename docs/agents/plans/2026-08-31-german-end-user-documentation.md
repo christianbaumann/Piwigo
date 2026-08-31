@@ -386,7 +386,10 @@ present and that the untranslated form is gone:
       coverage is precedent-refused (`docs/agents/TESTING.md:434`)
 - [x] `admin.php?page=batch_manager`: the filter panel reads German
 - [x] `admin.php?page=tags`: `Rename Tag`, `Remove color`, `Couleur` and the create button all read German
-- [x] The public picture page: the `+` badge and the `x` control carry German tooltips
+- [x] The public picture page: the `+` badge and the `x` control carry German tooltips.
+      The wording is asserted at the integration layer; that both controls carry the
+      declared title in the **DOM** needs a browser, because the `x` control has no
+      server-rendered form - `plugins/typetags/tests/e2e/german-tooltips.spec.js`
 - [x] No screen that was already German regressed - `testTheOverrideDoesNotShadowACoreGermanString`
       asserts no overridden key is one core's `de_DE` already translates
 

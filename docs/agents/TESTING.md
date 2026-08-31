@@ -419,6 +419,30 @@ The guard was then **watched reporting**: the mutant re-applied, the run came ba
 and 0 errors where it had been 6 failures and 1 error, then reverted. Suite after the fix:
 112 tests / 399 assertions (was 354), green.
 
+## The two tooltips only a browser can witness (2026-08-31)
+
+`GermanScreenTest` asserts the picture page's `+` and `×` tooltips read German, but it reads
+page source, and both titles sit there inside a `<script>` rather than on an element: the `×`
+control has no server-rendered form at all, and the `+` badge is rebuilt by the same script
+after a removal. A source assertion therefore stays green if the script stops carrying its
+declaration onto the element — the regression a reader of the handbook would actually see.
+
+`plugins/typetags/tests/e2e/german-tooltips.spec.js` closes it with two cases. Neither restates
+the wording, which belongs one layer down: each compares the rendered `title` against the
+declaration in the script's own text, read by `PicturePage.declaredTooltip()`, so no translated
+string is typed into a spec.
+
+| Mutant | Killed |
+|---|---|
+| the `title=` dropped from the `×` control's declaration | the remove case only |
+| the `title=` dropped from the JS-built `+` badge's declaration (`events_public.inc.php:329`, not the server-rendered `:184`) | the rebuilt-badge case only |
+
+Both mutants first came back green until `_data/templates_c/` was cleared — the same stale
+compile that hid the `Créer` mutant in Phase 2. The plugin's markup is embedded into the
+compiled core template by a prefilter, and Smarty's `compile_id` hashes only the callback name.
+
+typetags E2E is now 28 (27 specs + 1 auth setup), measured 2026-08-31.
+
 ## Core characterization tests — watched go red (2026-08-31)
 
 The four `Core*CharacterizationTest` files in `plugins/provenance/tests/Integration/` cover the
