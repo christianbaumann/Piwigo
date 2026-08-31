@@ -142,6 +142,11 @@ def verified_tracked_paths(repo_root: Path, run=subprocess.run) -> list[str]:
     return paths
 
 
+def total_bytes(repo_root: Path, paths: Iterable[str]) -> int:
+    """What a deploy of `paths` weighs — the figure the run reports and a human checks."""
+    return sum((Path(repo_root) / path).stat().st_size for path in paths)
+
+
 def select(tracked: Iterable[str]) -> list[str]:
     """Keep only what the remote install needs, in the order given."""
     return [path for path in tracked if _is_published(path)]

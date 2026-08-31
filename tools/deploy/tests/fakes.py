@@ -13,10 +13,22 @@ from pwgdeploy.errors import TransportError
 
 
 class FakeTransport:
-    """Records every operation in order; can be armed to fail on the Nth put."""
+    """Records every operation in order; can be armed to fail on the Nth put.
 
-    def __init__(self, *, fail_on_put: int | None = None, chmod_supported: bool = True):
+    `interrupt_on_put` is the Ctrl-C of a real run: a `BaseException`, which `except
+    Exception` does not catch and which therefore reaches a `finally` differently from
+    `fail_on_put`'s ordinary error. Resuming after one is a criterion of its own.
+    """
+
+    def __init__(
+        self,
+        *,
+        fail_on_put: int | None = None,
+        interrupt_on_put: int | None = None,
+        chmod_supported: bool = True,
+    ):
         self.fail_on_put = fail_on_put
+        self.interrupt_on_put = interrupt_on_put
         self.chmod_supported = chmod_supported
         # remote path -> bytes, including anything seeded before the run to stand for
         # content this deploy never wrote.
@@ -44,6 +56,9 @@ class FakeTransport:
 
     def put(self, local: Path, remote_path: str) -> None:
         self._puts += 1
+        if self._puts == self.interrupt_on_put:
+            self.calls.append(("put-interrupted", remote_path))
+            raise KeyboardInterrupt()
         if self._puts == self.fail_on_put:
             self.calls.append(("put-failed", remote_path))
             raise TransportError(f"fake transport refused put #{self._puts}: {remote_path}")

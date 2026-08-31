@@ -209,6 +209,36 @@ def test_resume_after_failure_uploads_only_the_remainder(config, repo, state):
     assert result.unchanged_count == 2
 
 
+def test_ctrl_c_mid_run_resumes_rather_than_restarts(config, repo, state):
+    """The Ctrl-C half of Phase 5's manual criterion, at the layer that can express it.
+
+    `KeyboardInterrupt` is a `BaseException`, so it reaches the run's `finally` by a
+    different route than an ordinary `TransportError` — a `except Exception` anywhere on
+    that path would swallow it and report a successful deploy. [ST] [NEG]
+    """
+    with pytest.raises(KeyboardInterrupt):
+        deploy(config, repo, state, FakeTransport(interrupt_on_put=3))
+
+    assert len(stored_manifest(config, state)) == 2
+
+    resumed = FakeTransport()
+    result = deploy(config, repo, state, resumed)
+
+    assert len(result.uploaded) == len(TRACKED) - 2
+    assert result.unchanged_count == 2
+    assert resumed.closed
+
+
+def test_ctrl_c_still_closes_the_session(config, repo, state):
+    """An interrupted run must not leave the FTPS control connection open. [NEG]"""
+    transport = FakeTransport(interrupt_on_put=1)
+
+    with pytest.raises(KeyboardInterrupt):
+        deploy(config, repo, state, transport)
+
+    assert transport.closed
+
+
 def test_a_failed_put_leaves_the_previous_hash_in_place(config, repo, state):
     """So the next run still sees the edited file as pending. [ST] [NEG]"""
     deploy(config, repo, state, FakeTransport())

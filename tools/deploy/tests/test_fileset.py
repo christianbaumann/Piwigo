@@ -27,6 +27,16 @@ MIN_SELECTED_PATHS = 2500
 # plugins/typetags held 157 tracked files, measured 2026-08-31.
 MIN_SUBMODULE_PATHS = 100
 
+# The payload a deploy actually pushes: 128.4 MiB (134.7 MB decimal, which is the figure
+# the plan's Phase 2 records) over 3332 selected paths, measured
+# 2026-08-31 with the typetags submodule checked out. The band is wide on purpose — a
+# figure this test pinned exactly would go red on the next photo added to galleries/ —
+# but a file set that shrank to a third of it is the silent-partial-deploy failure the
+# path-count floor above cannot see: dropping galleries/'s 105 PNGs costs a fraction of
+# the paths and most of the bytes.
+MIN_SELECTED_BYTES = 80 * 1024 * 1024
+MAX_SELECTED_BYTES = 400 * 1024 * 1024
+
 
 class FakeRun:
     """Stands in for subprocess.run: records the command, replays a canned result."""
@@ -314,6 +324,35 @@ def test_real_repository_file_set():
     # Anti-vacuity for the loop above: the core asset that a bare "vendor/" rule would
     # have wrongly excluded is present, so the loop is discriminating, not empty.
     assert any(p.startswith("themes/default/vendor/fontello/") for p in selected)
+
+
+def test_the_selected_file_set_weighs_what_a_deploy_expects():
+    """[ERR] Characterization of this checkout's payload, and the automated half of the
+    plan's "the byte total matches ~138 MB" manual criterion. The other half — that a
+    real deploy of those bytes completes — needs credentials and stays manual."""
+    selected = fileset.select(fileset.git_tracked_paths(REPO_ROOT))
+    assert len(selected) > MIN_SELECTED_PATHS, "nothing to weigh"
+
+    total = fileset.total_bytes(REPO_ROOT, selected)
+
+    assert MIN_SELECTED_BYTES < total < MAX_SELECTED_BYTES, (
+        f"the file set weighs {total / 1024 / 1024:.1f} MB, outside the band measured "
+        "2026-08-31 — either the exclusion rules moved or the working copy is partial"
+    )
+
+
+def test_total_bytes_of_nothing_is_zero():
+    """[BVA] The empty file set weighs nothing rather than raising."""
+    assert fileset.total_bytes(REPO_ROOT, []) == 0
+
+
+def test_total_bytes_sums_the_files_it_is_given(tmp_path):
+    """[HAPPY] Two files of known size, so the sum has an oracle outside this checkout."""
+    (tmp_path / "a.txt").write_bytes(b"x" * 10)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub/b.txt").write_bytes(b"y" * 25)
+
+    assert fileset.total_bytes(tmp_path, ["a.txt", "sub/b.txt"]) == 35
 
 
 def test_every_declared_submodule_contributes_its_files():

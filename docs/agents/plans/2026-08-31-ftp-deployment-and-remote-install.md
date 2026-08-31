@@ -764,8 +764,8 @@ the most expensive kind to find.
 
 #### Automated Verification
 - [x] `cd tools/deploy && uv run pytest tests/test_upload.py tests/test_urls.py` passes — 40 tests
-      (26 upload, 14 urls); whole suite **210 passed, 0 skipped**, measured 2026-08-31, green
-      three times in a row and with `-p no:randomly`
+      (28 upload, 14 urls); whole suite **215 passed, 0 skipped**, measured 2026-08-31 after the
+      verification round below added five tests, green twice in a row and with `-p no:randomly`
 - [x] Second-run test: running `run()` twice against the same `FakeTransport` uploads N files then
       0, with `unchanged_count == N` (N asserted > 0 first)
 - [x] Crash-safety test: `FakeTransport` armed to fail on put #3 leaves a manifest holding exactly
@@ -774,10 +774,24 @@ the most expensive kind to find.
       a path present on the fake but in **neither** manifest is untouched
 
 #### Manual Verification
-- [ ] A full first deploy to the real web space completes and the byte total matches ~138 MB —
-      needs `deploy.local.json`, which does not exist in this checkout; the CLI that runs it
-      lands in Phase 6, so this and the next criterion are performed there
-- [ ] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts
+- [ ] A full first deploy to the real web space completes and the byte total matches ~138 MB.
+      The **byte total half is automated** as `test_the_selected_file_set_weighs_what_a_deploy_expects`,
+      which weighs the real selected file set through the new `fileset.total_bytes()` — the same
+      function the run reports from, so no second copy of the figure exists. Measured 2026-08-31:
+      3332 paths, **128.4 MiB = 134.7 MB decimal**, which is Phase 2's figure in the other unit;
+      the plan's "~138 MB" was an estimate. The band is 80–400 MiB, wide on purpose: an exact
+      figure would go red on the next photo added. What stays manual is the *deploy* itself — it
+      needs `deploy.local.json`, which does not exist in this checkout, and the CLI that drives it
+      lands in Phase 6.
+- [ ] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts.
+      **Automated** as `test_ctrl_c_mid_run_resumes_rather_than_restarts` and
+      `test_ctrl_c_still_closes_the_session`: `FakeTransport(interrupt_on_put=N)` raises a real
+      `KeyboardInterrupt`, which — being a `BaseException` — reaches the run's `finally` by a
+      different route than an ordinary `TransportError`, so an `except Exception` anywhere on that
+      path would swallow it and report a successful deploy. What no fake can witness is the FTPS
+      control connection and the half-written file a real interrupt leaves on the server; that
+      residue is re-uploaded because the manifest only records completed puts, but proving it
+      needs the real run above.
 
 **Deviations from the plan as written, decided and implemented**:
 
@@ -798,6 +812,19 @@ path instead of five. `test_chmod_refusal_is_a_warning_not_a_failure` now assert
 list and kills it. Three mutants that died on the first table: dropping the per-file
 `manifest.save()` (9 tests), ignoring the `prune` flag (2), and pruning every manifest entry
 rather than `diff.removed` (9).
+
+**Verification round, 2026-08-31.** Both manual criteria were re-examined for an automatable half
+rather than being carried forward whole; see the criteria above for what each now covers and what
+survives as manual. Three further mutants, all killed:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `transport.close()` dropped from the `finally` | `test_ctrl_c_still_closes_the_session` | killed |
+| the put wrapped in `except BaseException: continue` | both `ctrl_c` tests | killed |
+| `total_bytes` counting files instead of summing sizes | `test_total_bytes_sums_the_files_it_is_given` and the payload band | killed |
+
+`fileset.total_bytes()` is the one production addition of the round: the summary line the run
+prints and the test's assertion must not be two separately typed sums.
 
 **Implementation Note**: Pause for manual confirmation before Phase 6.
 
@@ -1130,6 +1157,12 @@ Tags per `.claude/rules/test-design.md`: `[HAPPY]` `[NEG]` `[ECP]` `[BVA]` `[ST]
 - [x] `test_every_declared_submodule_contributes_its_files` — characterization; **skips**, naming
       the fix command, where the submodule is not checked out `[ERR]`
 - [x] `test_verified_tracked_paths_agrees_with_the_raw_enumeration` — same, skips likewise `[ERR]`
+- [x] `test_the_selected_file_set_weighs_what_a_deploy_expects` — the real payload weighed through
+      `fileset.total_bytes()`, inside an 80–400 MiB band; added in Phase 5's verification round as
+      the automated half of its byte-total criterion `[ERR]`
+- [x] `test_total_bytes_of_nothing_is_zero` `[BVA]`
+- [x] `test_total_bytes_sums_the_files_it_is_given` — two files of known size, so the sum has an
+      oracle outside this checkout `[HAPPY]`
 
 **Mutation spot-check** (`.claude/rules/mutation-testing.md` — Phase 2's rules are the whole
 point of the phase, so its five exclusion decisions were audited rather than deferred; run on the
@@ -1251,6 +1284,9 @@ Mutagen caveat does not apply — each mutant was verified to have changed the f
 - [x] `test_prune_deletes_only_previously_recorded_paths` — a path on the fake that is in
       neither manifest is untouched `[NEG]`
 - [x] `test_no_prune_flag_deletes_nothing` `[NEG]`
+- [x] `test_ctrl_c_mid_run_resumes_rather_than_restarts` — `KeyboardInterrupt` on put #3, the
+      manifest holds two, the re-run sends the remainder `[ST]` `[NEG]`
+- [x] `test_ctrl_c_still_closes_the_session` `[NEG]`
 - [x] `test_creates_the_data_and_upload_directories` `[HAPPY]`
 - [x] `test_chmod_refusal_is_a_warning_not_a_failure` — the run completes with
       `chmod_supported is False` `[NEG]`
