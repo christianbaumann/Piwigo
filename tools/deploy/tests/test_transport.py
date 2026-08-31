@@ -12,7 +12,7 @@ import ftplib
 import pytest
 
 from pwgdeploy import transport
-from pwgdeploy.errors import InsecureTransportError
+from pwgdeploy.errors import InsecureTransportError, TransportError
 
 # The two FEAT bodies that matter: one advertising AUTH TLS, one that does not. Both are
 # shaped like a real multi-line FEAT reply so the message-scraping test is not vacuous.
@@ -173,6 +173,50 @@ def test_the_connection_is_given_an_explicit_timeout():
 
     assert seen["timeout"] == transport.CONNECT_TIMEOUT_SECONDS
     assert seen["timeout"] > 0
+
+
+def test_an_unreachable_host_is_a_transport_error_not_a_traceback():
+    """Found by running `python3 -m pwgdeploy.smoke` against an unresolvable host: the
+    socket error escaped as a traceback, so the CLI's exit codes never applied. [NEG]"""
+
+    def factory(**_):
+        raise OSError(8, "nodename nor servname provided, or not known")
+
+    subject = transport.FtplibTransport(HOST, USER, PASSWORD, port=2121, ftp_factory=factory)
+
+    with pytest.raises(TransportError) as raised:
+        subject.connect()
+
+    message = str(raised.value)
+    assert HOST in message and "2121" in message
+    assert "nodename" in message, "the underlying reason must survive"
+
+
+def test_a_refused_login_is_a_transport_error():
+    """Wrong credentials are the everyday case, and ftplib raises error_perm. [NEG]"""
+
+    class RefusingFtp(ScriptedFtp):
+        def login(self, user, password):
+            raise ftplib.error_perm("530 Login incorrect")
+
+    subject = transport.FtplibTransport(
+        HOST, USER, PASSWORD, ftp_factory=lambda **_: RefusingFtp()
+    )
+
+    with pytest.raises(TransportError) as raised:
+        subject.connect()
+
+    assert "530" in str(raised.value)
+
+
+def test_a_cleartext_server_is_still_reported_as_insecure_not_merely_as_a_failure():
+    """Anti-vacuity for the wrapping above: it must not swallow the specific type. [NEG]"""
+    subject = transport.FtplibTransport(
+        HOST, USER, PASSWORD, ftp_factory=lambda **_: ScriptedFtp(feat=FEAT_WITHOUT_TLS)
+    )
+
+    with pytest.raises(InsecureTransportError):
+        subject.connect()
 
 
 # --- makedirs -----------------------------------------------------------------------

@@ -12,7 +12,7 @@ import ftplib
 from pathlib import Path
 from typing import Protocol
 
-from pwgdeploy.errors import InsecureTransportError
+from pwgdeploy.errors import InsecureTransportError, TransportError
 
 CONNECT_TIMEOUT_SECONDS = 30
 TRANSFER_BLOCKSIZE = 1 << 16
@@ -65,17 +65,28 @@ class FtplibTransport:
         self._created: set[str] = set()
 
     def connect(self) -> None:
-        ftp = self._ftp_factory(timeout=CONNECT_TIMEOUT_SECONDS)
-        ftp.connect(self._host, self._port)
-        features = ftp.sendcmd("FEAT")
-        if AUTH_TLS_FEATURE not in features.upper():
-            raise InsecureTransportError(
-                f"{self._host}:{self._port} does not advertise {AUTH_TLS_FEATURE}, so "
-                f"logging in would send the password in clear. FEAT replied:\n{features}"
-            )
-        ftp.login(self._user, self._password)
-        ftp.prot_p()
-        ftp.set_pasv(True)
+        # An unresolvable host, a refused port and a rejected password all arrive here
+        # as socket or ftplib errors. Wrapped, so the CLI's exit codes apply to them
+        # instead of a traceback — found by running the smoke check against a host that
+        # does not resolve.
+        try:
+            ftp = self._ftp_factory(timeout=CONNECT_TIMEOUT_SECONDS)
+            ftp.connect(self._host, self._port)
+            features = ftp.sendcmd("FEAT")
+            if AUTH_TLS_FEATURE not in features.upper():
+                raise InsecureTransportError(
+                    f"{self._host}:{self._port} does not advertise {AUTH_TLS_FEATURE}, "
+                    f"so logging in would send the password in clear. FEAT replied:\n"
+                    f"{features}"
+                )
+            ftp.login(self._user, self._password)
+            ftp.prot_p()
+            ftp.set_pasv(True)
+        except ftplib.all_errors as error:
+            raise TransportError(
+                f"FTPS connection to {self._host}:{self._port} as {self._user} "
+                f"failed: {error}"
+            ) from error
         self._ftp = ftp
 
     def close(self) -> None:

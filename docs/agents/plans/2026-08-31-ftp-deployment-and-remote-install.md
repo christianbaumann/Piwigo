@@ -595,7 +595,7 @@ The three guards were proved killable rather than assumed (host, no DDEV, so the
 
 ---
 
-## Phase 4: The Transport port and the FTPS adapter — IMPLEMENTED 2026-08-31
+## Phase 4: The Transport port and the FTPS adapter — IMPLEMENTED 2026-08-31; the one manual step is automated but unrun (credentials)
 
 ### Overview
 
@@ -653,11 +653,31 @@ class FakeTransport:
     Nth put, which is how the crash-safety test in Phase 5 is written."""
 ```
 
+#### [x] 4. The manual step, made runnable — added during verification
+
+**File**: `tools/deploy/pwgdeploy/smoke.py`
+
+The phase's manual criterion — connect to the real web space, upload one file, see it over
+HTTP — needs credentials, but it does not need a human in an FTP client. `smoke.run()` is that
+procedure, port-typed and unit-tested against `FakeTransport`; the real adapters are what the
+run adds underneath it:
+
+    python3 -m pwgdeploy.smoke deploy.local.json
+
+It uploads a probe named and *bodied* with a fresh random token, fetches it over HTTP,
+compares the bytes, deletes it and confirms it is gone. The token is in the body so a stale
+file or a caching proxy cannot satisfy the check by accident; a byte mismatch names both the
+remote path and the URL, because "the FTP root and the document root are different
+directories" is the failure this check exists to find.
+
+`pwgdeploy/urls.py` (a Phase 5 deliverable) was **brought forward** rather than duplicated —
+`smoke.py` needs the same two joins the upload does. Phase 5 inherits it, tests and all.
+
 ### Success Criteria
 
 #### Automated Verification
-- [x] `cd tools/deploy && uv run pytest tests/test_transport.py` passes — 17 tests; whole
-      suite 157, twice in a row and with `-p no:randomly`
+- [x] `cd tools/deploy && uv run pytest tests/test_transport.py` passes — 20 tests; whole
+      suite 185, twice in a row and with `-p no:randomly`
 - [x] A `FEAT` response lacking `AUTH TLS` raises `InsecureTransportError` whose message contains
       the host and the advertised feature list (asserted with a real substring, not `pytest.raises`
       alone) — `test_feat_without_auth_tls_raises`, with
@@ -666,9 +686,24 @@ class FakeTransport:
 
 #### Manual Verification
 - [ ] Against the real web space: connect succeeds, `PROT P` is negotiated, and a single small
-      file uploads and reappears over HTTP
-- [ ] Recorded in the hand-check ledger with the date — the adapter has no automated coverage by
-      design, and that is stated rather than implied
+      file uploads and reappears over HTTP. **Automated** as
+      `python3 -m pwgdeploy.smoke <credential file>` (task 4 above) — what stays manual is
+      supplying `deploy.local.json`, which no automation can invent. Not yet run: no credential
+      file exists in this checkout.
+- [ ] Recorded in the hand-check ledger with the date — deferred to Phase 7 on purpose, because
+      the run has not happened and a ledger row for an unperformed check is exactly the "marked
+      done on prose alone" the ledger rule forbids
+
+**Defect found while automating this step.** Running `python3 -m pwgdeploy.smoke
+deploy.example.json` against a host that does not resolve produced a raw `socket.gaierror`
+traceback: `FtplibTransport.connect()` let socket and `ftplib` errors escape untyped, so none of
+`errors.py`'s exit codes applied to the single most common real failure — a wrong host or a
+refused password. Fixed by wrapping the handshake in `TransportError`, with
+`test_an_unreachable_host_is_a_transport_error_not_a_traceback` and
+`test_a_refused_login_is_a_transport_error` watched red first, plus
+`test_a_cleartext_server_is_still_reported_as_insecure_not_merely_as_a_failure` as the
+anti-vacuity partner proving the wrapping does not swallow `InsecureTransportError`. The command
+now exits 5 with a message naming host, port and user.
 
 **Implementation Note**: Pause for manual confirmation before Phase 5.
 
@@ -713,7 +748,7 @@ Order, and why each step sits where it does:
    `tools/pwg_rel_create.sh:133-140`. A `False` return sets `chmod_supported = False` and emits
    one warning naming the paths to fix by hand in the FTP client.
 
-#### [ ] 2. Remote path joining
+#### [x] 2. Remote path joining — landed early, in Phase 4
 
 **File**: `tools/deploy/pwgdeploy/urls.py`
 
@@ -1132,6 +1167,11 @@ where it was needed.
       both calls present still fails `[ST]`
 - [x] `test_the_connection_is_given_an_explicit_timeout` — `CONNECT_TIMEOUT_SECONDS` read from
       the module, never retyped `[ERR]`
+- [x] `test_an_unreachable_host_is_a_transport_error_not_a_traceback` — the defect the smoke
+      run found `[NEG]`
+- [x] `test_a_refused_login_is_a_transport_error` `[NEG]`
+- [x] `test_a_cleartext_server_is_still_reported_as_insecure_not_merely_as_a_failure` —
+      anti-vacuity: the wrapping must not swallow the specific type `[NEG]`
 - [x] `test_makedirs_creates_each_segment_once` `[HAPPY]`
 - [x] `test_makedirs_treats_already_exists_as_success` — 550 on an existing dir `[ERR]`
 - [x] `test_makedirs_of_the_root_creates_nothing` `[BVA]`
@@ -1154,6 +1194,26 @@ Mutagen caveat does not apply — each mutant was verified to have changed the f
 | the `AUTH TLS` condition forced false | `test_feat_without_auth_tls_raises` and its anti-vacuity partner | killed (both) |
 | `makedirs` catches `ZeroDivisionError` instead of `error_perm` | `test_makedirs_treats_already_exists_as_success` | killed |
 
+#### `tests/test_smoke.py` — added during Phase 4 verification
+
+- [x] `test_the_probe_is_uploaded_read_back_and_deleted` — the whole call order `[HAPPY]` `[ST]`
+- [x] `test_the_probe_body_carries_the_token` `[HAPPY]`
+- [x] `test_an_empty_remote_root_uploads_beside_the_login_directory` `[ECP]` `[BVA]`
+- [x] `test_bytes_that_do_not_match_are_a_failure_naming_both_paths` `[NEG]`
+- [x] `test_a_missing_file_is_a_failure_not_a_silent_pass` — `None` must not compare equal to
+      the uploaded body `[NEG]`
+- [x] `test_a_probe_still_served_after_delete_is_reported_not_raised` `[NEG]`
+- [x] `test_the_session_is_closed_even_when_the_check_fails` `[NEG]`
+- [x] `test_each_run_uses_a_fresh_token` `[ST]`
+- [x] `test_main_without_a_credential_file_exits_two` `[NEG]`
+- [x] `test_main_reports_a_bad_credential_file_with_the_config_exit_code` `[NEG]`
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| the uploaded-vs-fetched byte comparison forced false | the two `[NEG]` body tests | killed |
+| `transport.close()` dropped from the `finally` | `test_the_session_is_closed_even_when_the_check_fails` | killed |
+| `remote_path` always prefixes the root, empty or not | `test_an_empty_remote_root_...` and two `test_urls` cases | killed |
+
 #### `tests/test_upload.py`
 
 - [ ] `test_first_run_uploads_every_file` — count asserted > 0 first `[HAPPY]`
@@ -1175,9 +1235,15 @@ Mutagen caveat does not apply — each mutant was verified to have changed the f
 
 #### `tests/test_urls.py`
 
-- [ ] `test_remote_path_joins_with_forward_slashes` — including a root of `""` and `"/"` `[ECP]`
-- [ ] `test_remote_path_never_doubles_a_slash` `[BVA]`
-- [ ] `test_site_url_joins_base_and_path` `[HAPPY]`
+- [x] `test_remote_path_joins_with_forward_slashes` — including a root of `""` and `"/"` `[ECP]`
+      — landed in Phase 4, which needed the same joins for the smoke check
+- [x] `test_remote_path_never_doubles_a_slash` `[BVA]`
+- [x] `test_remote_path_of_an_empty_relative_path_is_the_root_itself` `[BVA]`
+- [x] `test_remote_path_uses_forward_slashes_whatever_the_host_os_is` — anti-vacuity: no
+      `os.path.join` may creep in `[NEG]`
+- [x] `test_site_url_joins_base_and_path` `[HAPPY]`
+- [x] `test_site_url_never_doubles_a_slash` `[BVA]`
+- [x] `test_site_url_keeps_the_scheme_separator` `[NEG]`
 
 #### `tests/test_bootstrap.py`
 
