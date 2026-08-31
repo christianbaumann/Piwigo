@@ -83,6 +83,14 @@ It writes the git-ignored `local/config/persons-test.env` and creates `persons_w
 `persons_normal`, and marks the install with a `persons_throwaway_install` config row that
 `FixtureBuilder` refuses to run without. Never point it at a production database.
 
+`IndexRebuildTest` is the one destructive outlier: it **uninstalls the plugin**, which drops both
+tables, then reinstalls and rescans the whole gallery through `pwg.persons.rescan`. It snapshots
+both tables verbatim first and puts them back in teardown, so a failure - which is exactly the case
+where the rescan did not restore everything - does not leave the install short. It also asserts
+"nothing the index held is missing", never "the index came back byte-identical": a rescan reads
+every file, so a file whose regions were never indexed contributes new rows, and demanding
+otherwise would assert that no file in the gallery has ever drifted.
+
 The persons integration suite also creates a **private** album, to prove the per-image visibility
 gate ([decision 0019](../../docs/agents/decisions/0019-person-region-permission-model.md)). That
 needs `piwigo_user_cache` thrown away — `$user['forbidden_categories']` is cached per user, so a

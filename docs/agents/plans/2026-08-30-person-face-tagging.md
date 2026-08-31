@@ -891,8 +891,15 @@ tag. No new routing, per research answer 5.
 - [x] E2E: the rescan button completes and the counts on the admin screen match the database
 
 #### Manual Verification:
-- [ ] Delete the two tables, run a full rescan, and confirm the index comes back identical — this
-      is the claim "the DB is disposable" and nothing else tests it end to end
+- [x] Delete the two tables, run a full rescan, and confirm the index comes back identical — this
+      is the claim "the DB is disposable" and nothing else tests it end to end. **Automated**:
+      `IndexRebuildTest::testDroppingTheTablesAndRescanningRebuildsTheIndex` uninstalls the plugin
+      through `pwg.plugins.performAction` (which drops both tables), reinstalls, rescans the whole
+      gallery through `pwg.persons.rescan` in chunks, and asserts nothing the index held is missing
+      afterwards plus that its own two fixture photos come back exactly. It does **not** assert the
+      rebuilt index is byte-identical to the old one: a rescan reads every file, so a file whose
+      regions were never indexed contributes new rows — that is the rescan working, and demanding
+      otherwise would assert a fact about the gallery rather than about this code
 
 **Implementation Note**: pause for manual confirmation before Phase 9.
 
@@ -1109,7 +1116,9 @@ Conditions: **E** in file, **A** in add, **R** in remove.
 - [ ] `WriteRegionTest::testConcurrentWritersAllSucceedAndNoRegionIsLost` — the
       `write-back-worker.php` pattern, `[ERR]`
 - [ ] `WriteRegionTest::testAnOriginalSidecarIsLeftBesideTheImage` `[HAPPY]`
-- [ ] `ReindexTest::testDeletingTheTablesAndRescanningRebuildsAnIdenticalIndex` `[ST]`
+- [x] `IndexRebuildTest::testDroppingTheTablesAndRescanningRebuildsTheIndex` `[ST]` — landed in its
+      own file rather than in `ReindexTest`: it uninstalls the plugin, so it needs a teardown that
+      restores both tables verbatim, which no other test in that file wants
 - [ ] `ReindexTest::testAnImageWithNoRegionsProducesNoRows` `[BVA]`
 - [x] `RotationTest::testAPhysicallyRotatedFileHasItsRegionsCorrectedOnReindex` — rotate a tagged
       fixture with `exiftool`/ImageMagick outside the plugin, reindex, and assert the region still
