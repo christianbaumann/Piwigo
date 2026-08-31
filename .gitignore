@@ -36,6 +36,7 @@
 
 # Deploy tool: real credential files and per-target manifests
 /deploy.*.json
+/tools/deploy/deploy.*.json
 !/tools/deploy/deploy.example.json
 /tools/deploy/.state/
 __pycache__/

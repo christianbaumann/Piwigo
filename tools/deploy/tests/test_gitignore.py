@@ -19,6 +19,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 MUST_BE_IGNORED = (
     "deploy.local.json",
     "deploy.production.json",
+    # The copy that lands next to the example, which is where README.md tells an
+    # operator to put it and the only place they see the file being copied from.
+    "tools/deploy/deploy.local.json",
     "tools/deploy/.state/ftp.example.net-piwigo.json",
     "tools/deploy/pwgdeploy/__pycache__/config.cpython-312.pyc",
     "tools/deploy/.pytest_cache/CACHEDIR.TAG",

@@ -1162,7 +1162,7 @@ to be checked with a listing, not with `exists()`.
 
 ---
 
-## Phase 7: Documentation and decisions
+## Phase 7: Documentation and decisions — IMPLEMENTED 2026-08-31
 
 ### Overview
 
@@ -1171,7 +1171,7 @@ of re-litigating it.
 
 ### Changes Required
 
-#### [ ] 1. The how-to
+#### [x] 1. The how-to
 
 **File**: `tools/deploy/README.md`
 
@@ -1179,7 +1179,7 @@ Diataxis how-to: prerequisites, copy the example JSON, the one command, what eac
 is uploaded and what is not, and — stated, not implied — that the target is a sandbox and this
 tool is **never** safe to point at a production install.
 
-#### [ ] 2. Rules file and its read-trigger
+#### [x] 2. Rules file and its read-trigger
 
 **File**: `.claude/rules/deployment.md`, `CLAUDE.md`
 
@@ -1188,18 +1188,24 @@ and why, and the manual probe steps. `CLAUDE.md` gains one line under *Additiona
 read-trigger naming the task — "read before changing the deploy tool or deploying to the web
 space" — and stays under its 100-line cap.
 
-#### [ ] 3. Decisions
+#### [x] 3. Decisions
 
-**File**: `docs/agents/decisions/0020-remote-instance-is-a-sandbox.md`,
-`docs/agents/decisions/0021-no-database-transfer-to-the-remote.md`
+**File**: `docs/agents/decisions/0021-remote-instance-is-a-sandbox.md`,
+`docs/agents/decisions/0022-the-tools-directory-is-not-published.md`,
+`docs/agents/decisions/0023-no-database-transfer-to-the-remote.md`
 
-- 0020 records research decision 9's framing: the remote is disposable, so `restore` dropping
+Numbering shifted by one: `0020` was taken by the persons plan
+(`0020-persons-index-is-derived-the-file-is-the-source-of-truth.md`) before this phase ran.
+
+- 0021 records research decision 9's framing: the remote is disposable, so `restore` dropping
   provenance columns is tolerable here and would not be in production; this must be revisited
   before any real gallery is hosted.
-- 0021 records that no DB transfer exists and why — content is re-created by `site_update` and
+- 0022 records the `tools/` question Phase 6 left open, decided by the user 2026-08-31 in favour
+  of exclusion — core loads nothing from it at runtime.
+- 0023 records that no DB transfer exists and why — content is re-created by `site_update` and
   `pwg.persons.rescan`, and provenance values have no path to the remote at all.
 
-#### [ ] 4. Backlog and the known gap
+#### [x] 4. Backlog and the known gap
 
 **File**: `docs/backlog.md`
 
@@ -1207,7 +1213,7 @@ One entry for research decision 10's accepted silent-failure mode: a plugin sche
 `Version:` header is not bumped never reaches the remote table, and persons has no
 `ALTER … MODIFY` path so a *changed* column definition does not propagate even with a bump.
 
-#### [ ] 5. Hand-check ledger
+#### [x] 5. Hand-check ledger
 
 **File**: `docs/agents/TESTING.md`
 
@@ -1218,13 +1224,38 @@ server and no remote web space in CI, because there is no CI).
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `awk 'END{print NR}' CLAUDE.md` reports < 100
-- [ ] `awk 'END{print NR}' .claude/rules/deployment.md` reports < 500
-- [ ] `bash tools/test-hooks.sh` passes
+- [x] `awk 'END{print NR}' CLAUDE.md` reports < 100 — **74**, measured 2026-08-31
+- [x] `awk 'END{print NR}' .claude/rules/deployment.md` reports < 500 — **107**
+- [-] `bash tools/test-hooks.sh` passes — the **4 pre-existing failures** Phase 6 already recorded,
+      unchanged by this phase and environmental: this worktree has no `core.hooksPath` in the
+      typetags submodule and no plugin has `vendor/bin/phpunit` installed here. The two cases that
+      exercise the gate itself pass, and the new `rules/deployment.md` is checked against the cap
+      by the same run (`107 lines (cap 500)`). Not claimed as green.
+- [x] `cd tools/deploy && uv run pytest` — **288 passed**, twice in a row (pytest-randomly
+      shuffles), after the `.gitignore` fix below
 
 #### Manual Verification
 - [ ] A fresh reader can deploy from `tools/deploy/README.md` alone
-- [ ] Each decision file states what was decided, why, and what would reverse it
+- [x] Each decision file states what was decided, why, and what would reverse it — 0021, 0022 and
+      0023 each carry a *What would reverse this* section naming the concrete trigger
+
+**A defect found while writing the how-to.** `README.md` tells an operator to copy the example
+next to itself, and `tools/deploy/deploy.local.json` **was not git-ignored** — the root rule
+`/deploy.*.json` is anchored, so it covered only a copy in the repository root. The one place the
+file is naturally created was the one place it could be committed. Fixed by adding
+`/tools/deploy/deploy.*.json` above the example's negation, test first:
+`test_gitignore.py::MUST_BE_IGNORED` now carries that path and was watched failing for exactly
+that reason before the rule landed.
+
+**Deviations from the plan as written**:
+
+- Decision numbers shifted by one (see above); a third decision, 0022, was added for the `tools/`
+  question rather than leaving it in prose.
+- The backlog entry grew past the one item the plan asked for. Writing the docs surfaced that the
+  research note this whole plan cites —
+  `docs/agents/research/2026-08-30-ftp-deployment-and-remote-install.md` — **exists in no branch**,
+  so every "research decision N" reference in the plan is a dead link. The substance survives in
+  the plan's own summaries. Recorded rather than reconstructed.
 
 ---
 

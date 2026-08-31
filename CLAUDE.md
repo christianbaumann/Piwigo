@@ -61,6 +61,8 @@ Repository-specific, read on the task that needs them:
   not show up, when touching `_data/`, or when adding a plugin or theme git must track
 - [git-and-commits.md](.claude/rules/git-and-commits.md) — read before committing, branching, or
   pulling from upstream
+- [deployment.md](.claude/rules/deployment.md) — read before changing `tools/deploy` or deploying
+  this fork to the web space
 
 Stack-independent, applied on every task that touches tests or gates:
 
