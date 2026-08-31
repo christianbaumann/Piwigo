@@ -41,7 +41,7 @@ const SEEDED_PERSONS = array('E2E Overlay Jane', 'E2E Overlay John');
  * Removed by --restore alongside the seeded ones: they are created by the code
  * under test rather than by this script, so nothing else knows they exist.
  */
-const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace');
+const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace', 'E2E Admin Ada');
 
 /**
  * The regions written into the fixture photo.
@@ -222,6 +222,14 @@ PiwigoRuntime::resetRequestCaches();
 
 if (isset($args['restore']))
 {
+    // Unconditional, before the snapshot is even looked for: a spec killed
+    // between forcing the state and restoring it would otherwise leave every
+    // later page without an editor, and the persons the specs create through
+    // the UI are known by name rather than by anything the snapshot holds - a
+    // leftover one puts a stranger at the top of the next run's picker.
+    $db->query("DELETE FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
+    $builder->destroyPersons(array_merge(SEEDED_PERSONS, EDITOR_PERSONS));
+
     $snapshot = load_snapshot();
     if ($snapshot === null)
     {
@@ -232,11 +240,6 @@ if (isset($args['restore']))
     $builder->importTestObjects($snapshot['test_objects'] ?? array());
     $builder->destroyTestImages();
     $builder->destroyTestAlbums();
-    $builder->destroyPersons(array_merge(SEEDED_PERSONS, EDITOR_PERSONS));
-
-    // Unconditional: a spec killed between forcing the state and restoring it
-    // would otherwise leave every later page without an editor.
-    $db->query("DELETE FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
 
     @unlink(SNAPSHOT_FILE);
     echo json_encode(array('restored' => true)), "\n";

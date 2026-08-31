@@ -52,6 +52,13 @@ if (script_basename() == 'picture')
     EVENT_HANDLER_PRIORITY_NEUTRAL, PERSONS_PATH . 'include/events_public.inc.php');
 }
 
+if (defined('IN_ADMIN'))
+{
+  include_once(PERSONS_PATH . 'include/events_admin.inc.php');
+
+  add_event_handler('loc_begin_admin_page', 'persons_admin_photo_link');
+}
+
 /**
  * Registers the plugin's web-service methods.
  *

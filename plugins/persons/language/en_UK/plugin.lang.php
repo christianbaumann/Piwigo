@@ -11,5 +11,8 @@ $lang['That box is too small - drag a larger one'] = 'That box is too small - dr
 $lang['The photo could not be saved'] = 'The photo could not be saved';
 $lang['This server cannot write metadata into image files'] = 'This server cannot write metadata into image files';
 $lang['Remove this person from the photo'] = 'Remove this person from the photo';
+$lang['Back to the photo'] = 'Back to the photo';
+$lang['This photo no longer exists'] = 'This photo no longer exists';
+$lang['Open a photo and use "Tag people" to reach this screen'] = 'Open a photo and use "Tag people" to reach this screen';
 
 ?>

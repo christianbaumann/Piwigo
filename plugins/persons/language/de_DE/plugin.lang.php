@@ -11,5 +11,8 @@ $lang['That box is too small - drag a larger one'] = 'Der Rahmen ist zu klein - 
 $lang['The photo could not be saved'] = 'Das Foto konnte nicht gespeichert werden';
 $lang['This server cannot write metadata into image files'] = 'Dieser Server kann keine Metadaten in Bilddateien schreiben';
 $lang['Remove this person from the photo'] = 'Diese Person vom Foto entfernen';
+$lang['Back to the photo'] = 'Zurück zum Foto';
+$lang['This photo no longer exists'] = 'Dieses Foto existiert nicht mehr';
+$lang['Open a photo and use "Tag people" to reach this screen'] = 'Öffnen Sie ein Foto und wählen Sie "Personen markieren", um zu diesem Bildschirm zu gelangen';
 
 ?>

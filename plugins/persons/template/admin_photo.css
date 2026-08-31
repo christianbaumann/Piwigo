@@ -1,0 +1,25 @@
+/*
+ * The tagging screen in the admin panel.
+ *
+ * Only what the screen itself needs: the boxes, the picker and the toggle are
+ * styled by overlay.css and editor.css, which the shared overlay template pulls
+ * in on both surfaces.
+ */
+
+#persons-stage {
+	/* Shrink-to-fit, so the stage is the photo's box and nothing wider - the
+	   overlay is positioned against it. */
+	width: -moz-fit-content;
+	width: fit-content;
+	margin: 0 auto;
+}
+
+#persons-stage #theMainImage {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
+#persons-admin-return {
+	margin: 0 0 10px;
+}

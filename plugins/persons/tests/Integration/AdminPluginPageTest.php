@@ -118,6 +118,31 @@ final class AdminPluginPageTest extends TestCase
         }
     }
 
+    /**
+     * [NEG] The plugin's admin entry point, reached with no photo, renders.
+     *
+     * main.inc.php declares `Has Settings: true`, so the plugin list offers a
+     * link to admin.php?page=plugin-persons with nothing else on the query
+     * string. The only screen behind it so far wants an image_id, and the URL
+     * has to answer with a page saying so rather than a PHP error or a blank
+     * response - which is exactly what a missing dispatcher produced before.
+     */
+    public function testTheSettingsLinkRendersWithoutAnImageId(): void
+    {
+        $res = $this->ws->fetchPage('/admin.php?page=plugin-persons');
+
+        $this->assertSame(200, $res['http_code']);
+        $this->assertGreaterThan(
+            self::MIN_PAGE_BYTES,
+            strlen($res['body']),
+            'anti-vacuity: a short body is an error page or a redirect, not a rendered admin screen'
+        );
+
+        $this->assertSame(array(), $this->diagnosticsIn($res['body']));
+        $this->assertStringContainsString('class="errors"', $res['body'],
+            'the screen renders, but says nothing about the photo it is missing');
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /** path => list of diagnostics, with every page proven to have really rendered. */

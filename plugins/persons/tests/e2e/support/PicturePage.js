@@ -268,10 +268,31 @@ class PicturePage {
     await this.page.mouse.up();
   }
 
-  /** Types a name into the picker and waits for the list to answer. */
+  /**
+   * Types a name into the picker and waits for the option carrying that name.
+   *
+   * Not merely for *an* option: the picker opens showing the most recently used
+   * persons, so on an install that has any, the first option is already there
+   * before a keystroke is read. Waiting for that one would leave the highlight
+   * on somebody else's name, and Enter would commit them.
+   *
+   * @param {string} name
+   */
   async typeName(name) {
     await this.pickerInput.fill(name);
-    await this.pickerOptions.first().waitFor();
+    await this.pickerOption(name).waitFor();
+  }
+
+  /**
+   * The picker entry that commits a given name - an existing person or the
+   * create-new entry, both of which carry it in data-persons-name.
+   *
+   * @param {string} name
+   */
+  pickerOption(name) {
+    return this.page.locator(
+      `#persons-picker-list .persons-picker-option[data-persons-name="${name}"]`
+    );
   }
 
   /** The names currently rendered on the saved boxes. */

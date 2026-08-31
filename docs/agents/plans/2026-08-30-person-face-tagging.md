@@ -782,7 +782,7 @@ than `picture_modify`'s thumbnail.
 
 ### Changes Required:
 
-#### [ ] 1. The screen
+#### [x] 1. The screen
 **File**: `plugins/persons/admin/photo.php` reached at
 `admin.php?page=plugin-persons&image_id=N`, template `plugins/persons/template/admin_photo.tpl`
 
@@ -794,7 +794,7 @@ only difference is which element `stageRect()` measures.
 `picture_modify.tpl:114`'s `<img src="{$TN_SRC}">` is a thumbnail, too small to box a face on;
 that is why this is its own screen rather than an injection into the existing photo tab.
 
-#### [ ] 2. Link from the photo screen
+#### [x] 2. Link from the photo screen
 **File**: `plugins/persons/include/events_admin.inc.php`
 **Changes**: a `loc_begin_admin_page` handler that, on `$page['page'] == 'photo'`, injects a link to
 the screen above. `$page['tab']` is not set yet at that event — read `$_GET['tab']`, the trap
@@ -803,12 +803,14 @@ the screen above. `$page['tab']` is not set yet at that event — read `$_GET['t
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] E2E: an administrator draws and names a box on the admin screen; the file carries it
-- [ ] E2E: `persons_normal` navigating to the screen directly is refused
-- [ ] Unit: structural guard on the `picture_modify` anchor
+- [x] E2E: an administrator draws and names a box on the admin screen; the file carries it
+- [x] E2E: `persons_normal` navigating to the screen directly is refused
+- [x] Unit: structural guard on the `picture_modify` anchor
 
 #### Manual Verification:
-- [ ] Confirm the admin screen and the public page place an identical region identically
+- [x] Confirm the admin screen and the public page place an identical region identically — **automated**:
+      `admin.spec.js` → `a region drawn here sits where the public page draws it`, which compares the
+      two surfaces in fractions of the rendered photo. See the ledger in `docs/agents/TESTING.md`
 
 **Implementation Note**: pause for manual confirmation before Phase 8.
 

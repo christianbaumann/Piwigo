@@ -96,7 +96,11 @@ counts are rebuilt once after a run.
 before it had none, and still holds for them. Unlike the other two suites, persons' `auth.setup.js`
 logs in as `persons_normal` rather than the webmaster: the overlay is shown to any logged-in
 non-guest, and running it as an administrator would hide a permission mistake only a normal
-account can find.
+account can find. It saves a second, webmaster session to `tests/e2e/.state/auth-admin.json` as
+well, because the admin tagging screen added in Phase 7 sits behind `ACCESS_ADMINISTRATOR`. The
+`chromium` project runs every spec but `admin.spec.js` as the normal account, `chromium-admin`
+runs `admin.spec.js` as the webmaster, and the one spec there that proves a normal account is
+refused overrides the storage state for itself.
 
 `tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
 into that photo's file with a plain exiftool call, indexes them, and prints the box corners the
@@ -110,10 +114,12 @@ regions back with a plain exiftool call in its own process, which is how a spec 
 landed without asking the plugin's own parser. `seed.php --exiftool=missing|present` writes or
 removes a `persons_exiftool_path` config row pointing at a directory holding no binary, which is
 how the disabled-editor spec forces a host without exiftool rather than waiting for one.
-`--restore` deletes the album, the photo row, the
-copied file and exiftool's `_original` sidecar, the persons the editor specs created through the
-UI, and that config row unconditionally — a spec killed between forcing the state and restoring it
-would otherwise leave every later page without an editor. It rewrites an image file in place, so it
+`--restore` deletes the album, the photo row and the
+copied file with exiftool's `_original` sidecar when it finds a snapshot, and — before it even
+looks for one — removes that config row and the persons the specs create through the UI. Both are
+unconditional because both outlive a snapshot: a spec killed mid-run would otherwise leave every
+later page without an editor, and a leftover person puts a stranger at the top of the next run's
+picker, where `PicturePage.typeName()` would commit them. It rewrites an image file in place, so it
 is never pointed at a real scan.
 
 `PicturePage.settle()` is the one to reuse after a viewport change, not `waitForPlacement()`: after

@@ -93,6 +93,28 @@ define('PERSONS_TPL_INJECT_POINT', '{$ELEMENT_CONTENT}');
  */
 define('PERSONS_TPL_ROW_INJECT_POINT', "{/strip}\n</dl>");
 
+/*
+ * ---------------------------------------------------------------------------
+ * The admin photo screen.
+ *
+ * One more prefilter anchor, matched against
+ * admin/themes/default/template/picture_modify.tpl.
+ * tests/Unit/PhotoModifyAnchorTest.php is its guard, for the same reason as the
+ * two above: a moved anchor leaves the screen rendering perfectly, without the
+ * only link to the tagging screen.
+ * ---------------------------------------------------------------------------
+ */
+
+/**
+ * The link's anchor: the action bar beside the photo screen's thumbnail.
+ *
+ * The prefilter keeps the anchor and puts the link straight after it, so the
+ * link joins the row of icons the screen already offers. That thumbnail is far
+ * too small to box a face on, which is why the link goes to a screen of its own
+ * rather than the editor being injected here.
+ */
+define('PERSONS_TPL_PHOTO_ANCHOR', "<div class='picture-preview-actions'>");
+
 /** The config parameter holding the picture page's row-visibility map. */
 define('PERSONS_DISPLAY_INFO_PARAM', 'picture_informations');
 
