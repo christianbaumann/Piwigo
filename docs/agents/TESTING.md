@@ -50,8 +50,9 @@ execute them. `plugins/typetags/tests/Support/create-test-users.php` now creates
 gate; the other two are not.
 
 **`plugins/provenance` integration, measured 2026-08-31** after the four core characterization
-files landed: 181 tests / 952 assertions / 3 skipped in 68.7s. Unit unchanged at 180 tests / 502
-assertions in 0.018s. The same run leaves the install at 5 albums, 105 photos, 8 tags and 8
+files landed: 181 tests / 952 assertions / 3 skipped in 68.7s. Unit re-measured 2026-08-31 at
+the close of the handbook plan: 183 tests / 516 assertions in 0.018s, `GermanOverrideKeyTest`
+included. The same run leaves the install at 5 albums, 105 photos, 8 tags and 8
 colours — the values it started from.
 
 **`plugins/provenance`, measured 2026-08-29** (all three layers, after the gallery was
@@ -215,6 +216,9 @@ So a later reader can tell a considered omission from an oversight.
 | Touch and pen input on the region editor | `editor.js` binds `mousedown`/`mousemove`/`mouseup` only — measured 2026-08-31, there is no `touch*` or `pointer*` listener in the plugin — so there is no touch behaviour to assert. Carried in `docs/backlog.md` | A test would have to assert the *absence* of a feature. Playwright's touch emulation would drive events nothing listens for and fail for a reason that is not a defect |
 | Stored regions after an administrator changes `images.coi` | `coi` is a display hint; it changes neither the file's bytes nor its `AppliedToDimensions`, so no stored region moves. Carried in `docs/backlog.md` against the day a crop is driven from it | Nothing changes, so any assertion would be a tautology. What *would* move regions — a physical rotation — is asserted instead, by `RotationTest` and `persons_rotation_delta()`'s unit cases |
 | An external tool editing a file's regions behind Piwigo's back | The index is derived and nothing detects the drift; see [decision 0020](decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md). The candidate signal, `images.date_metadata_update`, is in `docs/backlog.md` | No behaviour exists to test. The repair that does exist is asserted: `IndexRebuildTest::testDroppingTheTablesAndRescanningRebuildsTheIndex` rebuilds the whole index from the files |
+| An E2E spec per workflow the German handbook documents | Each workflow's outcome is already witnessed at the layer that can express it - `CoreAlbumCharacterizationTest`, `CorePhotoTextCharacterizationTest`, `CoreTagCrudCharacterizationTest` and `CoreUploadCharacterizationTest` at integration, the plugin suites at all three. What the browser adds is the *controls* the handbook names, and those got their own specs (see *The handbook's own claims* below). Browser coverage of the uploader was already refused with a stated reason earlier in this file | Restating an integration rule at the browser layer violates the placement rule in `.claude/rules/testing.md`: break the low-level behaviour and its own test must go red first |
+| Pixel-diffing the handbook screenshots against a stored baseline | Rejected for the same reason screenshot comparison was rejected for the gallery itself: a photo gallery re-renders differently on a font, derivative or theme change that broke nothing, so the check fails on changes nobody made and is then disabled | Not a test of behaviour. `shoot.js`'s `assertOutput()` asserts the falsifiable part - every declared shot exists and no undeclared file sits beside them - and whether a shot still shows the screen its text describes is in the ledger |
+| A test over the handbook's prose - reading a page and checking what it says | `check.php` covers what a machine can decide: every `src` and `href` resolves, every screenshot is referenced and every reference resolves, each page is well-formed XML, every quoted `admin.php?page=` route is one `admin.php:129-176` really resolves, and no em-dash or emoji. Beyond that there is no oracle but a reader | *Build no apparatus that proves another apparatus* (`.claude/rules/test-design.md`). A scan that reads a document looking for a word is the example the rule names |
 
 ## Mutant table — unit suite
 
@@ -516,6 +520,54 @@ were left behind across the run and removed by hand afterwards; the install was 
 5 albums, 105 photos, 8 tags and 8 colours. This is a property of the mutants, not of teardown:
 a real regression produces no warning output, and the adopt-then-destroy path runs normally.
 
+## Mutant table — `GermanOverrideKeyTest` (2026-08-31)
+
+Run against the provenance unit suite at 183 tests / 516 assertions, by hand, one mutant at a
+time, per `.claude/rules/mutation-testing.md`: unit layer only, prose not script, end of the plan
+rather than per commit. Every mutant was applied, the container confirmed to hold the new bytes
+(host `md5` compared against `ddev exec md5sum` in a poll loop) and only then run; the file was
+restored and the suite re-run green afterwards. A `sed` that matched nothing was made a loud
+failure rather than a silent "survived".
+
+The guard is structural: its production side is not a function but the **template files that emit
+the English literal** and the **language file that translates it**. Mutants are therefore listed
+in pairs — one weakening the test, one damaging the thing the test watches — because a mutant that
+only weakens an assertion can never turn a green run red, and reporting it as "survived" without
+its pair would be an honest-looking lie.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| M1 `assertSame($times, ...)` replaced by a tautology | every case in the guard | **survived — invalid mutant.** A weakened assertion cannot make a green suite red; only its pair can say whether the count is load-bearing. See M4b |
+| M2 the anti-vacuity `MIN_BYTES` guard lowered to `-1` | the case reading a path that does not exist | **survived on an intact tree — invalid mutant as written.** `assertFileExists()` already covers a missing path, so the plan's expected killer does not exist. Probed properly instead, below |
+| M3 one literal altered by one character in the test's data set | that literal's case only | killed — exactly 1 failure, the `Rename album` case |
+| M3b the same literal altered in `albums.tpl`, the template that emits it | that literal's case only | killed — exactly 1 failure, the same case. This is the regression the guard exists for |
+| M4 `substr_count(...)` replaced by presence-only (`str_contains(...) ? 1 : 0`) | the two-occurrence cases | killed — exactly 2 failures, `Add tag` and `Remove tag`, the only entries whose expected count is 2 |
+| M4b the literal duplicated in `albums.tpl` so it occurs twice | the count assertion | killed — 1 failure. Together with M4 this is what proves the assertion counts rather than merely looks |
+| M5 one `$lang[...]` key renamed in `local/language/de_DE.lang.php` | `testTheLanguageFileStillTranslatesTheKey` | killed — 1 failure |
+| M6 `language/de_DE/admin.lang.php` given a key the override also carries | `testTheOverrideDoesNotShadowACoreGermanString` | killed — 1 failure |
+| M7 the `%s` and `%d` placeholders reordered in the override's format string | `testTheFormatStringsKeepTheirPlaceholderSequence` | killed — 1 failure |
+
+### The anti-vacuity guard is reachable, and it took a second probe to show it
+
+M2 survived because on an intact checkout nothing is vacuous. Whether the guard is dead code or
+simply idle was settled by forcing the state it exists for: `albums.tpl` was replaced with the
+single line `{'Rename album'|@translate}` — 28 bytes, still holding the literal, so the count
+assertion passes on a file that has lost everything else.
+
+- With `MIN_BYTES` in place: 1 failure, `Tests: 183, Assertions: 515`, reporting
+  *anti-vacuity: too little was read from admin/themes/default/template/albums.tpl*.
+- With `MIN_BYTES` lowered to `-1`: `OK (183 tests, 516 assertions)`.
+
+So the guard is the only thing standing between a gutted template and a green run. Whoever
+deletes it removes the watchman, not the risk.
+
+### What the pass did not change
+
+Nothing. No test was strengthened as a result — the two survivors are both invalid mutants with
+their reason recorded above, not weak assertions. That is a real finding rather than a null
+result: it says the guard's assertions are exactly as tight as the behaviour they watch, and no
+tighter.
+
 ## The handbook's own claims, and the E2E gap they exposed (2026-08-31)
 
 `docs/handbuch/` documents five workflows. Reconciling every control it names against the
@@ -658,6 +710,8 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-08-31 | Phase 9 of the persons plan left one manual box: the `CLAUDE.md` commands copy-paste and run on a fresh checkout. | **Executed 2026-08-31, and it found two things.** A real clone was made inside the web container (`git clone --local --no-hardlinks /var/www/html /tmp/freshclone`) and the documented fresh-clone steps run against it: `composer install -d plugins/persons` and `npm install` both succeeded and `plugins/persons/vendor/bin/phpunit --testsuite unit` came back green (112 tests at that HEAD); the same for `plugins/provenance` (138). **Finding 1**: the documented steps omitted `git submodule update --init --recursive`, so on a fresh clone `plugins/typetags` is an empty directory and every typetags command fails on a missing `composer.json` — `.claude/rules/plugin-test-suites.md` now says so, in the same change that measured it. **Finding 2**: that init cannot succeed today — the superproject records submodule commit `44fdd06`, which is not on `github.com/christianbaumann/Piwigo-Colored-Tags` (the submodule is one commit ahead of its own origin), so git reports `not our ref`. Pushing it is an outward-facing action and is carried in `docs/backlog.md` rather than done here. The part that a suite can keep watching is now `CleanCheckoutTest::testEverySuiteEntryPointIsCommitted`, which asserts every file a documented command names is tracked — `git ls-files --error-unmatch`, not just unignored, because a file can be unignored and still never added. Watched red against `vendor/autoload.php` added to the list. |
 | 2026-08-31 | Phase 4 of the handbook plan opened four manual boxes: the demo photos show no real person, the face shapes are big enough to drag a region box over, the German reads naturally, and the album looks like a gallery rather than an abstraction. | **Two closed and two reduced the same day**, as guards inside `docs/handbuch/tools/seed.php` rather than a suite of its own - the seed is scaffolding, and a test that tests a test is what `.claude/rules/test-design.md` forbids. `assert_scenes_are_photographable()` refuses any scene whose face box falls below `MIN_FACE_PIXELS`. `assert_regions_reached_the_file()` reads the written regions back with a plain exiftool call, so Phase 5 photographs coordinates that are known to be in the file. `assert_no_generated_photo_is_a_gallery_copy()` closes the falsifiable half of "no real person": every plugin fixture builds its photo by copying a real gallery image (`FixtureBuilder::createTestImage()`), and a seed written that way would publish one, so the generated files are compared byte for byte against every gallery file. `assert_german_texts_round_tripped()` proves the titles survive MariaDB and carries the anti-vacuity count that stops the set drifting to ASCII. All six were watched red: an undersized face, an all-ASCII title set, a writer shifting X by 0.05, a real gallery file passed into the copy guard, and the copy guard's own comparison set emptied. |
 | 2026-08-31 | Phase 4 verification pass: two defects the mutants found, neither in the handbook's content. | Recorded because both would have been invisible on a green run. (1) The copy guard first compared against `piwigo_images.md5sum`; its own anti-vacuity guard fired immediately, because all 105 rows of this install carry a **null** checksum - the guard would have passed every generated photo for the wrong reason. It now compares files on disk, size first and a checksum only where one matches, so the usual run hashes nothing. (2) The face-size check first ran inside the insert loop, so the undersized-face mutant failed **after** six photo rows existed and before the snapshot named them, leaving state `--restore` could not undo. The pure scene check now runs before any write, the snapshot is extended as each photo lands rather than written once at the end, and `--restore` empties the demo directory unconditionally, since a scene drawn by a run that died before its insert is a leftover no snapshot can name. |
+| 2026-08-31 | Handbook plan close-out: the nine-mutant pass over `GermanOverrideKeyTest`, the only unit-layer code the plan added (see the mutant table above). Each mutant was applied and reverted by hand, the container confirmed to hold the new bytes before every run, and a `sed` that matched nothing made a loud failure rather than a silent "survived". | Not automatable by rule - `.claude/rules/mutation-testing.md` forbids scripting patch/run/revert cycles against source, because the script is a second thing to keep correct and stops working the moment a patched line moves. Two mutants survived, both invalid, both recorded with their reason; the anti-vacuity guard needed a second probe before it could be called reachable. |
+| 2026-08-31 | Handbook plan close-out: the three commands `.claude/rules/handbook.md` quotes were run end to end - seed, shoot, restore - to prove the docs quote something that works. It found the demo album still seeded from Phase 5 (6 albums / 111 photos instead of 5 / 105); `--restore` removed it and the install came back to 5 / 105. | Partly automatable and partly not. That the commands exit 0 and that `check.php` stays green is mechanical; that a re-shoot still *shows the right screen* is not - and a re-shoot is deliberately not byte-reproducible, because the demo album takes a fresh id each seed, so 7 of the 20 PNGs differed with nothing wrong. Pixel-diffing is refused in the non-coverage table above. |
 
 ### Open — no oracle, so no test
 

@@ -64,6 +64,23 @@ That script writes the git-ignored `local/config/provenance-test.env` and create
 `provenance_webmaster` and `provenance_normal`. It writes users directly and is never safe
 against a production database.
 
+**`plugins/provenance` is also where Piwigo *core* is characterized.** Core carries no suite of
+its own and this repository deliberately does not stand one up, so six
+`Core*CharacterizationTest.php` files in `plugins/provenance/tests/Integration/` cover core
+behaviour the fork depends on: `CoreAlbumCharacterizationTest`, `CorePhotoTextCharacterizationTest`,
+`CoreTagCrudCharacterizationTest`, `CoreUploadCharacterizationTest`,
+`CoreAssociationCharacterizationTest` and `CoreDeleteCategoriesCharacterizationTest`. Every case is
+`[ERR]`: the oracle is the current implementation, so they report a *change* and prove nothing
+correct. They run inside the provenance integration suite — there is no separate command. Put a new
+core characterization case there rather than inventing a root `phpunit.xml`.
+
+The **unit** suite also guards the fork's German string overrides
+(`plugins/provenance/tests/Unit/GermanOverrideKeyTest.php`). `local/language/de_DE.lang.php` is a
+**tracked** file despite the blanket `/local/*` ignore rule — it has its own `!` re-include — and
+the guard asserts that each translated literal still occurs, the expected number of times, in the
+template or PHP file that emits it. A renamed upstream literal otherwise reverts a screen to English
+with no error anywhere. See [handbook.md](handbook.md) before adding a string.
+
 The persons suite works the same way:
 
 ```bash

@@ -1032,7 +1032,7 @@ Close the loop so a later reader cites the decision instead of re-litigating it.
 
 ### Changes Required
 
-#### [ ] 1. The decision
+#### [x] 1. The decision
 **File**: `docs/agents/decisions/0021-german-handbook-location-and-demo-content.md` (new)
 **Changes**: Next free number, confirmed 2026-08-31 (0020 is the highest). Records three
 decisions and their rejected alternatives: the handbook lives in `docs/handbuch/` rather than
@@ -1040,7 +1040,7 @@ decisions and their rejected alternatives: the handbook lives in `docs/handbuch/
 or cropped real scans; translations are fixed before screenshotting rather than documenting a
 half-English UI.
 
-#### [ ] 2. The testing record
+#### [x] 2. The testing record
 **File**: `docs/agents/TESTING.md`
 **Changes**: Add the new core characterization tests to the suite description with dated
 figures. Add non-coverage entries with justification for: an E2E spec per documented workflow
@@ -1049,7 +1049,7 @@ screenshots (`:428`); a test over the handbook prose itself (no oracle, and buil
 apparatus that proves another apparatus). Add the hand-check ledger entry for walking each
 documented workflow, with its reason for not being automatable.
 
-#### [ ] 3. The backlog
+#### [x] 3. The backlog
 **File**: `docs/backlog.md`
 **Changes**: Add the second unpushed typetags submodule commit to the existing entry about
 the submodule being ahead of its origin. Add an entry for the remaining half-translated
@@ -1060,7 +1060,7 @@ upstream help files if any were noticed. Add the deferred investigation of why p
 reproducing test yet: it needs the diagnosis this plan defers, and a skipped test that names
 no cause is prose in test form.
 
-#### [ ] 4. The rules index
+#### [x] 4. The rules index
 **File**: `CLAUDE.md` and `.claude/rules/`
 **Changes**: Note where the handbook lives and the two commands that regenerate its content,
 so the next agent does not rediscover them. `CLAUDE.md` stays under 100 lines - if the
@@ -1068,7 +1068,7 @@ addition would exceed it, the content goes into a rules file with a read-trigger
 Update `.claude/rules/plugin-test-suites.md` with the new core characterization tests and the
 fact that `local/language/de_DE.lang.php` is now tracked.
 
-#### [ ] 5. Mutation pass over the new unit guards
+#### [x] 5. Mutation pass over the new unit guards
 **File**: `docs/agents/TESTING.md`
 **Changes**: The Phase 2 key guards are the only new unit-layer code, so they get the
 end-of-plan strength check per `.claude/rules/mutation-testing.md`. Recorded as a prose table,
@@ -1078,19 +1078,26 @@ from the pre-mutation file and shifts every result by one.
 
 | Mutant | Expected killer | Result |
 |---|---|---|
-| `assertSame(1, ...)` → `assertGreaterThanOrEqual(0, ...)` | every case in the guard | |
-| the anti-vacuity `MIN_BYTES` guard deleted | the case reading a path that does not exist | |
-| one literal in the data set altered by one character | that literal's case only | |
-| `substr_count` → `str_contains` | the two-occurrence cases for `Add tag` / `Remove tag` | |
+| `assertSame(1, ...)` → `assertGreaterThanOrEqual(0, ...)` | every case in the guard | survived - invalid mutant |
+| the anti-vacuity `MIN_BYTES` guard deleted | the case reading a path that does not exist | survived - invalid as written; probed instead |
+| one literal in the data set altered by one character | that literal's case only | killed |
+| `substr_count` → `str_contains` | the two-occurrence cases for `Add tag` / `Remove tag` | killed |
+
+Run 2026-08-31. Five further mutants were added because the four above are all test-side, and a
+weakened assertion can never turn a green run red: each was paired with a mutant that damages what
+the test watches (a literal altered and duplicated in `albums.tpl`, a key renamed in the override,
+a shadowing key added to core's `de_DE`, the placeholders reordered). Nine in total, seven killed,
+two survivors both invalid with the reason recorded. The full table, and the second probe that
+proved the `MIN_BYTES` guard reachable, are in `docs/agents/TESTING.md`.
 
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `docs/agents/decisions/0021-*.md` exists and no other file claims number 0021
-- [ ] `CLAUDE.md` is under 100 lines
-- [ ] Every file in `.claude/rules/` is under 500 lines
-- [ ] Every command quoted in the updated docs actually runs
-- [ ] Full run of all three plugin suites, all layers, passes
+- [x] `docs/agents/decisions/0021-*.md` exists and no other file claims number 0021
+- [x] `CLAUDE.md` is under 100 lines
+- [x] Every file in `.claude/rules/` is under 500 lines
+- [x] Every command quoted in the updated docs actually runs
+- [x] Full run of all three plugin suites, all layers, passes
 
 #### Manual Verification
 - [ ] The decision file states what was rejected and why, not only what was chosen
