@@ -497,7 +497,7 @@ decision, outside this plan's scope, recorded here rather than worked around.
 
 ---
 
-## Phase 3: Manifest and diff
+## Phase 3: Manifest and diff — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -506,7 +506,7 @@ path → sha256 of the bytes last successfully uploaded there.
 
 ### Changes Required
 
-#### [ ] 1. Manifest format and per-target path
+#### [x] 1. Manifest format and per-target path
 
 **File**: `tools/deploy/pwgdeploy/manifest.py`
 
@@ -524,7 +524,7 @@ def save(path: Path, entries: Mapping[str, str]) -> None:   # atomic: tmp + os.r
 A version mismatch discards the manifest rather than guessing — the next run re-uploads
 everything, which is correct-but-slow instead of fast-but-wrong.
 
-#### [ ] 2. Hashing
+#### [x] 2. Hashing
 
 **File**: `tools/deploy/pwgdeploy/manifest.py`
 
@@ -537,7 +537,7 @@ sha256 over file bytes rather than git blob SHA-1: the same code path then cover
 submodule files and the generated `config.inc.php`, and nothing has to know about git's blob
 header. Hashing ~138 MB costs well under a second.
 
-#### [ ] 3. The diff
+#### [x] 3. The diff
 
 **File**: `tools/deploy/pwgdeploy/manifest.py`
 
@@ -557,12 +557,33 @@ def diff(current: Mapping[str, str], previous: Mapping[str, str]) -> Diff:
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_manifest.py` passes
-- [ ] Round-trip test: `save()` then `load()` returns an equal mapping
-- [ ] `load()` of a `{"version": 999}` file returns `{}` and does not raise
+- [x] `cd tools/deploy && uv run pytest tests/test_manifest.py` passes — 22 tests; whole suite 139
+- [x] Round-trip test: `save()` then `load()` returns an equal mapping
+- [x] `load()` of a `{"version": 999}` file returns `{}` and does not raise
 
 #### Manual Verification
-- [ ] Deleting `.state/*.json` makes the next `--dry-run` report every file as new
+- [ ] Deleting `.state/*.json` makes the next `--dry-run` report every file as new — **not
+      checkable in this phase**: there is no `--dry-run` until Phase 5 builds the CLI. Deferred
+      to Phase 5's manual verification, where the same fact is one of its listed checks.
+
+**Deviation from the plan, decided and implemented**: `manifest_path()` slugifies host and remote
+root instead of taking the root verbatim, so no separator or `..` can reach the file name — a
+remote root of `/www/../../etc` would otherwise have written outside `.state/`. Covered by
+`test_manifest_path_holds_no_separators`.
+
+Eight tests beyond the plan's list: `test_manifest_path_is_a_json_file_inside_the_state_dir`,
+`test_manifest_path_holds_no_separators`, `test_save_creates_the_state_directory` (a fresh clone
+has no `.state/`), `test_load_of_unreadable_json_is_empty`, `test_hash_of_an_empty_file`,
+`test_a_changed_byte_changes_the_hash` (anti-vacuity for the diff cases),
+`test_pending_is_new_and_changed` and `test_removed_is_only_ever_previously_recorded_paths`.
+
+Both guards were proved killable rather than assumed (host, no DDEV, so the Mutagen caveat in
+`mutation-testing.md` does not apply; each `sed` was verified to have changed the file first):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| version check → always accept | `test_load_of_a_future_version_is_empty` | killed |
+| `save()` writes the target directly, no tmp + `os.replace` | `test_save_is_atomic` | killed |
 
 **Implementation Note**: Pause for manual confirmation before Phase 4.
 
@@ -1074,20 +1095,20 @@ where it was needed.
 
 #### `tests/test_manifest.py`
 
-- [ ] `test_diff_decision_table` — parametrised over the four cases: in current only → new; in
+- [x] `test_diff_decision_table` — parametrised over the four cases: in current only → new; in
       both, hash differs → changed; in both, hash equal → unchanged; in previous only → removed
       `[DT]`
-- [ ] `test_diff_of_two_empty_manifests_is_empty` `[BVA]`
-- [ ] `test_first_run_is_all_new` — empty previous `[BVA]`
-- [ ] `test_pending_order_is_deterministic` — two calls yield the same list `[HAPPY]`
-- [ ] `test_hash_of_a_known_byte_string` — sha256 of a fixture with a hard-coded digest `[HAPPY]`
-- [ ] `test_hash_streams_across_the_chunk_boundary` — a file of `HASH_CHUNK_BYTES + 1` bytes
+- [x] `test_diff_of_two_empty_manifests_is_empty` `[BVA]`
+- [x] `test_first_run_is_all_new` — empty previous `[BVA]`
+- [x] `test_pending_order_is_deterministic` — two calls yield the same list `[HAPPY]`
+- [x] `test_hash_of_a_known_byte_string` — sha256 of a fixture with a hard-coded digest `[HAPPY]`
+- [x] `test_hash_streams_across_the_chunk_boundary` — a file of `HASH_CHUNK_BYTES + 1` bytes
       hashes equal to `hashlib.sha256` over the whole `[BVA]`
-- [ ] `test_save_then_load_round_trips` `[HAPPY]`
-- [ ] `test_load_of_a_missing_file_is_empty` `[NEG]`
-- [ ] `test_load_of_a_future_version_is_empty` — discard, do not guess `[NEG]` `[ECP]`
-- [ ] `test_save_is_atomic` — a pre-existing manifest is intact after a failed write `[ERR]`
-- [ ] `test_manifest_path_differs_per_target` — two hosts, and one host with two remote roots,
+- [x] `test_save_then_load_round_trips` `[HAPPY]`
+- [x] `test_load_of_a_missing_file_is_empty` `[NEG]`
+- [x] `test_load_of_a_future_version_is_empty` — discard, do not guess `[NEG]` `[ECP]`
+- [x] `test_save_is_atomic` — a pre-existing manifest is intact after a failed write `[ERR]`
+- [x] `test_manifest_path_differs_per_target` — two hosts, and one host with two remote roots,
       produce three distinct paths `[ECP]`
 
 #### `tests/test_transport.py`
