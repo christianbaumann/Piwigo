@@ -180,7 +180,7 @@ tools/deploy/
 
 ---
 
-## Phase 1: Config, credential file, and the package skeleton
+## Phase 1: Config, credential file, and the package skeleton — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -313,8 +313,19 @@ __pycache__/
 - [x] `git status --porcelain` shows `deploy.example.json` as tracked and no real credential file
 
 #### Manual Verification
-- [ ] `deploy.example.json` is copyable to `deploy.local.json` and every field is self-explanatory
-- [ ] A deliberately broken value (prefix `9foo`) produces a message naming the field and the rule
+- [x] `deploy.example.json` is copyable to `deploy.local.json` — **automated** as
+      `test_the_example_copies_to_a_working_local_credential_file`
+- [x] A deliberately broken value (prefix `9foo`) produces a message naming the field and the rule
+      — **automated** as `test_prefix_leading_digit_is_rejected` (field *and* rule asserted) and
+      generalised over all twelve rejection paths by
+      `test_every_rejection_names_the_offending_field`
+- [ ] *Not automatable*: whether every field of `deploy.example.json` is **self-explanatory** is a
+      human judgement with no oracle. Hand-check ledger entry, `docs/agents/TESTING.md` (Phase 7).
+
+Automated in addition, not asked for by the plan but by the same manual criterion: the
+`.gitignore` rules that keep a real credential file uncommittable are now a structural guard,
+`tests/test_gitignore.py`. It runs `git check-ignore --no-index` — without `--no-index` git
+reports every *tracked* path as not-ignored, which made the anti-vacuity control vacuous.
 
 **Implementation Note**: After this phase and its automated verification, pause for manual
 confirmation before Phase 2.
@@ -878,6 +889,13 @@ Tags per `.claude/rules/test-design.md`: `[HAPPY]` `[NEG]` `[ECP]` `[BVA]` `[ST]
 - [x] `test_port_bounds` — 0 / 1 / 65535 / 65536 `[BVA]`
 - [x] `test_base_url_trailing_slash_is_stripped` and `test_remote_root_is_normalised`
       (`""`, `"/"`, `"piwigo"`, `"/piwigo/"` all → `"/piwigo"` or `""`) `[ECP]`
+
+**Added during Phase 1 verification** (not in the original list):
+- [x] `test_every_rejection_names_the_offending_field` — parametrised over all twelve rejection
+      paths; a message that does not name its field wasted the run `[NEG]` `[ECP]`
+- [x] `test_the_example_copies_to_a_working_local_credential_file` `[HAPPY]`
+- [x] `tests/test_gitignore.py` — structural guard that `deploy.*.json`, `.state/`, `__pycache__` and `.venv` stay ignored
+      while the tool itself stays tracked `[NEG]` `[BVA]`
 
 #### `tests/test_fileset.py`
 

@@ -193,11 +193,13 @@ def test_prefix_length(length, accepted):
 
 
 def test_prefix_leading_digit_is_rejected():
-    """[NEG] install.php:271."""
+    """[NEG] install.php:271. The message must name the field *and* the rule."""
     raw = valid()
     raw["mysql"]["prefix"] = "9foo"
-    with pytest.raises(ConfigError, match="digit"):
+    with pytest.raises(ConfigError) as caught:
         config.load(raw)
+    assert "mysql.prefix" in str(caught.value)
+    assert "digit" in str(caught.value)
 
 
 @pytest.mark.parametrize("prefix", ["pwg_", "pwg$", "PWG9_$"])
@@ -264,3 +266,49 @@ def test_remote_root_is_normalised(given, expected):
     raw = valid()
     raw["ftp"]["remote_root"] = given
     assert config.load(raw).ftp.remote_root == expected
+
+
+# --- the messages a person actually has to act on --------------------------
+
+
+REJECTIONS = [
+    ("mysql.prefix", lambda r: r["mysql"].__setitem__("prefix", "9foo")),
+    ("mysql.prefix", lambda r: r["mysql"].__setitem__("prefix", "p" * 99)),
+    ("mysql.prefix", lambda r: r["mysql"].__setitem__("prefix", "pwg-tables")),
+    ("admin.username", lambda r: r["admin"].__setitem__("username", "web'master")),
+    ("admin.email", lambda r: r["admin"].__setitem__("email", "nobody")),
+    ("site.base_url", lambda r: r["site"].__setitem__("base_url", "gallery.example.net")),
+    ("site.assume_https", lambda r: r["site"].__setitem__("assume_https", "true")),
+    ("ftp.port", lambda r: r["ftp"].__setitem__("port", 0)),
+    ("ftp.remote_root", lambda r: r["ftp"].__setitem__("remote_root", "/a/../b")),
+    ("ftp.password", lambda r: r["ftp"].__setitem__("password", "")),
+    ("mysql", lambda r: r.pop("mysql")),
+    ("host", lambda r: r["ftp"].pop("host")),
+]
+
+
+@pytest.mark.parametrize(("field", "break_it"), REJECTIONS, ids=[f"{f}-{i}" for i, (f, _) in enumerate(REJECTIONS)])
+def test_every_rejection_names_the_offending_field(field, break_it):
+    """[NEG] [ECP] A rejection a person cannot act on is a rejection that wasted the run.
+
+    Automates the plan's Phase 1 manual check "a deliberately broken value produces a
+    message naming the field and the rule", generalised over every validation rule.
+    """
+    raw = valid()
+    break_it(raw)
+    with pytest.raises(ConfigError) as caught:
+        config.load(raw)
+    message = str(caught.value)
+    assert message.strip(), "a ConfigError with an empty message tells nobody anything"
+    assert field in message, f"{message!r} does not name {field}"
+
+
+def test_the_example_copies_to_a_working_local_credential_file(tmp_path):
+    """[HAPPY] The documented workflow is `cp deploy.example.json deploy.local.json`.
+
+    Automates the copyable half of the plan's Phase 1 manual check. Whether every field
+    is *self-explanatory* is a human judgement and stays in the hand-check ledger.
+    """
+    local = tmp_path / "deploy.local.json"
+    local.write_bytes(EXAMPLE_FILE.read_bytes())
+    assert config.load_file(local) == config.load_file(EXAMPLE_FILE)
