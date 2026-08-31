@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fotos zu einem Album hinzufügen</title>
+<link rel="stylesheet" href="assets/handbuch.css" />
+</head>
+<body>
+
+<h2>Fotos zu einem Album hinzufügen</h2>
+
+<p>
+  Der übliche Weg ist der Upload im Browser unter
+  <span class="pwgScreen">Fotos » Hinzufügen</span>
+  (<code>admin.php?page=photos_add</code>). Ein Foto kann anschließend weiteren Alben
+  zugeordnet werden, ohne es erneut hochzuladen. Beides ist der Verwaltung vorbehalten.
+</p>
+
+<h3>Fotos hochladen</h3>
+
+<ol>
+  <li>
+    <span class="pwgScreen">Verwaltung » Fotos » Hinzufügen</span> öffnen. Aus der
+    Albenliste führt auch die Schaltfläche <strong>Fotos hinzufügen</strong> in der Zeile eines
+    Albums direkt dorthin, mit diesem Album bereits ausgewählt.
+  </li>
+  <li>
+    Unter <strong>In dieses Album hochladen</strong> prüfen, welches Album eingetragen ist.
+  </li>
+  <li>
+    Auf <strong>Fotos hinzufügen</strong> klicken und die Dateien auswählen, oder die Dateien
+    in das Feld <strong>Dateien hier hin ziehen.</strong> ziehen.
+  </li>
+  <li>
+    Auf <strong>Upload starten</strong> klicken. Die Schaltfläche ist erst aktiv, wenn
+    mindestens eine Datei ausgewählt ist. Während der Übertragung kann der Vorgang mit
+    <strong>Abbrechen</strong> beendet werden.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/05-fotos-hochladen.png" alt="Die Seite zum Hochladen von Fotos" />
+  <figcaption>Der Upload. Über der Ablagefläche stehen das Zielalbum und die erlaubten Dateitypen.</figcaption>
+</figure>
+
+<p>
+  Nach dem Upload meldet die Seite <strong>... Fotos hochgeladen</strong> und darunter
+  <strong>Album ... enthält jetzt ... Fotos</strong>, wobei der Albumname ein Link zum Album
+  ist. Dazu erscheinen zwei Weiterführungen: <strong>Dieses Set von ... Fotos verwalten</strong>
+  öffnet die eben hochgeladenen Fotos in der Stapelverarbeitung,
+  <strong>Ein weiteres Fotoset hinzufügen</strong> beginnt von vorn. Die Fotos sind sofort im
+  Album sichtbar.
+</p>
+
+<div class="hinweis">
+  <p>
+    Erlaubt sind <strong>jpg, jpeg, png, gif</strong> und <strong>webp</strong>. Andere Dateien
+    weist Piwigo ab. Die Angabe steht neben der Schaltfläche <strong>Fotos hinzufügen</strong>
+    auf dem Bildschirm. Eine einzelne Datei darf bis zu 1000 MB groß sein.
+  </p>
+</div>
+
+<p>
+  Die Schaltfläche <strong>Optionen</strong> blendet einen Schalter ein: <em>Wenn ein Foto in
+  diesem Album denselben Dateinamen hat, aktualisieren Sie die Datei, ohne die Eigenschaften
+  des Fotos zu ändern.</em> Damit wird eine bestehende Bilddatei ersetzt, während Titel,
+  Beschreibung und Schlagworte des Fotos erhalten bleiben. Ohne diesen Schalter entsteht ein
+  zweites Foto.
+</p>
+
+<h3>Ein anderes Zielalbum wählen</h3>
+
+<ol>
+  <li>
+    Auf den Stift neben dem Albumnamen klicken.
+  </li>
+  <li>
+    Im Dialog <strong>In dieses Album hochladen</strong> das Album aus der Liste wählen oder
+    oben im Feld <strong>Suchen</strong> nach seinem Namen suchen.
+  </li>
+  <li>
+    Ist das gewünschte Album noch nicht vorhanden, den Schalter
+    <strong>Erstellungsmodus</strong> einschalten. Damit lässt sich ein Album direkt in diesem
+    Dialog anlegen und auswählen.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/06-fotos-album-waehlen.png" alt="Der Dialog zur Auswahl des Zielalbums" />
+  <figcaption>Die Albumauswahl mit Suchfeld und Erstellungsmodus.</figcaption>
+</figure>
+
+<h3>Vorhandene Fotos einem weiteren Album zuordnen</h3>
+
+<p>
+  Ein bereits hochgeladenes Foto kann in mehreren Alben erscheinen. Das geschieht in der
+  <span class="pwgScreen">Stapelverarbeitung</span> (<code>admin.php?page=batch_manager</code>).
+</p>
+
+<ol>
+  <li>
+    <span class="pwgScreen">Verwaltung » Fotos » Stapelverarbeitung</span> öffnen.
+  </li>
+  <li>
+    Unter <strong>Filter</strong> über <strong>Einen Filter hinzufügen</strong> den Filter
+    <strong>Album</strong> wählen und das Album eintragen, aus dem die Fotos stammen. Mit
+    <strong>Unteralben miteinbeziehen</strong> zählen auch deren Fotos mit.
+    <strong>Fotoset aktualisieren</strong> wendet den Filter an. Das Ergebnis ist das
+    <em>Fotoset</em>, auf das die Aktion später wirkt.
+  </li>
+  <li>
+    Unter <strong>Auswahl</strong> die gewünschten Fotos anklicken, oder <strong>Alles</strong>
+    für alle Fotos des Sets. <strong>Nichts</strong> hebt die Auswahl auf,
+    <strong>Invertieren</strong> kehrt sie um.
+  </li>
+  <li>
+    Unter <strong>Aktion</strong> den Eintrag <strong>Mit einem Album verbinden</strong>
+    wählen, über <strong>Ein Album auswählen</strong> das Zielalbum bestimmen und auf
+    <strong>Aktion anwenden</strong> klicken.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/07-stapelverarbeitung.png" alt="Die Stapelverarbeitung mit Filter und Auswahl" />
+  <figcaption>Die Stapelverarbeitung. Oben der Filter, darunter die Auswahl, unten die Aktion.</figcaption>
+</figure>
+
+<figure>
+  <img src="assets/screenshots/08-stapelverarbeitung-zuordnen.png" alt="Die Aktion Mit einem Album verbinden" />
+  <figcaption>Die Aktion nennt unter der Schaltfläche, auf wie viele Fotos sie angewendet wird.</figcaption>
+</figure>
+
+<div class="hinweis">
+  <p>
+    <strong>Mit einem Album verbinden</strong> fügt das Foto einem weiteren Album hinzu. Die
+    bisherigen Alben bleiben erhalten. Soll das Foto das alte Album verlassen, ist
+    <strong>Ins Album verschieben</strong> die richtige Aktion; sie löst alle anderen
+    Verknüpfungen. <strong>Von Album abtrennen</strong> entfernt das Foto aus einem einzelnen
+    Album.
+  </p>
+</div>
+
+<h3>Große Mengen ohne Browser</h3>
+
+<p>
+  Für sehr viele Dateien gibt es zwei weitere Wege, die Zugang zum Server voraussetzen: das
+  Hochladen per FTP mit anschließendem Einlesen unter
+  <span class="pwgScreen">Werkzeuge » Synchronisieren</span>, und das direkte Ablegen der
+  Dateien im Verzeichnis <code>galleries/</code>. Dieses Handbuch beschreibt sie nicht, nennt
+  aber zwei Fallen:
+</p>
+
+<ul>
+  <li>
+    Das Einlesen akzeptiert nur Dateinamen aus Buchstaben ohne Umlaute, Ziffern, Punkt,
+    Bindestrich und Unterstrich. Namen mit Umlauten oder Leerzeichen werden abgewiesen.
+  </li>
+  <li>
+    Im Abschnitt <strong>Simulation</strong> ist das Kästchen bei jedem Aufruf angehakt:
+    <em>Nur Simulation durchführen, ohne Änderungen in der Datenbank vorzunehmen.</em> Solange
+    es angehakt ist, zeigt der Vorgang nur an, was er tun würde, und ändert nichts.
+  </li>
+</ul>
+
+<nav class="zurueck">
+  <a href="index.html">Zurück zum Inhalt</a> ·
+  <a href="01-alben.html">Zurück: Album anlegen</a> ·
+  <a href="03-fototexte.html">Weiter: Titel, Autor, Datum und Beschreibung</a>
+</nav>
+
+</body>
+</html>

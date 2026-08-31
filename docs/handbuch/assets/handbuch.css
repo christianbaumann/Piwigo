@@ -1,0 +1,109 @@
+/* Benutzerhandbuch. Selbstenthaltend, damit jede Seite auch ohne Server
+   direkt aus dem Dateisystem geoeffnet werden kann. */
+
+body {
+  margin: 0 auto;
+  max-width: 46rem;
+  padding: 2rem 1.25rem 4rem;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: #222;
+  background: #fff;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+h3 {
+  font-size: 1.15rem;
+  margin: 2rem 0 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #e2e2e2;
+}
+
+p, ul, ol {
+  margin: 0 0 1rem;
+}
+
+ul, ol {
+  padding-left: 1.4rem;
+}
+
+li {
+  margin-bottom: 0.35rem;
+}
+
+a {
+  color: #b05a10;
+}
+
+code {
+  font-family: Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.9em;
+  background: #f4f4f4;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+/* Bildschirmnamen und Menuepfade, wie in der Piwigo-Hilfe. */
+.pwgScreen {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+figure {
+  margin: 1rem 0 1.5rem;
+}
+
+figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.hinweis {
+  margin: 1rem 0;
+  padding: 0.7rem 0.9rem;
+  border-left: 4px solid #f0a83c;
+  background: #fdf6ea;
+}
+
+.hinweis p:last-child {
+  margin-bottom: 0;
+}
+
+.rechte {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+nav.zurueck {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e2e2;
+  font-size: 0.9rem;
+}
+
+ul.inhalt {
+  list-style: none;
+  padding-left: 0;
+}
+
+ul.inhalt li {
+  margin-bottom: 1rem;
+}
+
+ul.inhalt a {
+  font-weight: bold;
+}

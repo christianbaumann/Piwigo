@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Personen auf Fotos markieren</title>
+<link rel="stylesheet" href="assets/handbuch.css" />
+</head>
+<body>
+
+<h2>Personen auf Fotos markieren</h2>
+
+<p>
+  Auf einem Foto lässt sich ein Rechteck über ein Gesicht ziehen und mit einem Namen versehen.
+  Danach ist die Person im Bild beschriftet und über ihren Namen sind alle Fotos zu finden, auf
+  denen sie markiert ist. Das geschieht auf der öffentlichen Fotoseite und steht jedem
+  angemeldeten Benutzer offen. Nicht angemeldete Besucher sehen von alldem nichts.
+</p>
+
+<h3>Vorhandene Markierungen ansehen</h3>
+
+<p>
+  Die Rahmen sind unsichtbar, solange die Maus nicht auf dem Foto steht. Mit dem Mauszeiger
+  über dem Foto erscheinen sie samt Namen. Ein Klick auf einen Namen führt zu allen Fotos
+  dieser Person.
+</p>
+
+<figure>
+  <img src="assets/screenshots/16-personen-boxen.png" alt="Ein Foto mit zwei markierten Personen" />
+  <figcaption>Zwei markierte Gesichter. Der Name steht unten am Rahmen.</figcaption>
+</figure>
+
+<p>
+  Ein <strong>gestrichelter Rahmen, halb durchsichtig</strong>, bedeutet: die Markierung wurde
+  auf einem anders zugeschnittenen Stand des Fotos gesetzt und sitzt deshalb vermutlich nicht
+  mehr an der richtigen Stelle. Der Kurzhinweis dazu lautet <em>Der Bereich ist womöglich
+  veraltet: das Bild wurde nach der Markierung skaliert</em>. Ein reines Verkleinern des Fotos
+  löst das nicht aus, nur ein veränderter Bildausschnitt. Solche Rahmen lassen sich löschen und
+  neu ziehen.
+</p>
+
+<h3>Eine Person markieren</h3>
+
+<ol>
+  <li>
+    Das Foto öffnen und unter dem Bild auf <strong>Personen markieren</strong> klicken. Die
+    Schaltfläche heißt danach <strong>Markieren beenden</strong>.
+  </li>
+  <li>
+    Mit gedrückter Maustaste ein Rechteck über das Gesicht ziehen. Ist der Rahmen zu klein,
+    meldet die Seite <em>Der Rahmen ist zu klein - ziehen Sie einen größeren auf</em>.
+  </li>
+  <li>
+    Es öffnet sich die Frage <strong>Wer ist das?</strong> mit einem Eingabefeld und einer
+    Liste bereits markierter Personen.
+  </li>
+  <li>
+    Den Namen eintippen. Die Liste wird beim Tippen enger. Mit den Pfeiltasten nach oben und
+    unten wird ein Eintrag ausgewählt, ein Klick wählt ihn ebenfalls aus.
+  </li>
+  <li>
+    Steht der Name noch nicht in der Liste, erscheint der Eintrag
+    <strong>Anlegen "..."</strong> mit dem eingetippten Namen. Er legt die Person neu an.
+  </li>
+  <li>
+    Mit <strong>Enter</strong> den in der Liste hervorgehobenen Eintrag übernehmen. Der Hinweis
+    unter der Liste lautet <em>Enter übernimmt - Esc bricht ab</em>.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/17-personen-markieren.png" alt="Ein Foto im Markierungsmodus" />
+  <figcaption>Im Markierungsmodus. Die Schaltfläche heißt jetzt Markieren beenden.</figcaption>
+</figure>
+
+<figure>
+  <img src="assets/screenshots/18-personen-rechteck.png" alt="Das aufgezogene Rechteck mit der Personenauswahl" />
+  <figcaption>Das aufgezogene Rechteck und die Auswahl der Person.</figcaption>
+</figure>
+
+<figure>
+  <img src="assets/screenshots/19-personen-auswahl.png" alt="Die Auswahl mit dem Eintrag zum Anlegen einer neuen Person" />
+  <figcaption>Ein noch unbekannter Name wird über Anlegen "..." neu angelegt.</figcaption>
+</figure>
+
+<div class="hinweis">
+  <p>
+    <strong>Enter</strong> übernimmt den hervorgehobenen Eintrag der Liste, nicht den Text im
+    Feld. Ist nichts hervorgehoben, passiert nichts. Wer sicher gehen will, klickt den
+    gewünschten Eintrag an.
+  </p>
+</div>
+
+<h3>Abbrechen und löschen</h3>
+
+<ul>
+  <li>
+    <strong>Esc</strong> verwirft ein gerade aufgezogenes Rechteck. Ist keines offen, beendet
+    <strong>Esc</strong> den Markierungsmodus.
+  </li>
+  <li>
+    <strong>Markieren beenden</strong> verlässt den Modus ebenfalls.
+  </li>
+  <li>
+    Eine gesetzte Markierung wird im Markierungsmodus über das <strong>x</strong> am Rahmen
+    gelöscht. Der Kurzhinweis lautet <em>Diese Person vom Foto entfernen</em>.
+  </li>
+</ul>
+
+<h3>Nach Personen suchen</h3>
+
+<p>
+  Jede markierte Person ist zugleich ein gewöhnliches Schlagwort. Es gibt daher zwei Wege zu
+  allen Fotos einer Person:
+</p>
+
+<ul>
+  <li>
+    Den Namen am Rahmen anklicken, oder den Namen in der Zeile <strong>Personen</strong> in den
+    Angaben rechts neben dem Foto.
+  </li>
+  <li>
+    Die Schlagwortseite der Galerie öffnen und die Person dort in der Liste aller Schlagworte
+    anklicken.
+  </li>
+</ul>
+
+<h3>Wenn die Schaltfläche grau ist</h3>
+
+<p>
+  Markierungen werden in die Bilddatei selbst geschrieben. Kann der Server das nicht, bleibt
+  <strong>Personen markieren</strong> sichtbar, ist aber ausgegraut und trägt den Kurzhinweis
+  <em>Dieser Server kann keine Metadaten in Bilddateien schreiben</em>. Vorhandene Markierungen
+  sind dann weiterhin zu sehen, neue lassen sich nicht setzen. Das ist ein Fall für die
+  Serververwaltung.
+</p>
+
+<div class="hinweis">
+  <p>
+    Weil die Markierungen in der Bilddatei stehen, wandern sie mit dem Foto mit: wer die Datei
+    herunterlädt oder weitergibt, gibt die Namen mit. Andere Programme, die denselben Standard
+    lesen, zeigen dieselben Personen an.
+  </p>
+</div>
+
+<h3>Die Personenliste in der Verwaltung</h3>
+
+<p>
+  Die Seite <span class="pwgScreen">Personen</span>
+  (<code>admin.php?page=plugin-persons</code>) führt alle Personen auf. Sie hat keinen eigenen
+  Eintrag in der Seitenleiste: der Weg dorthin führt über
+  <span class="pwgScreen">Verwaltung » Plugins</span> und dort beim Eintrag
+  <em>Persons</em> auf <strong>Einstellungen</strong>. Die Seite ist Administratoren
+  vorbehalten.
+</p>
+
+<figure>
+  <img src="assets/screenshots/20-personen-verwaltung.png" alt="Die Personenliste in der Verwaltung" />
+  <figcaption>Die Personenliste mit Anzahl der Fotos und der Bereiche je Person.</figcaption>
+</figure>
+
+<ul>
+  <li>
+    <strong>Name</strong>, <strong>Fotos</strong> und <strong>Bereiche</strong>: der Name, auf
+    wie vielen Fotos die Person markiert ist und wie viele Rahmen es insgesamt sind. Der Name
+    führt zu den Fotos der Person.
+  </li>
+  <li>
+    <strong>Suche</strong>: filtert die Liste nach einem Namensteil.
+  </li>
+  <li>
+    <strong>Umbenennen</strong>: ändert den Namen auf allen Fotos.
+  </li>
+  <li>
+    <strong>Löschen</strong>: entfernt die Person von allen Fotos. Die Rückfrage weist darauf
+    hin, dass die Rahmen auch aus den Bilddateien gelöscht werden.
+  </li>
+  <li>
+    <strong>Alle Dateien neu einlesen</strong>: liest jede Bilddatei der Galerie erneut und
+    baut die Liste aus dem auf, was in den Dateien steht. Nützlich, wenn Fotos von außerhalb
+    dazugekommen sind, die bereits Markierungen enthalten. Der Vorgang ändert die Dateien
+    nicht, kann aber bei großen Galerien dauern; ein Fortschrittsbalken zeigt den Stand.
+  </li>
+</ul>
+
+<p>
+  Unter der Liste steht, wie viele Personen und Bereiche es gibt und wann die Liste zuletzt neu
+  aufgebaut wurde.
+</p>
+
+<nav class="zurueck">
+  <a href="index.html">Zurück zum Inhalt</a> ·
+  <a href="04-schlagworte.html">Zurück: Schlagworte vergeben</a>
+</nav>
+
+</body>
+</html>

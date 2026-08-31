@@ -912,13 +912,13 @@ when the facts run out.
 
 ### Changes Required
 
-#### [ ] 1. Stylesheet
+#### [x] 1. Stylesheet
 **File**: `docs/handbuch/assets/handbuch.css` (new)
 **Changes**: Minimal and self-contained, so a page opens correctly from the filesystem with
 no server and no CDN. Readable measure, screenshots capped at container width with a light
 border.
 
-#### [ ] 2. Index
+#### [x] 2. Index
 **File**: `docs/handbuch/index.html` (new)
 **Changes**: One paragraph saying what the handbook covers and who it is for, then a list of
 the five pages with a one-line summary each. States that person tagging and colored-tag
@@ -926,14 +926,14 @@ assignment are open to any logged-in user, while album, photo-text and tag admin
 need administrator rights - the permission shapes differ deliberately and a reader who does
 not know that will be confused by a missing button.
 
-#### [ ] 3. Album page
+#### [x] 3. Album page
 **File**: `docs/handbuch/01-alben.html` (new)
 **Changes**: Creating an album, then setting its description on the properties screen. Must
 say the creation dialog has no description field, because that is the first thing a user
 looks for and does not find. Covers sub-albums, and the public album page where the
 description appears.
 
-#### [ ] 4. Photos page
+#### [x] 4. Photos page
 **File**: `docs/handbuch/02-fotos.html` (new)
 **Changes**: The browser uploader as the main path. Accepted types
 (`jpg, jpeg, png, gif, webp`) and the size limit. Adding an existing photo to a further album
@@ -941,7 +941,7 @@ from the Batch Manager. Names FTP and filesystem sync as alternatives for large 
 without documenting them, and warns that sync rejects filenames with umlauts or spaces
 (`/^[a-zA-Z0-9-_.]+$/`) and that its Simulation checkbox is on by default.
 
-#### [ ] 5. Photo text page
+#### [x] 5. Photo text page
 **File**: `docs/handbuch/03-fototexte.html` (new)
 **Changes**: The four core fields (Titel, Autor, Aufnahmedatum, Beschreibung), where each
 appears publicly, and that the filename cannot be changed. Then the provenance Notiz as the
@@ -949,14 +949,14 @@ per-photo free-text field, with the other four provenance fields explained as in
 the album and therefore read-only here - this is why four fields on that screen cannot be
 edited. Warns that the linked-albums control unlinks any album left out of the selection.
 
-#### [ ] 6. Tags page
+#### [x] 6. Tags page
 **File**: `docs/handbuch/04-schlagworte.html` (new)
 **Changes**: Creating, renaming, deleting and merging tags in the admin screen. Assigning
 tags on photo properties, and that assignment replaces the whole list rather than appending.
 Then the fork's colored tags: what the badge means, and adding or removing one directly on
 the public picture page as any logged-in user. Notes the eight existing German colored tags.
 
-#### [ ] 7. Persons page
+#### [x] 7. Persons page
 **File**: `docs/handbuch/05-personen.html` (new)
 **Changes**: The public workflow: hover to see boxes, **Personen markieren**, drag a
 rectangle, pick or create a person, Enter to commit, Esc to cancel, `x` to delete. Then
@@ -969,11 +969,17 @@ they travel with the photo.
 
 Documentation prose has no automated oracle. What can be checked mechanically:
 
-- [ ] Every `src` and `href` resolves - no broken image or link `[NEG]`
-- [ ] Every screenshot in `assets/screenshots/` is referenced by at least one page, and every
-      reference resolves to an existing file `[ERR]`
-- [ ] Each page is well-formed HTML
-- [ ] Every admin URL quoted in the text matches a real `admin.php?page=` route
+- [x] Every `src` and `href` resolves - no broken image or link `[NEG]` - `check.php`, watched red
+      against a mistyped screenshot name
+- [x] Every screenshot in `assets/screenshots/` is referenced by at least one page, and every
+      reference resolves to an existing file `[ERR]` - both directions, watched red both ways
+- [x] Each page is well-formed HTML - checked as **XML**, not as HTML. PHP's HTML parser silently
+      repairs an unclosed tag and reports nothing: an unclosed `</figure>` mutant survived it. The
+      pages are written valid HTML5 *and* well-formed XML (void elements self-closed, no named
+      entity beyond the five XML predefines), and `loadXML()` kills that mutant and two more
+- [x] Every admin URL quoted in the text matches a real `admin.php?page=` route - resolved the way
+      `admin.php:129-176` resolves it, including the `plugin-`, `album-` and `photo-` aliases;
+      watched red against `page=alben`
 
 Correctness of the German, and whether the instructions actually work, is a hand check. It
 goes in the ledger in `docs/agents/TESTING.md` with its reason, per
@@ -982,19 +988,36 @@ goes in the ledger in `docs/agents/TESTING.md` with its reason, per
 ### Success Criteria
 
 #### Automated Verification
-- [ ] A link and image checker over `docs/handbuch/` reports no unresolved reference
-- [ ] Every file under `assets/screenshots/` is referenced at least once
-- [ ] No page references a screenshot file that does not exist
+- [x] A link and image checker over `docs/handbuch/` reports no unresolved reference
+- [x] Every file under `assets/screenshots/` is referenced at least once
+- [x] No page references a screenshot file that does not exist
 
 #### Manual Verification
 - [ ] Each of the five workflows can be completed by following only the handbook, on a clean
-      install, without reading the code
-- [ ] Every screenshot matches the text next to it
-- [ ] German reads naturally and matches the on-screen wording exactly
-- [ ] No em-dashes, no emojis, no filler
-- [ ] Pages open correctly from the filesystem with no server
-- [ ] Permission notes are correct: the reader is not told to click something their role
-      cannot see
+      install, without reading the code - **still open**, no oracle but a first-time reader. The
+      mechanical half is now automated: every control the handbook names is witnessed by a spec in
+      `core-admin-screens.spec.js`, so a screen that moves fails a run instead of rotting silently
+- [ ] Every screenshot matches the text next to it - **still open**, no oracle; in the ledger
+- [ ] German reads naturally and matches the on-screen wording exactly - **still open** for the
+      wording; the strings themselves are guarded where they live, so a change breaks a test at
+      its source rather than diverging from the handbook silently
+- [x] No em-dashes, no emojis - automated in `check.php` with a byte floor, watched red against an
+      em-dash, an emoji and a symbol-range character. "No filler" stays a judgment call
+- [x] Pages open correctly from the filesystem with no server - automated as
+      `plugins/provenance/tests/e2e/handbuch-pages.spec.js`, 7 specs over `file://`: stylesheet
+      applied, no broken image, no console error. Watched red against a broken stylesheet href
+- [x] Permission notes are correct: the reader is not told to click something their role
+      cannot see - automated both ways. `[NEG]` four core admin screens refuse a normal account;
+      `[HAPPY]` a normal account adds and removes a coloured tag on the picture page, which the
+      typetags suite could not witness at all because every spec ran as a webmaster
+
+**Phase 6 verified 2026-08-31.** Six pages and a stylesheet; `docs/handbuch/tools/check.php`
+checks references, screenshot use in both directions, well-formedness and forbidden characters,
+each watched red. Nineteen E2E specs added for controls the handbook names that no layer
+witnessed, each watched red against a production mutant - see *The handbook's own claims, and
+the E2E gap they exposed* in `docs/agents/TESTING.md`. Two findings: the typetags suite could not
+witness its own permission model, and `01-alben.html` documented the sort action by what its icon
+looks like rather than what it does. E2E after the change: provenance 48, typetags 32, persons 31.
 
 **Implementation Note**: Pause here for manual confirmation before Phase 7 records anything
 as done.
@@ -1145,7 +1168,8 @@ ddev exec bash -c 'set -a; . local/config/persons-test.env;   set +a; cd plugins
 # Syntax
 ddev exec php -l <file>
 
-# Handbook content
+# Handbook
+ddev exec php docs/handbuch/tools/check.php
 ddev exec php docs/handbuch/tools/seed.php --scenario=demo
 ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; node docs/handbuch/tools/shoot.js'
 ddev exec php docs/handbuch/tools/seed.php --restore

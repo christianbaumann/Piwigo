@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Schlagworte vergeben</title>
+<link rel="stylesheet" href="assets/handbuch.css" />
+</head>
+<body>
+
+<h2>Schlagworte vergeben</h2>
+
+<p>
+  Schlagworte beschreiben, was auf einem Foto zu sehen ist, quer zu den Alben. Sie werden in
+  der Verwaltung unter <span class="pwgScreen">Schlagworte</span>
+  (<code>admin.php?page=tags</code>) angelegt und dort oder an einem einzelnen Foto zugeordnet.
+  Ein Teil der Schlagworte trägt eine Farbe. Farbige Schlagworte können angemeldete Benutzer
+  auch direkt auf der Fotoseite setzen, ohne Zugang zur Verwaltung.
+</p>
+
+<h3>Schlagworte anlegen, umbenennen und löschen</h3>
+
+<figure>
+  <img src="assets/screenshots/12-schlagworte-verwaltung.png" alt="Die Schlagwortverwaltung" />
+  <figcaption>Die Schlagwortverwaltung. Der farbige Punkt vor einem Namen zeigt die Farbe des Schlagworts.</figcaption>
+</figure>
+
+<ul>
+  <li>
+    <strong>Anlegen</strong>: auf <strong>Schlagwort hinzufügen</strong> klicken, den Namen
+    eingeben und bestätigen.
+  </li>
+  <li>
+    <strong>Suchen</strong>: das Feld <strong>Suchen</strong> rechts filtert die Liste.
+  </li>
+</ul>
+
+<p>
+  Die drei Punkte hinter einem Schlagwort öffnen sein Menü mit fünf Einträgen:
+</p>
+
+<ul>
+  <li>
+    <strong>Galerie-Ansicht</strong>: zeigt alle Fotos mit diesem Schlagwort so, wie Besucher
+    sie sehen. Fehlt, wenn kein Foto das Schlagwort trägt.
+  </li>
+  <li>
+    <strong>Fotos verwalten</strong>: öffnet die Stapelverarbeitung, gefiltert auf dieses
+    Schlagwort. Fehlt ebenfalls, solange kein Foto es trägt.
+  </li>
+  <li>
+    <strong>bearbeiten</strong>: benennt das Schlagwort um. Der neue Name kommt in das Feld
+    <strong>Tag-Name</strong>, bestätigt wird mit <strong>Ja, umbenennen</strong>. Der Name
+    ändert sich überall, an jedem Foto.
+  </li>
+  <li>
+    <strong>Duplikat</strong>: legt eine Kopie des Schlagworts an, deren Name die Ergänzung
+    <strong>(kopieren)</strong> trägt. Es wird sofort und ohne Rückfrage angelegt.
+  </li>
+  <li>
+    <strong>Löschen</strong>: entfernt das Schlagwort. Die Rückfrage
+    <strong>Schlagwort "..." löschen?</strong> wird mit <strong>Ja, löschen</strong>
+    bestätigt oder mit <strong>Nein, ich habe meine Meinung geändert</strong> abgebrochen. Die
+    Fotos bleiben erhalten, sie verlieren nur dieses Schlagwort.
+  </li>
+</ul>
+
+<h3>Schlagworte zusammenführen</h3>
+
+<p>
+  Zwei Namen für dieselbe Sache lassen sich zu einem zusammenführen. Das geht nur im
+  Auswahlmodus.
+</p>
+
+<ol>
+  <li>
+    Oben rechts <strong>Auswahlmodus</strong> einschalten.
+  </li>
+  <li>
+    Mindestens zwei Schlagworte anklicken. Unter <strong>Ihre Auswahl</strong> erscheinen die
+    gewählten Namen. Solange weniger als zwei ausgewählt sind, bleibt
+    <strong>Zusammenführen</strong> grau.
+  </li>
+  <li>
+    Auf <strong>Zusammenführen</strong> klicken und im Feld darunter das Schlagwort wählen, das
+    übrig bleiben soll. Der Hinweis <em>Die anderen Schlagworte werden entfernt</em> steht
+    daneben.
+  </li>
+  <li>
+    Mit <strong>Confirm merge</strong> bestätigen. Alle Fotos der anderen Schlagworte tragen
+    danach das gewählte, die anderen Schlagworte sind gelöscht.
+  </li>
+</ol>
+
+<div class="hinweis">
+  <p>
+    Die beiden Schaltflächen dieses Dialogs sind nicht übersetzt und heißen auf einer deutschen
+    Oberfläche <strong>Confirm merge</strong> und <strong>Cancel</strong>.
+  </p>
+</div>
+
+<h3>Nicht benutzte Schlagworte</h3>
+
+<p>
+  Trägt kein Foto ein Schlagwort mehr, meldet die Seite oben
+  <strong>Sie haben ... nicht benutzte Schlagworte</strong> mit dem Link
+  <strong>Überprüfung</strong>. Der Link löscht nichts, sondern zeigt zuerst die Namen. Erst
+  <strong>Lösche diese</strong> entfernt sie; <strong>Behalte diese</strong> blendet die
+  Meldung nur aus.
+</p>
+
+<h3>Schlagworte einem Foto zuordnen</h3>
+
+<p>
+  In den Eigenschaften eines Fotos (<code>admin.php?page=photo-&lt;nummer&gt;-properties</code>)
+  steht das Feld <strong>Schlagworte</strong>. Eintippen schlägt vorhandene Schlagworte vor,
+  das <strong>x</strong> an einem Eintrag entfernt ihn. Gesichert wird mit
+  <strong>Einstellungen sichern</strong>.
+</p>
+
+<figure>
+  <img src="assets/screenshots/13-schlagworte-zuordnen.png" alt="Das Feld Schlagworte in den Eigenschaften eines Fotos" />
+  <figcaption>Die Schlagworte eines Fotos. Farbige Schlagworte tragen ihre Farbe, die übrigen die Standardfarbe des Feldes.</figcaption>
+</figure>
+
+<div class="hinweis">
+  <p>
+    Beim Sichern ersetzt die Liste im Feld die bisherigen Schlagworte des Fotos vollständig.
+    Was hier fehlt, ist danach nicht mehr zugeordnet. Wer nur eines ergänzen will, lässt die
+    übrigen stehen.
+  </p>
+</div>
+
+<h3>Farbige Schlagworte</h3>
+
+<p>
+  Ein Schlagwort kann eine Farbe bekommen. Farbige Schlagworte werden überall als farbige
+  Plakette dargestellt und sind dadurch auf einen Blick von den übrigen zu unterscheiden. In
+  dieser Galerie sind acht Schlagworte farbig:
+</p>
+
+<ul>
+  <li>Arbeiten</li>
+  <li>Feste, Bräuche, Jahreskreis</li>
+  <li>Friedhof, Kirche, Kapelle</li>
+  <li>Gewerbe</li>
+  <li>Häuser, Ortsansichten</li>
+  <li>Personen</li>
+  <li>Stationen durch das Leben</li>
+  <li>Vereine, Gruppierungen</li>
+</ul>
+
+<p>Eine Farbe wird in der Schlagwortverwaltung vergeben:</p>
+
+<ol>
+  <li>
+    <strong>Auswahlmodus</strong> einschalten und mindestens ein Schlagwort anklicken. Erst
+    dann erscheint die Schaltfläche <strong>Farbe</strong>.
+  </li>
+  <li>
+    Auf <strong>Farbe</strong> klicken und unter <strong>Schlagwort-Farben festlegen</strong>
+    eine der vorhandenen Farben anklicken. Die erste, schwarze Fläche heißt
+    <strong>Farbe entfernen</strong> und nimmt die Farbe wieder weg.
+  </li>
+  <li>
+    Fehlt die passende Farbe, unter <strong>Eine neue Farbe hinzufügen</strong> Name und Farbe
+    eingeben und auf <strong>Erstellen</strong> klicken.
+  </li>
+  <li>
+    Mit <strong>Schlagwort-Farben festlegen</strong> anwenden, dann <strong>Schließen</strong>.
+  </li>
+</ol>
+
+<h3>Farbige Schlagworte auf der Fotoseite setzen</h3>
+
+<p>
+  Das ist der Weg für alle angemeldeten Benutzer, auch ohne Verwaltungsrechte. Auf der Seite
+  eines Fotos steht rechts der Abschnitt <strong>Schlagworte</strong> mit den bereits
+  vergebenen, darunter die noch nicht vergebenen farbigen Schlagworte, jeweils mit einem
+  <strong>+</strong> davor.
+</p>
+
+<figure>
+  <img src="assets/screenshots/14-schlagwort-badges.png" alt="Die vergebenen Schlagworte eines Fotos" />
+  <figcaption>Vergebene Schlagworte. Die farbigen tragen ein x zum Entfernen, die übrigen stehen als Text darunter.</figcaption>
+</figure>
+
+<figure>
+  <img src="assets/screenshots/15-schlagwort-hinzufuegen.png" alt="Noch nicht vergebene farbige Schlagworte" />
+  <figcaption>Die noch nicht vergebenen farbigen Schlagworte, jeweils mit einem Pluszeichen.</figcaption>
+</figure>
+
+<ul>
+  <li>
+    <strong>Hinzufügen</strong>: auf eine Plakette mit <strong>+</strong> klicken. Der
+    Kurzhinweis lautet <em>Schlagwort hinzufügen</em>. Das Schlagwort wandert sofort zu den
+    vergebenen.
+  </li>
+  <li>
+    <strong>Entfernen</strong>: auf das <strong>x</strong> einer vergebenen farbigen Plakette
+    klicken. Der Kurzhinweis lautet <em>Schlagwort entfernen</em>.
+  </li>
+</ul>
+
+<p>
+  Beides wirkt sofort, ohne Speichern. Schlagworte ohne Farbe lassen sich hier nicht ändern;
+  sie stehen als Text unter den Plaketten und werden in der Verwaltung gepflegt. Nicht
+  angemeldete Besucher sehen weder das <strong>+</strong> noch das <strong>x</strong>.
+</p>
+
+<nav class="zurueck">
+  <a href="index.html">Zurück zum Inhalt</a> ·
+  <a href="03-fototexte.html">Zurück: Titel, Autor, Datum und Beschreibung</a> ·
+  <a href="05-personen.html">Weiter: Personen auf Fotos markieren</a>
+</nav>
+
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Titel, Autor, Datum und Beschreibung</title>
+<link rel="stylesheet" href="assets/handbuch.css" />
+</head>
+<body>
+
+<h2>Titel, Autor, Datum und Beschreibung</h2>
+
+<p>
+  Die Texte eines Fotos stehen in seinen Eigenschaften
+  (<code>admin.php?page=photo-&lt;nummer&gt;-properties</code>). Dorthin führt die
+  Stapelverarbeitung oder ein Klick auf ein Foto in der Verwaltung. Die Seite ist der
+  Verwaltung vorbehalten.
+</p>
+
+<figure>
+  <img src="assets/screenshots/09-foto-eigenschaften.png" alt="Die Eigenschaften eines Fotos" />
+  <figcaption>Die Eigenschaften eines Fotos, hier mit allen Feldern ausgefüllt.</figcaption>
+</figure>
+
+<h3>Die vier Textfelder</h3>
+
+<ul>
+  <li>
+    <strong>Titel</strong>: die Überschrift des Fotos. Bleibt sie leer, zeigt Piwigo den
+    Dateinamen an.
+  </li>
+  <li>
+    <strong>Autor</strong>: wer das Foto aufgenommen hat.
+  </li>
+  <li>
+    <strong>Aufnahmedatum</strong>: wann das Foto entstanden ist, nicht wann es hochgeladen
+    wurde. Ein Klick auf das Feld öffnet einen Kalender.
+    <strong>Einstellung löschen</strong> darunter leert das Datum wieder.
+  </li>
+  <li>
+    <strong>Beschreibung</strong>: freier Text zum Foto.
+  </li>
+</ul>
+
+<p>
+  Alle Änderungen werden erst mit <strong>Einstellungen sichern</strong> übernommen.
+</p>
+
+<div class="hinweis">
+  <p>
+    Der <strong>Dateiname</strong> steht oben links im grauen Kasten und lässt sich nicht
+    ändern. Dort stehen auch Abmessungen, Dateigröße und Dateityp sowie rechts daneben, wann
+    das Foto eingestellt wurde, von wem und wie oft es angesehen wurde.
+  </p>
+</div>
+
+<h3>Die weiteren Felder derselben Seite</h3>
+
+<ul>
+  <li>
+    <strong>Verknüpfte Alben</strong>: die Alben, in denen das Foto liegt. Das
+    <strong>x</strong> entfernt eines, <strong>Hinzufügen</strong> ergänzt eines.
+  </li>
+  <li>
+    <strong>Album-Vorschaubild</strong>: macht dieses Foto zum Titelbild der hier gewählten
+    Alben.
+  </li>
+  <li>
+    <strong>Schlagworte</strong>: siehe <a href="04-schlagworte.html">Schlagworte vergeben</a>.
+  </li>
+  <li>
+    <strong>Wer soll dieses Foto sehen können? (Datenschutzstufe)</strong>: schränkt ein, wer
+    das Foto zu sehen bekommt. <strong>Jeder</strong> ist die offene Einstellung, die übrigen
+    Stufen beschränken es auf Kontakte, Freunde, Familie oder Administratoren.
+  </li>
+</ul>
+
+<div class="hinweis">
+  <p>
+    Beim Sichern gilt für <strong>Verknüpfte Alben</strong> genau die Liste, die im Feld steht.
+    Ein Album, das hier fehlt, verliert das Foto. Das Feld ergänzt also nicht, es ersetzt.
+    Wer ein Foto einem weiteren Album hinzufügen will, ohne die bisherigen zu verlieren,
+    benutzt in der Stapelverarbeitung die Aktion <strong>Mit einem Album verbinden</strong>
+    (siehe <a href="02-fotos.html">Fotos zu einem Album hinzufügen</a>). Das Album, in dem die
+    Datei physisch liegt, kann nicht entfernt werden.
+  </p>
+</div>
+
+<h3>Herkunft und Notiz</h3>
+
+<p>
+  Unter den Kernfeldern steht der Abschnitt <strong>Herkunft</strong>. Er beschreibt, woher die
+  Vorlage stammt.
+</p>
+
+<figure>
+  <img src="assets/screenshots/10-foto-notiz.png" alt="Der Abschnitt Herkunft mit dem Feld Notiz" />
+  <figcaption>Der Abschnitt Herkunft. Nur die Notiz ist hier veränderbar.</figcaption>
+</figure>
+
+<ul>
+  <li>
+    <strong>Physisches Album</strong>, <strong>Eigentümer</strong>,
+    <strong>Gescannt am</strong> und <strong>Albumnotiz</strong> stehen als Text da und lassen
+    sich auf dieser Seite nicht bearbeiten. Sie gelten für das ganze Album und werden dort
+    gepflegt, in den Eigenschaften des Albums.
+  </li>
+  <li>
+    <strong>Notiz</strong> ist das einzige Feld dieses Abschnitts, das zu diesem einen Foto
+    gehört. Hier steht, was nur für dieses Bild gilt, etwa eine Beschriftung auf der Rückseite
+    oder ein Schaden am Abzug.
+  </li>
+</ul>
+
+<p>
+  Der Abschnitt hat eine eigene Schaltfläche <strong>Einstellungen sichern</strong> direkt
+  darunter. Sie sichert die Notiz. Die Meldung lautet danach
+  <strong>Herkunft gespeichert</strong>.
+</p>
+
+<h3>Wo die Texte öffentlich erscheinen</h3>
+
+<figure>
+  <img src="assets/screenshots/11-foto-oeffentlich.png" alt="Die Fotoseite, wie Besucher sie sehen" />
+  <figcaption>Die Fotoseite. Links das Foto mit Titel und Beschreibung, rechts die Angaben.</figcaption>
+</figure>
+
+<ul>
+  <li><strong>Titel</strong>: als Überschrift über dem Foto und im Titel des Browserfensters.</li>
+  <li><strong>Beschreibung</strong>: als Text direkt unter dem Foto.</li>
+  <li><strong>Autor</strong>: rechts in den Angaben unter <strong>Autor</strong>.</li>
+  <li>
+    <strong>Aufnahmedatum</strong>: rechts unter <strong>Erstellt am</strong>. Daneben steht
+    unter <strong>Veröffentlicht am</strong> das Datum des Uploads.
+  </li>
+  <li>
+    <strong>Herkunft</strong>: rechts als eigene Zeile. Die fünf Angaben stehen dort
+    hintereinander, durch senkrechte Striche getrennt.
+  </li>
+</ul>
+
+<nav class="zurueck">
+  <a href="index.html">Zurück zum Inhalt</a> ·
+  <a href="02-fotos.html">Zurück: Fotos hinzufügen</a> ·
+  <a href="04-schlagworte.html">Weiter: Schlagworte vergeben</a>
+</nav>
+
+</body>
+</html>

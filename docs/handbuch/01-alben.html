@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Album anlegen und beschreiben</title>
+<link rel="stylesheet" href="assets/handbuch.css" />
+</head>
+<body>
+
+<h2>Album anlegen und beschreiben</h2>
+
+<p>
+  Alben gliedern die Galerie. Ein Foto kann in mehreren Alben liegen. Angelegt und bearbeitet
+  werden Alben in der Verwaltung unter <span class="pwgScreen">Alben » Verwaltung</span>
+  (<code>admin.php?page=albums</code>). Dafür sind Administratorrechte nötig.
+</p>
+
+<figure>
+  <img src="assets/screenshots/01-alben-verwaltung.png" alt="Die Albenliste in der Verwaltung" />
+  <figcaption>Die Albenliste. Jede Zeile hat rechts die Schaltflächen für dieses Album.</figcaption>
+</figure>
+
+<p>Die Schaltflächen am rechten Rand einer Zeile, von links nach rechts:</p>
+<ul>
+  <li><strong>Album hinzufügen</strong>: legt ein Unteralbum in diesem Album an.</li>
+  <li><strong>Album bearbeiten</strong>: öffnet die Eigenschaften mit Name und Beschreibung.</li>
+  <li><strong>Fotos hinzufügen</strong>: öffnet den Upload für dieses Album.</li>
+  <li><strong>Galerie ansehen</strong>: öffnet das Album so, wie Besucher es sehen.</li>
+  <li>
+    <strong>Automatische Sortierreihenfolge</strong>: sortiert die Unteralben dieses Albums.
+    Hat das Album keine Unteralben, ist die Schaltfläche ausgegraut und ohne Funktion.
+  </li>
+  <li><strong>Album löschen</strong>: entfernt das Album.</li>
+</ul>
+
+<h3>Album anlegen</h3>
+
+<ol>
+  <li>
+    <span class="pwgScreen">Verwaltung » Alben » Verwaltung</span> öffnen.
+  </li>
+  <li>
+    Oben links auf <strong>Album hinzufügen</strong> klicken. Damit entsteht ein Album im
+    Stammverzeichnis. Für ein Unteralbum stattdessen die Schaltfläche
+    <strong>Album hinzufügen</strong> in der Zeile des gewünschten Albums verwenden.
+  </li>
+  <li>
+    <strong>Albumname</strong> eingeben.
+  </li>
+  <li>
+    Unter <strong>Position</strong> festlegen, ob das Album an erster oder an letzter Stelle
+    einsortiert wird: <strong>Erster Platz</strong> oder <strong>Letzter Platz</strong>.
+  </li>
+  <li>
+    Auf <strong>Hinzufügen</strong> klicken. <strong>Abbrechen</strong> schließt den Dialog,
+    ohne etwas anzulegen.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/02-album-hinzufuegen.png" alt="Der Dialog zum Anlegen eines Albums" />
+  <figcaption>Der Dialog fragt nur nach Name und Position.</figcaption>
+</figure>
+
+<div class="hinweis">
+  <p>
+    Der Dialog hat kein Feld für die Beschreibung. Die Beschreibung wird danach in den
+    Eigenschaften des Albums eingetragen.
+  </p>
+</div>
+
+<h3>Beschreibung ergänzen</h3>
+
+<ol>
+  <li>
+    In der Albenliste in der Zeile des Albums auf <strong>Album bearbeiten</strong> klicken.
+    Die Eigenschaften öffnen sich unter
+    <code>admin.php?page=album-&lt;nummer&gt;-properties</code>.
+  </li>
+  <li>
+    Text in das Feld <strong>Beschreibung</strong> schreiben.
+  </li>
+  <li>
+    Auf <strong>Einstellungen sichern</strong> klicken. Ohne diesen Schritt bleibt die
+    Änderung nicht erhalten.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/03-album-eigenschaften.png" alt="Die Eigenschaften eines Albums" />
+  <figcaption>Eigenschaften des Albums, mit Name, Beschreibung und übergeordnetem Album.</figcaption>
+</figure>
+
+<p>Die Felder auf dieser Seite:</p>
+<ul>
+  <li>
+    <strong>Name</strong>: der Name, der Besuchern angezeigt wird. Er kann jederzeit geändert
+    werden.
+  </li>
+  <li>
+    <strong>Beschreibung</strong>: freier Text über den Inhalt des Albums. Er erscheint auf der
+    öffentlichen Albumseite über den Vorschaubildern.
+  </li>
+  <li>
+    <strong>Übergeordnetes Album</strong>: das Album, in dem dieses Album liegt.
+    <strong>Stamm</strong> bedeutet oberste Ebene. Über den Stift daneben wird das Album
+    verschoben.
+  </li>
+  <li>
+    <strong>Geschlossenes Album</strong>: sperrt das Album vorübergehend, etwa während es
+    befüllt wird. Besucher sehen es dann nicht.
+  </li>
+</ul>
+
+<p>
+  Oben zeigt die Seite, wann das Album erstellt und zuletzt geändert wurde und wie viele Fotos
+  und Unteralben es enthält. Die Schaltfläche <strong>In Galerie öffnen</strong> unten links
+  zeigt das Album so, wie Besucher es sehen.
+</p>
+
+<h3>Wo die Beschreibung erscheint</h3>
+
+<p>
+  Auf der öffentlichen Albumseite steht die Beschreibung zwischen dem Albumnamen und den
+  Vorschaubildern.
+</p>
+
+<figure>
+  <img src="assets/screenshots/04-album-oeffentlich.png" alt="Das Album, wie Besucher es sehen" />
+  <figcaption>Die Albumseite. Die Beschreibung steht über den Vorschaubildern.</figcaption>
+</figure>
+
+<nav class="zurueck">
+  <a href="index.html">Zurück zum Inhalt</a> ·
+  <a href="02-fotos.html">Weiter: Fotos zu einem Album hinzufügen</a>
+</nav>
+
+</body>
+</html>

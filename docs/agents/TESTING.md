@@ -516,6 +516,109 @@ were left behind across the run and removed by hand afterwards; the install was 
 5 albums, 105 photos, 8 tags and 8 colours. This is a property of the mutants, not of teardown:
 a real regression produces no warning output, and the adopt-then-destroy path runs normally.
 
+## The handbook's own claims, and the E2E gap they exposed (2026-08-31)
+
+`docs/handbuch/` documents five workflows. Reconciling every control it names against the
+three suites found that most of what it tells a reader to click was witnessed by nothing:
+the controls are assembled or revealed by JavaScript, so the integration layer's page-source
+assertions cannot reach them, and a change to any of them would leave the handbook quietly
+describing a screen nobody has.
+
+Nineteen specs were added. None writes anything: where a workflow's outcome is already proven
+at the integration layer - creating an album, associating a photo - the spec stops at the
+control the handbook names rather than restating the outcome one layer up
+(`.claude/rules/testing.md`, placement rule).
+
+- `plugins/provenance/tests/e2e/core-admin-screens.spec.js` (+8, with `support/CoreAdminPages.js`).
+  Core has no suite of its own, which is why this file is already its home. The album row's six
+  actions and their labels, the sort action's disabled state, the add-album dialog, the tag menu's
+  five entries, the merge panel, the upload screen's Optionen control, the Batch Manager's
+  associate picker, and `[NEG]` four core admin screens refusing a normal account.
+- `plugins/provenance/tests/e2e/handbuch-pages.spec.js` (+7). The handbook pages opened over
+  `file://`, which is the plan's own success criterion and a fact no server-side check can reach.
+- `plugins/typetags/tests/e2e/normal-account.spec.js` (+1). See below.
+
+Both suites gained a second setup test saving a non-administrator session; neither had one.
+
+### The finding: a whole suite that could not witness its own permission model
+
+Every typetags spec ran as `typetags_webmaster`. Decision 0005 deliberately opens colour
+assignment on the picture page to any logged-in non-guest, and `04-schlagworte.html` builds a
+section on that - it tells readers without administrator rights to add and remove coloured tags
+there. A webmaster passes an admin gate as readily as a non-admin one, so the suite could not
+tell the two apart: had those methods become `admin_only`, nothing would have gone red and the
+handbook would have been wrong for most of its readers. Watched red by adding an `is_admin()`
+guard to `ws_typetags_image_addTag()`.
+
+### The finding: the handbook documented a button by what its icon looks like
+
+Writing the row-action spec surfaced that `Automatische Sortierreihenfolge` orders **sub-albums**
+(`albums.js:110-118` sets `simpleAutoOrder` to `str_sub_album_order`) and is greyed out for an
+album with none (`albums.js:392-393`). `01-alben.html` said it reorders the album's photos. The
+page was corrected in the same change.
+
+The spec that records it is stated as an **invariant** - the action is inert exactly on rows
+marked as having no children - rather than as a distribution. Every album on this install is
+currently top-level, so only the inert side is exercised today; a spec demanding both would go
+red the day somebody nests an album. The first draft did demand both, and its anti-vacuity guard
+fired immediately, which is how the flat tree was discovered.
+
+### Every new spec watched go red
+
+All nineteen passed on their first run, which is normally the tell that a test recorded code
+rather than drove it. Each mutant below was applied to production code, the container's
+`md5sum` compared against the host's before the run (Mutagen delays a host edit reaching the
+runtime), and reverted afterwards; `git diff` over `admin/`, `include/`, `themes/` and
+`language/` was empty at the end.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `is_admin()` guard added to `ws_typetags_image_addTag()` | the normal-account colour spec | killed |
+| `.move-cat-order` greying removed (`albums.js:393`) | the sort-action invariant | killed |
+| a row action's `title` replaced with an English literal (`albums.js:361`) | the row-label spec | killed |
+| the `Duplicate` entry deleted from the tag menu (`tags.tpl:70`) | the five-entries spec | killed |
+| `Confirm merge` translated into German (`tags.tpl:110`) | the `[ERR]` merge spec | killed |
+| `id="place-end"` renamed on the add-album radio (`albums.tpl:181`) | the add-album dialog spec | killed |
+| `slideToggle()` removed from the Optionen control (`photos_add_direct.js:92`) | the upload-screen spec | killed |
+| `id="associate_as"` renamed (`batch_manager_global.tpl`) | the associate-picker spec | killed |
+| the stylesheet href broken on one handbook page | that page's `file://` spec | killed |
+| the normal session file replaced with the webmaster's | the four `[NEG]` refusal specs | killed (all four) |
+
+Two notes on honesty. The refusal specs are the one case where the mutant is the **fixture**
+rather than production code: an admin gate has no production mutation that makes a non-admin
+pass without opening the gate for real, so the spec's discriminating power is shown by handing
+it the wrong account. It has to be run with `--no-deps`, or the setup project rewrites the
+session before the specs read it - the first attempt did exactly that and reported four passes
+that meant nothing.
+
+And one mutant was **discarded rather than recorded as surviving**: forcing
+`style="display:block"` onto `#uploadOptionsContent` left the spec green, because
+`photos_add_direct.js:90` hides the element on init regardless. That mutant changed no
+observable behaviour, so it was an invalid mutant, not a weak test; it was replaced with the
+`slideToggle()` removal above, which is the behaviour the spec actually claims to watch.
+
+### Suites after the change (measured 2026-08-31)
+
+E2E: provenance 48, typetags 32, persons 31. Both changed suites pass twice in a row and in
+reverse file order. The PHP suites were not re-run: this change touches no PHP production code,
+only documentation, E2E specs and one new documentation checker.
+
+### What is still not covered, and why
+
+Named rather than dropped, per *report gaps, don't hide them*:
+
+- **The album description and the four photo texts on the public page.** Server-rendered, so the
+  right layer is a source assertion, not a browser; adding a browser test would restate a lower
+  layer's rule.
+- **Creating an album through the add-album dialog end to end.** The dialog is covered; the
+  outcome is `CoreAlbumCharacterizationTest`'s. A browser spec would have to create a real album
+  and clean it up, and a half-failed run leaves exactly the leftover Phase 1 of this plan spent
+  its time removing.
+- **The tag delete confirmation and the orphan-tags `Überprüfung` dialog.** Both destructive on
+  confirm; both documented from the template rather than witnessed.
+- **Persons rename and delete on the admin screen.** `AdminPersonsPage.js` carries no locators
+  for them. Pre-existing gap, unrelated to the handbook.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
@@ -569,3 +672,6 @@ than accumulating. Nothing is marked done on prose alone.
 | Whether a drawn figure could be mistaken for a real person, and whether the demo album reads as a plausible gallery rather than a confusing abstraction | Subjective. The falsifiable half is automated: `assert_no_generated_photo_is_a_gallery_copy()` proves no published photo is a byte copy of a gallery image, which is the only known route by which a private scan reaches the handbook. What the drawn shapes evoke is not a fact an assertion settles. |
 | Whether the German titles, album description and photo texts read naturally | Subjective. The mechanical half is automated: every text is compared against its constant on the way out of MariaDB, and `assert_german_texts_round_tripped()` fails if the set stops carrying a German special character. Whether the wording sounds like a person wrote it has no oracle. |
 | Committing does not *feel* slow with the pre-commit hook installed | Subjective, and a wall-clock assertion would violate *assert the causal fact, not a wall-clock figure*. |
+| Whether each of the five documented workflows can actually be completed by following only `docs/handbuch/`, without reading the code | The oracle is a first-time reader, not a machine. What a machine can decide is checked by `docs/handbuch/tools/check.php`: every reference resolves, every screenshot is referenced, every page is well formed, and every `admin.php?page=` route quoted in the text resolves the way `admin.php` resolves it. Whether a step is *missing* from a sequence is not among those. |
+| Whether the German of the handbook reads naturally and matches the on-screen wording exactly | Subjective on the first half, and unautomatable on the second: the handbook quotes what a screen says, and no assertion can compare running prose against a rendered screen. The strings themselves are guarded where they live - `GermanOverrideKeyTest` and `GermanAdminScreenTest` for the translated ones - so a wording change breaks a test at its source rather than silently diverging from the handbook. |
+| Whether a screenshot still shows the screen the text beside it describes | Subjective. `assertOutput()` in `shoot.js` proves every declared shot exists and that no undeclared file sits beside them, and `assertNoForeignPhoto()` proves no frame held a photo outside the demo album. That a shot is *framed on the right thing* has no oracle. |
