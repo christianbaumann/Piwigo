@@ -426,10 +426,16 @@ describes a guard, not a trap.
 - [x] `test_dry_run_connects_to_nothing` still passes unchanged — the preflight must not break it
 
 #### Manual Verification
-- [ ] Real run against `bilder.foerderverein-sefferweich.de` with the existing manifest: prints
-      `preflight installed, … — manifest and remote agree` and proceeds.
-- [ ] Move `.state/<host>_root.json` aside, run again: aborts with exit 9 and the
-      no-manifest message; restore the file.
+- [x] Real run against `bilder.foerderverein-sefferweich.de` with the existing manifest: prints
+      `preflight installed, … — manifest and remote agree` and proceeds. Run 2026-09-01:
+      `preflight   installed — manifest and remote agree`, then 27 new / 1 changed sent,
+      install skipped, all three plugins active. No `galleries` line — nothing irreplaceable
+      was pruned.
+- [x] Move `.state/<host>_root.json` aside, run again: aborts with exit 9 and the
+      no-manifest message; restore the file. Run 2026-09-01: `EXIT=9`, the message named the
+      3335 files it would have re-uploaded and both `--adopt-remote-state` and `--audit`, and
+      the report stopped after the `manifest … (new)` line — no `transport` line, so no FTPS
+      connection was opened. Manifest restored.
 
 **Implementation Note**: pause for confirmation before Phase 4.
 
