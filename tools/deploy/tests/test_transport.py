@@ -28,12 +28,14 @@ class ScriptedFtp:
     """A double for `ftplib.FTP_TLS`. Records every call in order, and can be told to
     refuse a command with the permanent error a real server would send."""
 
-    def __init__(self, feat=FEAT_WITH_TLS, refuse=(), **kwargs):
+    def __init__(self, feat=FEAT_WITH_TLS, refuse=(), listed=None, **kwargs):
         self.feat = feat
         self.refuse = tuple(refuse)
         self.init_kwargs = kwargs
         self.calls = []
         self.stored = {}
+        # What MLSD answers per directory: ftplib yields (name, facts) pairs.
+        self.listed = dict(listed or {})
 
     def _record(self, name, *args):
         self.calls.append((name,) + args)
@@ -71,6 +73,11 @@ class ScriptedFtp:
 
     def delete(self, path):
         self._record("delete", path)
+
+    def mlsd(self, path="", facts=()):
+        self._record("mlsd", path, tuple(facts))
+        self._maybe_refuse("MLSD " + path)
+        return iter(self.listed.get(path, []))
 
     def size(self, path):
         self._record("size", path)
@@ -319,6 +326,66 @@ def test_exists_is_false_when_the_server_refuses_the_path():
     subject, _double = connected(refuse=("SIZE",))
 
     assert subject.exists("/www/nothing.php") is False
+
+
+# --- list_dir -------------------------------------------------------------------------
+
+# One directory as a real MLSD answers it: the two navigation entries a server always
+# sends first, then a file and a subdirectory.
+MLSD_ANSWER = [
+    (".", {"type": "cdir"}),
+    ("..", {"type": "pdir"}),
+    ("index.php", {"type": "file"}),
+    ("themes", {"type": "dir"}),
+]
+
+
+def test_mlsd_entries_become_files_and_directories():
+    """[HAPPY] The one fact the walk needs per entry, asked for by name so the server
+    sends nothing else."""
+    subject, double = connected(listed={"/www": MLSD_ANSWER})
+
+    entries = subject.list_dir("/www")
+
+    assert entries == [
+        transport.RemoteEntry(name="index.php", is_dir=False),
+        transport.RemoteEntry(name="themes", is_dir=True),
+    ]
+    assert double.calls == [("mlsd", "/www", transport.MLSD_FACTS)]
+
+
+def test_mlsd_skips_the_self_and_parent_entries():
+    """[ERR] `.` and `..` are listed by every server and are not content; walking into
+    `..` would climb out of the remote root, and into `.` would never terminate."""
+    subject, _double = connected(listed={"/www": MLSD_ANSWER})
+
+    names = [entry.name for entry in subject.list_dir("/www")]
+
+    assert set(transport.MLSD_SKIP_TYPES) == {"cdir", "pdir"}
+    assert "." not in names and ".." not in names
+    assert names, "the listing is empty; this test would pass on nothing"
+
+
+def test_listing_an_empty_directory_is_not_an_error():
+    """[BVA]"""
+    subject, _double = connected(listed={"/www": []})
+
+    assert subject.list_dir("/www") == []
+
+
+def test_a_server_that_refuses_mlsd_fails_with_a_transport_error_naming_it():
+    """[NEG] MLSD is an optional extension. There is no NLST fallback on purpose — NLST
+    cannot tell a file from a directory — so the failure has to say which command was
+    refused, and that only --audit needs it."""
+    subject, _double = connected(refuse=("MLSD",))
+
+    with pytest.raises(TransportError) as raised:
+        subject.list_dir("/www")
+
+    message = str(raised.value)
+    assert "MLSD" in message
+    assert "/www" in message
+    assert transport.AUDIT_ONLY_HINT in message
 
 
 def test_close_quits_the_session():

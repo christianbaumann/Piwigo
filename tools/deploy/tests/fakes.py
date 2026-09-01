@@ -12,6 +12,7 @@ from pathlib import Path
 
 from pwgdeploy.errors import TransportError
 from pwgdeploy.http import Response
+from pwgdeploy.transport import RemoteEntry
 
 
 class FakeTransport:
@@ -78,6 +79,30 @@ class FakeTransport:
     def exists(self, remote_path: str) -> bool:
         self.calls.append(("exists", remote_path))
         return remote_path in self.files
+
+    def list_dir(self, remote_dir: str) -> list[RemoteEntry]:
+        """The tree `self.files` implies, one directory at a time.
+
+        Directories are synthesised from the path segments rather than tracked
+        separately, so anything seeded into `files` — including content this deploy never
+        wrote — is listed exactly as a server would list it. Recorded in `calls` like
+        every other operation, which is what lets an audit test assert that no `delete`
+        was ever issued.
+        """
+        self.calls.append(("list_dir", remote_dir))
+        prefix = remote_dir.rstrip("/")
+        prefix = f"{prefix}/" if prefix else ""
+        entries: dict[str, bool] = {}
+        for path in self.files:
+            if not path.startswith(prefix):
+                continue
+            name, separator, _rest = path[len(prefix) :].partition("/")
+            if name:
+                entries[name] = bool(separator)
+        return [
+            RemoteEntry(name=name, is_dir=is_dir)
+            for name, is_dir in sorted(entries.items())
+        ]
 
     # --- what tests ask it -----------------------------------------------------------
 

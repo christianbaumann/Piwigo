@@ -12,11 +12,12 @@ import sys
 import time
 from pathlib import Path
 
-from pwgdeploy import bootstrap, fileset, manifest, preflight, upload, version
+from pwgdeploy import audit, bootstrap, fileset, manifest, preflight, upload, version
 from pwgdeploy.config import DeployConfig, load_file
 from pwgdeploy.errors import DeployError
 from pwgdeploy.http import UrllibClient
 from pwgdeploy.transport import FtplibTransport
+from pwgdeploy.urls import remote_path
 
 PROGRAM = "pwg-deploy"
 DESCRIPTION = (
@@ -31,6 +32,12 @@ BYTES_PER_MB = 1024 * 1024
 # Enough to act on without turning the report into the deletion list itself; the tail
 # says how many were not named.
 MAX_REPORTED_GALLERY_DELETIONS = 10
+# Same idea for the audit, which can legitimately find hundreds. Larger because its whole
+# output is the list, where the deploy's is one line of a longer report.
+MAX_REPORTED_ORPHANS = 20
+# The audit's closing claim, and the one thing an operator has to be able to trust about
+# it. Stated once here so the test that asserts it reads it rather than retyping it.
+AUDIT_READ_ONLY_NOTICE = "This is a read-only report. Nothing was deleted."
 
 # tools/deploy/ relative to this file: pwgdeploy/ -> deploy/ -> tools/ -> repository root.
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -47,6 +54,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--list-files", action="store_true", help="print the published file set and exit"
+    )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="list the remote and report what the manifest does not cover; delete nothing",
     )
     parser.add_argument(
         "--no-bootstrap",
@@ -103,6 +115,12 @@ def main(
     started = clock()
     try:
         config = load_file(Path(args.config_json))
+
+        if args.audit:
+            _report_target(out, config)
+            _audit(out, config, state_dir, transport_factory)
+            return 0
+
         tracked_paths = tracked(repo_root)
 
         if args.list_files:
@@ -264,6 +282,73 @@ def _report_gallery_deletions(out, args, config, result) -> None:
     for path in photos[:MAX_REPORTED_GALLERY_DELETIONS]:
         _continuation(out, path)
     unnamed = len(photos) - MAX_REPORTED_GALLERY_DELETIONS
+    if unnamed > 0:
+        _continuation(out, f"… and {unnamed} more")
+
+
+def _audit(out, config, state_dir, transport_factory) -> None:
+    """List the remote and say what the manifest does not account for. Read-only.
+
+    A standalone mode, like `--list-files`: no preflight, no upload, no bootstrap. It is
+    the only thing in this tool that reads the server back, and the only way to see the
+    orphans the prune can never reach — but it removes nothing, because an over-broad
+    delete against a listing nobody has read is exactly the failure it exists to expose.
+    decision 0030.
+    """
+    root = config.ftp.remote_root
+    state_path = manifest.manifest_path(state_dir, config.ftp.host, root)
+    entries = manifest.load(state_path)
+    known = "existing" if state_path.exists() else "new"
+    _line(out, "manifest", f"{state_path} ({known}, {len(entries)} entries)")
+
+    transport = transport_factory(config)
+    _line(out, "transport", f"FTPS to {config.ftp.host}:{config.ftp.port}")
+    transport.connect()
+    try:
+        files, directories = audit.walk(transport.list_dir, root)
+    finally:
+        transport.close()
+
+    generated = {remote_path(root, name) for name in fileset.GENERATED_REMOTE_PATHS}
+    report = audit.compare(
+        files, entries, generated, directories=directories, skipped=audit.AUDIT_SKIP
+    )
+
+    skipped = " ".join(f"{name}/" for name in report.skipped)
+    _line(
+        out,
+        "listed",
+        f"{_plural(len(files), 'file')} in "
+        f"{_plural(report.directories, 'directory', 'directories')} "
+        f"(skipped: {skipped})",
+    )
+    _line(
+        out,
+        "covered",
+        f"{_plural(len(report.covered), 'file')} the manifest records and the server holds",
+    )
+    _report_paths(
+        out, "orphans", report.orphans, "on the server the manifest does not cover"
+    )
+    _report_paths(
+        out, "missing", report.missing, "the manifest records and the server does not hold"
+    )
+    print(f"  {AUDIT_READ_ONLY_NOTICE}", file=out)
+
+
+def _plural(count: int, singular: str, plural: str | None = None) -> str:
+    """`1 file`, `3 files`. One is the count the real host reports for its one orphan."""
+    return f"{count} {singular}" if count == 1 else f"{count} {plural or singular + 's'}"
+
+
+def _report_paths(out, label: str, paths: list[str], what: str) -> None:
+    """One labelled count, then the paths themselves, capped. Silent when empty."""
+    if not paths:
+        return
+    _line(out, label, f"{_plural(len(paths), 'file')} {what}:")
+    for path in paths[:MAX_REPORTED_ORPHANS]:
+        _continuation(out, path)
+    unnamed = len(paths) - MAX_REPORTED_ORPHANS
     if unnamed > 0:
         _continuation(out, f"… and {unnamed} more")
 

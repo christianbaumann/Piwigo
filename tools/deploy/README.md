@@ -71,6 +71,7 @@ reports the plugins already active.
 |---|---|
 | `--dry-run` | enumerate, hash and diff; open no socket. Reports what *would* be sent **and deleted** |
 | `--list-files` | print the published file set and exit |
+| `--audit` | list the remote and report what the manifest does not cover; delete nothing |
 | `--no-bootstrap` | upload only; skip install, config, plugins and sync |
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
@@ -159,7 +160,44 @@ The same asymmetry is what makes prune safe. It only ever considers paths the pr
 recorded, which is why it cannot touch `upload/`, `_data/`, or anything a person put on the
 server by hand — and equally why it can never clean up after anything that bypassed it. A file
 dropped from the manifest while still on the server is an orphan no future run can reach; it
-has to be deleted over FTP by hand.
+has to be deleted over FTP by hand. `--audit` is how you find them.
+
+## `--audit` — what the server actually holds
+
+The one mode that reads the server back. It lists the remote tree, compares it against the
+manifest, and prints three buckets. It uploads nothing, installs nothing and **deletes
+nothing** — removing an orphan stays a hand operation over FTP.
+
+```
+$ uv run pwg-deploy --audit deploy.local.json
+Piwigo deploy -> bilder.example.de:/
+  manifest    /…/.state/bilder.example.de_root.json (existing, 3309 entries)
+  transport   FTPS to bilder.example.de:21
+  listed      3411 files in 402 directories (skipped: _data/ upload/)
+  covered     3308 files the manifest records and the server holds
+  orphans     103 files on the server the manifest does not cover:
+              plugins/removed_plugin/main.inc.php
+              … and 83 more
+  missing     1 file the manifest records and the server does not hold:
+              themes/modus/theme.css
+  This is a read-only report. Nothing was deleted.
+```
+
+- **orphans** are what no run can reach: prune only considers paths the previous manifest
+  recorded. `local/config/database.inc.php` is always among them — `install.php` wrote it on
+  the server and it never leaves this machine — and that is correct, not a fault.
+- **missing** means the manifest claims a file the server does not hold, so the next deploy
+  would call it unchanged and never send it. Delete the manifest, or pass
+  `--adopt-remote-state`, to force a full re-upload.
+- `upload/` and `_data/` are **not** walked. They are server-authoritative, the manifest
+  records nothing under either, and listing them would bury the real orphans under thousands
+  of files that are not orphans. The report names what it skipped.
+
+It needs `MLSD`, and says so loudly if the server does not offer it; there is no `NLST`
+fallback, because `NLST` cannot tell a file from a directory. Empty directories are never
+removed by anything in this tool
+([decision 0029](../../docs/agents/decisions/0029-empty-remote-directories-are-never-removed.md)).
+See [decision 0030](../../docs/agents/decisions/0030-the-audit-is-read-only-and-exists-stays-size-based.md).
 
 ### The one prune worth reading twice
 
@@ -189,7 +227,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-371 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
+403 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

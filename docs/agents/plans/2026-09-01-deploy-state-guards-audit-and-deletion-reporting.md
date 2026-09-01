@@ -548,7 +548,7 @@ compares against the manifest. It reports; it never deletes.
 
 ### Changes Required
 
-#### [ ] 1. The port grows a listing
+#### [x] 1. The port grows a listing
 **File**: `tools/deploy/pwgdeploy/transport.py`
 
 ```python
@@ -563,7 +563,7 @@ class Transport(Protocol):
         """One directory's entries. Used only by --audit; a deploy never lists."""
 ```
 
-#### [ ] 2. The adapter, MLSD only
+#### [x] 2. The adapter, MLSD only
 **File**: `tools/deploy/pwgdeploy/transport.py`
 
 ```python
@@ -576,7 +576,7 @@ MLSD_SKIP_TYPES = ("cdir", "pdir")
 needs a listing. No NLST fallback: NLST cannot distinguish a file from a directory, and probing
 each of 3400 names with a `CWD` is both slow and a second thing to keep correct.
 
-#### [ ] 3. The pure walk and compare
+#### [x] 3. The pure walk and compare
 **File**: `tools/deploy/pwgdeploy/audit.py` (new)
 
 ```python
@@ -605,20 +605,20 @@ def compare(remote_files, entries, generated) -> AuditReport:
 `local/config/database.inc.php` is written by `install.php` on the server and appears as an
 orphan; that is correct and the report says so in its own line rather than special-casing it.
 
-#### [ ] 4. `FakeTransport` grows `list_dir`
+#### [x] 4. `FakeTransport` grows `list_dir`
 **File**: `tools/deploy/tests/fakes.py`
 **Changes**: derives entries from `self.files` keys, synthesising directories from path
 segments, and records `("list_dir", remote_dir)` in `calls` like every other operation. That is
 what lets an audit test assert **no** `delete` call was ever made.
 
-#### [ ] 5. The flag and the report
+#### [x] 5. The flag and the report
 **File**: `tools/deploy/pwgdeploy/cli.py`
 **Changes**: `--audit` is a standalone mode like `--list-files`: it connects, lists, reports,
 and returns `0`. It runs no preflight, no upload and no bootstrap. `MAX_REPORTED_ORPHANS = 20`,
 with an `… and N more` tail. The report ends with the literal sentence
 `This is a read-only report. Nothing was deleted.`
 
-#### [ ] 6. Decisions 0029 and 0030
+#### [x] 6. Decisions 0029 and 0030
 **Files**:
 `docs/agents/decisions/0029-empty-remote-directories-are-never-removed.md`,
 `docs/agents/decisions/0030-the-audit-is-read-only-and-exists-stays-size-based.md`
@@ -629,7 +629,7 @@ removed by hand over FTP), and that `exists()` keeps its `SIZE`-based directory 
 though `list_dir` could now answer correctly — nothing in the tool calls `exists()`, and a
 second way to ask one question is the copy that rots.
 
-#### [ ] 7. README and rules file
+#### [x] 7. README and rules file
 **Files**: `tools/deploy/README.md`, `.claude/rules/deployment.md`
 **Changes**: `--audit` in the flag table with a worked example; the rules file's "prune only ever
 considers what the previous manifest recorded … a path dropped from the manifest is an orphan no
@@ -638,17 +638,24 @@ run can reach" paragraph now points at `--audit` as the way to find them.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes
-- [ ] An audit test asserts `"delete" not in transport.names()` — the read-only claim, made
+- [x] `cd tools/deploy && uv run pytest` passes
+- [x] An audit test asserts `"delete" not in transport.names()` — the read-only claim, made
       mechanical
-- [ ] A `MIN_AUDIT_FILES` lower bound guards every audit count assertion
+- [x] A `MIN_AUDIT_FILES` lower bound guards every audit count assertion
 
 #### Manual Verification
-- [ ] `uv run pwg-deploy --audit deploy.local.json` against the real host. Record the counts and
+- [x] `uv run pwg-deploy --audit deploy.local.json` against the real host. Record the counts and
       whether MLSD is supported in `docs/agents/TESTING.md`, dated. This is the only way to learn
-      whether the host answers MLSD at all.
-- [ ] If orphans are reported, spot-check two of them over FTP by hand before believing the
-      report.
+      whether the host answers MLSD at all. Run 2026-09-01: **MLSD supported**, `3337 files in
+      394 directories (skipped: _data/ upload/)` in 75.8 s, `covered 3336` (the whole manifest),
+      one orphan, no missing files. Ledger row added.
+- [x] If orphans are reported, spot-check two of them over FTP by hand before believing the
+      report. **Only one orphan exists** — `local/config/database.inc.php`, written by
+      `install.php` and unreachable by any run, exactly as the README predicts. Checked over
+      HTTPS rather than FTP, so the oracle is not the tool's own listing: it answers 200, the
+      *covered* `config.inc.php` answers 200 (so the generated-config exception holds on the
+      real host), and a path the audit did not list answers 404 — the control that makes a 200
+      mean something. Found and fixed one cosmetic defect: the report said `1 files`.
 
 **Implementation Note**: pause for confirmation before Phase 6.
 
@@ -821,33 +828,33 @@ is a recorded gap, not a silent one.
 
 #### Phase 5 — the audit (`tests/test_audit.py` new, `tests/test_transport.py`, `tests/test_cli.py`)
 
-- [ ] `test_walk_finds_a_file_at_the_root` `[HAPPY]`
-- [ ] `test_walk_descends_into_a_subdirectory` `[HAPPY]`
-- [ ] `test_walk_of_an_empty_remote_finds_nothing` `[BVA]`
-- [ ] `test_walk_skips_the_server_authoritative_directories` — `_data/` and `upload/`, read from
+- [x] `test_walk_finds_a_file_at_the_root` `[HAPPY]`
+- [x] `test_walk_descends_into_a_subdirectory` `[HAPPY]`
+- [x] `test_walk_of_an_empty_remote_finds_nothing` `[BVA]`
+- [x] `test_walk_skips_the_server_authoritative_directories` — `_data/` and `upload/`, read from
       `fileset.REMOTE_DIRS_TO_CREATE` `[ECP]`
-- [ ] `test_walk_stops_at_the_depth_limit` — a `list_dir` that returns itself forever; without
+- [x] `test_walk_stops_at_the_depth_limit` — a `list_dir` that returns itself forever; without
       this the test hangs rather than fails `[BVA]`
-- [ ] `test_walk_counts_every_directory_it_listed` `[HAPPY]`
-- [ ] `test_compare_puts_a_recorded_and_present_file_in_covered` `[ECP]`
-- [ ] `test_compare_puts_an_unrecorded_present_file_in_orphans` `[ECP]`
-- [ ] `test_compare_puts_a_recorded_absent_file_in_missing` `[ECP]`
-- [ ] `test_the_generated_config_is_covered_not_an_orphan` — it is in the manifest but not the
+- [x] `test_walk_counts_every_directory_it_listed` `[HAPPY]`
+- [x] `test_compare_puts_a_recorded_and_present_file_in_covered` `[ECP]`
+- [x] `test_compare_puts_an_unrecorded_present_file_in_orphans` `[ECP]`
+- [x] `test_compare_puts_a_recorded_absent_file_in_missing` `[ECP]`
+- [x] `test_the_generated_config_is_covered_not_an_orphan` — it is in the manifest but not the
       file set; the same trap `upload.py:62-69` already fixed once `[ERR]`
-- [ ] `test_compare_of_an_empty_manifest_makes_everything_an_orphan` `[BVA]`
-- [ ] `test_compare_of_an_empty_listing_makes_everything_missing` `[BVA]`
-- [ ] `test_mlsd_entries_become_files_and_directories` — against `ScriptedFtp` `[HAPPY]`
-- [ ] `test_mlsd_skips_the_self_and_parent_entries` — `cdir` / `pdir` `[ERR]`
-- [ ] `test_a_server_that_refuses_mlsd_fails_with_a_transport_error_naming_it` `[NEG]`
-- [ ] `test_audit_deletes_nothing` — `"delete" not in transport.names()`, the read-only claim
+- [x] `test_compare_of_an_empty_manifest_makes_everything_an_orphan` `[BVA]`
+- [x] `test_compare_of_an_empty_listing_makes_everything_missing` `[BVA]`
+- [x] `test_mlsd_entries_become_files_and_directories` — against `ScriptedFtp` `[HAPPY]`
+- [x] `test_mlsd_skips_the_self_and_parent_entries` — `cdir` / `pdir` `[ERR]`
+- [x] `test_a_server_that_refuses_mlsd_fails_with_a_transport_error_naming_it` `[NEG]`
+- [x] `test_audit_deletes_nothing` — `"delete" not in transport.names()`, the read-only claim
       `[NEG]`
-- [ ] `test_audit_uploads_nothing_and_runs_no_bootstrap` — `"put" not in transport.names()` and
+- [x] `test_audit_uploads_nothing_and_runs_no_bootstrap` — `"put" not in transport.names()` and
       `gallery.calls == []` `[NEG]`
-- [ ] `test_audit_reports_an_orphan_by_name` `[HAPPY]`
-- [ ] `test_audit_exits_zero_even_with_orphans` — a report is not a failure `[BVA]`
-- [ ] `test_more_orphans_than_the_cap_are_summarised` — `MAX_REPORTED_ORPHANS` + 1 `[BVA]`
-- [ ] `test_audit_says_it_deleted_nothing` — the literal closing sentence `[HAPPY]`
-- [ ] **Regression**: `test_dry_run_never_touches_the_transport` and every `test_transport.py`
+- [x] `test_audit_reports_an_orphan_by_name` `[HAPPY]`
+- [x] `test_audit_exits_zero_even_with_orphans` — a report is not a failure `[BVA]`
+- [x] `test_more_orphans_than_the_cap_are_summarised` — `MAX_REPORTED_ORPHANS` + 1 `[BVA]`
+- [x] `test_audit_says_it_deleted_nothing` — the literal closing sentence `[HAPPY]`
+- [x] **Regression**: `test_dry_run_never_touches_the_transport` and every `test_transport.py`
       test — the port grew an operation; nothing that existed may change
 
 #### Phase 6 — documents

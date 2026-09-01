@@ -1,14 +1,15 @@
 """The file-server port, and the one adapter that speaks to a real web space.
 
-Six operations, no more — everything the upload needs and nothing it does not. The
-adapter holds no decisions of its own beyond refusing a cleartext session (decision 2),
-which is why it is verified by hand once and recorded in the ledger rather than by an
-integration suite nobody could run without an FTPS server.
+Seven operations, no more — the six a deploy needs, plus the listing only `--audit`
+needs. The adapter holds no decisions of its own beyond refusing a cleartext session
+(decision 2), which is why it is verified by hand once and recorded in the ledger rather
+than by an integration suite nobody could run without an FTPS server.
 """
 
 from __future__ import annotations
 
 import ftplib
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -20,6 +21,22 @@ TRANSFER_BLOCKSIZE = 1 << 16
 # What FEAT must advertise before a password is sent. Plain FTP would put it on the wire
 # in clear, and the host offers FTPS, so its absence is a bug or an impostor.
 AUTH_TLS_FEATURE = "AUTH TLS"
+
+# The only fact the audit needs, asked for by name so the server sends nothing else.
+MLSD_FACTS = ("type",)
+# `.` and `..`, which every server lists and which are not content: walking into `..`
+# climbs out of the remote root, and into `.` never terminates.
+MLSD_SKIP_TYPES = ("cdir", "pdir")
+MLSD_DIR_TYPE = "dir"
+AUDIT_ONLY_HINT = "only --audit lists directories; a deploy is unaffected"
+
+
+@dataclass(frozen=True)
+class RemoteEntry:
+    """One line of a directory listing. `name` is the bare name, never a path."""
+
+    name: str
+    is_dir: bool
 
 
 class Transport(Protocol):
@@ -40,6 +57,9 @@ class Transport(Protocol):
         """False when the server has no SITE CHMOD — a warning, not a failed deploy."""
 
     def exists(self, remote_path: str) -> bool: ...
+
+    def list_dir(self, remote_dir: str) -> list[RemoteEntry]:
+        """One directory's entries. Used only by --audit; a deploy never lists."""
 
 
 class FtplibTransport:
@@ -132,8 +152,28 @@ class FtplibTransport:
         return True
 
     def exists(self, remote_path: str) -> bool:
+        # SIZE is refused for a directory, so this reports a directory that is plainly
+        # there as "already gone". Deliberately left alone: nothing in the tool calls it,
+        # and a second way to ask one question is the copy that rots. decision 0030.
         try:
             self._ftp.size(remote_path)
         except ftplib.error_perm:
             return False
         return True
+
+    def list_dir(self, remote_dir: str) -> list[RemoteEntry]:
+        # MLSD only, no NLST fallback: NLST cannot tell a file from a directory, and
+        # probing each of several thousand names with a CWD is both slow and a second
+        # thing to keep correct.
+        try:
+            listed = list(self._ftp.mlsd(remote_dir, facts=MLSD_FACTS))
+        except ftplib.all_errors as error:
+            raise TransportError(
+                f"MLSD of {remote_dir or 'the login directory'} failed: {error}. "
+                f"This server may not support MLSD — {AUDIT_ONLY_HINT}."
+            ) from error
+        return [
+            RemoteEntry(name=name, is_dir=facts.get("type") == MLSD_DIR_TYPE)
+            for name, facts in listed
+            if facts.get("type") not in MLSD_SKIP_TYPES
+        ]

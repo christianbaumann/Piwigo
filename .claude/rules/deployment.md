@@ -12,7 +12,8 @@ cd tools/deploy
 uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
-uv run pytest                                    # 371 tests, measured 2026-09-01
+uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
+uv run pytest                                    # 403 tests, measured 2026-09-01
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -83,16 +84,22 @@ reads the server back to decide what to send.
   `--dry-run` skips the check and says so, because it opens no connection.
 - **Prune only ever considers what the previous manifest recorded.** That is what makes it safe
   for `upload/` and `_data/`, and exactly why it can never clean up after anything that bypassed
-  it. A path dropped from the manifest while still on the server is an orphan no run can reach;
-  it has to be deleted over FTP by hand.
+  it. A path dropped from the manifest while still on the server is an orphan no run can reach.
+  `--audit` is the only thing that can *see* one — it lists the remote over `MLSD`, compares it
+  against the manifest and prints orphans and missing files by name — but it deletes nothing,
+  and neither does anything else here: removing an orphan is a hand operation over FTP, and no
+  code path issues `RMD`, so pruning a plugin's last file leaves its empty tree on the server
+  forever ([decision 0029](../../docs/agents/decisions/0029-empty-remote-directories-are-never-removed.md),
+  [decision 0030](../../docs/agents/decisions/0030-the-audit-is-read-only-and-exists-stays-size-based.md)).
 - **The tracked `galleries/` scans are prune-eligible on purpose**
   ([decision 0026](../../docs/agents/decisions/0026-tracked-gallery-photos-are-prune-eligible.md)),
   and they are the only published files no later run could put back. `cli._report_gallery_deletions()`
   names them on their own report line whenever a prune reaches one; the line's absence is the
   signal that nothing irreplaceable is at stake.
 - `FtplibTransport.exists()` asks `SIZE`, and a server refuses `SIZE` for a **directory** — it
-  will report a directory that is plainly there as "already gone". Check anything that might be a
-  directory with a listing.
+  will report a directory that is plainly there as "already gone". Deliberately left that way
+  (decision 0030): nothing in the tool calls it, and reimplementing it on `list_dir` would be a
+  second way to ask one question. Check anything that might be a directory with `list_dir`.
 
 ## What has no local test double
 

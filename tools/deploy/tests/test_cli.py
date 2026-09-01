@@ -14,6 +14,7 @@ import re
 import pytest
 
 from pwgdeploy import cli
+from pwgdeploy import fileset
 from pwgdeploy import preflight
 from pwgdeploy import version as pwgversion
 from pwgdeploy.errors import (
@@ -509,6 +510,124 @@ def test_verbose_names_each_uploaded_path(run):
     run.out.seek(0)
 
     assert "/piwigo/index.php" in verbose
+
+
+# --- --audit ---------------------------------------------------------------------------
+
+ORPHAN_REMOTE_PATH = "/piwigo/plugins/removed_plugin/main.inc.php"
+
+
+def _audited(run, *extra_remote_files: str):
+    """One deploy, then whatever else is on the server, then the audit over both."""
+    assert run() == 0
+    for path in extra_remote_files:
+        run.transport.files[path] = b"x"
+    run.transport.calls.clear()
+    run.gallery.calls.clear()
+    run.out.truncate(0)
+    run.out.seek(0)
+    return run("--audit")
+
+
+# What a completed deploy leaves on the server: the published file set plus the config
+# the bootstrap generates. The second half is the one an audit would wrongly call an
+# orphan, since git never enumerated it.
+EXPECTED_COVERED = EXPECTED_PUBLISHED + len(fileset.GENERATED_REMOTE_PATHS)
+
+
+def test_audit_deletes_nothing(run):
+    """[NEG] The read-only claim, made mechanical. An orphan is worth reporting only if
+    the report can be trusted not to have acted on it."""
+    assert _audited(run, ORPHAN_REMOTE_PATH) == 0
+
+    assert "delete" not in run.transport.names()
+    assert "list_dir" in run.transport.names(), "the audit listed nothing; this is vacuous"
+
+
+def test_audit_uploads_nothing_and_runs_no_bootstrap(run):
+    """[NEG] It is a standalone mode: no put, and not one request to the gallery — not
+    even the preflight's read-only GET."""
+    assert _audited(run) == 0
+
+    assert "put" not in run.transport.names()
+    assert run.gallery.calls == []
+
+
+def test_audit_reports_an_orphan_by_name(run):
+    """[HAPPY] The reason the mode exists: prune only considers what the manifest
+    records, so this path is one no run of this tool could ever reach."""
+    _audited(run, ORPHAN_REMOTE_PATH)
+
+    assert ORPHAN_REMOTE_PATH in run.text
+    assert "1 file on the server the manifest does not cover" in run.text
+
+
+def test_a_single_orphan_is_counted_in_the_singular(run):
+    """[BVA] One is the count the real host actually reports — `local/config/database.inc.php`,
+    written by install.php and unreachable by any run — so it is the phrasing an operator
+    reads most often, and `1 files` is the tell that nobody did."""
+    _audited(run, ORPHAN_REMOTE_PATH)
+
+    assert "1 file " in run.text and "1 files" not in run.text
+
+
+def test_audit_reports_a_file_the_server_lost_as_missing(run):
+    """[ECP] The other direction: the manifest calls it unchanged forever, so the next
+    deploy would never send it."""
+    assert run() == 0
+    lost = run.transport.paths("put")[0]
+    del run.transport.files[lost]
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    run("--audit")
+
+    assert lost in run.text
+    assert "the server does not hold" in run.text
+
+
+def test_audit_of_a_matching_remote_reports_neither_bucket(run):
+    """[NEG] Absence is what makes the two lists signal. Anti-vacuity: the covered count
+    proves the walk really read the tree — and it counts the generated config, which git
+    never enumerated and which a naive comparison would call an orphan."""
+    _audited(run)
+
+    assert f"{EXPECTED_COVERED} files the manifest records" in run.text
+    assert "orphans" not in run.text and "missing" not in run.text
+
+
+def test_audit_exits_zero_even_with_orphans(run):
+    """[BVA] A report is not a failure; an operator scripting around it must not see one."""
+    assert _audited(run, ORPHAN_REMOTE_PATH) == 0
+
+
+def test_more_orphans_than_the_cap_are_summarised(run):
+    """[BVA] One past MAX_REPORTED_ORPHANS: the report stays readable and still says how
+    many it did not name."""
+    over = cli.MAX_REPORTED_ORPHANS + 1
+
+    _audited(run, *[f"/piwigo/stray/{i}.php" for i in range(over)])
+
+    named = [line for line in run.text.splitlines() if "/piwigo/stray/" in line]
+    assert len(named) == cli.MAX_REPORTED_ORPHANS
+    assert f"{over - cli.MAX_REPORTED_ORPHANS} more" in run.text
+
+
+def test_audit_says_it_deleted_nothing(run):
+    """[HAPPY] The closing sentence, read off production rather than retyped here."""
+    _audited(run, ORPHAN_REMOTE_PATH)
+
+    assert cli.AUDIT_READ_ONLY_NOTICE in run.text
+
+
+def test_audit_does_not_walk_the_server_authoritative_directories(run):
+    """[ECP] `_data/` and `upload/` hold what the remote itself wrote. Listing them would
+    bury the real orphans under thousands of files that are not orphans."""
+    _audited(run, "/piwigo/_data/i/thumb.jpg", "/piwigo/upload/2026/photo.jpg")
+
+    assert "thumb.jpg" not in run.text and "photo.jpg" not in run.text
+    for name in fileset.REMOTE_DIRS_TO_CREATE:
+        assert f"{name}/" in run.text, "the skipped directories are not named on the report"
 
 
 def test_a_missing_credential_file_exits_with_the_config_code(config_file, repo, tmp_path):
