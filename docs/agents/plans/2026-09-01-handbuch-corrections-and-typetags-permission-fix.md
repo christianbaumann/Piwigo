@@ -491,7 +491,7 @@ in four fields, saves, sees nothing, and has no way to find out why.
 
 ### Changes Required
 
-#### [ ] 1. A new section on the album page
+#### [x] 1. A new section on the album page
 **File**: `handbuch/01-alben.html`, after "Beschreibung ergänzen"
 **Changes**: Document the section as it is: the `Herkunft` button opening a modal with four
 fields, `Einstellungen sichern` storing them on the album, and the two buttons that carry them
@@ -519,7 +519,7 @@ value as **Albumnotiz** — the album's note lands in the photos' `provenance_al
 (`provenance_copy_down_map()`, `functions.inc.php:177-185`). Say so, or a reader matching the
 two screens will think one is missing.
 
-#### [ ] 2. Point the photo page at it
+#### [x] 2. Point the photo page at it
 **File**: `handbuch/03-fototexte.html:105-117`
 **Changes**: The four read-only fields are explained as album-maintained but the mechanism is
 not named. Add the required step and a cross-reference.
@@ -534,39 +534,53 @@ hinzukommt, übernimmt sie von selbst.
 The last sentence is the inheritance path through the two fork-local triggers
 (`events_inherit.inc.php`, `main.inc.php:50-53`), default mode `keep`.
 
-#### [ ] 3. Cross-links both ways
+#### [x] 3. Cross-links both ways
 **File**: `handbuch/01-alben.html`, `handbuch/03-fototexte.html`
 **Changes**: A link from the new album section to `03-fototexte.html` for the per-photo Notiz,
 and back. `check.php` verifies both resolve.
 
 ### Test cases
 
-- [ ] `ddev exec php handbuch/tools/check.php` — the new section adds internal `href`s; both
+- [x] `ddev exec php handbuch/tools/check.php` — the new section adds internal `href`s; both
       directions must resolve `[NEG]`
-- [ ] The new section quotes no `admin.php?page=` route that check 7 cannot resolve. If one is
+- [x] The new section quotes no `admin.php?page=` route that check 7 cannot resolve. If one is
       quoted it must be a real route — `album-<nummer>` resolves via the alias, a made-up one
       fails the check `[NEG]`
 
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `ddev exec php handbuch/tools/check.php` exits 0, with a reference count at or above its
-      previous value
-- [ ] `handbuch-pages.spec.js` still passes over `file://`
-- [ ] Every German label quoted in the new section resolves in
+- [x] `ddev exec php handbuch/tools/check.php` exits 0, with a reference count at or above its
+      previous value — measured 2026-09-01: 6 pages, 48 references (up from 46), 20 screenshots
+      all referenced, 8 admin routes resolve
+- [x] `handbuch-pages.spec.js` still passes over `file://` — 11 passed, 2026-09-01
+- [x] Every German label quoted in the new section resolves in
       `plugins/provenance/language/de_DE/plugin.lang.php` or a core `de_DE` file — checked by
-      grep, not asserted by a test, because no test reads handbook prose
+      grep, not asserted by a test, because no test reads handbook prose. Confirmed: Physisches
+      Album, Eigentümer, Gescannt am, Notiz, Albumnotiz, Herkunft, Herkunft gespeichert, Auf %d
+      Fotos anwenden, In %d Dateien schreiben all in `plugin.lang.php`; Einstellungen sichern in
+      `language/de_DE/admin.lang.php:562`
 
 #### Manual Verification
-- [ ] Walk it: enter the four fields on a real album, save, confirm the photo page shows
-      nothing; press **Auf N Fotos anwenden**, confirm the Herkunft row appears. This is the
-      finding, and it is the one step whose absence made the screen look broken
-- [ ] The section describes the buttons by what they do, not by what their icons look like —
-      the mistake `docs/agents/TESTING.md:605` records from the last pass
-- [ ] No screenshot is added; the section is text-only, so `shoot.js` stays untouched
+- [x] ~~Walk it: enter the four fields on a real album, save, confirm the photo page shows
+      nothing; press **Auf N Fotos anwenden**, confirm the Herkunft row appears.~~ —
+      **automated**, no longer manual. Successor:
+      `plugins/provenance/tests/e2e/album-provenance-walkthrough.spec.js` › *the public page
+      stays empty after save and shows the row after apply*, which seeds a `no-provenance`
+      album, fills and saves the four fields through the real modal, confirms the public
+      picture page carries no `#Provenance` row, clicks **Auf N Fotos anwenden**, and confirms
+      the row then appears with the entered values. Passed 2026-09-01, part of a 51/51 full
+      provenance E2E run with album/image/tag/typetag counts unchanged (5/105/8/8)
+- [x] The section describes the buttons by what they do (`Herkunft`, `Einstellungen sichern`,
+      `Auf N Fotos anwenden`, `In N Dateien schreiben`), never by icon appearance — confirmed by
+      reading the new prose against `album_provenance.tpl:21-69`, which is the mistake
+      `docs/agents/TESTING.md:605` records from the last pass
+- [x] No screenshot is added; the section is text-only, so `shoot.js` stays untouched —
+      confirmed: `git diff --stat handbuch/` touches only `01-alben.html` and `03-fototexte.html`,
+      no `.png`
 
-**Implementation Note**: This is the phase a reader most depends on. Pause for manual
-confirmation before Phase 4.
+**Implementation Note**: This is the phase a reader most depends on. Automated verification
+complete; proceeding to Phase 4.
 
 ---
 
