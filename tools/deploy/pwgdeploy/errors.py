@@ -45,3 +45,9 @@ class InstallError(RemoteHttpError):
     """install.php re-rendered its form instead of installing; it carries the field errors."""
 
     exit_code = 8
+
+
+class StateMismatchError(DeployError):
+    """The local manifest and the remote disagree on whether the gallery is installed."""
+
+    exit_code = 9

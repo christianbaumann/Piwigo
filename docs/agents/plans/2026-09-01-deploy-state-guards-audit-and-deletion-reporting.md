@@ -337,7 +337,7 @@ answer contradicts the manifest.
 
 ### Changes Required
 
-#### [ ] 1. A new error class
+#### [x] 1. A new error class
 **File**: `tools/deploy/pwgdeploy/errors.py`
 
 ```python
@@ -347,7 +347,7 @@ class StateMismatchError(DeployError):
     exit_code = 9
 ```
 
-#### [ ] 2. A pure decision function
+#### [x] 2. A pure decision function
 **File**: `tools/deploy/pwgdeploy/preflight.py` (new)
 
 ```python
@@ -374,7 +374,7 @@ Decision table:
 | `> 0` | `False` | raise: the manifest is a lie, name the file to delete |
 | `0` | `True` | raise: no local state for an installed remote, orphans would be permanent |
 
-#### [ ] 3. The impure probe
+#### [x] 3. The impure probe
 **File**: `tools/deploy/pwgdeploy/preflight.py`
 
 ```python
@@ -390,7 +390,7 @@ def probe(client, config) -> RemoteState:
 Phase 3 leaves `version` as `None` unconditionally; Phase 4 gives it a value. Splitting it that
 way keeps each phase's tests honest about what it proved.
 
-#### [ ] 4. The flag and the wiring
+#### [x] 4. The flag and the wiring
 **File**: `tools/deploy/pwgdeploy/cli.py`
 **Changes**: `--adopt-remote-state` on the parser; a `_preflight()` helper called from `main()`
 after `_report_target` and **before** `_upload`, skipped when `args.dry_run` or
@@ -398,7 +398,7 @@ after `_report_target` and **before** `_upload`, skipped when `args.dry_run` or
 or the adopted-anyway warning. `state_path` moves up into `main()` so both `_preflight` and
 `_upload` read the same one.
 
-#### [ ] 5. README
+#### [x] 5. README
 **File**: `tools/deploy/README.md`
 **Changes**: the new flag in the flag table, exit code `9` in the exit-code section, and the
 operational rule under "the manifest is the only record of remote state" rewritten from "the
@@ -406,14 +406,14 @@ next run reports 0 new, 0 changed and leaves the site broken" to "the next run r
 `test_every_flag_the_tool_accepts_is_documented` and
 `test_every_exit_code_the_tool_can_return_is_documented` enforce the first two.
 
-#### [ ] 6. Decision 0027
+#### [x] 6. Decision 0027
 **File**: `docs/agents/decisions/0027-manifest-and-remote-must-agree-on-installation.md`
 **Changes**: why the guard aborts rather than self-heals in either direction — self-healing the
 wiped-remote case means silently re-uploading 128 MB, and self-healing the missing-manifest case
 means adopting a server whose contents nobody has seen. Records `--adopt-remote-state` as the
 deliberate, named escape hatch.
 
-#### [ ] 7. Rules file
+#### [x] 7. Rules file
 **File**: `.claude/rules/deployment.md`
 **Changes**: the "wiping the remote means deleting that target's manifest" paragraph now
 describes a guard, not a trap.
@@ -421,9 +421,9 @@ describes a guard, not a trap.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes
-- [ ] All four cells of the decision table are covered by their own test
-- [ ] `test_dry_run_connects_to_nothing` still passes unchanged — the preflight must not break it
+- [x] `cd tools/deploy && uv run pytest` passes
+- [x] All four cells of the decision table are covered by their own test
+- [x] `test_dry_run_connects_to_nothing` still passes unchanged — the preflight must not break it
 
 #### Manual Verification
 - [ ] Real run against `bilder.foerderverein-sefferweich.de` with the existing manifest: prints
@@ -744,31 +744,31 @@ is a recorded gap, not a silent one.
 
 #### Phase 3 — the state guard (`tests/test_preflight.py` new, `tests/test_cli.py`)
 
-- [ ] `test_an_empty_manifest_and_a_blank_remote_is_a_first_run` `[DT]` `[HAPPY]`
-- [ ] `test_a_recorded_manifest_and_an_installed_remote_is_an_update_run` `[DT]` `[HAPPY]`
-- [ ] `test_a_recorded_manifest_and_a_blank_remote_is_refused` `[DT]` `[NEG]`
-- [ ] `test_an_empty_manifest_and_an_installed_remote_is_refused` `[DT]` `[NEG]`
-- [ ] `test_one_recorded_entry_is_already_a_recorded_manifest` — `entry_count == 1` `[BVA]`
-- [ ] `test_the_wiped_remote_message_names_the_manifest_file_to_delete` — the message is the whole
+- [x] `test_an_empty_manifest_and_a_blank_remote_is_a_first_run` `[DT]` `[HAPPY]`
+- [x] `test_a_recorded_manifest_and_an_installed_remote_is_an_update_run` `[DT]` `[HAPPY]`
+- [x] `test_a_recorded_manifest_and_a_blank_remote_is_refused` `[DT]` `[NEG]`
+- [x] `test_an_empty_manifest_and_an_installed_remote_is_refused` `[DT]` `[NEG]`
+- [x] `test_one_recorded_entry_is_already_a_recorded_manifest` — `entry_count == 1` `[BVA]`
+- [x] `test_the_wiped_remote_message_names_the_manifest_file_to_delete` — the message is the whole
       point of the guard; assert the path, not a substring of prose `[NEG]`
-- [ ] `test_the_missing_manifest_message_names_the_audit_flag` `[NEG]`
-- [ ] `test_adopt_turns_each_refusal_into_a_warning` — parametrised over both refusing rows `[DT]`
-- [ ] `test_adopt_says_nothing_when_the_two_already_agree` — a flag that is always noisy stops
+- [x] `test_the_missing_manifest_message_names_the_audit_flag` `[NEG]`
+- [x] `test_adopt_turns_each_refusal_into_a_warning` — parametrised over both refusing rows `[DT]`
+- [x] `test_adopt_says_nothing_when_the_two_already_agree` — a flag that is always noisy stops
       being read `[NEG]`
-- [ ] `test_probe_reports_a_blank_remote_as_not_installed` `[ECP]`
-- [ ] `test_probe_reports_an_installed_remote_from_the_marker` `[ECP]`
-- [ ] `test_a_wiped_remote_exits_with_the_state_mismatch_code` — `StateMismatchError.exit_code`
+- [x] `test_probe_reports_a_blank_remote_as_not_installed` `[ECP]`
+- [x] `test_probe_reports_an_installed_remote_from_the_marker` `[ECP]`
+- [x] `test_a_wiped_remote_exits_with_the_state_mismatch_code` — `StateMismatchError.exit_code`
       read off the class `[NEG]`
-- [ ] `test_a_refused_preflight_uploads_nothing` — `transport.calls == []`, the same shape as
+- [x] `test_a_refused_preflight_uploads_nothing` — `transport.calls == []`, the same shape as
       `test_a_failed_upload_stops_before_the_bootstrap` `[NEG]`
-- [ ] `test_a_first_run_then_a_second_both_pass_the_guard` — one `FakeGallery`, two `cli.main`
+- [x] `test_a_first_run_then_a_second_both_pass_the_guard` — one `FakeGallery`, two `cli.main`
       calls `[ST]`
-- [ ] `test_the_preflight_line_says_the_two_agree` `[HAPPY]`
-- [ ] **Regression, and the one that matters most**: `test_dry_run_connects_to_nothing` — the
+- [x] `test_the_preflight_line_says_the_two_agree` `[HAPPY]`
+- [x] **Regression, and the one that matters most**: `test_dry_run_connects_to_nothing` — the
       preflight must not open a socket on a dry run. Also `test_list_files_prints_the_published_set_and_stops`,
       `test_no_bootstrap_uploads_but_leaves_the_gallery_alone` (the preflight still runs),
       `test_a_full_run_uploads_then_bootstraps_and_exits_zero`, `test_the_report_names_every_step`
-- [ ] `test_a_dry_run_says_the_preflight_was_skipped` — a silently skipped guard is one an
+- [x] `test_a_dry_run_says_the_preflight_was_skipped` — a silently skipped guard is one an
       operator believes ran `[NEG]`
 
 #### Phase 4 — the version guard (`tests/test_version.py` new, `tests/test_preflight.py`)

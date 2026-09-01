@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from pwgdeploy import bootstrap, fileset, manifest, upload
+from pwgdeploy import bootstrap, fileset, manifest, preflight, upload
 from pwgdeploy.config import DeployConfig, load_file
 from pwgdeploy.errors import DeployError
 from pwgdeploy.http import UrllibClient
@@ -58,6 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="never delete, even a path the previous manifest recorded",
     )
+    parser.add_argument(
+        "--adopt-remote-state",
+        action="store_true",
+        help="upload even when the manifest and the remote disagree about the install",
+    )
     parser.add_argument("--verbose", action="store_true", help="name each uploaded path")
     return parser
 
@@ -100,8 +105,18 @@ def main(
                 print(path, file=out)
             return 0
 
+        published = fileset.select(tracked_paths)
+        state_path = manifest.manifest_path(
+            state_dir, config.ftp.host, config.ftp.remote_root
+        )
+
         _report_target(out, config)
-        _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_paths)
+        _report_file_set(out, repo_root, tracked_paths, published)
+        _report_manifest(out, state_path)
+        _preflight(out, args, config, state_path, len(published), client_factory)
+        _upload(
+            out, args, config, repo_root, state_dir, transport_factory, tracked_paths
+        )
 
         if not args.dry_run and not args.no_bootstrap:
             _bootstrap(out, config, state_dir, transport_factory, client_factory)
@@ -125,8 +140,7 @@ def main(
     return 0
 
 
-def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_paths):
-    published = fileset.select(tracked_paths)
+def _report_file_set(out, repo_root, tracked_paths, published) -> None:
     megabytes = fileset.total_bytes(repo_root, published) / BYTES_PER_MB
     excluded = len(tracked_paths) - len(published)
     _line(
@@ -136,10 +150,36 @@ def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_
         f"(excluded: {excluded} dev/test files)",
     )
 
-    state_path = manifest.manifest_path(state_dir, config.ftp.host, config.ftp.remote_root)
+
+def _report_manifest(out, state_path: Path) -> None:
     known = "existing" if state_path.exists() else "new"
     _line(out, "manifest", f"{state_path} ({known})")
 
+
+def _preflight(out, args, config, state_path, file_count, client_factory) -> None:
+    """Refuse before uploading when the manifest and the remote contradict each other.
+
+    Skipped on a dry run, and it says so: `--dry-run` opens no connection at all, and a
+    guard that was silently not run is one an operator believes ran. It still runs under
+    `--no-bootstrap` — the upload is exactly the half the guard protects.
+    """
+    if args.dry_run:
+        _line(out, "preflight", "skipped (--dry-run opens no connection)")
+        return
+
+    state = preflight.probe(client_factory(config), config)
+    warning = preflight.check_state(
+        entry_count=len(manifest.load(state_path)),
+        remote_installed=state.installed,
+        manifest_path=state_path,
+        file_count=file_count,
+        adopt=args.adopt_remote_state,
+    )
+    verdict = "installed" if state.installed else "not installed"
+    _line(out, "preflight", f"{verdict} — {warning or 'manifest and remote agree'}")
+
+
+def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_paths):
     transport = transport_factory(config)
     if not args.dry_run:
         _line(out, "transport", f"FTPS to {config.ftp.host}:{config.ftp.port}")

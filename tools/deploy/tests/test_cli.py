@@ -14,7 +14,13 @@ import re
 import pytest
 
 from pwgdeploy import cli
-from pwgdeploy.errors import ConfigError, InsecureTransportError, TransportError
+from pwgdeploy import preflight
+from pwgdeploy.errors import (
+    ConfigError,
+    InsecureTransportError,
+    StateMismatchError,
+    TransportError,
+)
 from tests.fakes import FakeGallery, FakeTransport
 
 BASE_URL = "https://g.example.test"
@@ -103,7 +109,7 @@ def test_the_report_names_every_step(run):
     """[HAPPY] The operator reads this instead of the log; each step says what it did."""
     run()
 
-    for label in ("transport", "file set", "manifest", "upload", "chmod", "install", "config", "plugins", "sync"):
+    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "sync"):
         assert label in run.text, f"{label} missing from:\n{run.text}"
 
 
@@ -312,12 +318,95 @@ def test_the_report_names_what_the_sync_deleted(config_file, repo, tmp_path):
     assert "deleted: 7 photos, 2 albums" in run.text
 
 
+def _preflight_line(text: str) -> str:
+    """The one `preflight` line, matched by label rather than by the word."""
+    label = f"  {'preflight':{cli.LABEL_WIDTH}}"
+    found = [line for line in text.splitlines() if line.startswith(label)]
+    assert len(found) == 1, f"expected one preflight line, got {found}"
+    return found[0]
+
+
+def test_the_preflight_line_says_the_two_agree(run):
+    """[HAPPY] A guard whose verdict is not reported is one nobody knows ran."""
+    run()
+
+    assert "manifest and remote agree" in _preflight_line(run.text)
+
+
+def test_a_dry_run_says_the_preflight_was_skipped(run):
+    """[NEG] A silently skipped guard is one an operator believes ran, and `--dry-run`
+    opens no connection at all — so the skip has to be on the report."""
+    run("--dry-run")
+
+    assert "skipped" in _preflight_line(run.text)
+
+
+def test_a_wiped_remote_exits_with_the_state_mismatch_code(run):
+    """[NEG] The 2026-08-31 state: a manifest full of hashes and an emptied web space.
+    The code is read off the class so a renumbering cannot make this test wrong."""
+    run()
+    run.gallery.installed = False
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    assert run() == StateMismatchError.exit_code
+    assert preflight.ADOPT_FLAG in run.err.getvalue()
+
+
+def test_a_refused_preflight_uploads_nothing(run):
+    """[NEG] The guard is worthless if it aborts after the transfer it was meant to stop.
+    Anti-vacuity: the first run's puts prove the transport would otherwise be used."""
+    run()
+    assert run.transport.paths("put")
+    run.transport.calls.clear()
+    run.gallery.installed = False
+
+    run()
+
+    assert run.transport.calls == []
+
+
+def test_an_installed_remote_with_no_manifest_is_refused(config_file, repo, tmp_path):
+    """[NEG] The other direction: nothing local to compare against, and every remote path
+    this file set does not carry would become an orphan no prune can reach."""
+    runner = Run(config_file, repo, tmp_path, gallery=FakeGallery(BASE_URL, installed=True))
+
+    assert runner() == StateMismatchError.exit_code
+    assert runner.transport.calls == []
+    assert preflight.AUDIT_FLAG in runner.err.getvalue()
+
+
+def test_adopt_remote_state_uploads_over_the_disagreement(config_file, repo, tmp_path):
+    """[DT] The escape hatch's paired row: the same setup that aborts above proceeds, and
+    says on the report which guard it overrode."""
+    runner = Run(config_file, repo, tmp_path, gallery=FakeGallery(BASE_URL, installed=True))
+
+    assert runner("--adopt-remote-state") == 0
+
+    assert runner.transport.paths("put")
+    assert preflight.ADOPT_FLAG in _preflight_line(runner.text)
+
+
+def test_a_first_run_then_a_second_both_pass_the_guard(run):
+    """[ST] One gallery, two invocations: the verdict flips from "first run" to "update
+    run" as the manifest fills and the install completes, and neither is an abort."""
+    assert run() == 0
+    assert run.gallery.installed is True
+
+    assert run() == 0
+
+
 def test_no_bootstrap_uploads_but_leaves_the_gallery_alone(run):
-    """[DT] Upload yes, install/plugins/sync no — the row for a file-only redeploy."""
+    """[DT] Upload yes, install/plugins/sync no — the row for a file-only redeploy.
+
+    The preflight still runs: the upload is exactly the half it protects. So the claim is
+    not "no request at all" but "nothing that changes the remote" — one read-only GET, no
+    POST, and a gallery still uninstalled afterwards."""
     assert run("--no-bootstrap") == 0
 
     assert run.transport.paths("put")
-    assert run.gallery.calls == []
+    assert [call[0] for call in run.gallery.calls] == ["get"]
+    assert run.gallery.installed is False
 
 
 def test_no_prune_keeps_a_file_the_manifest_no_longer_covers(run, tmp_path):
@@ -388,11 +477,15 @@ def test_a_refused_ftps_handshake_exits_with_its_own_code(config_file, repo, tmp
 
 def test_a_failed_upload_stops_before_the_bootstrap(config_file, repo, tmp_path):
     """[NEG][ST] Installing over a half-uploaded tree would produce a gallery whose code
-    is missing files, and the install would look like it worked."""
+    is missing files, and the install would look like it worked.
+
+    The preflight's read-only GET precedes the upload, so what must not have happened is
+    the install POST: the gallery is still uninstalled and no ws method was called."""
     runner = Run(config_file, repo, tmp_path, transport=FakeTransport(fail_on_put=2))
 
     assert runner() == TransportError.exit_code
-    assert runner.gallery.calls == []
+    assert runner.gallery.installed is False
+    assert runner.gallery.methods_called() == []
 
 
 def test_the_error_goes_to_stderr_and_not_to_the_report(config_file, repo, tmp_path):

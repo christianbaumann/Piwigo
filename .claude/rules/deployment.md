@@ -12,7 +12,7 @@ cd tools/deploy
 uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
-uv run pytest                                    # 328 tests, measured 2026-09-01
+uv run pytest                                    # 350 tests, measured 2026-09-01
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -74,8 +74,13 @@ code is found by whoever visits the broken page.
 One JSON per target under `tools/deploy/.state/`, keyed by host and remote root. The tool never
 reads the server back to decide what to send.
 
-- **Wiping the remote means deleting that target's manifest**, or the next run reports
-  `0 new, 0 changed`, uploads nothing, and leaves the site broken.
+- **Wiping the remote means deleting that target's manifest.** Since
+  [decision 0027](../../docs/agents/decisions/0027-manifest-and-remote-must-agree-on-installation.md)
+  that is a guard rather than a trap: `preflight.check_state()` compares the manifest's entry
+  count against what `install.php` says *before* the upload, and refuses with exit `9` in both
+  directions — a recorded manifest over a blank remote (the old `0 new, 0 changed` over a broken
+  site), and no manifest at all over an installed one. `--adopt-remote-state` overrides either;
+  `--dry-run` skips the check and says so, because it opens no connection.
 - **Prune only ever considers what the previous manifest recorded.** That is what makes it safe
   for `upload/` and `_data/`, and exactly why it can never clean up after anything that bypassed
   it. A path dropped from the manifest while still on the server is an orphan no run can reach;

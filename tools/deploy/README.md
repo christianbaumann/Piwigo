@@ -73,10 +73,12 @@ reports the plugins already active.
 | `--list-files` | print the published file set and exit |
 | `--no-bootstrap` | upload only; skip install, config, plugins and sync |
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
+| `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
 | `--verbose` | name each uploaded path as it goes |
 
 Exit codes are one per failure mode — `3` bad credential file, `4` git, `5` transport, `6` no
-FTPS offered, `7` remote HTTP, `8` `install.php` refused — and `130` for Ctrl-C.
+FTPS offered, `7` remote HTTP, `8` `install.php` refused, `9` manifest and remote disagree — and
+`130` for Ctrl-C.
 
 Interrupting is safe. The manifest records completed uploads only, so re-running the same
 command resumes from where it stopped rather than starting over.
@@ -115,8 +117,23 @@ holds a hash per uploaded path, and it is the **only** thing the tool consults t
 to send — by design, the server is never read back.
 
 > **Wiping the remote means deleting that target's manifest.** If the web space is emptied by
-> any means other than this tool's own prune, the manifest becomes a lie: the next run reports
-> `0 new, 0 changed`, uploads nothing, and leaves the site broken.
+> any means other than this tool's own prune, the manifest becomes a lie — it describes a server
+> holding none of those files. The next run **refuses**, naming the manifest file to delete.
+
+Before uploading anything, every run that opens a connection asks `install.php` whether the
+gallery is installed and compares that answer against the manifest. The two disagree in exactly
+two ways, and both abort with exit `9`:
+
+| Manifest | Remote | Verdict |
+|---|---|---|
+| empty | not installed | a first run — proceed |
+| has entries | installed | an update run — proceed |
+| has entries | not installed | the remote was emptied behind the tool's back; delete the manifest |
+| empty | installed | no local state for an installed server; anything it holds that this run does not send becomes an orphan no later run can reach |
+
+`--adopt-remote-state` turns either refusal into a warning and uploads anyway. The guard is
+skipped on `--dry-run`, which opens no connection at all, and the report says so. See
+[decision 0027](../../docs/agents/decisions/0027-manifest-and-remote-must-agree-on-installation.md).
 
 The same asymmetry is what makes prune safe. It only ever considers paths the previous manifest
 recorded, which is why it cannot touch `upload/`, `_data/`, or anything a person put on the
@@ -152,7 +169,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-328 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
+350 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).
