@@ -4,7 +4,7 @@ git_commit: ec41c7293c40326b36fb1f580e8faaa6c4eef1fe
 branch: feat/provenance-metadata
 topic: "FTP deployment script and first-run remote install"
 tags: [plan, deployment, ftp, install, python, tooling]
-status: approved
+status: implemented
 ---
 
 # FTP Deployment and First-Run Remote Install — Implementation Plan
@@ -180,7 +180,7 @@ tools/deploy/
 
 ---
 
-## Phase 1: Config, credential file, and the package skeleton
+## Phase 1: Config, credential file, and the package skeleton — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -189,7 +189,7 @@ loader that fails with a typed, actionable error before a single byte is transfe
 
 ### Changes Required
 
-#### [ ] 1. Package skeleton and dev tooling
+#### [x] 1. Package skeleton and dev tooling
 
 **File**: `tools/deploy/pyproject.toml`, `tools/deploy/pwgdeploy/__init__.py`,
 `tools/deploy/pwgdeploy/__main__.py`
@@ -216,7 +216,7 @@ addopts = "-q --strict-markers --strict-config -W error"  # warnings are failure
 testpaths = ["tests"]
 ```
 
-#### [ ] 2. Typed errors
+#### [x] 2. Typed errors
 
 **File**: `tools/deploy/pwgdeploy/errors.py`
 
@@ -233,7 +233,7 @@ class InstallError(RemoteHttpError): ...     # install.php reported field errors
 class GitError(DeployError): ...             # git ls-files failed / not a repo
 ```
 
-#### [ ] 3. Config schema and loader
+#### [x] 3. Config schema and loader
 
 **File**: `tools/deploy/pwgdeploy/config.py`
 
@@ -270,7 +270,7 @@ in milliseconds instead of after a 138 MB upload:
 - `ftp.remote_root` — normalised; `..` segments rejected
 - `ftp.port` — integer in 1..65535
 
-#### [ ] 4. Committed example credential file
+#### [x] 4. Committed example credential file
 
 **File**: `tools/deploy/deploy.example.json`
 
@@ -287,7 +287,7 @@ in milliseconds instead of after a 138 MB upload:
 }
 ```
 
-#### [ ] 5. Keep real credential files and manifests out of git
+#### [x] 5. Keep real credential files and manifests out of git
 
 **File**: `.gitignore`
 
@@ -306,22 +306,33 @@ __pycache__/
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_config.py` passes
-- [ ] `cd tools/deploy && uv sync` resolves with an empty runtime dependency set
-- [ ] `python3 -c "import pwgdeploy"` works with no site-packages beyond stdlib
-- [ ] `git check-ignore -v deploy.local.json` reports the new rule
-- [ ] `git status --porcelain` shows `deploy.example.json` as tracked and no real credential file
+- [x] `cd tools/deploy && uv run pytest tests/test_config.py` passes
+- [x] `cd tools/deploy && uv sync` resolves with an empty runtime dependency set
+- [x] `python3 -c "import pwgdeploy"` works with no site-packages beyond stdlib
+- [x] `git check-ignore -v deploy.local.json` reports the new rule
+- [x] `git status --porcelain` shows `deploy.example.json` as tracked and no real credential file
 
 #### Manual Verification
-- [ ] `deploy.example.json` is copyable to `deploy.local.json` and every field is self-explanatory
-- [ ] A deliberately broken value (prefix `9foo`) produces a message naming the field and the rule
+- [x] `deploy.example.json` is copyable to `deploy.local.json` — **automated** as
+      `test_the_example_copies_to_a_working_local_credential_file`
+- [x] A deliberately broken value (prefix `9foo`) produces a message naming the field and the rule
+      — **automated** as `test_prefix_leading_digit_is_rejected` (field *and* rule asserted) and
+      generalised over all twelve rejection paths by
+      `test_every_rejection_names_the_offending_field`
+- [ ] *Not automatable*: whether every field of `deploy.example.json` is **self-explanatory** is a
+      human judgement with no oracle. Hand-check ledger entry, `docs/agents/TESTING.md` (Phase 7).
+
+Automated in addition, not asked for by the plan but by the same manual criterion: the
+`.gitignore` rules that keep a real credential file uncommittable are now a structural guard,
+`tests/test_gitignore.py`. It runs `git check-ignore --no-index` — without `--no-index` git
+reports every *tracked* path as not-ignored, which made the anti-vacuity control vacuous.
 
 **Implementation Note**: After this phase and its automated verification, pause for manual
 confirmation before Phase 2.
 
 ---
 
-## Phase 2: The file set — what "needed" means
+## Phase 2: The file set — what "needed" means — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -331,7 +342,7 @@ repository.
 
 ### Changes Required
 
-#### [ ] 1. Git enumeration adapter
+#### [x] 1. Git enumeration adapter
 
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
@@ -344,7 +355,7 @@ def git_tracked_paths(repo_root: Path, run=subprocess.run) -> list[str]:
 Raises `GitError` naming the command when git exits non-zero or the output is empty — an empty
 file set must fail loudly rather than deploy nothing.
 
-#### [ ] 2. Pure exclusion filter
+#### [x] 2. Pure exclusion filter
 
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
@@ -369,7 +380,36 @@ Notes on scope, each a deliberate call:
 - `tools/deploy/` excludes itself. The tool has no business on the web space.
 - `docs/` and `.claude/` are agent/working artifacts, not application files.
 
-#### [ ] 3. Always-created directories
+#### [x] 4. Completeness guard — added during Phase 2, not in the original plan
+
+**File**: `tools/deploy/pwgdeploy/fileset.py`
+
+```python
+MIN_EXPECTED_PATHS = 3000
+SUBMODULE_INIT_HINT = "git submodule update --init --recursive"
+
+def declared_submodule_paths(repo_root, run=subprocess.run) -> list[str]:
+    """git config --file .gitmodules --get-regexp ^submodule\..*\.path$"""
+
+def check_complete(paths, submodule_paths, min_expected=MIN_EXPECTED_PATHS) -> None:
+    """Pure. Raise GitError when the enumeration is obviously partial."""
+
+def verified_tracked_paths(repo_root, run=subprocess.run) -> list[str]:
+    """Enumerate, then prove the enumeration is whole. The entry point a deploy uses."""
+```
+
+Why it was needed: an **uninitialised submodule is dropped from `--recurse-submodules`
+silently** — neither its 157 files nor its gitlink appear, and the total stays plausible
+(3376 here), so the plan's empty-set `GitError` never fires. A deploy would publish a gallery
+whose Colored Tags plugin has no code and report success. The submodule paths are read from
+`.gitmodules` rather than hardcoded, so a future submodule is covered without an edit.
+
+**Phase 5/6 must call `verified_tracked_paths()`, not `git_tracked_paths()`.** The raw
+enumerator stays public only because the characterization tests need a list that is *not*
+gated. `test_verified_tracked_paths_refuses_an_incomplete_working_copy` is what holds the
+wiring in place.
+
+#### [x] 3. Always-created directories
 
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
@@ -381,22 +421,83 @@ WRITABLE_REMOTE_PATHS = ("local", "_data", "upload", "plugins", "themes")
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_fileset.py` passes
-- [ ] A characterization test asserts `select()` over the **real** tracked list keeps
+- [x] `cd tools/deploy && uv run pytest tests/test_fileset.py` passes — 46 tests; whole suite
+      **117 passed, 0 skipped**, measured 2026-08-31 with the typetags submodule checked out,
+      green twice in a row and with the shuffle disabled
+- [x] A characterization test asserts `select()` over the **real** tracked list keeps
       `plugins/persons/main.inc.php` and drops `plugins/persons/tests/Support/create-test-users.php`
-- [ ] Anti-vacuity: the real-list test asserts the input has > 3000 entries and the output > 2500
+- [x] Anti-vacuity: the real-list test asserts the input has > 3000 entries and the output > 2500
       before any exclusion count is asserted
 
 #### Manual Verification
-- [ ] `pwg-deploy --list-files` output contains no `vendor/`, `node_modules/`, `tests/` or
-      `.playwright-browsers/` path
-- [ ] `plugins/typetags/` files appear individually, not as one entry
+- [x] `pwg-deploy --list-files` output contains no `vendor/`, `node_modules/`, `tests/` or
+      `.playwright-browsers/` path — **automated** as the last loop of
+      `test_real_repository_file_set`. The `pwg-deploy --list-files` *command* cannot run until the
+      CLI lands in Phase 6; re-confirm it there against the same figures. **The `vendor/` half of
+      this criterion was wrong as written
+      and has been corrected.** `themes/default/vendor/fontello/` (15 files) is a *tracked core
+      asset* — the gallery's icon font — and must ship. The dependency-manager `vendor/`
+      directories are each plugin's own composer output, which that plugin's `.gitignore` already
+      keeps out of the tracked list, so they can never reach the enumeration. The automated
+      successor, `test_real_repository_file_set`, therefore excludes `plugins/*/vendor/` by name
+      and asserts the fontello asset **is** present, which is that loop's anti-vacuity guard.
+      `node_modules/`, `/tests/` and `.playwright-browsers/`: 0 hits, measured 2026-08-31.
+      `pwg-deploy --list-files` itself cannot run until the CLI lands in Phase 6.
+- [x] `plugins/typetags/` files appear individually, not as one entry — **automated** as
+      `test_every_declared_submodule_contributes_its_files` (asserts the submodule contributed
+      > `MIN_SUBMODULE_PATHS` paths and that `select()` does not drop it wholesale), and the
+      failure mode it cannot observe from an uninitialised working copy is now a hard deploy-time
+      error rather than a manual check — see task 4 above. **Observed green 2026-08-31** after the
+      submodule was checked out in this worktree: 157 tracked files under `plugins/typetags/`, 123
+      of them published, 0 skipped tests. Original finding, kept for the record: **not satisfiable
+      from a worktree with an uninitialised submodule, and this is a silent-data-loss gap, not a
+      local inconvenience.** In `.claude/worktrees/ftp-deploy`, `plugins/typetags` is an empty
+      directory, and `git ls-files -z --recurse-submodules` then omits the submodule *entirely* —
+      neither the 157 files nor the gitlink appear. Enumeration still returns 3376 paths, so
+      `GitError`'s empty-set guard does not fire and a deploy would silently publish a gallery
+      whose Colored Tags plugin has no code. Measured 2026-08-31: 3376 tracked, 3209 selected,
+      134.4 MB, **0** `plugins/typetags/` files.
+
+**Deviation from the plan, decided and implemented**: Phase 2 as written had no guard against a
+partially-enumerated file set. A `MIN_EXPECTED_PATHS` floor **and** a per-submodule contribution
+check now raise `GitError` naming `git submodule update --init --recursive`. See task 4.
+
+**Measured 2026-08-31, submodule checked out**: 3535 tracked → 3332 selected, 134.7 MB, 203
+excluded, 123 published `plugins/typetags/` files.
+
+### Blocker found while verifying Phase 2: the typetags submodule pin is unpushed
+
+`git submodule update --init --recursive` **fails from a clean clone of this fork**:
+
+```
+fatal: remote error: upload-pack: not our ref 44fdd062d1ab2f1c19304a4b3987fb2dc2fedfcd
+```
+
+The superproject pins `plugins/typetags` at `44fdd06`, but
+`github.com/christianbaumann/Piwigo-Colored-Tags` only has `e920a3b` — `git submodule status`
+reports `heads/master-1-g44fdd06`, i.e. one local commit that was never pushed. The commit exists
+solely in this machine's `.git/modules/plugins/typetags` object store, which is how it was
+recovered for this verification (`git fetch <local module store> 44fdd06` from inside the
+submodule, then `git submodule update --recursive`).
+
+Consequences for this plan, none of them cosmetic:
+
+- **The deploy cannot run from a fresh clone** until the pin is pushed or moved. The 157 typetags
+  files are simply unobtainable, and Phase 2's `check_complete()` will refuse the run — loudly and
+  correctly, which is the guard doing its job rather than a second bug.
+- **`.claude/rules/plugin-test-suites.md` is now out of date.** It states a fresh clone needs
+  `git submodule update --init --recursive` "(measured 2026-08-31 against a real clone)"; that
+  command cannot presently succeed. Per `backpressure.md`'s *keep instructions honest*, whichever
+  change resolves the pin fixes that sentence in the same commit.
+
+Fix is one push of the Colored Tags repository, or moving the pin to `e920a3b` — an owner
+decision, outside this plan's scope, recorded here rather than worked around.
 
 **Implementation Note**: Pause for manual confirmation before Phase 3.
 
 ---
 
-## Phase 3: Manifest and diff
+## Phase 3: Manifest and diff — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -405,7 +506,7 @@ path → sha256 of the bytes last successfully uploaded there.
 
 ### Changes Required
 
-#### [ ] 1. Manifest format and per-target path
+#### [x] 1. Manifest format and per-target path
 
 **File**: `tools/deploy/pwgdeploy/manifest.py`
 
@@ -423,7 +524,7 @@ def save(path: Path, entries: Mapping[str, str]) -> None:   # atomic: tmp + os.r
 A version mismatch discards the manifest rather than guessing — the next run re-uploads
 everything, which is correct-but-slow instead of fast-but-wrong.
 
-#### [ ] 2. Hashing
+#### [x] 2. Hashing
 
 **File**: `tools/deploy/pwgdeploy/manifest.py`
 
@@ -436,7 +537,7 @@ sha256 over file bytes rather than git blob SHA-1: the same code path then cover
 submodule files and the generated `config.inc.php`, and nothing has to know about git's blob
 header. Hashing ~138 MB costs well under a second.
 
-#### [ ] 3. The diff
+#### [x] 3. The diff
 
 **File**: `tools/deploy/pwgdeploy/manifest.py`
 
@@ -456,18 +557,45 @@ def diff(current: Mapping[str, str], previous: Mapping[str, str]) -> Diff:
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_manifest.py` passes
-- [ ] Round-trip test: `save()` then `load()` returns an equal mapping
-- [ ] `load()` of a `{"version": 999}` file returns `{}` and does not raise
+- [x] `cd tools/deploy && uv run pytest tests/test_manifest.py` passes — 23 tests; whole suite 140
+- [x] Round-trip test: `save()` then `load()` returns an equal mapping
+- [x] `load()` of a `{"version": 999}` file returns `{}` and does not raise
 
 #### Manual Verification
-- [ ] Deleting `.state/*.json` makes the next `--dry-run` report every file as new
+- [x] Deleting `.state/*.json` makes the next `--dry-run` report every file as new — **automated**
+      as `test_a_deleted_manifest_makes_every_file_new`, which composes `manifest_path` + `load` +
+      `diff` over real files on disk: it saves a manifest, asserts `pending == []`, unlinks the
+      file, and asserts every path comes back as new. Its own anti-vacuity control is that first
+      `pending == []` — a `load()` that always returned `{}` fails there rather than passing the
+      test for the wrong reason, confirmed by mutation. What stays for Phase 5 is only the CLI's
+      `--dry-run` *printing*, which is already one of that phase's listed checks.
+
+**Deviation from the plan, decided and implemented**: `manifest_path()` slugifies host and remote
+root instead of taking the root verbatim, so no separator or `..` can reach the file name — a
+remote root of `/www/../../etc` would otherwise have written outside `.state/`. Covered by
+`test_manifest_path_holds_no_separators`.
+
+Nine tests beyond the plan's list: `test_manifest_path_is_a_json_file_inside_the_state_dir`,
+`test_manifest_path_holds_no_separators`, `test_save_creates_the_state_directory` (a fresh clone
+has no `.state/`), `test_load_of_unreadable_json_is_empty`, `test_hash_of_an_empty_file`,
+`test_a_changed_byte_changes_the_hash` (anti-vacuity for the diff cases),
+`test_pending_is_new_and_changed`, `test_removed_is_only_ever_previously_recorded_paths` and
+`test_a_deleted_manifest_makes_every_file_new`.
+
+The three guards were proved killable rather than assumed (host, no DDEV, so the Mutagen caveat in
+`mutation-testing.md` does not apply; each `sed` was verified to have changed the file first):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| version check → always accept | `test_load_of_a_future_version_is_empty` | killed |
+| `save()` writes the target directly, no tmp + `os.replace` | `test_save_is_atomic` | killed |
+| `load()` always returns `{}` | `test_a_deleted_manifest_makes_every_file_new` (its `pending == []` control) | killed |
 
 **Implementation Note**: Pause for manual confirmation before Phase 4.
 
 ---
 
-## Phase 4: The Transport port and the FTPS adapter
+## Phase 4: The Transport port and the FTPS adapter — IMPLEMENTED 2026-08-31; the one manual step is automated but unrun (credentials)
 
 ### Overview
 
@@ -476,7 +604,7 @@ whole of Phase 5 is tested against, and an `ftplib` adapter that refuses to spea
 
 ### Changes Required
 
-#### [ ] 1. The port
+#### [x] 1. The port
 
 **File**: `tools/deploy/pwgdeploy/transport.py`
 
@@ -494,7 +622,7 @@ class Transport(Protocol):
 Six operations, no more. `chmod` returns a bool rather than raising because `SITE CHMOD` is an
 optional FTP extension — a server that refuses it is a warning, not a failed deploy.
 
-#### [ ] 2. The FTPS adapter
+#### [x] 2. The FTPS adapter
 
 **File**: `tools/deploy/pwgdeploy/transport.py`
 
@@ -515,7 +643,7 @@ Constants, named rather than magic: `CONNECT_TIMEOUT_SECONDS = 30`,
 `makedirs` walks the path creating one segment at a time and treats "already exists" (550) as
 success — the only way to be idempotent over FTP.
 
-#### [ ] 3. The fake
+#### [x] 3. The fake
 
 **File**: `tools/deploy/tests/fakes.py`
 
@@ -525,25 +653,68 @@ class FakeTransport:
     Nth put, which is how the crash-safety test in Phase 5 is written."""
 ```
 
+#### [x] 4. The manual step, made runnable — added during verification
+
+**File**: `tools/deploy/pwgdeploy/smoke.py`
+
+The phase's manual criterion — connect to the real web space, upload one file, see it over
+HTTP — needs credentials, but it does not need a human in an FTP client. `smoke.run()` is that
+procedure, port-typed and unit-tested against `FakeTransport`; the real adapters are what the
+run adds underneath it:
+
+    python3 -m pwgdeploy.smoke deploy.local.json
+
+It uploads a probe named and *bodied* with a fresh random token, fetches it over HTTP,
+compares the bytes, deletes it and confirms it is gone. The token is in the body so a stale
+file or a caching proxy cannot satisfy the check by accident; a byte mismatch names both the
+remote path and the URL, because "the FTP root and the document root are different
+directories" is the failure this check exists to find.
+
+`pwgdeploy/urls.py` (a Phase 5 deliverable) was **brought forward** rather than duplicated —
+`smoke.py` needs the same two joins the upload does. Phase 5 inherits it, tests and all.
+
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_transport.py` passes
-- [ ] A `FEAT` response lacking `AUTH TLS` raises `InsecureTransportError` whose message contains
+- [x] `cd tools/deploy && uv run pytest tests/test_transport.py` passes — 20 tests; whole
+      suite 185, twice in a row and with `-p no:randomly`
+- [x] A `FEAT` response lacking `AUTH TLS` raises `InsecureTransportError` whose message contains
       the host and the advertised feature list (asserted with a real substring, not `pytest.raises`
-      alone)
+      alone) — `test_feat_without_auth_tls_raises`, with
+      `test_a_refused_handshake_never_sends_the_password` as its anti-vacuity partner: the point of
+      the guard is the login that does **not** happen
 
 #### Manual Verification
-- [ ] Against the real web space: connect succeeds, `PROT P` is negotiated, and a single small
-      file uploads and reappears over HTTP
-- [ ] Recorded in the hand-check ledger with the date — the adapter has no automated coverage by
-      design, and that is stated rather than implied
+- [x] Against the real web space: connect succeeds, `PROT P` is negotiated, and a single small
+      file uploads and reappears over HTTP. **Automated** as
+      `python3 -m pwgdeploy.smoke <credential file>` (task 4 above) — what stays manual is
+      supplying `deploy.local.json`, which no automation can invent. **Verified 2026-08-31** by
+      the real deploy to `bilder.foerderverein-sefferweich.de`, which is a superset of the probe:
+      3332 files went up over `FtplibTransport` and the install that followed was driven over
+      HTTP against the same tree, so the FTP root and the document root are the same directory.
+- [x] Recorded in the hand-check ledger with the date — the row was deliberately withheld until the
+      run had happened, because a ledger row for an unperformed check is exactly the "marked done on
+      prose alone" the ledger rule forbids. Written in Phase 7 once it had:
+      `docs/agents/TESTING.md`, the 2026-08-31 row for `FtplibTransport` against the real web space
+      (`AUTH TLS`, `PROT P`, one file put / listed / downloaded byte-identical / deleted), with the
+      reason it cannot be automated here
+
+**Defect found while automating this step.** Running `python3 -m pwgdeploy.smoke
+deploy.example.json` against a host that does not resolve produced a raw `socket.gaierror`
+traceback: `FtplibTransport.connect()` let socket and `ftplib` errors escape untyped, so none of
+`errors.py`'s exit codes applied to the single most common real failure — a wrong host or a
+refused password. Fixed by wrapping the handshake in `TransportError`, with
+`test_an_unreachable_host_is_a_transport_error_not_a_traceback` and
+`test_a_refused_login_is_a_transport_error` watched red first, plus
+`test_a_cleartext_server_is_still_reported_as_insecure_not_merely_as_a_failure` as the
+anti-vacuity partner proving the wrapping does not swallow `InsecureTransportError`. The command
+now exits 5 with a message naming host, port and user.
 
 **Implementation Note**: Pause for manual confirmation before Phase 5.
 
 ---
 
-## Phase 5: The upload run
+## Phase 5: The upload run — IMPLEMENTED 2026-08-31; the two manual steps need credentials
 
 ### Overview
 
@@ -552,7 +723,7 @@ persist the manifest as it goes so an interrupted run resumes instead of restart
 
 ### Changes Required
 
-#### [ ] 1. The run
+#### [x] 1. The run
 
 **File**: `tools/deploy/pwgdeploy/upload.py`
 
@@ -582,7 +753,7 @@ Order, and why each step sits where it does:
    `tools/pwg_rel_create.sh:133-140`. A `False` return sets `chmod_supported = False` and emits
    one warning naming the paths to fix by hand in the FTP client.
 
-#### [ ] 2. Remote path joining
+#### [x] 2. Remote path joining — landed early, in Phase 4
 
 **File**: `tools/deploy/pwgdeploy/urls.py`
 
@@ -597,23 +768,88 @@ the most expensive kind to find.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest tests/test_upload.py tests/test_urls.py` passes
-- [ ] Second-run test: running `run()` twice against the same `FakeTransport` uploads N files then
+- [x] `cd tools/deploy && uv run pytest tests/test_upload.py tests/test_urls.py` passes — 40 tests
+      (28 upload, 14 urls); whole suite **215 passed, 0 skipped**, measured 2026-08-31 after the
+      verification round below added five tests, green twice in a row and with `-p no:randomly`
+- [x] Second-run test: running `run()` twice against the same `FakeTransport` uploads N files then
       0, with `unchanged_count == N` (N asserted > 0 first)
-- [ ] Crash-safety test: `FakeTransport` armed to fail on put #3 leaves a manifest holding exactly
+- [x] Crash-safety test: `FakeTransport` armed to fail on put #3 leaves a manifest holding exactly
       the first two paths, and a re-run uploads only the remainder
-- [ ] Prune test: a path present in the previous manifest and absent from the file set is deleted;
+- [x] Prune test: a path present in the previous manifest and absent from the file set is deleted;
       a path present on the fake but in **neither** manifest is untouched
 
 #### Manual Verification
-- [ ] A full first deploy to the real web space completes and the byte total matches ~138 MB
-- [ ] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts
+- [x] A full first deploy to the real web space completes and the byte total matches ~138 MB.
+      **Verified 2026-08-31**: 3332 files, 128.4 MB, 387 directories created, `SITE CHMOD`
+      accepted on all five writable paths, 823.3 s wall clock. The byte figure the run printed is
+      the one `fileset.total_bytes()` measures, so it agrees with the test below by construction.
+      The **byte total half is automated** as `test_the_selected_file_set_weighs_what_a_deploy_expects`,
+      which weighs the real selected file set through the new `fileset.total_bytes()` — the same
+      function the run reports from, so no second copy of the figure exists. Measured 2026-08-31:
+      3332 paths, **128.4 MiB = 134.7 MB decimal**, which is Phase 2's figure in the other unit;
+      the plan's "~138 MB" was an estimate. The band is 80–400 MiB, wide on purpose: an exact
+      figure would go red on the next photo added. What stays manual is the *deploy* itself — it
+      needs `deploy.local.json`, which does not exist in this checkout, and the CLI that drives it
+      lands in Phase 6.
+- [x] Interrupting a real run with Ctrl-C and re-running resumes rather than restarts.
+      **Verified against the real web space 2026-08-31**, scripted rather than hand-timed: 400
+      non-gallery entries were dropped from the manifest to force a known pending count, a real
+      `--no-bootstrap --no-prune` deploy was started, and SIGINT was sent to its process group
+      once 60 files had gone up. Exit 130, `KeyboardInterrupt` out of `ssl.unwrap`, manifest
+      holding exactly 2931 + 60 = 2991 entries. The re-run reported **340 new, 0 changed, 2988
+      unchanged** — 60 + 340 = 400, the remainder and nothing else. A following full run reported
+      `0 new, 0 changed`, and the gallery still rendered with zero console errors.
+      Two notes from doing it for real: `kill -INT <pid>` on the `uv run` wrapper does **not**
+      reach the Python child — the first attempt ran to completion, and only signalling the
+      process group (`set -m`, `kill -INT -- -$PID`) interrupted anything. And the interrupt
+      surfaced as a bare traceback, fixed below.
+      **Automated** as `test_ctrl_c_mid_run_resumes_rather_than_restarts` and
+      `test_ctrl_c_still_closes_the_session`: `FakeTransport(interrupt_on_put=N)` raises a real
+      `KeyboardInterrupt`, which — being a `BaseException` — reaches the run's `finally` by a
+      different route than an ordinary `TransportError`, so an `except Exception` anywhere on that
+      path would swallow it and report a successful deploy. What no fake can witness is the FTPS
+      control connection and the half-written file a real interrupt leaves on the server; that
+      residue is re-uploaded because the manifest only records completed puts, but proving it
+      needs the real run above.
+
+**Deviations from the plan as written, decided and implemented**:
+
+- `run()` takes two keyword arguments the sketch does not name: `prune=True`, because `--no-prune`
+  is a listed CLI flag and the run is where it has to be honoured, and `tracked=
+  fileset.verified_tracked_paths`, the enumeration injected the same way `fileset` injects
+  `run=subprocess.run` — the upload suite is about the transfer, not about git.
+- `UploadResult` carries the whole `Diff` instead of a bare `unchanged_count`; the count stays as
+  a property. A dry run must report what it *would* send, and the CLI's summary line needs
+  new/changed/unchanged/removed — all four already live on `Diff`, so a second copy would rot.
+- `manifest.save()` also runs after each **deletion**, not only after each upload. A prune
+  interrupted halfway would otherwise leave the manifest claiming files that are gone.
+
+**Mutant that survived the first table, and what it cost.** Turning the `chmod` loop's list into a
+generator — `all([...])` → `all(...)` — left the suite green: `all()` then short-circuits at the
+first refusal, so a server without `SITE CHMOD` is asked about one path and the warning names one
+path instead of five. `test_chmod_refusal_is_a_warning_not_a_failure` now asserts the whole call
+list and kills it. Three mutants that died on the first table: dropping the per-file
+`manifest.save()` (9 tests), ignoring the `prune` flag (2), and pruning every manifest entry
+rather than `diff.removed` (9).
+
+**Verification round, 2026-08-31.** Both manual criteria were re-examined for an automatable half
+rather than being carried forward whole; see the criteria above for what each now covers and what
+survives as manual. Three further mutants, all killed:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `transport.close()` dropped from the `finally` | `test_ctrl_c_still_closes_the_session` | killed |
+| the put wrapped in `except BaseException: continue` | both `ctrl_c` tests | killed |
+| `total_bytes` counting files instead of summing sizes | `test_total_bytes_sums_the_files_it_is_given` and the payload band | killed |
+
+`fileset.total_bytes()` is the one production addition of the round: the summary line the run
+prints and the test's assertion must not be two separately typed sums.
 
 **Implementation Note**: Pause for manual confirmation before Phase 6.
 
 ---
 
-## Phase 6: Remote bootstrap over HTTP
+## Phase 6: Remote bootstrap over HTTP — IMPLEMENTED 2026-08-31; the manual steps need credentials
 
 ### Overview
 
@@ -622,7 +858,7 @@ step idempotent, so re-running the command is always safe.
 
 ### Changes Required
 
-#### [ ] 1. The HTTP port and adapter
+#### [x] 1. The HTTP port and adapter
 
 **File**: `tools/deploy/pwgdeploy/http.py`
 
@@ -639,7 +875,7 @@ class UrllibClient:
 `HTTP_TIMEOUT_SECONDS = 60`; `SYNC_TIMEOUT_SECONDS = 600` for the `site_update` POST, which scans
 106 photos and reads their metadata.
 
-#### [ ] 2. Install
+#### [x] 2. Install
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -666,7 +902,7 @@ Failure handling: `install.php` re-renders its form with an error list rather th
 non-2xx. So a successful POST is confirmed by a **follow-up** `is_installed()` returning True; if
 it does not, raise `InstallError` carrying the errors scraped from the response.
 
-#### [ ] 3. Generated `local/config/config.inc.php`
+#### [x] 3. Generated `local/config/config.inc.php`
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -688,7 +924,7 @@ what the local install carries, and dropping it is a separate decision from this
 Uploaded **after** install: `install.php` writes `database.inc.php` into the same directory, and
 ordering the two avoids any question about which run created `local/config/`.
 
-#### [ ] 4. Session and plugin activation
+#### [x] 4. Session and plugin activation
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -709,7 +945,7 @@ def activate_plugins(client, base_url, token) -> dict[str, str]:
     is a no-op rather than an error."""
 ```
 
-#### [ ] 5. Filesystem sync
+#### [x] 5. Filesystem sync
 
 **File**: `tools/deploy/pwgdeploy/bootstrap.py`
 
@@ -725,7 +961,7 @@ def sync(client, base_url) -> None:
 Runs last, because it scans the `galleries/` tree the upload just placed. Filenames are already
 known to satisfy `sync_chars_regex` (research §8), so no filtering is needed here.
 
-#### [ ] 6. The CLI
+#### [x] 6. The CLI
 
 **File**: `tools/deploy/pwgdeploy/cli.py`
 
@@ -743,29 +979,210 @@ usage: pwg-deploy [-h] [--dry-run] [--list-files] [--no-bootstrap] [--no-prune]
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes the whole suite
-- [ ] `cd tools/deploy && uv run pytest` passes **twice in a row**, each run in a different
+- [x] `cd tools/deploy && uv run pytest` passes the whole suite — 276 tests, measured 2026-08-31
+- [x] `cd tools/deploy && uv run pytest` passes **twice in a row**, each run in a different
       order — `pytest-randomly` shuffles by default, so two consecutive green runs are two
       different orderings and a hidden inter-test dependency surfaces as a flake
-- [ ] A reported failure reproduces from its printed seed:
+- [x] A reported failure reproduces from its printed seed:
       `uv run pytest --randomly-seed=<n>`
-- [ ] `ddev exec php -l` on nothing — no PHP is changed in this plan; note this explicitly
+- [x] `ddev exec php -l` on nothing — no PHP is changed in this plan; note this explicitly
       rather than claiming a PHP check ran
-- [ ] `bash tools/test-hooks.sh` still passes (the commit gate is untouched)
+- [-] `bash tools/test-hooks.sh` still passes (the commit gate is untouched)
 
 #### Manual Verification
-- [ ] Against the real web space: a first run installs, activates three plugins and syncs; the
-      gallery renders and the four recovered albums are visible
-- [ ] A second run reports `already installed`, `nothing to do`, and 0 pending transfers
-- [ ] `admin.php?page=plugins` shows typetags, provenance and persons active
-- [ ] The pre-install probe (research decision 1) and `admin.php?page=maintenance&action=phpinfo`
-      (decision 12) are run by hand and their `exec`/`imagick` answers recorded
+- [x] Against the real web space: a first run installs, activates three plugins and syncs; the
+      gallery renders and the four recovered albums are visible. **Verified 2026-08-31**:
+      `install installed`, `plugins typetags activated, provenance activated, persons activated`,
+      `sync 105 photos, 4 albums, 0 errors`, then confirmed in a browser (playwright-cli) at
+      `http://bilder.foerderverein-sefferweich.de/` — four album tiles reading 56 + 16 + 18 + 15 =
+      **105**, the same figure the sync reported; derivatives generate (250x250 crops served from
+      `_data/i/`, so that directory is writable and image resizing works on the host); an album
+      page and a picture page both render with **zero console errors**. Note the count: 105
+      photos, not the plan's estimated 106 — 105 is what research §8 measured in the four tracked
+      album directories, so the estimate was the wrong half.
+      Screenshots: `.agent-tests/2026-08-31-ftp-deploy-verification/`.
+- [x] A second run reports `already installed`, `nothing to do`, and 0 pending transfers —
+      **verified 2026-08-31**: `0 new, 0 changed, 3332 unchanged`, `already installed - skipped`,
+      `typetags active, provenance active, persons active`, `sync 0 photos, 0 albums, 0 errors`,
+      2.6 s against the 823.3 s of the first run. It also exposed two defects; see below.
+- [x] `admin.php?page=plugins` shows typetags, provenance and persons active — witnessed through
+      `pwg.plugins.getList`, which reads the same `piwigo_plugins.state` rows that screen renders.
+      The screen itself was not opened in a browser; the API answer is the same fact one layer down.
+- [x] The pre-install probe (research decision 1) and `admin.php?page=maintenance&action=phpinfo`
+      (decision 12) are run by hand and their `exec`/`imagick` answers recorded — **done
+      2026-08-31**, and both decisions resolve in favour of the host. Method: a `phpinfo()` file
+      and a capability file were uploaded through the tool's own `FtplibTransport` under random
+      16-byte names, fetched over HTTP, and deleted in a `finally` that then re-checked the URL no
+      longer answers. Measured on `bilder.foerderverein-sefferweich.de`:
+
+      | Question | Answer |
+      |---|---|
+      | `disable_functions` | **empty** — `exec()` is not disabled |
+      | `exiftool -ver` | **12.76**, at `/usr/bin/exiftool` (rc 0) |
+      | Imagick | **3.7.0**, ImageMagick 6.9.12-98 Q16; `class_exists('Imagick')` true |
+      | ImageMagick CLI | `convert -version` rc 0 |
+      | GD | enabled, JPEG + PNG + WebP |
+      | PHP | 8.4.16-nmm1; `memory_limit` 384M, `max_execution_time` 60, no `open_basedir` |
+
+      So the provenance and persons **write-back works on this host** — the research recorded both
+      `exec()` and Imagick as unresolved, and the plan was written assuming the degraded mode
+      might be the permanent one. `site.exiftool_path` can stay `""`: the binary is on `PATH`.
+      Note the version gap — the host has exiftool 12.76 against the local 13.25. Nothing in
+      either plugin is known to need 13.x, but no suite has ever run against 12.76.
+
+**Deviations from the plan as written, decided and implemented**:
+
+- `HttpClient.get`/`post` take a keyword `timeout`, which the sketch does not name. The sync POST
+  needs `SYNC_TIMEOUT_SECONDS` and every other call needs `HTTP_TIMEOUT_SECONDS`; a client that
+  chose per URL would put a routing decision inside an adapter that is meant to hold none.
+- `Response` carries the URL that **answered**, not the one asked. Without it, `sync()` cannot say
+  that `admin.php` bounced it to `identification.php` — a redirect that returns HTTP 200 and a
+  page holding no summary at all.
+- `sync()` returns a `SyncCounts` rather than `None`. The run's report claims "N photos, M albums",
+  and a number printed by a step that returned nothing would have to be invented.
+- `bootstrap.run()` is the orchestration the sketch implies but does not name; it is what makes
+  "install, then config, then session, then plugins, then sync" one testable ordering rather than
+  an order the CLI happens to call things in.
+- `activate_plugins()` raises when the remote does not list a plugin at all. `getList` reports the
+  **filesystem**, so an absent name means `plugins/<name>/` never reached the web space — a partial
+  deploy, which is worth a loud failure rather than a gallery that quietly lacks a feature.
+- `main()` takes `tracked=` alongside the two adapter factories, matching the seam `upload.run()`
+  already has, so the CLI suite runs without a 3000-file git repository underneath it.
+
+**Verification round, 2026-08-31.** Commands actually run, from `tools/deploy/`:
+
+- `uv run pytest` — **276 passed**, twice in a row (pytest-randomly shuffles, so those are two
+  orderings), plus `--randomly-seed=12345` twice and `-p no:randomly` once.
+- `uv run pwg-deploy --list-files deploy.example.json` — 3332 paths, 123 of them under
+  `plugins/typetags/` (the submodule), and the only `vendor/` hits are core's own
+  `themes/default/vendor/fontello/` icon font.
+- `uv run pwg-deploy --dry-run deploy.example.json` — reports 3332 files, 128.4 MB, 3332 new,
+  0 changed, and opens no socket, against a credential file naming a host that does not exist.
+- `bash tools/test-hooks.sh` — **4 pre-existing failures**, none caused by this phase: the
+  typetags submodule has no `core.hooksPath` in this worktree and no plugin has `vendor/bin/phpunit`
+  installed here. The two cases that exercise the gate itself ("git rejects a real commit",
+  "git accepts a clean commit") both pass. Not claimed as green.
+- No PHP file is touched by this phase (`git status` shows only `tools/deploy/` and the plan), so
+  no `php -l` run is claimed.
+
+Three mutants applied to `bootstrap.py` and reverted, all killed:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `newsletter_subscribe: "0"` added to the install fields | `test_install_omits_the_two_isset_checkboxes` | killed (with 1 more) |
+| the already-`active` short-circuit removed from `activate_plugins` | `test_an_already_active_plugin_is_left_alone` | killed (with 2 more) |
+| `int(value)` → `int(value) + 1` in `parse_sync_counts` | `test_sync_reports_the_counts_the_summary_carries` | killed (with 2 more) |
+
+**Two defects the second real run exposed, both fixed 2026-08-31.** Neither was reachable from
+the fake: one needed a manifest that had survived a previous run, the other needed a file set
+somebody had actually looked at.
+
+1. **The generated config was pruned on every run.** `local/config/config.inc.php` is written by
+   the bootstrap and recorded in the manifest, but it is never in the tracked file set — so
+   `manifest.diff` classified it `removed` on every run after the first. The full command hid it
+   (prune deleted the file, `upload_config` re-uploaded it seconds later, which is why the second
+   run printed `1 removed` and `config ... uploaded` instead of `unchanged`), but under
+   `--no-bootstrap` nothing would have put it back and the gallery would have lost its config.
+   Fixed by naming the generated paths once in `fileset.GENERATED_REMOTE_PATHS` and hiding them
+   from the comparison in `upload.run()` — hidden from all four buckets, not merely spared from
+   the prune, so the report cannot claim a deletion nobody asked for. Regression tests:
+   `test_the_generated_config_is_never_pruned`, `test_the_generated_config_is_absent_from_every_diff_bucket`.
+   The docstring of `test_the_config_entry_joins_the_target_s_own_manifest` had *asserted this
+   property in prose* while testing something weaker — the exact shape of gap that makes a green
+   suite misleading.
+
+2. **`.ddev/` and the fork's hook scripts were being published.** Found by inspecting the real
+   `--list-files` output after a note in `docs/backlog.md` asked why. Now excluded:
+   `.ddev/config.yaml`, `.ddev/web-build/Dockerfile.playwright`, `tools/install-hooks.sh`,
+   `tools/test-hooks.sh` — four files, 3332 -> 3328. The rest of `tools/` **stays**, deliberately:
+   upstream ships the whole directory in its release (`tools/pwg_rel_create.sh` strips only
+   `.git`), `tools/index.php` redirects any request out of it, and matching a stock install is the
+   safer default. `local/*/index.php` stays too — those are the directory-listing guards
+   `LOCAL_GUARD_*` publishes on purpose. Test:
+   `test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools`. **Superseded in Phase 7**
+   — the user decided the whole of `tools/` is excluded
+   ([decision 0022](../decisions/0022-the-tools-directory-is-not-published.md)), and that test was
+   replaced by `test_excludes_the_whole_tools_directory`, whose docstring names it as its
+   predecessor. The narrative above is the state at the time of the run, kept as such.
+
+**A third weakness, fixed in the same round**: `--dry-run` reported `0 removed` no matter what,
+because a dry run deletes nothing and the figure was read from `deleted`. Prune is the only
+destructive thing this tool does, so the preview that hides it is the one an operator most needs.
+It now predicts from `diff.removed`, honouring `--no-prune`. Verified against the real manifest:
+the dry run now reports `4 removed`, naming the cost of the exclusion change before it is paid.
+Tests: `test_dry_run_reports_what_it_would_delete`, `test_dry_run_with_no_prune_reports_no_deletion`.
+
+**A fourth fix, from the interrupt run**: Ctrl-C ended the command with a raw
+`KeyboardInterrupt` traceback out of `ssl.unwrap`, which reads like a crash of exactly the kind
+an operator would respond to by starting over. `main()` now catches it, exits 130 (the shell's
+own SIGINT convention) and says the run is resumable — which is true, and is the one fact the
+traceback did not carry. Tests: `test_an_interrupted_run_says_it_can_be_resumed`,
+`test_an_interrupted_run_keeps_what_it_already_uploaded`.
+
+Suite after the round: **288 passed**, twice.
+
+### State of the remote and of this checkout, 2026-08-31 (end of session)
+
+**The web space was wiped by hand** — all files, folders and database tables — after the
+verification above. Everything recorded above was measured before the wipe and stands; the
+gallery is simply not currently deployed. The next run is a first run again.
+
+**The local manifest was deleted to match** (`tools/deploy/.state/bilder…_root.json`). This is
+the single most important operational lesson of the session and it belongs in the README:
+
+> The manifest is the **only** record of remote state — by design, the tool never reads the
+> server back to decide what to send (`upload.py`). So if the remote is emptied by any means
+> other than this tool's own prune, the manifest becomes a lie: the next run reports
+> `0 new, 0 changed`, uploads nothing, and leaves the site broken. **Wiping the remote means
+> deleting that target's manifest**, or the tool will confidently do nothing.
+
+The same asymmetry produced a second, subtler failure during the Ctrl-C experiment. Dropping
+entries from the manifest to force a pending count also dropped `.ddev/…` (it sorts first), which
+made those files **orphans**: present on the server, absent from the manifest, and — once the
+exclusion below landed — absent from the file set too, so no future prune could ever reach them.
+They had to be deleted by hand over FTP. Prune only ever considers what the previous manifest
+recorded, which is what makes it safe for `upload/` and `_data/`, and is also exactly why it
+cannot clean up after anything that bypasses it.
+
+A third trap, worth a line because it cost a wrong conclusion: `FtplibTransport.exists()` asks
+`SIZE`, and a server refuses `SIZE` for a **directory**. It reported `.ddev` as "already gone"
+while the directory was plainly still there. Existence of anything that might be a directory has
+to be checked with a listing, not with `exists()`.
+
+### Still open when this session paused
+
+- **`tools/` is still published** (19 files). Core never loads anything from it at runtime — the
+  only two mentions in core are comments (`include/config_default.inc.php:18,353`) — so it is
+  dev/maintenance PHP reachable over HTTP for no benefit. Recommended for exclusion; **not
+  changed**, because it is a judgment call that was put to the user and not answered. Phase 7
+  should record whichever way it goes as a decision.
+- **`admin.php?page=plugins` has still never been opened in a browser.** All three plugins were
+  witnessed `active` through `pwg.plugins.getList`, which reads the same `piwigo_plugins.state`
+  rows that screen renders, so the fact is established — but the screen itself is unseen. The
+  temp admin account created for that check died with the table wipe.
+- **`deploy.local.json` still carries `admin.password: "REPLACE_ME"`.** The wiped install had a
+  webmaster with that literal password, and the value is in the session transcript. Set a real
+  one before the next deploy, since the next install will bake in whatever is in that file.
+- **Phase 7 has not been started.**
+
+**Resolved since, 2026-08-31** (kept above verbatim rather than rewritten, so the state at the
+pause stays readable):
+
+- `tools/` **is now excluded** — the user answered in favour of exclusion; recorded as
+  [decision 0022](../decisions/0022-the-tools-directory-is-not-published.md) and guarded by
+  `test_excludes_the_whole_tools_directory`.
+- `admin.php?page=plugins` **is still unseen in a browser**, and now cannot be: the remote was
+  wiped and the temp admin account with it. The fact itself stands on `pwg.plugins.getList`, which
+  reads the rows that screen renders. Re-checkable on the next real deploy; not a gate on this plan.
+- The `deploy.local.json` password remains the operator's to set before the next deploy — no
+  automation can invent it, and the tool bakes in whatever the file holds.
+- Phase 7 is **implemented and verified**.
 
 **Implementation Note**: Pause for manual confirmation before Phase 7.
 
 ---
 
-## Phase 7: Documentation and decisions
+## Phase 7: Documentation and decisions — IMPLEMENTED, VERIFIED 2026-08-31
 
 ### Overview
 
@@ -774,7 +1191,7 @@ of re-litigating it.
 
 ### Changes Required
 
-#### [ ] 1. The how-to
+#### [x] 1. The how-to
 
 **File**: `tools/deploy/README.md`
 
@@ -782,7 +1199,7 @@ Diataxis how-to: prerequisites, copy the example JSON, the one command, what eac
 is uploaded and what is not, and — stated, not implied — that the target is a sandbox and this
 tool is **never** safe to point at a production install.
 
-#### [ ] 2. Rules file and its read-trigger
+#### [x] 2. Rules file and its read-trigger
 
 **File**: `.claude/rules/deployment.md`, `CLAUDE.md`
 
@@ -791,18 +1208,24 @@ and why, and the manual probe steps. `CLAUDE.md` gains one line under *Additiona
 read-trigger naming the task — "read before changing the deploy tool or deploying to the web
 space" — and stays under its 100-line cap.
 
-#### [ ] 3. Decisions
+#### [x] 3. Decisions
 
-**File**: `docs/agents/decisions/0020-remote-instance-is-a-sandbox.md`,
-`docs/agents/decisions/0021-no-database-transfer-to-the-remote.md`
+**File**: `docs/agents/decisions/0021-remote-instance-is-a-sandbox.md`,
+`docs/agents/decisions/0022-the-tools-directory-is-not-published.md`,
+`docs/agents/decisions/0023-no-database-transfer-to-the-remote.md`
 
-- 0020 records research decision 9's framing: the remote is disposable, so `restore` dropping
+Numbering shifted by one: `0020` was taken by the persons plan
+(`0020-persons-index-is-derived-the-file-is-the-source-of-truth.md`) before this phase ran.
+
+- 0021 records research decision 9's framing: the remote is disposable, so `restore` dropping
   provenance columns is tolerable here and would not be in production; this must be revisited
   before any real gallery is hosted.
-- 0021 records that no DB transfer exists and why — content is re-created by `site_update` and
+- 0022 records the `tools/` question Phase 6 left open, decided by the user 2026-08-31 in favour
+  of exclusion — core loads nothing from it at runtime.
+- 0023 records that no DB transfer exists and why — content is re-created by `site_update` and
   `pwg.persons.rescan`, and provenance values have no path to the remote at all.
 
-#### [ ] 4. Backlog and the known gap
+#### [x] 4. Backlog and the known gap
 
 **File**: `docs/backlog.md`
 
@@ -810,7 +1233,7 @@ One entry for research decision 10's accepted silent-failure mode: a plugin sche
 `Version:` header is not bumped never reaches the remote table, and persons has no
 `ALTER … MODIFY` path so a *changed* column definition does not propagate even with a bump.
 
-#### [ ] 5. Hand-check ledger
+#### [x] 5. Hand-check ledger
 
 **File**: `docs/agents/TESTING.md`
 
@@ -821,13 +1244,103 @@ server and no remote web space in CI, because there is no CI).
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `awk 'END{print NR}' CLAUDE.md` reports < 100
-- [ ] `awk 'END{print NR}' .claude/rules/deployment.md` reports < 500
-- [ ] `bash tools/test-hooks.sh` passes
+- [x] `awk 'END{print NR}' CLAUDE.md` reports < 100 — **74**, measured 2026-08-31
+- [x] `awk 'END{print NR}' .claude/rules/deployment.md` reports < 500 — **107**
+- [-] `bash tools/test-hooks.sh` passes — the **4 pre-existing failures** Phase 6 already recorded,
+      unchanged by this phase and environmental: this worktree has no `core.hooksPath` in the
+      typetags submodule and no plugin has `vendor/bin/phpunit` installed here. The two cases that
+      exercise the gate itself pass, and the new `rules/deployment.md` is checked against the cap
+      by the same run (`107 lines (cap 500)`). Not claimed as green.
+- [x] `cd tools/deploy && uv run pytest` — **288 passed**, twice in a row (pytest-randomly
+      shuffles), after the `.gitignore` fix below
 
 #### Manual Verification
-- [ ] A fresh reader can deploy from `tools/deploy/README.md` alone
-- [ ] Each decision file states what was decided, why, and what would reverse it
+- [-] A fresh reader can deploy from `tools/deploy/README.md` alone — **the falsifiable half is
+      automated 2026-08-31** as `tools/deploy/tests/test_readme.py` (16 tests): every flag, exit
+      code, credential field, default, exclusion prefix and relative link the README names is
+      compared against the code that defines it, in **both** directions, so a flag added later
+      cannot ship undocumented either. All 16 watched red against a mutation of what they watch;
+      two survived their first mutant, were found to assert only that a string appears somewhere,
+      and were strengthened. Ledger entry recorded. What stays manual is whether the prose is
+      *followable* by a person who has not read the code — no assertion reaches that, and it needs
+      a human who is not the author. **Extended 2026-08-31 to 19 tests**, see the verification
+      round below.
+- [x] Each decision file states what was decided, why, and what would reverse it — 0021, 0022 and
+      0023 each carry a *What would reverse this* section naming the concrete trigger
+
+**Verification round, 2026-08-31.** `cd tools/deploy && uv run pytest` — **304 passed**, twice in
+a row (pytest-randomly shuffles, so those are two orderings). The README's and the rules file's
+dated test count was corrected from 288 to 304 in the same change. `bash tools/test-hooks.sh` was
+run once for this phase and is recorded above; it was not re-run for the README tests, which touch
+neither the gate nor any line-count cap.
+
+**A defect found while writing the how-to.** `README.md` tells an operator to copy the example
+next to itself, and `tools/deploy/deploy.local.json` **was not git-ignored** — the root rule
+`/deploy.*.json` is anchored, so it covered only a copy in the repository root. The one place the
+file is naturally created was the one place it could be committed. Fixed by adding
+`/tools/deploy/deploy.*.json` above the example's negation, test first:
+`test_gitignore.py::MUST_BE_IGNORED` now carries that path and was watched failing for exactly
+that reason before the rule landed.
+
+**Deviations from the plan as written**:
+
+- Decision numbers shifted by one (see above); a third decision, 0022, was added for the `tools/`
+  question rather than leaving it in prose.
+- The backlog entry grew past the one item the plan asked for. Writing the docs surfaced that the
+  research note this whole plan cites —
+  `docs/agents/research/2026-08-30-ftp-deployment-and-remote-install.md` — **exists in no branch**,
+  so every "research decision N" reference in the plan is a dead link. The substance survives in
+  the plan's own summaries. Recorded rather than reconstructed.
+
+### Second verification round, 2026-08-31 — reconciling the plan against the suite
+
+Every test name the plan cites was extracted and compared against the names the suite actually
+defines. Two citations pointed at tests that do not exist, and both are now fixed in place rather
+than deleted:
+
+- `test_generated_config_is_valid_php_open_tag` (Test Commands) never landed as a test of its own.
+  The assertion did — inside `test_generated_config_carries_the_three_settings`.
+- `test_excludes_the_fork_s_own_hook_scripts_but_keeps_upstream_tools` (Phase 6 narrative) was
+  superseded by `test_excludes_the_whole_tools_directory` when decision 0022 landed. The successor's
+  docstring names it, per *a superseded test file is deleted, not kept alongside*.
+
+Everything else resolves. The two remaining unmatched strings are benign and were checked by hand:
+`test_an_empty_remote_root_...` is a deliberate ellipsis in the mutant table, and `test_cache` is
+`.pytest_cache/` quoted from a `.gitignore` listing.
+
+**A real gap this found, now closed.** Both `tools/deploy/README.md` and
+`.claude/rules/deployment.md` quote the suite size as a dated measurement, and **neither was
+guarded** — the number had already rotted once (Phase 7 found both still claiming 288 after the
+suite reached 304, and corrected them by hand). Three tests were added to
+`tools/deploy/tests/test_readme.py`:
+
+- `test_the_documented_test_count_is_the_number_pytest_reports` — parametrised over both documents,
+  compared against what `pytest --collect-only` reports in its own process. Counting `def test_` in
+  the source would be a second, wrong definition: the parametrised cases expand.
+- `test_both_documents_date_the_same_measurement` — one document updated and the other left behind
+  is exactly the state Phase 7 had to fix by hand.
+
+Both carry anti-vacuity guards (`MIN_COLLECTED`, and an assertion that the scan matched a count at
+all). The guard was red on arrival for the right reason — adding three tests moved the count from
+304 to 307 — and each was then watched red against its own mutant: a differing date, and the count
+sentence removed from the rules file, which failed as *"states no dated test count"* rather than
+passing on an empty scan. Both documents now read **307**.
+
+**What was re-run.** `cd tools/deploy && uv run pytest` — **307 passed**, twice under
+pytest-randomly's shuffle and once with `-p no:randomly`. `bash tools/test-hooks.sh` — re-run this
+round and unchanged: every documentation-cap case passes (including `rules/deployment.md is 107
+lines (cap 500)`), both gate-behaviour cases pass (`git rejects a real commit`, `git accepts a clean
+commit`), and the same **4 environmental cases fail** — no `core.hooksPath` in the `plugins/typetags`
+submodule, and no `vendor/bin/phpunit` for any of the three plugins. Neither is reachable from this
+worktree and neither is this plan's to fix; not claimed as green.
+
+**What was deliberately not automated.** A standing test that checks *this plan's* test-name
+citations. `test-design.md` forbids building apparatus that proves other apparatus — "a scan that
+reads a document looking for a word" — and a plan is a dated snapshot, not a living document:
+guarding it forever would freeze a record that is supposed to age. The reconciliation above was run
+once, by hand, and its result is this section. The *living* documents (`README.md`,
+`.claude/rules/deployment.md`) are the ones that carry standing guards, which is where the three
+new tests went.
 
 ---
 
@@ -858,132 +1371,302 @@ Tags per `.claude/rules/test-design.md`: `[HAPPY]` `[NEG]` `[ECP]` `[BVA]` `[ST]
 #### `tests/test_config.py`
 
 **Happy path**
-- [ ] `test_loads_the_example_file` — `deploy.example.json` itself loads into a `DeployConfig`
+- [x] `test_loads_the_example_file` — `deploy.example.json` itself loads into a `DeployConfig`
       `[HAPPY]` — this doubles as a **structural guard**: the committed example cannot drift out
       of sync with the loader without a red test
-- [ ] `test_defaults_are_applied` — omitting `port`, `prefix`, `language`, `assume_https`,
+- [x] `test_defaults_are_applied` — omitting `port`, `prefix`, `language`, `assume_https`,
       `exiftool_path` yields the documented defaults `[HAPPY]`
 
 **Negative**
-- [ ] `test_missing_section_names_the_section` — no `mysql` key → `ConfigError` naming `mysql` `[NEG]`
-- [ ] `test_unknown_top_level_key_is_rejected` — a typo'd section fails rather than being ignored `[NEG]`
-- [ ] `test_empty_password_is_rejected` `[NEG]` `[ECP]`
-- [ ] `test_admin_username_with_a_quote_is_rejected` — mirrors `install.php:287-291` `[NEG]`
-- [ ] `test_relative_base_url_is_rejected` `[NEG]`
-- [ ] `test_remote_root_with_dotdot_is_rejected` `[NEG]`
+- [x] `test_missing_section_names_the_section` — no `mysql` key → `ConfigError` naming `mysql` `[NEG]`
+- [x] `test_unknown_top_level_key_is_rejected` — a typo'd section fails rather than being ignored `[NEG]`
+- [x] `test_empty_password_is_rejected` `[NEG]` `[ECP]`
+- [x] `test_admin_username_with_a_quote_is_rejected` — mirrors `install.php:287-291` `[NEG]`
+- [x] `test_relative_base_url_is_rejected` `[NEG]`
+- [x] `test_remote_root_with_dotdot_is_rejected` `[NEG]`
 
 **Boundaries**
-- [ ] `test_prefix_length` — 0 / 1 / 20 / 21 chars: reject, accept, accept, reject `[BVA]`
-- [ ] `test_prefix_leading_digit_is_rejected` and `test_prefix_underscore_and_dollar_accepted` `[ECP]`
-- [ ] `test_port_bounds` — 0 / 1 / 65535 / 65536 `[BVA]`
-- [ ] `test_base_url_trailing_slash_is_stripped` and `test_remote_root_is_normalised`
+- [x] `test_prefix_length` — 0 / 1 / 20 / 21 chars: reject, accept, accept, reject `[BVA]`
+- [x] `test_prefix_leading_digit_is_rejected` and `test_prefix_underscore_and_dollar_accepted` `[ECP]`
+- [x] `test_port_bounds` — 0 / 1 / 65535 / 65536 `[BVA]`
+- [x] `test_base_url_trailing_slash_is_stripped` and `test_remote_root_is_normalised`
       (`""`, `"/"`, `"piwigo"`, `"/piwigo/"` all → `"/piwigo"` or `""`) `[ECP]`
+
+**Added during Phase 1 verification** (not in the original list):
+- [x] `test_every_rejection_names_the_offending_field` — parametrised over all twelve rejection
+      paths; a message that does not name its field wasted the run `[NEG]` `[ECP]`
+- [x] `test_the_example_copies_to_a_working_local_credential_file` `[HAPPY]`
+- [x] `tests/test_gitignore.py` — structural guard that `deploy.*.json`, `.state/`, `__pycache__` and `.venv` stay ignored
+      while the tool itself stays tracked `[NEG]` `[BVA]`
 
 #### `tests/test_fileset.py`
 
-- [ ] `test_keeps_an_ordinary_plugin_file` `[HAPPY]`
-- [ ] `test_drops_a_tests_segment_anywhere_in_the_path` `[ECP]`
-- [ ] `test_keeps_a_file_named_tests_js` — `tests` matches a **segment**, not a substring `[BVA]`
-- [ ] `test_drops_each_excluded_basename` — parametrised over `EXCLUDED_BASENAMES` `[ECP]`
-- [ ] `test_drops_each_excluded_prefix` — parametrised over `EXCLUDED_PREFIXES` `[ECP]`
-- [ ] `test_keeps_local_index_php_guards` — `local/**/index.php` survives while
+- [x] `test_keeps_an_ordinary_plugin_file` `[HAPPY]`
+- [x] `test_drops_a_tests_segment_anywhere_in_the_path` `[ECP]`
+- [x] `test_keeps_a_file_named_tests_js` — `tests` matches a **segment**, not a substring `[BVA]`
+- [x] `test_drops_each_excluded_basename` — parametrised over `EXCLUDED_BASENAMES` `[ECP]`
+- [x] `test_drops_each_excluded_prefix` — parametrised over `EXCLUDED_PREFIXES` `[ECP]`
+- [x] `test_keeps_local_index_php_guards` — `local/**/index.php` survives while
       `local/config/*` does not `[BVA]`
-- [ ] `test_excludes_the_deploy_tool_itself` `[NEG]`
-- [ ] `test_empty_git_output_raises_git_error` — an empty file set must fail, never deploy
+- [x] `test_excludes_the_deploy_tool_itself` `[NEG]`
+- [x] `test_empty_git_output_raises_git_error` — an empty file set must fail, never deploy
       nothing `[NEG]`
-- [ ] `test_git_failure_names_the_command` `[NEG]`
-- [ ] `test_real_repository_file_set` — runs `git ls-files --recurse-submodules` against this
+- [x] `test_git_failure_names_the_command` `[NEG]`
+- [x] `test_real_repository_file_set` — runs `git ls-files --recurse-submodules` against this
       checkout; asserts input > 3000 entries **before** asserting anything about the output, and
-      that the output contains no `vendor/`, `node_modules/` or `tests/` path `[ERR]`
-      *(characterization: its oracle is the current repository contents, not a requirement)*
+      that the output contains no dependency-manager `vendor/`, `node_modules/` or `tests/` path
+      `[ERR]` *(characterization: its oracle is the current repository contents, not a
+      requirement)*
+
+**Added during Phase 2** (not in the original list):
+- [x] `test_an_excluded_basename_is_not_matched_as_a_substring` — parametrised over
+      `EXCLUDED_BASENAMES`; `not-a-composer.json` stays. The obvious `endswith` implementation
+      passes every other basename test and fails only this one `[BVA]`
+- [x] `test_select_preserves_input_order_and_drops_nothing_else` — anti-vacuity for every
+      `== []` assertion above, each of which a filter returning `[]` for everything would satisfy
+      `[HAPPY]`
+- [x] `test_git_tracked_paths_runs_recurse_submodules` — asserts the exact argv, so decision 7's
+      flag cannot be dropped silently `[HAPPY]`
+- [x] `test_the_created_directories_are_the_two_the_release_script_creates` — structural guard
+      against `tools/pwg_rel_create.sh:123-127` drifting apart `[HAPPY]`
+
+**The completeness guard** (task 4):
+- [x] `test_check_complete_accepts_a_whole_enumeration` — anti-vacuity for every rejection case
+      below, each of which a guard that raised unconditionally would satisfy `[HAPPY]`
+- [x] `test_check_complete_accepts_a_repository_with_no_submodules` `[ECP]`
+- [x] `test_check_complete_path_floor` — `MIN_EXPECTED_PATHS` minus one / exactly / plus one; the
+      floor is inclusive `[BVA]`
+- [x] `test_check_complete_rejects_an_uninitialised_submodule` — message names the submodule
+      *and* the fix command `[NEG]`
+- [x] `test_check_complete_is_not_fooled_by_a_prefix_match` — `plugins/typetags-backup/` does not
+      count as `plugins/typetags` having contributed `[BVA]`
+- [x] `test_declared_submodule_paths_parses_git_config` — `.gitmodules` is the source of truth;
+      the path is never hardcoded `[HAPPY]`
+- [x] `test_declared_submodule_paths_is_empty_without_gitmodules` — exit 1 means "no match", not
+      failure `[NEG]` `[ECP]`
+- [x] `test_declared_submodule_paths_raises_on_a_real_git_failure` `[NEG]`
+- [x] `test_verified_tracked_paths_refuses_an_incomplete_working_copy` — proves the guard is
+      *wired into* the deploy entry point, on a scripted double so it holds regardless of this
+      working copy `[NEG]`
+- [x] `test_verified_tracked_paths_returns_a_whole_enumeration` — anti-vacuity for the above
+      `[HAPPY]`
+- [x] `test_every_declared_submodule_contributes_its_files` — characterization; **skips**, naming
+      the fix command, where the submodule is not checked out `[ERR]`
+- [x] `test_verified_tracked_paths_agrees_with_the_raw_enumeration` — same, skips likewise `[ERR]`
+- [x] `test_the_selected_file_set_weighs_what_a_deploy_expects` — the real payload weighed through
+      `fileset.total_bytes()`, inside an 80–400 MiB band; added in Phase 5's verification round as
+      the automated half of its byte-total criterion `[ERR]`
+- [x] `test_total_bytes_of_nothing_is_zero` `[BVA]`
+- [x] `test_total_bytes_sums_the_files_it_is_given` — two files of known size, so the sum has an
+      oracle outside this checkout `[HAPPY]`
+
+**Mutation spot-check** (`.claude/rules/mutation-testing.md` — Phase 2's rules are the whole
+point of the phase, so its five exclusion decisions were audited rather than deferred; run on the
+host, no DDEV, so the Mutagen caveat does not apply. Each `sed` was verified to have changed the
+file before the suite ran):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `tests` segment match → substring match | `test_keeps_a_file_named_tests_js` | killed |
+| `_is_local_guard` exception removed | `test_keeps_local_index_php_guards` | killed |
+| empty-output `GitError` guard disabled | `test_empty_git_output_raises_git_error` | killed |
+| basename equality → `endswith` | `test_an_excluded_basename_is_not_matched_as_a_substring` | killed |
+| `--recurse-submodules` dropped from argv | `test_git_tracked_paths_runs_recurse_submodules` | killed |
+
+And over the completeness guard added as task 4:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| floor `<` → `<=` | `test_check_complete_path_floor` at exactly the floor | killed |
+| submodule contribution check removed | `test_check_complete_rejects_an_uninitialised_submodule` | killed |
+| prefix match loses its trailing `/` | `test_check_complete_is_not_fooled_by_a_prefix_match` | killed |
+| `git config` exit 1 treated as a hard failure | `test_declared_submodule_paths_is_empty_without_gitmodules` | killed |
+| `verified_tracked_paths` skips `check_complete` | `test_verified_tracked_paths_refuses_an_incomplete_working_copy` | **survived on the first pass, then killed** |
+
+The last row is the one worth keeping. The guard's *wiring* was initially witnessed only by a
+characterization test that skips on an uninitialised submodule — so in this worktree the mutant
+that disabled the whole check passed the suite. The successor test drives the entry point with a
+scripted double and is independent of the working copy. Recorded per `mutation-testing.md`: a
+survivor is a finding, and this one showed a guard that would have been silently inert exactly
+where it was needed.
 
 #### `tests/test_manifest.py`
 
-- [ ] `test_diff_decision_table` — parametrised over the four cases: in current only → new; in
+- [x] `test_diff_decision_table` — parametrised over the four cases: in current only → new; in
       both, hash differs → changed; in both, hash equal → unchanged; in previous only → removed
       `[DT]`
-- [ ] `test_diff_of_two_empty_manifests_is_empty` `[BVA]`
-- [ ] `test_first_run_is_all_new` — empty previous `[BVA]`
-- [ ] `test_pending_order_is_deterministic` — two calls yield the same list `[HAPPY]`
-- [ ] `test_hash_of_a_known_byte_string` — sha256 of a fixture with a hard-coded digest `[HAPPY]`
-- [ ] `test_hash_streams_across_the_chunk_boundary` — a file of `HASH_CHUNK_BYTES + 1` bytes
+- [x] `test_diff_of_two_empty_manifests_is_empty` `[BVA]`
+- [x] `test_first_run_is_all_new` — empty previous `[BVA]`
+- [x] `test_pending_order_is_deterministic` — two calls yield the same list `[HAPPY]`
+- [x] `test_hash_of_a_known_byte_string` — sha256 of a fixture with a hard-coded digest `[HAPPY]`
+- [x] `test_hash_streams_across_the_chunk_boundary` — a file of `HASH_CHUNK_BYTES + 1` bytes
       hashes equal to `hashlib.sha256` over the whole `[BVA]`
-- [ ] `test_save_then_load_round_trips` `[HAPPY]`
-- [ ] `test_load_of_a_missing_file_is_empty` `[NEG]`
-- [ ] `test_load_of_a_future_version_is_empty` — discard, do not guess `[NEG]` `[ECP]`
-- [ ] `test_save_is_atomic` — a pre-existing manifest is intact after a failed write `[ERR]`
-- [ ] `test_manifest_path_differs_per_target` — two hosts, and one host with two remote roots,
+- [x] `test_save_then_load_round_trips` `[HAPPY]`
+- [x] `test_load_of_a_missing_file_is_empty` `[NEG]`
+- [x] `test_load_of_a_future_version_is_empty` — discard, do not guess `[NEG]` `[ECP]`
+- [x] `test_save_is_atomic` — a pre-existing manifest is intact after a failed write `[ERR]`
+- [x] `test_manifest_path_differs_per_target` — two hosts, and one host with two remote roots,
       produce three distinct paths `[ECP]`
 
 #### `tests/test_transport.py`
 
-- [ ] `test_feat_without_auth_tls_raises` — message contains host **and** the advertised
+- [x] `test_feat_without_auth_tls_raises` — message contains host **and** the advertised
       features `[NEG]`
-- [ ] `test_feat_with_auth_tls_logs_in_and_calls_prot_p` — asserts the call order on a
+- [x] `test_a_refused_handshake_never_sends_the_password` — anti-vacuity for the above: no
+      `login` call, and the password appears nowhere in the call log `[NEG]`
+- [x] `test_feat_with_auth_tls_logs_in_and_calls_prot_p` — asserts the call order on a
       scripted double `[HAPPY]` `[ST]`
-- [ ] `test_makedirs_creates_each_segment_once` `[HAPPY]`
-- [ ] `test_makedirs_treats_already_exists_as_success` — 550 on an existing dir `[ERR]`
-- [ ] `test_chmod_returns_false_when_site_chmod_is_refused` — not an exception `[NEG]`
+- [x] `test_prot_p_comes_after_login` — the ordering on its own, so a reordering that keeps
+      both calls present still fails `[ST]`
+- [x] `test_the_connection_is_given_an_explicit_timeout` — `CONNECT_TIMEOUT_SECONDS` read from
+      the module, never retyped `[ERR]`
+- [x] `test_an_unreachable_host_is_a_transport_error_not_a_traceback` — the defect the smoke
+      run found `[NEG]`
+- [x] `test_a_refused_login_is_a_transport_error` `[NEG]`
+- [x] `test_a_cleartext_server_is_still_reported_as_insecure_not_merely_as_a_failure` —
+      anti-vacuity: the wrapping must not swallow the specific type `[NEG]`
+- [x] `test_makedirs_creates_each_segment_once` `[HAPPY]`
+- [x] `test_makedirs_treats_already_exists_as_success` — 550 on an existing dir `[ERR]`
+- [x] `test_makedirs_of_the_root_creates_nothing` `[BVA]`
+- [x] `test_makedirs_of_a_relative_path_creates_each_segment` — a remote root of `""` `[ECP]`
+- [x] `test_put_stores_the_file_bytes_under_the_remote_path` `[HAPPY]`
+- [x] `test_delete_removes_the_remote_path` `[HAPPY]`
+- [x] `test_chmod_sends_site_chmod` `[HAPPY]`
+- [x] `test_chmod_returns_false_when_site_chmod_is_refused` — not an exception `[NEG]`
+- [x] `test_exists_is_true_for_a_path_the_server_reports` `[HAPPY]`
+- [x] `test_exists_is_false_when_the_server_refuses_the_path` `[NEG]`
+- [x] `test_close_quits_the_session` `[HAPPY]`
+- [x] `test_close_before_connect_is_a_no_op` — a failed handshake still runs the caller's
+      cleanup `[NEG]` `[BVA]`
+
+**Mutation spot-check** (`.claude/rules/mutation-testing.md`; run on the host, no DDEV, so the
+Mutagen caveat does not apply — each mutant was verified to have changed the file first):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| the `AUTH TLS` condition forced false | `test_feat_without_auth_tls_raises` and its anti-vacuity partner | killed (both) |
+| `makedirs` catches `ZeroDivisionError` instead of `error_perm` | `test_makedirs_treats_already_exists_as_success` | killed |
+
+#### `tests/test_smoke.py` — added during Phase 4 verification
+
+- [x] `test_the_probe_is_uploaded_read_back_and_deleted` — the whole call order `[HAPPY]` `[ST]`
+- [x] `test_the_probe_body_carries_the_token` `[HAPPY]`
+- [x] `test_an_empty_remote_root_uploads_beside_the_login_directory` `[ECP]` `[BVA]`
+- [x] `test_bytes_that_do_not_match_are_a_failure_naming_both_paths` `[NEG]`
+- [x] `test_a_missing_file_is_a_failure_not_a_silent_pass` — `None` must not compare equal to
+      the uploaded body `[NEG]`
+- [x] `test_a_probe_still_served_after_delete_is_reported_not_raised` `[NEG]`
+- [x] `test_the_session_is_closed_even_when_the_check_fails` `[NEG]`
+- [x] `test_each_run_uses_a_fresh_token` `[ST]`
+- [x] `test_main_without_a_credential_file_exits_two` `[NEG]`
+- [x] `test_main_reports_a_bad_credential_file_with_the_config_exit_code` `[NEG]`
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| the uploaded-vs-fetched byte comparison forced false | the two `[NEG]` body tests | killed |
+| `transport.close()` dropped from the `finally` | `test_the_session_is_closed_even_when_the_check_fails` | killed |
+| `remote_path` always prefixes the root, empty or not | `test_an_empty_remote_root_...` and two `test_urls` cases | killed |
 
 #### `tests/test_upload.py`
 
-- [ ] `test_first_run_uploads_every_file` — count asserted > 0 first `[HAPPY]`
-- [ ] `test_second_run_uploads_nothing` — `unchanged_count == N`, `uploaded == []` `[ST]`
-- [ ] `test_changed_file_is_re_uploaded_alone` `[ST]`
-- [ ] `test_dry_run_never_touches_the_transport` — `FakeTransport` records zero calls,
+- [x] `test_first_run_uploads_every_file` — count asserted > 0 first `[HAPPY]`
+- [x] `test_second_run_uploads_nothing` — `unchanged_count == N`, `uploaded == []` `[ST]`
+- [x] `test_changed_file_is_re_uploaded_alone` `[ST]`
+- [x] `test_dry_run_never_touches_the_transport` — `FakeTransport` records zero calls,
       `connect` included `[NEG]`
-- [ ] `test_manifest_persists_after_each_file` — armed to fail on put #3, the manifest holds
+- [x] `test_manifest_persists_after_each_file` — armed to fail on put #3, the manifest holds
       exactly the first two paths `[ERR]`
-- [ ] `test_resume_after_failure_uploads_only_the_remainder` `[ST]`
-- [ ] `test_prune_deletes_only_previously_recorded_paths` — a path on the fake that is in
+- [x] `test_resume_after_failure_uploads_only_the_remainder` `[ST]`
+- [x] `test_prune_deletes_only_previously_recorded_paths` — a path on the fake that is in
       neither manifest is untouched `[NEG]`
-- [ ] `test_no_prune_flag_deletes_nothing` `[NEG]`
-- [ ] `test_creates_the_data_and_upload_directories` `[HAPPY]`
-- [ ] `test_chmod_refusal_is_a_warning_not_a_failure` — the run completes with
+- [x] `test_no_prune_flag_deletes_nothing` `[NEG]`
+- [x] `test_ctrl_c_mid_run_resumes_rather_than_restarts` — `KeyboardInterrupt` on put #3, the
+      manifest holds two, the re-run sends the remainder `[ST]` `[NEG]`
+- [x] `test_ctrl_c_still_closes_the_session` `[NEG]`
+- [x] `test_creates_the_data_and_upload_directories` `[HAPPY]`
+- [x] `test_chmod_refusal_is_a_warning_not_a_failure` — the run completes with
       `chmod_supported is False` `[NEG]`
-- [ ] `test_parent_directories_are_created_before_their_files` — order assertion on the fake
+- [x] `test_parent_directories_are_created_before_their_files` — order assertion on the fake
       `[ST]`
 
 #### `tests/test_urls.py`
 
-- [ ] `test_remote_path_joins_with_forward_slashes` — including a root of `""` and `"/"` `[ECP]`
-- [ ] `test_remote_path_never_doubles_a_slash` `[BVA]`
-- [ ] `test_site_url_joins_base_and_path` `[HAPPY]`
+- [x] `test_remote_path_joins_with_forward_slashes` — including a root of `""` and `"/"` `[ECP]`
+      — landed in Phase 4, which needed the same joins for the smoke check
+- [x] `test_remote_path_never_doubles_a_slash` `[BVA]`
+- [x] `test_remote_path_of_an_empty_relative_path_is_the_root_itself` `[BVA]`
+- [x] `test_remote_path_uses_forward_slashes_whatever_the_host_os_is` — anti-vacuity: no
+      `os.path.join` may creep in `[NEG]`
+- [x] `test_site_url_joins_base_and_path` `[HAPPY]`
+- [x] `test_site_url_never_doubles_a_slash` `[BVA]`
+- [x] `test_site_url_keeps_the_scheme_separator` `[NEG]`
 
 #### `tests/test_bootstrap.py`
 
-- [ ] `test_is_installed_true_on_the_marker` — uses `INSTALLED_MARKER`, **read from the module**,
-      never a second copy of the string in the test `[HAPPY]`
-- [ ] `test_is_installed_false_on_the_install_form` `[NEG]`
-- [ ] `test_install_posts_the_ten_expected_fields` — exact field set asserted, read from a
-      module constant rather than typed a second time in the test `[HAPPY]` `[DT]`
-- [ ] `test_install_omits_newsletter_subscribe` — the field is **absent**, not `0`
-      (`install.php:147-151` is an `isset()`) `[NEG]`
-- [ ] `test_install_omits_send_credentials_by_mail` — same reason `[NEG]`
-- [ ] `test_admin_pass2_mirrors_admin_pass1` `[HAPPY]`
-- [ ] `test_install_raises_when_the_marker_never_appears` — a re-rendered form with errors →
-      `InstallError` carrying the scraped errors `[NEG]`
-- [ ] `test_install_is_skipped_when_already_installed` `[ST]`
-- [ ] `test_login_reads_the_token_from_get_status` `[HAPPY]`
-- [ ] `test_login_failure_raises_remote_http_error` — bad credentials `[NEG]`
-- [ ] `test_activate_plugins_posts_action_and_token_per_plugin` `[HAPPY]`
-- [ ] `test_activate_skips_already_active_plugins` — from `pwg.plugins.getList` `[ST]`
-- [ ] `test_activate_error_names_the_plugin` — one plugin fails, the message says which `[NEG]`
-- [ ] `test_sync_posts_the_remote_sync_field_set` — the exact fields from
-      `tools/remote_sync.pl:41-56` `[HAPPY]`
-- [ ] `test_generated_config_contains_the_exiftool_paths` — both plugin keys, from the JSON
-      `[HAPPY]`
-- [ ] `test_generated_config_is_valid_php_open_tag` `[HAPPY]`
-- [ ] `test_bootstrap_step_order` — install → config → login → plugins → sync, asserted on the
-      fake client's call log `[ST]`
+The names that landed differ from the plan's provisional ones: each was rewritten during
+Phase 6 to say what it witnesses. Every behaviour the plan listed is covered and the file
+grew past it — **33 tests, measured 2026-08-31**. Technique tags are read from each test's
+own docstring.
+
+- [x] `test_a_fresh_gallery_reports_not_installed` `[HAPPY]` `[ST]`
+- [x] `test_an_installed_gallery_is_recognised_by_the_marker` `[ST]`
+- [x] `test_install_posts_every_field_the_form_declares` `[HAPPY]` `[DT]`
+- [x] `test_install_omits_the_two_isset_checkboxes` `[NEG]`
+- [x] `test_install_passes_the_language_as_a_get_parameter` `[ECP]`
+- [x] `test_install_confirms_by_asking_the_server_again` `[ST]`
+- [x] `test_a_rejected_install_raises_with_the_server_s_own_errors` `[NEG]`
+- [x] `test_an_install_that_reports_no_error_at_all_still_fails_loudly` `[NEG]`
+- [x] `test_scrape_errors_reads_every_error_list_item` `[HAPPY]`
+- [x] `test_scrape_errors_returns_nothing_for_a_page_without_an_error_block` `[BVA]`
+- [x] `test_generated_config_carries_the_three_settings` `[HAPPY]`
+- [x] `test_generated_config_reflects_assume_https_false` `[ECP]`
+- [x] `test_generated_config_quotes_an_exiftool_path_safely` `[NEG]`
+- [x] `test_config_upload_lands_at_the_remote_config_path` `[HAPPY]`
+- [x] `test_an_unchanged_config_is_not_uploaded_again` `[ST]`
+- [x] `test_a_changed_exiftool_path_re_uploads_the_config` `[ST]`
+- [x] `test_the_config_entry_joins_the_target_s_own_manifest` `[ST]`
+- [x] `test_login_returns_the_pwg_token` `[HAPPY]`
+- [x] `test_a_wrong_password_fails_with_the_server_s_message` `[NEG]`
+- [x] `test_activation_installs_all_three_fork_plugins` `[HAPPY]`
+- [x] `test_an_already_active_plugin_is_left_alone` `[ST]`
+- [x] `test_an_inactive_plugin_is_activated_while_its_neighbour_is_not` `[DT]`
+- [x] `test_activation_sends_the_token_with_every_action` `[NEG]`
+- [x] `test_a_plugin_the_server_does_not_know_is_reported_as_missing` `[NEG]`
+- [x] `test_sync_posts_the_field_set_remote_sync_replays` `[HAPPY]` `[DT]`
+- [x] `test_sync_reports_the_counts_the_summary_carries` `[HAPPY]`
+- [x] `test_a_second_sync_reporting_zero_new_is_a_success` `[BVA]`
+- [x] `test_sync_errors_are_carried_through` `[ECP]`
+- [x] `test_a_sync_answered_by_the_login_page_fails_loudly` `[NEG]`
+- [x] `test_parse_sync_counts_needs_both_added_lines` `[BVA]`
+- [x] `test_a_first_run_installs_activates_and_syncs` `[HAPPY]` `[ST]`
+- [x] `test_a_second_run_installs_nothing_and_activates_nothing` `[ST]`
+- [x] `test_the_config_is_uploaded_after_the_install` `[ST]`
+- [x] `test_the_sync_runs_last` `[ST]`
 
 #### `tests/test_cli.py`
 
-- [ ] `test_missing_config_argument_exits_two` `[NEG]`
-- [ ] `test_each_error_type_maps_to_its_own_exit_code` — parametrised over the `DeployError`
-      subclasses `[DT]`
-- [ ] `test_no_bootstrap_flag_skips_the_http_phase` `[ST]`
-- [ ] `test_list_files_prints_and_exits_without_connecting` `[NEG]`
+**20 tests, measured 2026-08-31**; names as landed, tags read from each test's own docstring.
+
+- [x] `test_a_full_run_uploads_then_bootstraps_and_exits_zero` `[HAPPY]` `[ST]`
+- [x] `test_the_report_names_every_step` `[HAPPY]`
+- [x] `test_the_report_names_the_target_it_deployed_to` `[HAPPY]`
+- [x] `test_list_files_prints_the_published_set_and_stops` `[ECP]`
+- [x] `test_dry_run_connects_to_nothing` `[ST]`
+- [x] `test_dry_run_reports_what_it_would_send` `[HAPPY]`
+- [x] `test_a_second_dry_run_after_a_deploy_reports_nothing_pending` `[ST]`
+- [x] `test_dry_run_reports_what_it_would_delete` `[NEG]`
+- [x] `test_dry_run_with_no_prune_reports_no_deletion` `[DT]`
+- [x] `test_no_bootstrap_uploads_but_leaves_the_gallery_alone` `[DT]`
+- [x] `test_no_prune_keeps_a_file_the_manifest_no_longer_covers` `[DT]`
+- [x] `test_a_pruned_file_is_deleted_by_default` `[DT]`
+- [x] `test_verbose_names_each_uploaded_path` `[ECP]`
+- [x] `test_a_missing_credential_file_exits_with_the_config_code` `[NEG]`
+- [x] `test_a_refused_ftps_handshake_exits_with_its_own_code` `[NEG]`
+- [x] `test_a_failed_upload_stops_before_the_bootstrap` `[NEG]` `[ST]`
+- [x] `test_the_error_goes_to_stderr_and_not_to_the_report` `[NEG]`
+- [x] `test_an_interrupted_run_says_it_can_be_resumed` `[NEG]` `[ST]`
+- [x] `test_an_interrupted_run_keeps_what_it_already_uploaded` `[ST]`
+- [x] `test_the_config_file_argument_is_required` `[NEG]`
 
 ### Integration Tests
 
@@ -1007,11 +1690,22 @@ first real deploy is the manual acceptance run in Phase 6.
 This plan changes **no PHP, no template and no plugin code**, so no existing suite is at risk. The
 only shared files touched are additive:
 
-- [ ] Root `.gitignore` — new rules only. Verify `git status --porcelain` still shows the same
-      tracked set for `plugins/`, `themes/` and `galleries/` after the change
-- [ ] `CLAUDE.md` — one added line; the < 100-line cap is asserted in Phase 7
-- [ ] `bash tools/test-hooks.sh` — the commit gate is untouched; run it to prove that
-- [ ] The three plugin suites are unaffected and are **not** re-run as part of this plan; saying so
+- [x] Root `.gitignore` — new rules only. Verified 2026-08-31: `git status --porcelain` is empty,
+      and `git ls-files plugins themes galleries | git check-ignore --stdin` matches **0** paths
+      against 171 / 840 / 106 tracked files, so no previously tracked file became ignored.
+      `tests/test_gitignore.py` is the standing guard on the rules themselves
+- [x] `CLAUDE.md` — one added line; the < 100-line cap is asserted in Phase 7 (**74** lines,
+      re-measured 2026-08-31)
+- [x] `bash tools/test-hooks.sh` — the commit gate is untouched; run it to prove that. Run
+      2026-08-31: the gate's two behavioural cases pass (`git rejects a real commit`, `git accepts
+      a clean commit`), as do all documentation-cap cases. **4 cases fail for environment reasons
+      unrelated to this phase**, each naming its own fix: `plugins/typetags` has no
+      `core.hooksPath` (`tools/install-hooks.sh`), and `vendor/bin/phpunit` is absent for all
+      three plugins (`composer install` per plugin). Neither is reachable from this worktree —
+      DDEV is bound to the main checkout, so `ddev exec composer install` would install into the
+      main checkout rather than here. Phase 2 changed no PHP, no hook and no gate, so the gate is
+      untouched as claimed; the 4 failures predate it
+- [x] The three plugin suites are unaffected and are **not** re-run as part of this plan; saying so
       is more honest than running them to produce a green line that means nothing here
 
 ### Manual Testing Steps
@@ -1056,7 +1750,10 @@ defect (`test-design.md`, anti-vacuity).
 
 No `php -l` run is claimed: this plan adds no PHP file. The generated
 `local/config/config.inc.php` is a string built in Python and is covered by
-`test_generated_config_is_valid_php_open_tag`.
+`test_generated_config_carries_the_three_settings`, which asserts the `<?php` opening tag
+alongside the three settings (the plan's provisional
+`test_generated_config_is_valid_php_open_tag` never landed as a test of its own — the
+assertion did, in that test).
 
 ## Performance Considerations
 

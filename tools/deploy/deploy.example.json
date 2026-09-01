@@ -1,0 +1,27 @@
+{
+  "ftp": {
+    "host": "ftp.example.net",
+    "user": "w01234",
+    "password": "REPLACE_ME",
+    "port": 21,
+    "remote_root": "/piwigo"
+  },
+  "mysql": {
+    "host": "localhost",
+    "user": "d01234",
+    "password": "REPLACE_ME",
+    "database": "d01234",
+    "prefix": "piwigo_"
+  },
+  "admin": {
+    "username": "webmaster",
+    "password": "REPLACE_ME",
+    "email": "you@example.net"
+  },
+  "site": {
+    "base_url": "https://gallery.example.net",
+    "language": "de_DE",
+    "assume_https": true,
+    "exiftool_path": ""
+  }
+}

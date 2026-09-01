@@ -1,3 +1,27 @@
+## ftp deploy
+
+- **A plugin schema change can miss the remote silently.** `activate` falls through to `install`
+  only when there is no DB row; an existing row goes through `autoupdate_plugin()`, which compares
+  the `Version:` header. So a schema change shipped without a version bump never reaches the
+  remote tables, and the deploy reports the plugin `active` either way. Worse for `persons`, which
+  has no `ALTER … MODIFY` path at all — a *changed* column definition does not propagate even with
+  a bump. Accepted, not gated (the FTP deploy plan's *What We're NOT Doing*); a gate would have to
+  read each plugin's header and diff it against the remote's `piwigo_plugins.version`.
+- **The research note the deploy plan cites was never committed.**
+  `docs/agents/research/2026-08-30-ftp-deployment-and-remote-install.md` does not exist in any
+  branch, so every "research decision N" / "research §N" reference in the plan and in the decision
+  files is a dead link. The substance survives in the plan's own summaries; the note itself is
+  gone.
+- **`deploy.local.json` still carries `admin.password: "REPLACE_ME"`.** The next install bakes in
+  whatever is in that file. Set a real one before the next deploy.
+
+*(Answered 2026-08-31: `.ddev` and `tools` are no longer uploaded — see
+[decision 0022](agents/decisions/0022-the-tools-directory-is-not-published.md). Of `local/`, only
+the `index.php` directory-listing guards ship; `local/config/` is excluded and the remote's config
+is generated. `tools/deploy/README.md` has the full list.)*
+
+## misc
+
 - search function by: tag, person
 - save labels/ tags in the image meta data
 - enforce a 1:1 photo-album relationship (core allows many-to-many via `piwigo_image_category`; freetext-per-album assumes 1:1)
