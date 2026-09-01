@@ -137,6 +137,12 @@ two ways, and both abort with exit `9`:
 skipped on `--dry-run`, which opens no connection at all, and the report says so. See
 [decision 0027](../../docs/agents/decisions/0027-manifest-and-remote-must-agree-on-installation.md).
 
+Reading only the manifest is also what makes the prune safe. It only ever considers paths the
+previous manifest recorded, which is why it cannot touch `upload/`, `_data/`, or anything a
+person put on the server by hand — and equally why it can never clean up after anything that
+bypassed it. A file dropped from the manifest while still on the server is an orphan no future
+run can reach; it has to be deleted over FTP by hand. `--audit` is how you find them.
+
 ## The remote's core version has to match this checkout
 
 The same preflight asks an installed gallery for its `PHPWG_VERSION` (`pwg.getVersion`) and
@@ -155,12 +161,6 @@ content moves in either direction and nothing here posts to `upgrade.php` — ru
 in a browser, then re-run the deploy. `--allow-version-change` turns the refusal into a warning
 for the case where you know the schema is already right. See
 [decision 0028](../../docs/agents/decisions/0028-core-version-is-detected-never-migrated.md).
-
-The same asymmetry is what makes prune safe. It only ever considers paths the previous manifest
-recorded, which is why it cannot touch `upload/`, `_data/`, or anything a person put on the
-server by hand — and equally why it can never clean up after anything that bypassed it. A file
-dropped from the manifest while still on the server is an orphan no future run can reach; it
-has to be deleted over FTP by hand. `--audit` is how you find them.
 
 ## `--audit` — what the server actually holds
 
@@ -182,6 +182,9 @@ Piwigo deploy -> bilder.example.de:/
               themes/modus/theme.css
   This is a read-only report. Nothing was deleted.
 ```
+
+Each bucket names at most 20 paths and summarises the rest as `… and N more`; the block above
+is trimmed to one name per bucket for length, which is why 103 orphans show a single line.
 
 - **orphans** are what no run can reach: prune only considers paths the previous manifest
   recorded. `local/config/database.inc.php` is always among them — `install.php` wrote it on
@@ -227,7 +230,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-403 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
+404 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

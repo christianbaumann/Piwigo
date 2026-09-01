@@ -4,7 +4,7 @@ git_commit: 51a8a89dab7bbf1a9f82a5145279f23e0d82dbd0
 branch: master
 topic: "Deploy: state guards, version detection, deletion reporting and a read-only audit"
 tags: [plan, deployment, pwgdeploy, manifest, prune, audit, guards]
-status: draft
+status: complete
 ---
 
 # Deploy state guards, version detection, deletion reporting and a read-only audit
@@ -670,17 +670,17 @@ be settled once, at the end.
 
 ### Changes Required
 
-#### [ ] 1. The dated test count, final
+#### [x] 1. The dated test count, final
 **Files**: `tools/deploy/README.md`, `.claude/rules/deployment.md`
 **Changes**: both to the final `uv run pytest` collection count, both dated the same day.
 
-#### [ ] 2. The hand-check ledger
+#### [x] 2. The hand-check ledger
 **File**: `docs/agents/TESTING.md`
 **Changes**: dated entries for what has no automated oracle in this plan — the MLSD support of
 the real host, the two real-run guard checks of Phase 3, and the version line of Phase 4. State
 for each why it cannot be automated (no FTP server, no second web space).
 
-#### [ ] 3. Research note status
+#### [x] 3. Research note status
 **File**: `docs/agents/research/2026-09-01-ftp-deploy-blank-vs-existing-remote.md`
 **Changes**: its "Open Questions — answered by the user" table gains the decision file each
 answer became, so the next reader follows a link instead of re-litigating. Its two "Still open"
@@ -691,13 +691,19 @@ moves to `docs/backlog.md`.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes, including both `test_readme.py` count guards
-- [ ] `test_the_rules_file_is_reachable_from_claude_md` passes
+- [x] `cd tools/deploy && uv run pytest` passes, including both `test_readme.py` count guards
+- [x] `test_the_rules_file_is_reachable_from_claude_md` passes
 
 #### Manual Verification
-- [ ] Read `tools/deploy/README.md` end to end as a first-time operator: the five new flags and
+- [x] Read `tools/deploy/README.md` end to end as a first-time operator: the three new flags and
       two new exit codes read as instructions someone could follow. This half has no oracle
-      (`test_readme.py` module docstring says so) and belongs in the ledger.
+      (`test_readme.py` module docstring says so) and belongs in the ledger. Read 2026-09-01;
+      it found two defects no guard could see — a paragraph on the prune stranded in the
+      core-version section with a dangling *"the same asymmetry"*, and an `--audit` example
+      whose `… and 83 more` tail could not follow the single orphan name shown. Both fixed.
+      The one mechanizable part became `test_the_readme_version_refusal_is_the_message_the_tool_produces`
+      (the README's `VersionError` block vs. `check_version`'s own string), watched red against
+      a reworded message. Ledger row added.
 
 ---
 
@@ -859,13 +865,14 @@ is a recorded gap, not a silent one.
 
 #### Phase 6 — documents
 
-- [ ] **Regression only**: `test_every_flag_the_tool_accepts_is_documented`,
+- [x] **Regression only**: `test_every_flag_the_tool_accepts_is_documented`,
       `test_every_exit_code_the_tool_can_return_is_documented`,
       `test_the_documented_test_count_is_the_number_pytest_reports`,
       `test_both_documents_date_the_same_measurement`,
       `test_every_relative_link_in_the_readme_resolves`. Raise `MIN_FLAGS` and `MIN_EXIT_CODES`
       in `test_readme.py` to sit just under the new totals, the way the existing constants sit
-      just under the old ones — otherwise the anti-vacuity floor stops floor-ing.
+      just under the old ones — otherwise the anti-vacuity floor stops floor-ing. Raised
+      2026-09-01: `MIN_FLAGS` 4 → 7 (8 documented), `MIN_EXIT_CODES` 6 → 8 (9 documented).
 
 ### Integration Tests
 

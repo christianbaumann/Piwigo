@@ -378,25 +378,33 @@ one of the sharp edges in §7 (orphans, wiped-remote blindness, per-machine stat
 
 ## Open Questions — answered by the user, 2026-09-01
 
-Seven were put to the user and all seven were answered. They are direction for a follow-up plan;
-none is implemented, and none has a decision file yet.
+Seven were put to the user and all seven were answered. All seven are now implemented by
+[2026-09-01-deploy-state-guards-audit-and-deletion-reporting.md](../plans/2026-09-01-deploy-state-guards-audit-and-deletion-reporting.md);
+the **Recorded as** column names the decision file each answer became, so a later reader follows
+the link instead of re-litigating the answer here.
 
-| # | Question | Answer |
-|---|---|---|
-| 1 | Reconcile the two "is it installed" oracles (§1c)? | **Yes, as a hard guard.** In `cli.py`: a non-empty manifest together with `is_installed() == False` aborts the run, naming the manifest file to delete. This is the wiped-remote case that actually happened 2026-08-31. |
-| 2 | Is `galleries/` being prune-eligible (§4) intended? | **Yes — intended, and to be made explicit.** Record it as a decision, and have `--dry-run` report `galleries/` deletions as their own line rather than folding them into one count. Deleting a scan locally *should* propagate; a bare "3 removed" hides which 3. |
-| 3 | A core-version upgrade path (§7.5)? | **Detect only.** Compare local `PHPWG_VERSION` against the remote's and refuse the run when they differ, naming `upgrade.php`. No unauthenticated POST to a migration endpoint. |
-| 4 | Remove empty remote directories (§7.1)? | **No.** Record the decision instead. `RMD` needs a listing operation `Transport` does not have, and directory removal is where an over-broad delete stops being recoverable. |
-| 5 | Make orphans (§7.2) recoverable? | **Read-only audit.** A `--audit` flag that lists the remote tree and reports what the manifest does not cover. Needs one `list()` on the port; it reports, never deletes. |
-| 6 | Stop the manifest being per-machine (§7.4)? | **No — fail loudly instead.** When the manifest is absent and the remote answers `already installed`, say so before re-uploading everything. The same guard as #1, in the other direction. Committing hashes of a private target is worse. |
-| 7 | Report `site_update`'s deletions (§7.7)? | **Yes.** Add `albums_deleted` / `photos_deleted` to `SyncCounts` and to the summary line. `_SUMMARY_ITEM` already matches `update_summary_del`; the rows are genuinely being deleted unreported. |
+| # | Question | Answer | Recorded as |
+|---|---|---|---|
+| 1 | Reconcile the two "is it installed" oracles (§1c)? | **Yes, as a hard guard.** In `cli.py`: a non-empty manifest together with `is_installed() == False` aborts the run, naming the manifest file to delete. This is the wiped-remote case that actually happened 2026-08-31. | [decision 0027](../decisions/0027-manifest-and-remote-must-agree-on-installation.md) |
+| 2 | Is `galleries/` being prune-eligible (§4) intended? | **Yes — intended, and to be made explicit.** Record it as a decision, and have `--dry-run` report `galleries/` deletions as their own line rather than folding them into one count. Deleting a scan locally *should* propagate; a bare "3 removed" hides which 3. | [decision 0026](../decisions/0026-tracked-gallery-photos-are-prune-eligible.md) |
+| 3 | A core-version upgrade path (§7.5)? | **Detect only.** Compare local `PHPWG_VERSION` against the remote's and refuse the run when they differ, naming `upgrade.php`. No unauthenticated POST to a migration endpoint. | [decision 0028](../decisions/0028-core-version-is-detected-never-migrated.md) |
+| 4 | Remove empty remote directories (§7.1)? | **No.** Record the decision instead. `RMD` needs a listing operation `Transport` does not have, and directory removal is where an over-broad delete stops being recoverable. | [decision 0029](../decisions/0029-empty-remote-directories-are-never-removed.md) |
+| 5 | Make orphans (§7.2) recoverable? | **Read-only audit.** A `--audit` flag that lists the remote tree and reports what the manifest does not cover. Needs one `list()` on the port; it reports, never deletes. | [decision 0030](../decisions/0030-the-audit-is-read-only-and-exists-stays-size-based.md) |
+| 6 | Stop the manifest being per-machine (§7.4)? | **No — fail loudly instead.** When the manifest is absent and the remote answers `already installed`, say so before re-uploading everything. The same guard as #1, in the other direction. Committing hashes of a private target is worse. | [decision 0027](../decisions/0027-manifest-and-remote-must-agree-on-installation.md) |
+| 7 | Report `site_update`'s deletions (§7.7)? | **Yes.** Add `albums_deleted` / `photos_deleted` to `SyncCounts` and to the summary line. `_SUMMARY_ITEM` already matches `update_summary_del`; the rows are genuinely being deleted unreported. | No decision — a reporting fix with no tradeoff to record |
 
 Answers 1 and 6 are two halves of one guard: the manifest and the remote must agree on whether
 the gallery is installed, in both directions.
 
+### Resolved since
+
+- The `Transport` port's listing operation is decided: `list_dir(remote_dir) -> list[RemoteEntry]`,
+  one directory at a time, `MLSD` only, used by `--audit` and by nothing else. `exists()` keeps its
+  `SIZE`-based directory blindness — nothing in the tool calls it, and a second way to ask one
+  question is the copy that rots ([decision 0030](../decisions/0030-the-audit-is-read-only-and-exists-stays-size-based.md)).
+
 ### Still open
 
 - `admin.php?page=plugins` has still never been opened in a browser; plugin state has only ever
-  been witnessed through `pwg.plugins.getList` (plan:1174-1176).
-- The `Transport` port gains a `list()` operation under answer 5. What it returns — and whether
-  `exists()`'s `SIZE`-based directory blindness (§6) is fixed by it or left alone — is not decided.
+  been witnessed through `pwg.plugins.getList` (plan:1174-1176). Carried in
+  [`docs/backlog.md`](../../backlog.md).

@@ -26,18 +26,18 @@ from pathlib import Path
 
 import pytest
 
-from pwgdeploy import cli, config, errors, fileset
+from pwgdeploy import cli, config, errors, fileset, preflight
 
 README = Path(__file__).resolve().parents[1] / "README.md"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-# Lower bounds for the scans below, each one under what the README carried when this file
-# was written, 2026-08-31: 5 flags, 7 exit codes, 13 distinct field names (the sets are
+# Lower bounds for the scans below, each one under what the README carried when it was
+# last measured, 2026-09-01: 8 flags, 9 exit codes, 13 distinct field names (the sets are
 # compared by name, so the `host`/`user`/`password` that three sections share count once),
 # 6 exclusion prefixes, 4 relative links. A scan that finds fewer has stopped reading the
 # document it claims to check.
-MIN_FLAGS = 4
-MIN_EXIT_CODES = 6
+MIN_FLAGS = 7
+MIN_EXIT_CODES = 8
 MIN_FIELDS = 12
 MIN_EXCLUDED_PREFIXES = 5
 MIN_LINKS = 3
@@ -356,3 +356,33 @@ def test_both_documents_date_the_same_measurement():
         assert found, f"{path.name} states no dated test count"
         dates.update(date for _count, date in found)
     assert len(dates) == 1, f"the test count is dated differently across the documents: {sorted(dates)}"
+
+
+# --- the worked error example -----------------------------------------------------------
+
+# The README quotes one refusal verbatim, hard-wrapped across three lines. A shorter match
+# than this is a block that lost its body to a rewrite, and the comparison below would then
+# be asserting that two fragments agree.
+MIN_VERSION_EXAMPLE_CHARS = 120
+VERSION_EXAMPLE = re.compile(
+    r"^(VersionError: local PHPWG_VERSION is (\S+), the remote reports (\S+)\.[^`]*?)\n```",
+    re.MULTILINE,
+)
+
+
+def test_the_readme_version_refusal_is_the_message_the_tool_produces(readme):
+    """[HAPPY] The worked example is a verbatim second copy of `check_version`'s message,
+    down to the two flags it names. An operator reads it to learn what the abort looks
+    like and what to do next, so a reworded message with the block left behind teaches the
+    wrong recovery. The two versions are read out of the block rather than transcribed, so
+    the test drives the function with exactly what the document claims."""
+    match = VERSION_EXAMPLE.search(readme)
+    assert match, "the README carries no VersionError example; this guard is scanning nothing"
+    documented, local, remote = match.group(1), match.group(2), match.group(3)
+    assert len(documented) >= MIN_VERSION_EXAMPLE_CHARS, f"only {len(documented)} chars matched"
+
+    with pytest.raises(errors.VersionError) as raised:
+        preflight.check_version(local, remote, allow_change=False)
+    produced = f"{type(raised.value).__name__}: {raised.value}"
+
+    assert " ".join(documented.split()) == " ".join(produced.split())

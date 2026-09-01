@@ -12,6 +12,11 @@
   branch, so every "research decision N" / "research §N" reference in the plan and in the decision
   files is a dead link. The substance survives in the plan's own summaries; the note itself is
   gone.
+- **`admin.php?page=plugins` has never been opened in a browser on the remote.** Plugin state has
+  only ever been witnessed through `pwg.plugins.getList`, which is what the deploy reports. Carried
+  over from
+  [2026-09-01-ftp-deploy-blank-vs-existing-remote.md](agents/research/2026-09-01-ftp-deploy-blank-vs-existing-remote.md)
+  when the rest of its open questions were closed.
 - **`deploy.local.json` still carries `admin.password: "REPLACE_ME"`.** The next install bakes in
   whatever is in that file. Set a real one before the next deploy.
 
