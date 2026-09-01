@@ -224,10 +224,20 @@ class BatchManagerActionPage {
     this.associateBlock = page.locator('#action_associate');
     this.associateAlbumButton = page.locator('#associate_as');
     this.applyAction = page.locator('#applyAction');
+
+    // The "which whole page" selection controls, and the pagination furniture
+    // whose presence is what makes them multi-page in the first place —
+    // navigation_bar.tpl:1 renders `.pagination-container` only when
+    // create_navigation_bar() found more elements than fit one page
+    // (functions.inc.php:2052), which is the anti-vacuity check for the
+    // `nb_thumbs_set > nb_thumbs_page` precondition itself.
+    this.selectSet = page.locator('#selectSet');
+    this.paginationContainer = page.locator('.pagination-container');
   }
 
-  async goto() {
-    await this.page.goto('/admin.php?page=batch_manager');
+  /** @param {string} [query] extra query-string appended to the URL, e.g. '&display=all' */
+  async goto(query = '') {
+    await this.page.goto(`/admin.php?page=batch_manager${query}`);
     await this.thumbnails.first().waitFor({ state: 'visible' });
   }
 

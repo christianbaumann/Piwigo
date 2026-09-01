@@ -302,6 +302,47 @@ test.describe('the controls the handbook tells a reader to click', () => {
     expect(option).not.toBe('');
   });
 
+  /**
+   * [ERR] [BVA] Finding 2 of the 2026-09-01 handbook-vs-live walkthrough.
+   *
+   * batch_manager_global.tpl:325-330: whenever the filtered set is bigger than
+   * one page, "Alles" splits into "Die ganze Seite" and "Das ganze Set". The
+   * install's own 105 photos against the default 20-per-page make an
+   * unfiltered Batch Manager the multi-page case with no fixture — but the
+   * precondition is asserted from the DOM, not assumed from that count: the
+   * pagination furniture only renders when create_navigation_bar() actually
+   * found more than one page (functions.inc.php:2052).
+   */
+  test('a multi-page set offers Die ganze Seite and Das ganze Set', async ({ page }) => {
+    const batch = new BatchManagerActionPage(page);
+    await batch.goto();
+
+    // Anti-vacuity: without this, the pair below could be asserting against a
+    // set that never spanned more than one page.
+    expect(await batch.paginationContainer.count()).toBeGreaterThan(0);
+
+    await expect(batch.selectAll).toBeVisible();
+    await expect(batch.selectSet).toBeVisible();
+    expect(await serverText(batch.selectAll)).toBe('Die ganze Seite');
+    expect(await serverText(batch.selectSet)).toBe('Das ganze Set');
+  });
+
+  /** [ERR] [BVA] The other side of the same boundary: display=all collapses the set to one page. */
+  test('display=all offers Alles instead', async ({ page }) => {
+    const batch = new BatchManagerActionPage(page);
+    await batch.goto('&display=all');
+
+    // Anti-vacuity, the mirror of the case above: display=all must actually
+    // have collapsed the set to one page, or the single-label assertion below
+    // would pass for an unrelated reason.
+    expect(await batch.paginationContainer.count()).toBe(0);
+    expect(await batch.thumbnails.count()).toBeGreaterThan(0);
+
+    await expect(batch.selectAll).toBeVisible();
+    await expect(batch.selectSet).toHaveCount(0);
+    expect(await serverText(batch.selectAll)).toBe('Alles');
+  });
+
   test('choosing "associate" reveals the album picker the handbook sends the reader to', async ({ page }) => {
     const batch = new BatchManagerActionPage(page);
     await batch.goto();
