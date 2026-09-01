@@ -74,11 +74,12 @@ reports the plugins already active.
 | `--no-bootstrap` | upload only; skip install, config, plugins and sync |
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
+| `--allow-version-change` | upload even when the remote runs a different core version |
 | `--verbose` | name each uploaded path as it goes |
 
 Exit codes are one per failure mode — `3` bad credential file, `4` git, `5` transport, `6` no
-FTPS offered, `7` remote HTTP, `8` `install.php` refused, `9` manifest and remote disagree — and
-`130` for Ctrl-C.
+FTPS offered, `7` remote HTTP, `8` `install.php` refused, `9` manifest and remote disagree,
+`10` core versions differ — and `130` for Ctrl-C.
 
 Interrupting is safe. The manifest records completed uploads only, so re-running the same
 command resumes from where it stopped rather than starting over.
@@ -135,6 +136,25 @@ two ways, and both abort with exit `9`:
 skipped on `--dry-run`, which opens no connection at all, and the report says so. See
 [decision 0027](../../docs/agents/decisions/0027-manifest-and-remote-must-agree-on-installation.md).
 
+## The remote's core version has to match this checkout
+
+The same preflight asks an installed gallery for its `PHPWG_VERSION` (`pwg.getVersion`) and
+compares it against `include/constants.php` in this working copy. Any difference — in either
+direction — aborts with exit `10`:
+
+```
+VersionError: local PHPWG_VERSION is 17.1.0, the remote reports 17.0.0beta1. Uploading would
+put core PHP on a schema this tool did not migrate; it does not run upgrade.php. Run
+upgrade.php on the remote yourself, or pass --allow-version-change.
+```
+
+The comparison is exact string equality, never an ordering: `17.0.0beta1` is not a semver, and
+this tool must not decide which of two versions is newer. **It never migrates.** No database
+content moves in either direction and nothing here posts to `upgrade.php` — run that yourself,
+in a browser, then re-run the deploy. `--allow-version-change` turns the refusal into a warning
+for the case where you know the schema is already right. See
+[decision 0028](../../docs/agents/decisions/0028-core-version-is-detected-never-migrated.md).
+
 The same asymmetry is what makes prune safe. It only ever considers paths the previous manifest
 recorded, which is why it cannot touch `upload/`, `_data/`, or anything a person put on the
 server by hand — and equally why it can never clean up after anything that bypassed it. A file
@@ -169,7 +189,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-350 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
+371 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

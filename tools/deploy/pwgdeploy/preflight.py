@@ -23,29 +23,47 @@ from pathlib import Path
 
 from pwgdeploy import bootstrap
 from pwgdeploy.config import DeployConfig
-from pwgdeploy.errors import StateMismatchError
+from pwgdeploy.errors import RemoteHttpError, StateMismatchError, VersionError
 
 ADOPT_FLAG = "--adopt-remote-state"
 AUDIT_FLAG = "--audit"
+ALLOW_VERSION_FLAG = "--allow-version-change"
+# Core's own migration entry point. This tool never posts to it — it names it and stops.
+UPGRADE_SCRIPT = "upgrade.php"
+
+VERSION_METHOD = "pwg.getVersion"
 
 
 @dataclass(frozen=True)
 class RemoteState:
     installed: bool
     version: str | None
-    """None while the remote is blank — and, for now, always: Phase 4 fills this in."""
+    """None while the remote is blank: there is no gallery to ask."""
 
 
 def probe(client, config: DeployConfig) -> RemoteState:
-    """One GET of install.php. Port-typed; opens no socket of its own.
+    """One GET of install.php, and — when it is installed — its PHPWG_VERSION.
 
-    Asks the same marker the bootstrap asks (install.php:156-165 decides it from
-    local/config/database.inc.php alone), so the two halves of the run cannot disagree
-    about what "installed" means.
+    Port-typed; opens no socket of its own. Asks the same marker the bootstrap asks
+    (install.php:156-165 decides it from local/config/database.inc.php alone), so the two
+    halves of the run cannot disagree about what "installed" means.
+
+    ws.php:57-62 registers pwg.getVersion with no `admin_only`, so the session is not
+    strictly needed — it is taken anyway, because an install with guest access disabled
+    refuses every method but the login, and one code path that works against both beats
+    an unauthenticated call with a login retry.
     """
-    return RemoteState(
-        installed=bootstrap.is_installed(client, config.site.base_url), version=None
-    )
+    installed = bootstrap.is_installed(client, config.site.base_url)
+    if not installed:
+        return RemoteState(installed=False, version=None)
+
+    bootstrap.login(client, config)
+    reported = bootstrap.ws_call(client, config.site.base_url, VERSION_METHOD)
+    if not isinstance(reported, str):
+        raise RemoteHttpError(
+            f"{VERSION_METHOD} returned {reported!r}, not a version string"
+        )
+    return RemoteState(installed=True, version=reported)
 
 
 def check_state(
@@ -72,6 +90,27 @@ def check_state(
     if entry_count == 0 and remote_installed:
         return _refuse(_missing_manifest_message(file_count), adopt)
     return None
+
+
+def check_version(local: str, remote: str | None, *, allow_change: bool) -> str | None:
+    """None when they match or there is nothing to compare (the remote is not installed).
+
+    Exact string equality, not a semver parse: `17.0.0beta1` is not a semver, and "which
+    of these two is newer" is a question this tool must not answer. Any difference is a
+    refusal — uploading either way puts core PHP on a schema no run of this tool migrated.
+    """
+    if remote is None or local == remote:
+        return None
+
+    message = (
+        f"local PHPWG_VERSION is {local}, the remote reports {remote}. Uploading would "
+        f"put core PHP on a schema this tool did not migrate; it does not run "
+        f"{UPGRADE_SCRIPT}. Run {UPGRADE_SCRIPT} on the remote yourself, or pass "
+        f"{ALLOW_VERSION_FLAG}."
+    )
+    if allow_change:
+        return f"{ALLOW_VERSION_FLAG} given, proceeding anyway. {message}"
+    raise VersionError(message)
 
 
 def _refuse(message: str, adopt: bool) -> str:

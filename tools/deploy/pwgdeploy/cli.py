@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from pwgdeploy import bootstrap, fileset, manifest, preflight, upload
+from pwgdeploy import bootstrap, fileset, manifest, preflight, upload, version
 from pwgdeploy.config import DeployConfig, load_file
 from pwgdeploy.errors import DeployError
 from pwgdeploy.http import UrllibClient
@@ -62,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--adopt-remote-state",
         action="store_true",
         help="upload even when the manifest and the remote disagree about the install",
+    )
+    parser.add_argument(
+        "--allow-version-change",
+        action="store_true",
+        help="upload even when the remote runs a different core version",
     )
     parser.add_argument("--verbose", action="store_true", help="name each uploaded path")
     return parser
@@ -113,7 +118,9 @@ def main(
         _report_target(out, config)
         _report_file_set(out, repo_root, tracked_paths, published)
         _report_manifest(out, state_path)
-        _preflight(out, args, config, state_path, len(published), client_factory)
+        _preflight(
+            out, args, config, state_path, len(published), client_factory, repo_root
+        )
         _upload(
             out, args, config, repo_root, state_dir, transport_factory, tracked_paths
         )
@@ -156,27 +163,41 @@ def _report_manifest(out, state_path: Path) -> None:
     _line(out, "manifest", f"{state_path} ({known})")
 
 
-def _preflight(out, args, config, state_path, file_count, client_factory) -> None:
-    """Refuse before uploading when the manifest and the remote contradict each other.
+def _preflight(
+    out, args, config, state_path, file_count, client_factory, repo_root
+) -> None:
+    """Refuse before uploading when the remote contradicts the manifest or the checkout.
+
+    Two guards, in that order: the manifest against the install marker, then this
+    checkout's PHPWG_VERSION against the one the remote reports. The state guard runs
+    first because a remote that is not installed has no version to compare.
 
     Skipped on a dry run, and it says so: `--dry-run` opens no connection at all, and a
     guard that was silently not run is one an operator believes ran. It still runs under
-    `--no-bootstrap` — the upload is exactly the half the guard protects.
+    `--no-bootstrap` — the upload is exactly the half the guards protect.
     """
     if args.dry_run:
         _line(out, "preflight", "skipped (--dry-run opens no connection)")
         return
 
     state = preflight.probe(client_factory(config), config)
-    warning = preflight.check_state(
-        entry_count=len(manifest.load(state_path)),
-        remote_installed=state.installed,
-        manifest_path=state_path,
-        file_count=file_count,
-        adopt=args.adopt_remote_state,
-    )
-    verdict = "installed" if state.installed else "not installed"
-    _line(out, "preflight", f"{verdict} — {warning or 'manifest and remote agree'}")
+    warnings = [
+        preflight.check_state(
+            entry_count=len(manifest.load(state_path)),
+            remote_installed=state.installed,
+            manifest_path=state_path,
+            file_count=file_count,
+            adopt=args.adopt_remote_state,
+        ),
+        preflight.check_version(
+            version.local_version(repo_root),
+            state.version,
+            allow_change=args.allow_version_change,
+        ),
+    ]
+    verdict = f"installed, {state.version}" if state.installed else "not installed"
+    said = " ".join(w for w in warnings if w) or "manifest and remote agree"
+    _line(out, "preflight", f"{verdict} — {said}")
 
 
 def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_paths):

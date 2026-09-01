@@ -15,11 +15,13 @@ import pytest
 
 from pwgdeploy import cli
 from pwgdeploy import preflight
+from pwgdeploy import version as pwgversion
 from pwgdeploy.errors import (
     ConfigError,
     InsecureTransportError,
     StateMismatchError,
     TransportError,
+    VersionError,
 )
 from tests.fakes import FakeGallery, FakeTransport
 
@@ -42,6 +44,10 @@ TRACKED = (
 # Anti-vacuity: the two excluded entries above are what makes --list-files a real filter.
 EXPECTED_PUBLISHED = 3
 
+# A checkout the fake gallery is not running. Any difference is a refusal, so which one
+# it is does not matter — only that it is not FakeGallery.VERSION.
+OTHER_VERSION = "17.1.0"
+
 
 @pytest.fixture
 def config_file(tmp_path):
@@ -52,6 +58,14 @@ def config_file(tmp_path):
     return path
 
 
+def _write_constants(root, version: str) -> None:
+    """The one file the version guard reads. Written with the fake gallery's own version
+    by default, so an ordinary run is a matching pair rather than a refusal."""
+    path = root / pwgversion.VERSION_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"<?php\ndefine('PHPWG_VERSION', '{version}');\n", encoding="utf-8")
+
+
 @pytest.fixture
 def repo(tmp_path):
     root = tmp_path / "repo"
@@ -59,6 +73,7 @@ def repo(tmp_path):
         path = root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"contents of {rel}\n", encoding="utf-8")
+    _write_constants(root, FakeGallery.VERSION)
     return root
 
 
@@ -339,6 +354,51 @@ def test_a_dry_run_says_the_preflight_was_skipped(run):
     run("--dry-run")
 
     assert "skipped" in _preflight_line(run.text)
+
+
+def test_the_preflight_line_reports_both_versions(config_file, repo, tmp_path):
+    """[HAPPY] An operator reads this line to know the two cores match; a verdict with no
+    figures behind it is one they have to take on trust."""
+    runner = Run(config_file, repo, tmp_path, gallery=FakeGallery(BASE_URL, installed=True))
+
+    runner("--adopt-remote-state")
+
+    assert FakeGallery.VERSION in _preflight_line(runner.text)
+
+
+def test_a_version_difference_exits_with_the_version_code(config_file, repo, tmp_path):
+    """[NEG] Newer core PHP over a schema nothing migrated. The code is read off the
+    class, so a renumbering cannot make this test wrong."""
+    _write_constants(repo, OTHER_VERSION)
+    runner = Run(config_file, repo, tmp_path, gallery=FakeGallery(BASE_URL, installed=True))
+
+    assert runner("--adopt-remote-state") == VersionError.exit_code
+    assert preflight.UPGRADE_SCRIPT in runner.err.getvalue()
+
+
+def test_a_version_difference_uploads_nothing(run):
+    """[NEG] The refusal is worthless if it fires after the transfer it was meant to stop.
+    Anti-vacuity: the first run's puts prove the transport would otherwise be used."""
+    assert run() == 0
+    assert run.transport.paths("put")
+    run.transport.calls.clear()
+    _write_constants(run._repo, OTHER_VERSION)
+
+    assert run() == VersionError.exit_code
+    assert run.transport.calls == []
+
+
+def test_allow_version_change_uploads_over_the_difference(run):
+    """[DT] The escape hatch's paired row, and it says on the report what it overrode."""
+    assert run() == 0
+    _write_constants(run._repo, OTHER_VERSION)
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    assert run("--allow-version-change") == 0
+
+    assert run.transport.paths("put")
+    assert preflight.ALLOW_VERSION_FLAG in _preflight_line(run.text)
 
 
 def test_a_wiped_remote_exits_with_the_state_mismatch_code(run):

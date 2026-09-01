@@ -103,6 +103,9 @@ class FakeGallery:
 
     LOGIN_PAGE = "identification.php"
     TOKEN = "0123456789abcdef"
+    # What this fake's gallery is running. A test that needs a *matching* local checkout
+    # builds one from this attribute rather than typing the literal a second time.
+    VERSION = "17.0.0beta1"
     ALL_PLUGINS = ("typetags", "provenance", "persons")
 
     def __init__(
@@ -112,6 +115,7 @@ class FakeGallery:
         installed=False,
         plugin_states=None,
         install_errors=(),
+        version=VERSION,
         albums_added=4,
         photos_added=106,
         albums_deleted=0,
@@ -126,6 +130,9 @@ class FakeGallery:
             plugin_states or {name: "uninstalled" for name in self.ALL_PLUGINS}
         )
         self.install_errors = list(install_errors)
+        # PHPWG_VERSION as pwg.getVersion returns it (pwg.php:125-128). Not typed as a
+        # string on purpose: a test hands it an int to prove the caller checks.
+        self.version = version
         self.albums_added = albums_added
         self.photos_added = photos_added
         self.albums_deleted = albums_deleted
@@ -191,6 +198,11 @@ class FakeGallery:
             return _ok(True)
         if not self.logged_in:
             return _fail(401, "Access denied")
+        # Below the logged_in gate although ws.php:57-62 registers pwg.getVersion with no
+        # admin_only: an install with guest access disabled refuses it too, and the tool
+        # must work against that one.
+        if method == "pwg.getVersion":
+            return _ok(self.version)
         if method == "pwg.session.getStatus":
             return _ok(
                 {

@@ -51,3 +51,13 @@ class StateMismatchError(DeployError):
     """The local manifest and the remote disagree on whether the gallery is installed."""
 
     exit_code = 9
+
+
+class VersionError(DeployError):
+    """The checkout's PHPWG_VERSION cannot be read, or differs from the remote's.
+
+    Both failure modes share one code deliberately: they are one question — "which core
+    is this?" — and a caller branching on the answer takes the same action either way.
+    """
+
+    exit_code = 10

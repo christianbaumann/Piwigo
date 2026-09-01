@@ -449,7 +449,7 @@ Answer 3. Detect only. The tool never posts to `upgrade.php`; it stops and names
 
 ### Changes Required
 
-#### [ ] 1. A new error class
+#### [x] 1. A new error class
 **File**: `tools/deploy/pwgdeploy/errors.py`
 
 ```python
@@ -462,7 +462,7 @@ class VersionError(DeployError):
 Both failure modes share one code deliberately: they are one question — "which core is this?" —
 and a caller branching on the answer takes the same action either way.
 
-#### [ ] 2. Read the local version
+#### [x] 2. Read the local version
 **File**: `tools/deploy/pwgdeploy/version.py` (new)
 
 ```python
@@ -476,14 +476,14 @@ def local_version(repo_root: Path) -> str:
     """parse_version of include/constants.php."""
 ```
 
-#### [ ] 3. Read the remote version
+#### [x] 3. Read the remote version
 **File**: `tools/deploy/pwgdeploy/preflight.py`
 **Changes**: `probe()` gains, when `installed` is true, `bootstrap.login(client, config)`
 followed by `bootstrap.ws_call(client, base_url, "pwg.getVersion")`. `pwg.getVersion` is public
 (`ws.php:57-62` passes no `admin_only`), but the session is taken anyway so one code path covers
 an install with guest access disabled. A non-string result raises `RemoteHttpError`.
 
-#### [ ] 4. A pure comparison
+#### [x] 4. A pure comparison
 **File**: `tools/deploy/pwgdeploy/preflight.py`
 
 ```python
@@ -494,18 +494,18 @@ def check_version(local: str, remote: str | None, *, allow_change: bool) -> str 
 Exact string equality, not a semver parse: `17.0.0beta1` is not a semver, and "which of these
 two is newer" is a question this tool must not answer — any difference is a refusal.
 
-#### [ ] 5. The flag and the wiring
+#### [x] 5. The flag and the wiring
 **File**: `tools/deploy/pwgdeploy/cli.py`
 **Changes**: `--allow-version-change`; `_preflight()` runs `check_state` first, then
 `check_version`. The `preflight` line reports both versions when the remote is installed.
 
-#### [ ] 6. `FakeGallery` answers `pwg.getVersion`
+#### [x] 6. `FakeGallery` answers `pwg.getVersion`
 **File**: `tools/deploy/tests/fakes.py`
 **Changes**: a `version="17.0.0beta1"` constructor keyword and a `pwg.getVersion` branch in
 `_ws()`, placed **after** the `logged_in` gate so the fake keeps mirroring a real install with
 guest access off.
 
-#### [ ] 7. README, decision 0028, rules file
+#### [x] 7. README, decision 0028, rules file
 **Files**: `tools/deploy/README.md`,
 `docs/agents/decisions/0028-core-version-is-detected-never-migrated.md`,
 `.claude/rules/deployment.md`
@@ -517,14 +517,22 @@ version-guard note.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes
-- [ ] A test asserts `version.local_version(REPO_ROOT)` equals the literal in
+- [x] `cd tools/deploy && uv run pytest` passes
+- [x] A test asserts `version.local_version(REPO_ROOT)` equals the literal in
       `include/constants.php` — read from the file, never transcribed
 
 #### Manual Verification
-- [ ] Real run against the remote: the `preflight` line reports `17.0.0beta1` on both sides.
-- [ ] The remote host runs exiftool 12.76 against local 13.25 and no suite has run against
+- [x] Real run against the remote: the `preflight` line reports `17.0.0beta1` on both sides.
+      Run 2026-09-01: `preflight   installed, 17.0.0beta1 — manifest and remote agree`, then
+      `0 new, 0 changed, 3335 unchanged`, install skipped, all three plugins active. The
+      refusal path was forced in the same session by setting the working copy's
+      `PHPWG_VERSION` to `17.1.0`: `EXIT=10`, the message named both versions, `upgrade.php`
+      and `--allow-version-change`, and the report stopped after the `manifest` line — no
+      `transport` line, so no connection was opened. `constants.php` restored, diff clean.
+- [x] The remote host runs exiftool 12.76 against local 13.25 and no suite has run against
       12.76 — unchanged by this phase, but confirm the version line does not imply otherwise.
+      Confirmed: the line reads `installed, 17.0.0beta1` and names `PHPWG_VERSION` only. Both
+      entries are in the `docs/agents/TESTING.md` ledger, dated.
 
 **Implementation Note**: pause for confirmation before Phase 5.
 
@@ -779,27 +787,35 @@ is a recorded gap, not a silent one.
 
 #### Phase 4 — the version guard (`tests/test_version.py` new, `tests/test_preflight.py`)
 
-- [ ] `test_parse_version_reads_the_literal` `[HAPPY]`
-- [ ] `test_parse_version_of_this_checkout_matches_constants_php` — reads
+- [x] `test_parse_version_reads_the_literal` `[HAPPY]`
+- [x] `test_local_version_reads_this_checkout` (renamed) — reads
       `include/constants.php`, never transcribes `17.0.0beta1` `[HAPPY]`
-- [ ] `test_parse_version_without_the_define_raises` `[NEG]`
-- [ ] `test_parse_version_of_an_empty_literal_raises` — `define('PHPWG_VERSION', '')` `[BVA]`
-- [ ] `test_parse_version_ignores_a_double_quoted_define` — core uses single quotes; a
+- [x] `test_parse_version_without_the_define_raises` `[NEG]`
+- [x] `test_parse_version_of_an_empty_literal_raises` — `define('PHPWG_VERSION', '')` `[BVA]`
+- [x] `test_parse_version_ignores_a_double_quoted_define` — core uses single quotes; a
       double-quoted one is not the define this tool means `[ERR]`
-- [ ] `test_parse_version_takes_the_first_define_when_there_are_two` `[ERR]`
-- [ ] `test_matching_versions_pass` `[HAPPY]`
-- [ ] `test_differing_versions_are_refused` `[NEG]`
-- [ ] `test_a_blank_remote_has_no_version_to_compare` — `remote is None` `[BVA]`
-- [ ] `test_the_refusal_names_upgrade_php` `[NEG]`
-- [ ] `test_allow_version_change_turns_the_refusal_into_a_warning` `[DT]`
-- [ ] `test_a_version_difference_exits_with_the_version_code` `[NEG]`
-- [ ] `test_a_version_difference_uploads_nothing` `[NEG]`
-- [ ] `test_the_probe_logs_in_before_asking_for_the_version` — assert `pwg.session.login`
+- [x] `test_parse_version_takes_the_first_define_when_there_are_two` `[ERR]`
+- [x] `test_parse_version_tolerates_the_whitespace_core_may_use` `[HAPPY]` and
+      `test_local_version_of_a_tree_without_core_raises` `[NEG]` — added: an unreadable local
+      version shares exit `10` and had no case
+- [x] `test_matching_versions_pass` `[HAPPY]`
+- [x] `test_differing_versions_are_refused` `[NEG]`
+- [x] `test_a_blank_remote_has_no_version_to_compare` — `remote is None` `[BVA]`, paired with
+      `test_a_blank_remote_has_no_version_to_read` on the probe side
+- [x] `test_the_refusal_names_both_versions_and_upgrade_php` (renamed; it asserts both figures too) `[NEG]`
+- [x] `test_allow_version_change_turns_the_refusal_into_a_warning` `[DT]`
+- [x] `test_a_version_difference_exits_with_the_version_code` `[NEG]`
+- [x] `test_a_version_difference_uploads_nothing` `[NEG]`
+- [x] `test_the_probe_logs_in_before_asking_for_the_version` — assert `pwg.session.login`
       precedes `pwg.getVersion` in `gallery.methods_called()`; the fake refuses ws calls to an
       anonymous session, which is what makes this a real check `[ST]`
-- [ ] `test_a_non_string_version_result_fails_loudly` `[NEG]`
-- [ ] `test_the_preflight_line_reports_both_versions` `[HAPPY]`
-- [ ] **Regression**: every Phase 3 preflight test — `check_state` runs first and its verdicts
+- [x] `test_a_non_string_version_result_fails_loudly` `[NEG]`
+- [x] `test_the_preflight_line_reports_both_versions` `[HAPPY]`
+- [x] `test_allow_version_change_uploads_over_the_difference` `[DT]` and
+      `test_allow_version_change_says_nothing_when_the_versions_match` `[NEG]`
+- [x] **Superseded**: `test_probe_leaves_the_version_unread` (Phase 3's `[ERR]` placeholder)
+      deleted, successor `test_probe_reports_the_remote_version`
+- [x] **Regression**: every Phase 3 preflight test — `check_state` runs first and its verdicts
       must not change; `test_login_returns_the_pwg_token` and
       `test_a_wrong_password_fails_with_the_server_s_message`, since `probe` now calls `login`
 

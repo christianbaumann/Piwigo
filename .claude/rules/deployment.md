@@ -12,7 +12,7 @@ cd tools/deploy
 uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
-uv run pytest                                    # 350 tests, measured 2026-09-01
+uv run pytest                                    # 371 tests, measured 2026-09-01
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -124,7 +124,13 @@ write-back works there. Note the version gap: local is 13.25, and no suite has r
 ## No database is transferred
 
 In either direction
-([decision 0023](../../docs/agents/decisions/0023-no-database-transfer-to-the-remote.md)). Albums
+([decision 0023](../../docs/agents/decisions/0023-no-database-transfer-to-the-remote.md)) — and
+because the schema therefore stays whatever the remote's last `install.php`/`upgrade.php` left,
+the preflight compares `include/constants.php`'s `PHPWG_VERSION` against the remote's
+`pwg.getVersion` and refuses any difference with exit `10`
+([decision 0028](../../docs/agents/decisions/0028-core-version-is-detected-never-migrated.md)).
+Exact string equality, never an ordering; `--allow-version-change` overrides. **The tool never
+posts to `upgrade.php`** — run it in a browser yourself, then re-run the deploy. Albums
 and photos are re-created by the `site_update` scan; person regions by `pwg.persons.rescan` out
 of the image files. **Provenance columns have no path to the remote at all** — they live in the
 database and the file is only an export target — so a photo whose provenance was not written back
