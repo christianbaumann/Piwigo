@@ -2,7 +2,7 @@
 /**
  * Screenshot run for the German end-user handbook.
  *
- * Every image under docs/handbuch/assets/screenshots/ is produced here, so a
+ * Every image under handbuch/assets/screenshots/ is produced here, so a
  * screen that changes is re-photographed by one command instead of rotting in
  * the pages that show it.
  *
@@ -12,9 +12,9 @@
  * than a full page that could catch a real thumbnail in a sidebar.
  *
  * Usage:
- *   ddev exec php docs/handbuch/tools/seed.php --scenario=demo
+ *   ddev exec php handbuch/tools/seed.php --scenario=demo
  *   ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
- *     node docs/handbuch/tools/shoot.js'
+ *     node handbuch/tools/shoot.js'
  *
  * It reads the ids and face boxes the seed wrote to _data/handbuch/demo.json;
  * it never recomputes a box from the scene table, so the drawn face and the
@@ -37,8 +37,8 @@ const fs = require('fs');
 const path = require('path');
 const { createRequire } = require('module');
 
-const ROOT = path.resolve(__dirname, '..', '..', '..');
-const OUT_DIR = path.join(ROOT, 'docs', 'handbuch', 'assets', 'screenshots');
+const ROOT = path.resolve(__dirname, '..', '..');
+const OUT_DIR = path.join(ROOT, 'handbuch', 'assets', 'screenshots');
 const DEMO_FILE = path.join(ROOT, '_data', 'handbuch', 'demo.json');
 
 /**
@@ -111,7 +111,7 @@ function loadDemo() {
   if (!fs.existsSync(DEMO_FILE)) {
     fail(
       'No demo album is seeded: ' + DEMO_FILE + ' is missing. Run:\n'
-      + '  ddev exec php docs/handbuch/tools/seed.php --scenario=demo'
+      + '  ddev exec php handbuch/tools/seed.php --scenario=demo'
     );
   }
 
@@ -656,7 +656,7 @@ async function main() {
 
   assertOutput();
   process.stdout.write(
-    SHOTS.length + ' screenshots in docs/handbuch/assets/screenshots/, '
+    SHOTS.length + ' screenshots in handbuch/assets/screenshots/, '
     + framesHoldingAPhoto + ' of them holding a photo, none from outside the demo album\n'
   );
 }

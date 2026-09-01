@@ -255,7 +255,7 @@ final class CorePhotoTextCharacterizationTest extends TestCase
      * "Administratoren, Familie", and so on, with "Jeder" for level 0. No option
      * carries a single group name such as "Familie" on its own.
      *
-     * docs/handbuch/03-fototexte.html quotes these labels. It said "Kontakte,
+     * handbuch/03-fototexte.html quotes these labels. It said "Kontakte,
      * Freunde, Familie oder Administratoren" until 2026-08-31, which sent the
      * reader looking for options that do not exist. This case exists so the
      * handbook cannot drift from the screen again unnoticed. The oracle is the
@@ -293,7 +293,7 @@ final class CorePhotoTextCharacterizationTest extends TestCase
                 'Jeder',
             ),
             $labels,
-            'the privacy options no longer read as docs/handbuch/03-fototexte.html says'
+            'the privacy options no longer read as handbuch/03-fototexte.html says'
         );
     }
 

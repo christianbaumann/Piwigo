@@ -2,7 +2,7 @@
 /**
  * Demo gallery seed for the German end-user handbook.
  *
- * Every screenshot in docs/handbuch/ shows this album and nothing else. The
+ * Every screenshot in handbuch/ shows this album and nothing else. The
  * gallery this repository points at holds recovered family scans of
  * identifiable private people, so the handbook photographs generated content
  * instead: ImageMagick draws six 1200x800 scenes with face-like shapes at fixed
@@ -16,8 +16,8 @@
  * update_category(), delete_elements(), delete_categories().
  *
  * Usage:
- *   php docs/handbuch/tools/seed.php --scenario=demo
- *   php docs/handbuch/tools/seed.php --restore
+ *   php handbuch/tools/seed.php --scenario=demo
+ *   php handbuch/tools/seed.php --restore
  *
  * Both print one JSON object on stdout. Errors go to stderr with exit 1.
  *
@@ -189,7 +189,7 @@ const DEMO_REGION_SLUG = 'sommerfest';
 
 // ------------------------------------------------------------------ runtime
 
-define('PHPWG_ROOT_PATH', dirname(__DIR__, 3) . '/');
+define('PHPWG_ROOT_PATH', dirname(__DIR__, 2) . '/');
 
 /** Snapshot lives under _data/, which .gitignore already excludes. */
 define('SNAPSHOT_FILE', PHPWG_ROOT_PATH . '_data/handbuch/snapshot.json');

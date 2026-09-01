@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
  * French) literal. An upstream merge that renames or drops one of those
  * literals is invisible at runtime: l10n() falls back to returning the key,
  * the screen silently reverts to English, and nothing errors. Every screenshot
- * in docs/handbuch/ then shows a language the handbook does not.
+ * in handbuch/ then shows a language the handbook does not.
  *
  * [ERR] The oracle is the current template source, not a requirement. These
  * cases report a change; they do not prove any wording correct.

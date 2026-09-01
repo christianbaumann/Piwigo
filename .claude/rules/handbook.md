@@ -1,9 +1,9 @@
 # The German End-User Handbook
 
-Read before changing anything under `docs/handbuch/`, before re-taking a screenshot, and before
+Read before changing anything under `handbuch/`, before re-taking a screenshot, and before
 changing a German string a screenshot shows.
 
-`docs/handbuch/` is the fork's German end-user documentation: six plain HTML pages plus a
+`handbuch/` is the fork's German end-user documentation: six plain HTML pages plus a
 stylesheet, covering album creation, adding photos, photo texts, tags and person tagging. It is
 **not** part of upstream's `language/de_DE/help/` and must not be moved there — an upstream merge
 rewrites those files. See
@@ -15,17 +15,17 @@ All three are committed and reproducible. Run them in this order when a document
 
 ```bash
 # 1. Build the demo album the screenshots show (and only that album)
-ddev exec php docs/handbuch/tools/seed.php --scenario=demo
+ddev exec php handbuch/tools/seed.php --scenario=demo
 
 # 2. Re-take every screenshot
 ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
-  node docs/handbuch/tools/shoot.js'
+  node handbuch/tools/shoot.js'
 
 # 3. Remove the demo album again
-ddev exec php docs/handbuch/tools/seed.php --restore
+ddev exec php handbuch/tools/seed.php --restore
 
 # Mechanical checks over the pages themselves — run this before committing
-ddev exec php docs/handbuch/tools/check.php
+ddev exec php handbuch/tools/check.php
 ```
 
 **Always finish with `--restore`.** A second `--scenario=demo` refuses while one is seeded, and a

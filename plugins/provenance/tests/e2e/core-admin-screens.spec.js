@@ -106,7 +106,7 @@ test.describe('core admin screens the handbook documents', () => {
 });
 
 /**
- * The controls `docs/handbuch/` tells a reader to click.
+ * The controls `handbuch/` tells a reader to click.
  *
  * Every one of these is assembled or revealed by JavaScript, so a page-source
  * assertion cannot witness it: the row actions are appended by albums.js from

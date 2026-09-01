@@ -6,7 +6,7 @@ const path = require('path');
 /**
  * The handbook pages themselves, opened the way a reader opens them.
  *
- * `docs/handbuch/tools/check.php` reads the files: it proves every reference
+ * `handbuch/tools/check.php` reads the files: it proves every reference
  * resolves on disk and every page parses. It cannot say whether a browser
  * actually paints them, and the plan's own success criterion is that the pages
  * "open correctly from the filesystem with no server" - a `file://` fact no
@@ -18,7 +18,7 @@ const path = require('path');
  * Nothing here is navigated over HTTP, so no session and no fixture is needed.
  */
 
-const HANDBUCH_DIR = path.resolve(__dirname, '../../../../docs/handbuch');
+const HANDBUCH_DIR = path.resolve(__dirname, '../../../../handbuch');
 
 /**
  * Lower bound on the pages a run must have opened.
@@ -75,4 +75,21 @@ test.describe('the handbook opens from the filesystem', () => {
       expect(problems).toEqual([]);
     });
   }
+});
+
+test.describe('the handbook is served by the running app', () => {
+  test('index.html answers at /handbuch/ with its content intact', async ({ page }) => {
+    const response = await page.goto('/handbuch/');
+    expect(response.status()).toBe(200);
+    // The handbook's pages use <h2> as their top-level heading, not <h1>.
+    await expect(page.locator('h2')).toBeVisible();
+  });
+
+  test('a screenshot referenced from a page loads over HTTP', async ({ page }) => {
+    await page.goto('/handbuch/01-alben.html');
+    const firstImage = page.locator('img').first();
+    await expect(firstImage).toBeVisible();
+    const naturalWidth = await firstImage.evaluate((img) => img.naturalWidth);
+    expect(naturalWidth).toBeGreaterThan(0);
+  });
 });

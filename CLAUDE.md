@@ -61,7 +61,7 @@ Repository-specific, read on the task that needs them:
   not show up, when touching `_data/`, or when adding a plugin or theme git must track
 - [git-and-commits.md](.claude/rules/git-and-commits.md) — read before committing, branching, or
   pulling from upstream
-- [handbook.md](.claude/rules/handbook.md) — read before changing `docs/handbuch/`, re-taking a
+- [handbook.md](.claude/rules/handbook.md) — read before changing `handbuch/`, re-taking a
   screenshot, or changing a German string a screenshot shows
 - [deployment.md](.claude/rules/deployment.md) — read before changing `tools/deploy` or deploying
   this fork to the web space

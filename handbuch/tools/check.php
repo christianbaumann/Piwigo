@@ -7,14 +7,14 @@
 // +-----------------------------------------------------------------------+
 
 /**
- * Mechanical checks over docs/handbuch/.
+ * Mechanical checks over handbuch/.
  *
  * Handbook prose has no automated oracle. What a machine can decide is
  * checked here and nothing else; the German wording and whether the
  * instructions actually work stay in the hand-check ledger of
  * docs/agents/TESTING.md.
  *
- *   ddev exec php docs/handbuch/tools/check.php
+ *   ddev exec php handbuch/tools/check.php
  *
  * Exits 0 when every check passes, 1 on the first failure, naming the page,
  * the reference and the file it did not resolve to.
@@ -22,7 +22,7 @@
 
 const HANDBUCH_DIR = __DIR__ . '/..';
 const SHOT_DIR = HANDBUCH_DIR . '/assets/screenshots';
-const ROOT = __DIR__ . '/../../..';
+const ROOT = __DIR__ . '/../..';
 
 /**
  * Anti-vacuity floors.
@@ -63,7 +63,7 @@ sort($pages);
 
 if (count($pages) < MIN_PAGES)
 {
-    fail('only ' . count($pages) . ' HTML pages found in docs/handbuch/, expected at least ' . MIN_PAGES);
+    fail('only ' . count($pages) . ' HTML pages found in handbuch/, expected at least ' . MIN_PAGES);
 }
 
 $referencedShots = array();
@@ -237,7 +237,7 @@ sort($shots);
 
 if (count($shots) === 0)
 {
-    fail('no screenshots found in docs/handbuch/assets/screenshots/');
+    fail('no screenshots found in handbuch/assets/screenshots/');
 }
 
 foreach ($shots as $shot)
