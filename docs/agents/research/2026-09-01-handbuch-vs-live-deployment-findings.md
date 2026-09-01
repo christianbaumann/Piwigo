@@ -19,9 +19,12 @@ built?
 
 ## Summary
 
-**No functional defect was found.** Every one of the eight is either a handbook error, a
-test-data consequence of the deployment design, or — in two cases — correct application
-behaviour the handbook fails to mention.
+**No functional defect was found among the eight.** Every one of them is either a handbook
+error, a test-data consequence of the deployment design, or — in two cases — correct
+application behaviour the handbook fails to mention. A ninth issue, unrelated to the
+handbook, turned up while resolving this report's own last open question below:
+`typetags.type.add` was reachable by an anonymous caller. That is a real defect, closed
+separately — see the amended open-questions entry.
 
 | # | Area | Classification |
 |---|---|---|
@@ -488,6 +491,12 @@ album later.
   provenance-above-persons (measured 2026-09-01), but any handbook or test claim about it
   would rest on `get_db_plugins()` returning rows in a stable order, which it does not
   promise. Neither the handbook nor any spec asserts it today, so nothing is broken.
-- `typetags.type.add` is registered with **no** `admin_only` option
-  (`plugins/typetags/main.inc.php:82-90`), unlike its sibling `typetags.tags.setType`
-  (`:71-80`). Noticed while reading the method list; not investigated, and out of scope here.
+- ~~`typetags.type.add` is registered with **no** `admin_only` option~~ — **investigated and
+  closed.** It was reachable by an anonymous caller over GET on the live sandbox, verified
+  non-destructively (`err 1003 Invalid color`, proving the body executed, against
+  `pwg.tags.getAdminList`'s `Access denied` from the same anonymous session). The only
+  legitimate caller is the admin tags screen, so gating it `admin_only` breaks nothing. Fixed
+  in Phase 1 of
+  [2026-09-01-handbuch-corrections-and-typetags-permission-fix.md](../plans/2026-09-01-handbuch-corrections-and-typetags-permission-fix.md),
+  which also closed the unrelated `mysqli_sql_exception` stack-trace leak the same method had
+  on an over-length name. Takes effect on the remote only after a redeploy.

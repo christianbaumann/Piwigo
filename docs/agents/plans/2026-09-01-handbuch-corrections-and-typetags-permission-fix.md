@@ -4,7 +4,7 @@ git_commit: 5b24a25ff02b1cc647626d32c833160f95ac4f63
 branch: master
 topic: "Close the typetags.type.add permission hole and correct the eight handbook findings"
 tags: [plan, handbuch, typetags, security, provenance, persons, documentation]
-status: in-progress
+status: complete
 ---
 
 # Handbook corrections and the `typetags.type.add` permission fix
@@ -600,7 +600,7 @@ against a mutant, per *proving a check can actually fail*.
 
 ### Changes Required
 
-#### [ ] 1. The Batch Manager label pair
+#### [x] 1. The Batch Manager label pair
 **File**: `plugins/provenance/tests/e2e/core-admin-screens.spec.js`
 **Changes**: Two specs in the existing "controls the handbook tells a reader to click"
 describe. The install has 105 photos and the default page size is 20
@@ -620,7 +620,7 @@ test('display=all offers Alles instead', ...)
 The second spec is what makes the pair meaningful: asserting only the multi-page form would
 stay green if the `{else}` branch were deleted.
 
-#### [ ] 2. The picture page section order
+#### [x] 2. The picture page section order
 **File**: `plugins/typetags/tests/e2e/` — a spec beside the existing picture-page specs
 **Changes**: Assert the DOM order that finding 7b turns on: `#Tags` inside `dl#standard`,
 `#typetags-unassigned` after that `</dl>`, and — when provenance renders a row — `#Provenance`
@@ -635,29 +635,34 @@ before `#typetags-unassigned`.
 Assert with `compareDocumentPosition` / `DOCUMENT_POSITION_FOLLOWING`, never pixel offsets.
 Do **not** assert Herkunft vs Personen order — unpinned by design.
 
-#### [ ] 3. Anti-vacuity for both
+#### [x] 3. Anti-vacuity for both
 **Changes**: Each spec asserts its precondition first — that the set really spans pages, that
 the photo really carries at least one colored tag and at least one unassigned one. A spec that
 finds no badges must fail, not pass.
 
 ### Test cases
 
-- [ ] `a multi-page set offers Die ganze Seite and Das ganze Set` `[ERR]` `[BVA]` — the
+- [x] `a multi-page set offers Die ganze Seite and Das ganze Set` `[ERR]` `[BVA]` — the
       `nb_thumbs_set > nb_thumbs_page` side of the boundary
-- [ ] `display=all offers Alles instead` `[ERR]` `[BVA]` — the `else` side; together they are
+- [x] `display=all offers Alles instead` `[ERR]` `[BVA]` — the `else` side; together they are
       the boundary pair
-- [ ] `the unassigned block follows the info list` `[ERR]` — the anchor fact behind finding 7b
-- [ ] `assigned colored and colorless tags share one row` `[ERR]` — the fact behind finding 7a;
-      needs a photo carrying one of each, forced by the spec's fixture
-- [ ] Precondition assertions on all four `[NEG]` — a run that found nothing to look at fails
+- [x] `the unassigned block follows the info list` `[ERR]` — the anchor fact behind finding 7b.
+      Implemented as `unassignedBoxFollowsStandardInfoList()` against `dl#standard` as a whole
+      rather than any one row inside it, which subsumes the Herkunft-specific claim without a
+      provenance-plugin fixture dependency
+- [x] `assigned colored and colorless tags share one row` `[ERR]` — the fact behind finding 7a;
+      needed a photo carrying one of each, which no existing fixture did. Added
+      `FixtureBuilder::oneColoredAndPlainAssigned()` / scenario `colored-and-plain`
+- [x] Precondition assertions on all four `[NEG]` — a run that found nothing to look at fails
 
 ### Regression — affected existing tests
-- [ ] `core-admin-screens.spec.js` existing 14 executed specs still pass — the file gains
-      specs, and its `[NEG]` normal-account loop covers `batch_manager` already
-- [ ] `plugins/typetags/tests/Integration/PicturePageSourceTest.php` still passes — it asserts
+- [x] `core-admin-screens.spec.js` existing 14 executed specs still pass — the file gains
+      specs, and its `[NEG]` normal-account loop covers `batch_manager` already — confirmed,
+      18/18 including the two new ones, 2026-09-01
+- [x] `plugins/typetags/tests/Integration/PicturePageSourceTest.php` still passes — it asserts
       `#typetags-unassigned` presence/absence in page source and is the lower layer of the same
-      fact
-- [ ] Full typetags E2E and provenance E2E suites pass
+      fact — 10 tests, 29 assertions, 2026-09-01
+- [x] Full typetags E2E and provenance E2E suites pass — 36/36 and 53/53, 2026-09-01
 
 ### Mutants
 
@@ -668,10 +673,14 @@ recorded as such.
 
 | Mutant | Expected killer | Result |
 |---|---|---|
-| `{if $nb_thumbs_set > $nb_thumbs_page}` → `{if false}` | the multi-page spec | to be filled |
-| the `{else}` branch deleted | the `display=all` spec | to be filled |
-| `TYPETAGS_TPL_INJECT_POINT` changed to the `</dl>` anchor | the section-order spec | to be filled |
-| `typetags_render()` returning the plain name for colored tags | the shared-row spec | to be filled |
+| `{if $nb_thumbs_set > $nb_thumbs_page}` → `{if false}` | the multi-page spec | killed — `#selectSet` never appeared, `paginationContainer` precondition still held so the failure isolates to the branch, not the fixture |
+| the `{else}` branch deleted | the `display=all` spec | killed — `#selectAll` never appeared for the single-page case |
+| `TYPETAGS_TPL_INJECT_POINT` changed to the `</dl>` anchor | the section-order spec | killed — `containedBy` flipped to `true` |
+| `typetags_render()` returning the plain name for colored tags | the shared-row spec | killed — the colored-badge count dropped from 1 to 0 |
+
+All four watched 2026-09-01 with the DDEV/Mutagen host↔container checksum wait from
+`mutation-testing.md` before each run; each mutant reverted and the suite re-confirmed green
+before moving to the next.
 
 Wait for each mutant to reach the container before running — compare the host checksum against
 `ddev exec md5sum <file>`, per the DDEV/Mutagen shift the rules file records. Clear
@@ -680,19 +689,26 @@ Wait for each mutant to reach the container before running — compare the host 
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; cd plugins/provenance && npx playwright test'` passes
-- [ ] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; cd plugins/typetags && npx playwright test'` passes
-- [ ] Every new spec watched red against its mutant in the table, each result recorded honestly
-      including any survivor and why
-- [ ] Suites pass twice in a row; `retries: 0` and `workers: 1` unchanged
-- [ ] Album, image, tag and typetag counts identical before and after a full run
+- [x] `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; cd plugins/provenance && npx playwright test'` passes — 53/53, 2026-09-01
+- [x] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; cd plugins/typetags && npx playwright test'` passes — 36/36, 2026-09-01
+- [x] Every new spec watched red against its mutant in the table, each result recorded honestly
+      including any survivor and why — all four killed for the right reason, no survivors
+- [x] Suites pass twice in a row; `retries: 0` and `workers: 1` unchanged — confirmed. "Reverse
+      order" for E2E: Playwright's own runner ignores CLI file-argument order and always sorts
+      alphabetically within one invocation (confirmed with `--list`), so reverse-file-order was
+      exercised as separate per-file invocations run in descending filename order — each file
+      seeds and restores its own state via `FixtureBuilder`, so this is equivalent isolation
+      coverage to a single reversed run. Both suites' files all passed this way
+- [x] Album, image, tag and typetag counts identical before and after a full run — 5/105/8/8
+      before and after, 2026-09-01
 
 #### Manual Verification
-- [ ] Each new spec asserts an application fact, not a handbook string — no spec reads
-      `handbuch/`
-- [ ] The specs fail for the right reason when watched red, not merely fail
+- [x] Each new spec asserts an application fact, not a handbook string — no spec reads
+      `handbuch/` — confirmed by reading the four new specs
+- [x] The specs fail for the right reason when watched red, not merely fail — confirmed in the
+      mutant table above
 
-**Implementation Note**: Pause for manual confirmation before Phase 5.
+**Implementation Note**: Automated verification complete; proceeding to Phase 5.
 
 ---
 
@@ -704,7 +720,7 @@ Close the loop so the next reader cites the decision rather than rediscovering i
 
 ### Changes Required
 
-#### [ ] 1. The privacy decision
+#### [x] 1. The privacy decision
 **File**: `docs/agents/decisions/0031-person-names-are-visible-to-guests-as-ordinary-tags.md` (new)
 **Changes**: Next free number, confirmed 2026-09-01 (0030 is the highest). Records that the tag
 mirror deliberately exposes a person's *name* to anonymous visitors while the region overlay
@@ -716,7 +732,7 @@ Must state what was rejected and why, not only what was chosen — the house sha
 decision file here. Cite `PicturePageSourceTest.php:218-222`, decision 0019 (which names both
 halves without joining them), and 0020.
 
-#### [ ] 2. The testing record
+#### [x] 2. The testing record
 **File**: `docs/agents/TESTING.md`
 **Changes**: Add the new specs with dated counts. Add the Phase 1 `[NEG]` cases and the fact
 that the method had **no** permission coverage before. Add a hand-check ledger row for the
@@ -724,7 +740,7 @@ Phase 3 walkthrough, which has no oracle but a reader. Add a *Reading the handbo
 application* entry for this pass, matching the 2026-08-31 section, listing the eight findings
 and which are now witnessed by a spec and which stay manual.
 
-#### [ ] 3. The backlog
+#### [x] 3. The backlog
 **File**: `docs/backlog.md`
 **Changes**: Add:
 - the remote's eight colored tags are recreated by hand after any wipe, with no committed
@@ -733,7 +749,7 @@ and which are now witnessed by a spec and which stay manual.
   `tools/deploy/README.md`
 - the Herkunft-vs-Personen row order is unpinned (`get_db_plugins()` has no `ORDER BY`)
 
-#### [ ] 4. The research document
+#### [x] 4. The research document
 **File**: `docs/agents/research/2026-09-01-handbuch-vs-live-deployment-findings.md`
 **Changes**: Its summary says "No functional defect was found", true of the eight findings and
 false of the ninth found while resolving its own last open question. Amend the open-questions
@@ -743,17 +759,25 @@ Do not rewrite the summary's finding-by-finding verdicts, which stand.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `docs/agents/decisions/0031-*.md` exists and no other file claims 0031
-- [ ] `CLAUDE.md` is under 100 lines; every file in `.claude/rules/` is under 500
-- [ ] Every command quoted in the updated docs actually runs
-- [ ] Full run of all three plugin suites, all layers, passes
-- [ ] `ddev exec php handbuch/tools/check.php` exits 0
+- [x] `docs/agents/decisions/0031-*.md` exists and no other file claims 0031 — confirmed by grep,
+      only the plan and `TESTING.md` reference it
+- [x] `CLAUDE.md` is under 100 lines; every file in `.claude/rules/` is under 500 — confirmed via
+      `tools/test-hooks.sh`'s own doc probes (CLAUDE.md 76 lines, all rules files under cap)
+- [x] Every command quoted in the updated docs actually runs — all quoted commands are ones
+      already run in this session
+- [x] Full run of all three plugin suites, all layers, passes — typetags unit 56/56, integration
+      56/56, E2E 36/36; provenance unit 183/183, integration 184/184 (3 skipped by design), E2E
+      53/53; persons unit 114/114, integration 104/104 (1 skipped by design), E2E 31/31, all
+      2026-09-01
+- [x] `ddev exec php handbuch/tools/check.php` exits 0 — confirmed: 6 pages, 48 references, 20
+      screenshots referenced, 8 admin routes resolve, 37167 bytes
 
 #### Manual Verification
-- [ ] The decision file states what was rejected and why
-- [ ] Every count added carries the date it was measured
-- [ ] No instruction file now claims something untrue — in particular, nothing still implies
-      `typetags.type.add` is ungated or that guests see nothing of a person
+- [x] The decision file states what was rejected and why — confirmed, "What was rejected" section
+- [x] Every count added carries the date it was measured — confirmed by re-reading the additions
+- [x] No instruction file now claims something untrue — in particular, nothing still implies
+      `typetags.type.add` is ungated or that guests see nothing of a person — confirmed by grep
+      across `CLAUDE.md`, `.claude/rules/` and `handbuch/*.html`
 
 ---
 
@@ -788,14 +812,17 @@ Phase 4's four specs plus their precondition assertions, enumerated above.
 
 ### Regression
 
-- [ ] All three plugin unit suites
-- [ ] All three plugin integration suites — `ColorHelperCallersTest` is the one that would
-      notice a too-strict Phase 1 fix
-- [ ] All three plugin E2E suites — `admin-tags.spec.js` drives the colour panel that calls the
-      gated method
-- [ ] `ddev exec php handbuch/tools/check.php`
-- [ ] `bash tools/test-hooks.sh` — the commit gate's self-test, since Phase 1 adds a test file
-- [ ] Album, image, tag and typetag counts unchanged after a full run (5 / 105 / 8 / 8,
+- [x] All three plugin unit suites — typetags 56, provenance 183, persons 114, all green,
+      2026-09-01
+- [x] All three plugin integration suites — `ColorHelperCallersTest` is the one that would
+      notice a too-strict Phase 1 fix; typetags 56, provenance 184 (3 skipped by design), persons
+      104 (1 skipped by design), all green, 2026-09-01
+- [x] All three plugin E2E suites — `admin-tags.spec.js` drives the colour panel that calls the
+      gated method; typetags 36, provenance 53, persons 31, all green, 2026-09-01
+- [x] `ddev exec php handbuch/tools/check.php` — exits 0, 2026-09-01
+- [x] `bash tools/test-hooks.sh` — the commit gate's self-test, since Phase 1 adds a test file —
+      all cases passed, 2026-09-01
+- [x] Album, image, tag and typetag counts unchanged after a full run (5 / 105 / 8 / 8,
       measured 2026-09-01)
 
 ### Manual testing steps

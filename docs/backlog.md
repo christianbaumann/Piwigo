@@ -19,6 +19,13 @@
   when the rest of its open questions were closed.
 - **`deploy.local.json` still carries `admin.password: "REPLACE_ME"`.** The next install bakes in
   whatever is in that file. Set a real one before the next deploy.
+- **The remote's eight colored tags have no committed seeding script.** They were recreated by
+  hand on 2026-09-01 after the gallery loss; since [decision 0023](agents/decisions/0023-no-database-transfer-to-the-remote.md)
+  means no database ever transfers to the remote, any future wipe loses them again the same way.
+- **`pwg.persons.rescan` is not called by the deploy, and is not a listed manual step.** Person
+  regions live only in the image files (decision 0020), so after any resync they return to the
+  remote's index only if someone calls this method by hand. `tools/deploy/README.md`'s command
+  sequence does not name it.
 
 *(Answered 2026-08-31: `.ddev` and `tools` are no longer uploaded — see
 [decision 0022](agents/decisions/0022-the-tools-directory-is-not-published.md). Of `local/`, only
@@ -44,6 +51,7 @@ is generated. `tools/deploy/README.md` has the full list.)*
 - (open) persons: `plugins/persons/tests/e2e/support/seed.php --restore` **leaks**. Five `Persons E2E <hex>` albums and five orphan `persons-test-*` image rows (roughly 63 MB of copied scans) survived interrupted runs and had to be removed by hand in Phase 1 of the handbook plan, 2026-08-31. Widened by the same day's measurement: a **green** integration run also leaves one `upload/persons-test/*.png` and its exiftool `_original` behind with no image row, so the leak is not confined to interrupted runs. No reproducing test yet — it needs the diagnosis this defers, and a skipped test that names no cause is prose in test form
 - (open) documentation: only the fourteen strings the handbook screenshots were translated (`local/language/de_DE.lang.php`, 2026-08-31). The rest of the German locale was deliberately left alone — see [decision 0024](agents/decisions/0024-german-handbook-location-and-demo-content.md). Upstream's own `language/de_DE/help/` pages were not audited for half-translated content; the handbook does not use them
 - (open) dev environment: if gallery content is ever lost again, turn on MariaDB `general_log` first — the 2026-08-29 loss could not be explained because `log_bin` and `general_log` were both off and `delete_elements()` writes no activity row (decision 0011)
+- (open) picture page: the relative order of the Herkunft and Personen rows is unpinned. `get_db_plugins()` carries no `ORDER BY`, so today's provenance-above-persons order (measured 2026-09-01) is not a guarantee. Neither the handbook nor any spec asserts it, so nothing is broken — recorded so a future reorder is not mistaken for a regression
 
 The two low-priority provenance items above — `owner` as a reference to a people table, and
 file-vs-DB divergence detection — are **unchanged** by the metadata write-back plan

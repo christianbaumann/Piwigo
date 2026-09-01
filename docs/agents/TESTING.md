@@ -721,6 +721,110 @@ each action's presence and label but not their order, so a reordering of `albums
 have left it green and the handbook pointing at the wrong icon. `rowActionOrder()` now asserts the
 DOM order; watched red by swapping the last two anchors.
 
+## Closing `typetags.type.add`, and a second handbook pass (2026-09-01)
+
+Resolving the last open question of the 2026-08-31 pass — whether `typetags.type.add`'s missing
+`admin_only` option meant anything — found it live-reachable by an anonymous caller on the public
+sandbox, verified non-destructively (`err 1003 Invalid color` from an anonymous `type.add` call,
+proving the body executed, against `Access denied` from `pwg.tags.getAdminList` in the same
+anonymous session). That investigation is what produced the eight-finding walkthrough this section
+also covers: the security question surfaced while reconciling `handbuch/` against the live
+deployment. Both are implemented in
+[2026-09-01-handbuch-corrections-and-typetags-permission-fix.md](../plans/2026-09-01-handbuch-corrections-and-typetags-permission-fix.md).
+
+### The permission fix, and the two defects it closed
+
+Two, one method: `typetags.type.add` had no `admin_only` option — unlike its sibling
+`typetags.tags.setType` — and no length guard on `typetag_name`, so a name past the
+`varchar(255)` column threw an uncaught `mysqli_sql_exception` that rendered a full stack trace
+into the HTTP response. `TypeAddPermissionTest.php` (new) carries seven cases, each `[NEG]` but
+two: an anonymous POST, an anonymous GET (the hole was reachable over GET specifically, with no
+`post_only`), an authenticated non-admin, an over-long name at the boundary, a name exactly at the
+boundary (`[HAPPY]`), the webmaster's normal case (`[HAPPY]`, the anti-vacuity check that the three
+refusal cases are not passing because the method refuses everyone), and a still-refused invalid
+colour (guards that the new length check did not displace the pre-existing `check_color()`
+refusal). All watched red before the fix, for the right reason (`stat === 'ok'` and a row present),
+and green after.
+
+`ColorHelperCallersTest::testTypeAddReturnsContrastColour` is the regression canary: it calls the
+method as the webmaster and would have caught the fix being too strict. It stayed green throughout.
+
+typetags integration suite: 56 tests, 205 assertions (2026-09-01). typetags unit suite: 56 tests,
+33009 assertions (2026-09-01, unaffected — the new length bound is a constant, not logic, so
+nothing was added at that layer). `admin-tags.spec.js`'s existing colour-creation specs are the
+browser-level regression check for the only real caller; both stayed green, and one was watched
+red on its own account against a `post_only=>true` mutant, since a browser is the only witness for
+what `tags.js` actually sends.
+
+### Phase 4's two structural E2E facts, and their mutants
+
+Findings 2 and 7 of the walkthrough below were wrong for roughly a year because nothing witnessed
+them. Both are `[ERR]` characterization facts about rendered layout, so they belong at the E2E
+layer per the placement rule, and both passed on their first run — the tell that a test recorded
+code rather than drove it — so each was watched red per *proving a check can actually fail*.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `{if $nb_thumbs_set > $nb_thumbs_page}` → `{if false}` in `batch_manager_global.tpl` | the multi-page spec | killed — `#selectSet` never appeared; the `.pagination-container` anti-vacuity check still held, isolating the failure to the branch |
+| the `{else}` branch deleted from the same `{if}` | the `display=all` spec | killed — `#selectAll` never appeared for the single-page case |
+| `TYPETAGS_TPL_INJECT_POINT` changed from `{if isset($metadata)}` to the `</dl>` anchor | the section-order spec | killed — `#typetags-unassigned` moved inside `dl#standard`, flipping `containedBy` to `true` |
+| `typetags_render()`'s colour branch forced to the plain-name path | the shared-row spec | killed — the colored-badge count in the mixed fixture dropped from 1 to 0 |
+
+All four applied on the host with the container's `md5sum` polled until it matched before each run
+(the DDEV/Mutagen delay `.claude/rules/mutation-testing.md` warns about), `_data/templates_c`
+cleared after the `TYPETAGS_TPL_INJECT_POINT` mutant specifically — it changes what the prefilter
+*produces*, not the `.tpl` file Smarty's own compile-check watches — and reverted with a checksum
+poll back to the original before the next mutant.
+
+The shared-row fact needed a fixture nothing before it produced: a photo carrying one colored and
+one plain tag assigned together. `FixtureBuilder::oneColoredAndPlainAssigned()` (scenario
+`colored-and-plain`) is new; every other scenario in that file assigns colored tags only, or the
+plain tag alone. The section-order fact is asserted against `dl#standard` as a whole — via
+`compareDocumentPosition`, never a pixel offset — rather than against any one row inside it. That
+subsumes the Herkunft-specific claim the finding actually names (the `+` badges sit below
+*Herkunft*, not just below Tags) with no dependency on a provenance-plugin fixture: proving order
+against the whole list proves it against any row inside it, `#Provenance` included whenever the
+provenance plugin renders one.
+
+typetags E2E: 36 (2026-09-01). provenance E2E: 53 (2026-09-01). Both suites pass twice in a row.
+"Reverse file order" needed a workaround: Playwright's own runner ignores the order of file
+arguments on its command line and always sorts alphabetically within one invocation (confirmed
+with `--list`), so reverse-file-order was exercised as separate per-file invocations run in
+descending filename order instead — each file seeds and restores its own state through
+`FixtureBuilder`, so per-file isolation is what the check is actually protecting either way. Album,
+image, tag and typetag counts identical before and after: 5 / 105 / 8 / 8.
+
+## Reading the handbook against the application, second pass (2026-09-01)
+
+A second walkthrough against the live sandbox at `bilder.foerderverein-sefferweich.de`, the same
+method as 2026-08-31, produced eight findings — full detail in
+[2026-09-01-handbuch-vs-live-deployment-findings.md](research/2026-09-01-handbuch-vs-live-deployment-findings.md).
+Seven are documentation defects, corrected in Phase 2 and Phase 3 of the implementing plan; the
+eighth is test data, unfixed by design.
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | Eight colored tags missing on the remote | Test data by deployment design (decision 0023); handbook is install-specific and stays that way. Not fixed — carried in `docs/backlog.md` |
+| 2 | Batch Manager "Alles" label depends on set size | Corrected in `02-fotos.html`. Witnessed by the two Phase 4 specs above |
+| 3 | Unused-tags notice needs 24h and the tester misread "Überprüfung" | Corrected in `04-schlagworte.html`. No new spec — the 24h rule is a `> 1 day` comparison already reachable by reading the code, and adding a spec would restate `admin/include/functions.php:438-439` one layer up with a slow fixture to boot |
+| 4 | Album provenance's required "Auf N Fotos anwenden" step, and the whole screen, undocumented | New section in `01-alben.html`, cross-linked from `03-fototexte.html`. Witnessed end-to-end by `album-provenance-walkthrough.spec.js` |
+| 5 | Upload fills the title from the filename | Corrected in `03-fototexte.html`. No new spec — server-rendered and already covered by `CoreUploadCharacterizationTest` one layer down; the handbook gap was in the prose, not the suite |
+| 6 | Person names reach guests as ordinary tags, contrary to the handbook | Corrected in `05-personen.html`. Recorded as [decision 0031](decisions/0031-person-names-are-visible-to-guests-as-ordinary-tags.md) — implemented and tested since Phase 5 of the persons plan (`PicturePageSourceTest::testAGuestSeesNoOverlay`'s comment), but never a citable decision until now |
+| 7 | Tag layout: colored and colorless tags do not stand on separate lines, and the `+` badges sit below the whole info list, not just below Tags | Corrected in `04-schlagworte.html`. Both halves witnessed by the Phase 4 section-order specs above |
+| 8 | Four small items: three handbook errors, one non-issue | The two textual ones corrected (`03-fototexte.html`'s heading, `04-schlagworte.html`'s merge-hint position); `album-<id>` vs `album-<id>-properties` needed no change (both resolve to the same screen); the Herkunft/Personen row order is unpinned by design and stays that way, carried in `docs/backlog.md` |
+
+### The one thing this pass checked by hand, the same way the last pass did
+
+`docs/agents/TESTING.md:605-610` records the last pass finding a handbook page describing a
+button by what its icon looks like rather than what it does. The new album-provenance section
+(finding 4) was the one place this pass could have repeated that mistake, since it names four new
+buttons (`Herkunft`, `Einstellungen sichern`, `Auf N Fotos anwenden`, `In N Dateien schreiben`)
+with nothing forcing the wording to stay behavioural. Checked by hand against
+`album_provenance.tpl:21-69`: all four are named by what they do. Not automatable — a checker that
+reads handbook prose and compares it against a template is the apparatus-proving-an-apparatus case
+`test-design.md` forbids — so this stays a dated hand check rather than a test, added to the ledger
+below.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
@@ -771,6 +875,7 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-09-01 | Phase 4 of the deploy state-guards plan left two manual boxes: a real run reports the same core version on both sides, and the version line does not imply anything about the host's *other* versions. Both run against `bilder.foerderverein-sefferweich.de`. The agree path printed `preflight installed, 17.0.0beta1 — manifest and remote agree` and completed (`0 new, 0 changed, 3335 unchanged`, install skipped, all three plugins active). The refusal path was then forced by editing `include/constants.php` to `17.1.0` in the working copy: `EXIT=10`, the message named both versions, `upgrade.php` and `--allow-version-change`, and the report **stopped after the `manifest` line** — no `transport` line, so no FTPS connection was opened and nothing was sent. `constants.php` restored and confirmed byte-identical to HEAD. | Not automatable — the falsifiable half already is. `test_the_preflight_line_reports_both_versions`, `test_a_version_difference_exits_with_the_version_code` and `test_a_version_difference_uploads_nothing` prove the guard and its exit code against `FakeGallery`; `test_local_version_reads_this_checkout` proves the local half is read from the file rather than transcribed. What no double can prove is that **that** host answers `pwg.getVersion` at all, and with the literal this checkout carries — the same limit already recorded for the FTPS adapter. The second box has no assertion behind it by design: the line reads `installed, 17.0.0beta1`, names `PHPWG_VERSION` and nothing else, and the exiftool gap (host 12.76, local 13.25, no suite ever run against 12.76) is unchanged by this phase and stays recorded in `.claude/rules/deployment.md`. |
 | 2026-09-01 | Phase 5 of the deploy state-guards plan left two manual boxes: does the real host answer `MLSD` at all, and are the reported orphans real? `uv run pwg-deploy --audit deploy.local.json` against `bilder.foerderverein-sefferweich.de`: **MLSD is supported**, `listed 3337 files in 394 directories (skipped: _data/ upload/)` in **75.8 s**, `covered 3336` — the whole manifest — and exactly **one orphan**, `local/config/database.inc.php`. No missing files. The orphan was then spot-checked through a **different protocol**, `curl` over HTTPS rather than the tool's own listing: `database.inc.php` **200** (it is there), `config.inc.php` **200** (there, and correctly *not* called an orphan — the generated-config trap holds on the real host), `local/config/index.php` **302** (the directory-listing guard), and a path the audit did not list **404**, which is the control that makes a 200 mean something. | Not automatable — there is no FTP server and no second web space, the limit already recorded for the FTPS adapter, and MLSD support is a property of *that* host that no double can assert. Everything falsifiable already is: `test_mlsd_entries_become_files_and_directories` and `test_a_server_that_refuses_mlsd_fails_with_a_transport_error_naming_it` cover the adapter against `ScriptedFtp`, `test_audit_deletes_nothing` makes the read-only claim mechanical (`"delete" not in transport.names()`), and `test_the_generated_config_is_covered_not_an_orphan` is the unit-layer form of the `config.inc.php` result above. **Only one orphan exists**, so the plan's "spot-check two" is met as far as the remote allows — the second check went to a covered file and a known-absent path instead, which tests the classification in both directions rather than the same direction twice. The **finding** was cosmetic and is now guarded: the report read `1 files`, and `test_a_single_orphan_is_counted_in_the_singular` was written red before `_plural()` fixed it. One is the count this host actually reports, so it is the phrasing an operator sees most. |
 | 2026-09-01 | Phase 6 of the deploy state-guards plan left one manual box, the half `test_readme.py`'s own docstring says it cannot reach: read `tools/deploy/README.md` end to end and judge whether the three new flags (`--audit`, `--adopt-remote-state`, `--allow-version-change`) and two new exit codes (`9`, `10`) read as instructions someone could follow. **Read end to end; it found two defects, both invisible to every existing guard.** (1) A paragraph beginning *"The same asymmetry is what makes prune safe"* had landed at the end of the **core-version** section, where "the same asymmetry" refers to nothing — the antecedent is the manifest-only rule two sections earlier. Moved under *The manifest is the only record of remote state*, where its subject is. (2) The `--audit` worked example printed one orphan name and then `… and 83 more`, which no real run produces: the cap is `MAX_REPORTED_ORPHANS = 20`, so 103 orphans show 20 names. The block is trimmed for length and now says so, naming the cap. | The judgment half is not automatable — the oracle is a person who has not read the code, and a checker that reads prose looking for words is the apparatus-proving-an-apparatus case `.claude/rules/test-design.md` forbids. Both defects are of exactly that kind: every flag and every exit code was already *present* and guarded, so `test_every_flag_the_tool_accepts_is_documented` and `test_every_exit_code_the_tool_can_return_is_documented` were green throughout — presence is mechanical, coherence is not. **One third defect class was mechanizable and is now guarded**: the README quotes `check_version`'s refusal verbatim, a second copy of a production literal with nothing watching it. `test_the_readme_version_refusal_is_the_message_the_tool_produces` reads the two versions out of the documented block and drives `check_version` with them, so a reworded message and a stale example cannot coexist. Watched red twice — once on arrival against its own regex, then against the production message mutated to `the remote says {remote}`, which killed it and nothing else. Suite 403 → 404. |
+| 2026-09-01 | Phase 3 of the handbook-corrections plan named four new buttons in the new album-provenance section (`Herkunft`, `Einstellungen sichern`, `Auf N Fotos anwenden`, `In N Dateien schreiben`) — the same shape of claim that went wrong in the 2026-08-31 pass, where a page named a button by what its icon looks like rather than what it does. Read by hand against `album_provenance.tpl:21-69`: all four are named by what they do, none by icon appearance. | Not automatable — a checker that reads handbook prose and compares it against a template is the apparatus-proving-an-apparatus case `test-design.md` forbids. The falsifiable half of the section is covered instead: `album-provenance-walkthrough.spec.js` proves the sequence the section describes actually behaves that way (empty until applied, then populated). |
 
 ### Open — no oracle, so no test
 
