@@ -58,6 +58,10 @@ EXCLUDED_PREFIXES = (
     # in core are comments (include/config_default.inc.php:18,353) — so the whole
     # directory stays off the web space, upstream's release script notwithstanding.
     "tools/",
+    # decision 0025: the handbook's dev-only generator/checker tooling stays off the
+    # web space, same reasoning as the bare tools/ entry above — just scoped to the
+    # one subtree that needs it, since handbuch/ itself now ships.
+    "handbuch/tools/",
     ".gitignore",
     ".gitmodules",
 )

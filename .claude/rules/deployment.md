@@ -12,7 +12,7 @@ cd tools/deploy
 uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
-uv run pytest                                    # 307 tests, measured 2026-08-31
+uv run pytest                                    # 311 tests, measured 2026-09-01
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -35,6 +35,13 @@ Every value is validated locally against the rule the remote enforces (`config.p
 `install.php` line for each), so a bad table prefix fails in milliseconds rather than after a
 128 MB upload. Validation lives there and nowhere else.
 
+**Validation checks "non-empty string", not "you actually edited this field".** Every password in
+`deploy.example.json` is the literal placeholder `REPLACE_ME`, and `_required_string()` accepts it
+unchanged — nothing catches a forgotten `admin.password` before it is submitted to `install.php`
+as the real webmaster password. Confirmed 2026-09-01: a deploy ran clean with `admin.password`
+still `REPLACE_ME`, and that literal string became the working login. Diff every field in a new
+`deploy.*.json` against the example before the first run against a given target.
+
 ## What is published
 
 `git ls-files --recurse-submodules`, minus `EXCLUDED_PREFIXES` / `EXCLUDED_BASENAMES` /
@@ -43,6 +50,9 @@ file names only what needs a reason:
 
 - **`tools/` in full** — core loads nothing from it at runtime
   ([decision 0022](../../docs/agents/decisions/0022-the-tools-directory-is-not-published.md)).
+- **`handbuch/` ships, `handbuch/tools/` does not** — the German handbook is application content
+  since [decision 0025](../../docs/agents/decisions/0025-handbuch-moves-into-the-application-tree.md);
+  its generator/checker scripts are dev tooling and stay off the web space, same as `tools/`.
 - **`local/config/`, but the `index.php` inside it survives** — those are the directory-listing
   guards. Without them the server offers an index of the directory holding the DB credentials.
 - **each plugin's `vendor/`, never a bare `vendor/`** — `themes/default/vendor/fontello/` is a
@@ -92,7 +102,11 @@ their answers are in the plan's Phase 6 section.
    longer answers. Asks: `disable_functions`, `exec()`, `exiftool -ver`, `class_exists('Imagick')`,
    GD formats.
 2. **`admin.php?page=maintenance&action=phpinfo`** — the same questions from inside the installed
-   gallery, for the ones the probe cannot see.
+   gallery, for the ones the probe cannot see. **Needs a `pwg_token`**: `maintenance_env.php:25`
+   calls `check_pwg_token()` whenever `action` is set, so the bare URL redirects with no error
+   (confirmed 2026-09-01 — page title `redirection`, empty body). Reach it by clicking through
+   Werkzeuge → Wartung → Server-Umgebung → phpinfo in a logged-in session rather than typing the
+   URL — the link there carries `&pwg_token=`.
 
 The host answered `exec()` enabled and exiftool 12.76 present, so the provenance and persons
 write-back works there. Note the version gap: local is 13.25, and no suite has run against 12.76.

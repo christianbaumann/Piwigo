@@ -148,6 +148,34 @@ def test_a_toolsish_path_outside_the_directory_is_kept():
     ]
 
 
+def test_the_handbook_ships_with_the_application():
+    """[HAPPY] The pages, stylesheet and screenshots are ordinary application content."""
+    kept = [
+        "handbuch/index.html",
+        "handbuch/01-alben.html",
+        "handbuch/assets/handbuch.css",
+        "handbuch/assets/screenshots/01-alben-verwaltung.png",
+    ]
+    assert fileset.select(kept) == kept
+
+
+def test_the_handbook_toolchain_stays_off_the_web_space():
+    """[NEG] The generator/checker scripts need DDEV, php exec and Node — dev-only,
+    same posture as the top-level tools/ directory (decision 0022)."""
+    assert fileset.select([
+        "handbuch/tools/seed.php",
+        "handbuch/tools/shoot.js",
+        "handbuch/tools/check.php",
+    ]) == []
+
+
+def test_a_handbuch_toolsish_path_outside_the_tools_directory_is_kept():
+    """[BVA] handbuch/tools/ is a path prefix, not a substring: a sibling file whose
+    name merely starts the same way survives, mirroring
+    test_a_toolsish_path_outside_the_directory_is_kept for the top-level tools/ rule."""
+    assert fileset.select(["handbuch/toolshed.html"]) == ["handbuch/toolshed.html"]
+
+
 def test_the_generated_config_is_not_part_of_the_tracked_file_set():
     """[ST] It is produced by the bootstrap, never enumerated by git — which is exactly
     why prune has to be told about it; see tests/test_upload.py."""
@@ -366,6 +394,10 @@ def test_real_repository_file_set():
     # loop cannot express (decision 0022).
     assert any(p.startswith("tools/") for p in tracked), "tools/ is tracked here"
     assert not [p for p in selected if p.startswith("tools/")]
+
+    assert "handbuch/index.html" in selected
+    assert "handbuch/tools/seed.php" in tracked
+    assert "handbuch/tools/seed.php" not in selected
 
 
 def test_the_selected_file_set_weighs_what_a_deploy_expects():
