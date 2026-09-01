@@ -196,7 +196,8 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory):
         out,
         "sync",
         f"{result.sync.photos_added} photos, {result.sync.albums_added} albums, "
-        f"{result.sync.errors} errors",
+        f"{result.sync.errors} errors (deleted: {result.sync.photos_deleted} photos, "
+        f"{result.sync.albums_deleted} albums)",
     )
 
 

@@ -114,6 +114,8 @@ class FakeGallery:
         install_errors=(),
         albums_added=4,
         photos_added=106,
+        albums_deleted=0,
+        photos_deleted=0,
         sync_errors=0,
         admin=("webmaster", "p"),
     ):
@@ -126,6 +128,8 @@ class FakeGallery:
         self.install_errors = list(install_errors)
         self.albums_added = albums_added
         self.photos_added = photos_added
+        self.albums_deleted = albums_deleted
+        self.photos_deleted = photos_deleted
         self.sync_errors = sync_errors
         self.admin = admin
         self.logged_in = False
@@ -217,8 +221,8 @@ class FakeGallery:
             "<h3>Resultat</h3><ul>"
             f'<li class="update_summary_new">{self.albums_added} Alben</li>'
             f'<li class="update_summary_new">{self.photos_added} Fotos</li>'
-            '<li class="update_summary_del">0 Alben</li>'
-            '<li class="update_summary_del">0 Fotos</li>'
+            f'<li class="update_summary_del">{self.albums_deleted} Alben</li>'
+            f'<li class="update_summary_del">{self.photos_deleted} Fotos</li>'
             "<li>0 Fotos</li>"
             f'<li class="update_summary_err">{self.sync_errors} Fehler</li>'
             "</ul>"

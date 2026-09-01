@@ -66,6 +66,8 @@ _LIST_ITEM = re.compile(r"<li[^>]*>(.*?)</li>", re.DOTALL)
 _TAG = re.compile(r"<[^>]+>")
 
 MIN_SUMMARY_ADDED_LINES = 2
+# site_update.tpl:21-22 renders both, always — an albums line and a photos line.
+MIN_SUMMARY_DELETED_LINES = 2
 MAX_REPORTED_ERRORS = 10
 
 
@@ -73,6 +75,8 @@ MAX_REPORTED_ERRORS = 10
 class SyncCounts:
     albums_added: int
     photos_added: int
+    albums_deleted: int
+    photos_deleted: int
     errors: int
 
 
@@ -313,17 +317,32 @@ def sync(client, base_url: str) -> SyncCounts:
 def parse_sync_counts(body: str) -> SyncCounts:
     """The summary list, read by class rather than by its localised label."""
     added = []
+    deleted = []
     errors = 0
     for css_class, value in _SUMMARY_ITEM.findall(body):
         if css_class == "update_summary_new":
             added.append(int(value))
+        elif css_class == "update_summary_del":
+            deleted.append(int(value))
         elif css_class == "update_summary_err":
             errors = int(value)
     if len(added) < MIN_SUMMARY_ADDED_LINES:
         raise RemoteHttpError(
             f"expected {MIN_SUMMARY_ADDED_LINES} 'added' summary lines, found {len(added)}"
         )
-    return SyncCounts(albums_added=added[0], photos_added=added[1], errors=errors)
+    if len(deleted) < MIN_SUMMARY_DELETED_LINES:
+        raise RemoteHttpError(
+            f"expected {MIN_SUMMARY_DELETED_LINES} 'deleted' summary lines, "
+            f"found {len(deleted)}"
+        )
+    # Both buckets are albums first, photos second (site_update.tpl:19-22).
+    return SyncCounts(
+        albums_added=added[0],
+        photos_added=added[1],
+        albums_deleted=deleted[0],
+        photos_deleted=deleted[1],
+        errors=errors,
+    )
 
 
 # --- the whole bootstrap --------------------------------------------------------------

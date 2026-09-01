@@ -350,7 +350,13 @@ def test_sync_reports_the_counts_the_summary_carries(cfg):
 
     counts = bootstrap.sync(gallery, cfg.site.base_url)
 
-    assert (counts.albums_added, counts.photos_added, counts.errors) == (4, 106, 0)
+    assert (
+        counts.albums_added,
+        counts.photos_added,
+        counts.albums_deleted,
+        counts.photos_deleted,
+        counts.errors,
+    ) == (4, 106, 0, 0, 0)
 
 
 def test_a_second_sync_reporting_zero_new_is_a_success(cfg):
@@ -378,6 +384,56 @@ def test_a_sync_answered_by_the_login_page_fails_loudly(cfg, gallery):
         bootstrap.sync(gallery, cfg.site.base_url)
 
     assert "site_update" in str(raised.value)
+
+
+def test_sync_reports_the_albums_and_photos_the_summary_says_were_deleted(cfg):
+    """[HAPPY] An update run genuinely removes rows for photos that are gone; the
+    summary carries the two counts and they were being read and discarded."""
+    gallery = FakeGallery(BASE_URL, albums_deleted=2, photos_deleted=7)
+    bootstrap.login(gallery, cfg)
+
+    counts = bootstrap.sync(gallery, cfg.site.base_url)
+
+    assert (counts.albums_deleted, counts.photos_deleted) == (2, 7)
+
+
+def test_a_sync_that_deleted_nothing_reports_zero_deletions(cfg):
+    """[BVA] Zero must read as "nothing was deleted", never as "field missing"."""
+    gallery = FakeGallery(BASE_URL, albums_deleted=0, photos_deleted=0)
+    bootstrap.login(gallery, cfg)
+
+    counts = bootstrap.sync(gallery, cfg.site.base_url)
+
+    assert (counts.albums_deleted, counts.photos_deleted) == (0, 0)
+
+
+def test_the_added_and_deleted_counts_are_not_transposed(cfg):
+    """[ERR] Four distinct values pin the field order. Without this a swapped pair —
+    added into deleted, or albums into photos — passes every other test here."""
+    gallery = FakeGallery(
+        BASE_URL, albums_added=1, photos_added=2, albums_deleted=3, photos_deleted=4
+    )
+    bootstrap.login(gallery, cfg)
+
+    counts = bootstrap.sync(gallery, cfg.site.base_url)
+
+    assert (
+        counts.albums_added,
+        counts.photos_added,
+        counts.albums_deleted,
+        counts.photos_deleted,
+    ) == (1, 2, 3, 4)
+
+
+def test_parse_sync_counts_needs_both_deleted_lines():
+    """[NEG] Same reason as the added-lines guard: a page shape this scraper does not
+    understand must fail rather than report the missing half as zero."""
+    with pytest.raises(RemoteHttpError):
+        bootstrap.parse_sync_counts(
+            '<li class="update_summary_new">4 Alben</li>'
+            '<li class="update_summary_new">106 Fotos</li>'
+            '<li class="update_summary_del">0 Alben</li>'
+        )
 
 
 def test_parse_sync_counts_needs_both_added_lines():

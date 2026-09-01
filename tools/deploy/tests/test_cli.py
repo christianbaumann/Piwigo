@@ -189,6 +189,21 @@ def test_dry_run_with_no_prune_reports_no_deletion(run, tmp_path):
     assert "0 removed" in run.text
 
 
+def test_the_report_names_what_the_sync_deleted(config_file, repo, tmp_path):
+    """[HAPPY] The scan removes database rows for photos that are gone; a summary that
+    only ever counts additions never says so."""
+    run = Run(
+        config_file,
+        repo,
+        tmp_path,
+        gallery=FakeGallery(BASE_URL, albums_deleted=2, photos_deleted=7),
+    )
+
+    assert run() == 0
+
+    assert "deleted: 7 photos, 2 albums" in run.text
+
+
 def test_no_bootstrap_uploads_but_leaves_the_gallery_alone(run):
     """[DT] Upload yes, install/plugins/sync no — the row for a file-only redeploy."""
     assert run("--no-bootstrap") == 0
