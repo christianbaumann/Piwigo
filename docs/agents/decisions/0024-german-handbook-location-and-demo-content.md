@@ -1,4 +1,4 @@
-# 0021 — The German handbook lives in `docs/handbuch/` and is photographed from generated content
+# 0024 — The German handbook lives in `docs/handbuch/` and is photographed from generated content
 
 Date: 2026-08-31
 Status: accepted

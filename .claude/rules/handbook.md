@@ -7,7 +7,7 @@ changing a German string a screenshot shows.
 stylesheet, covering album creation, adding photos, photo texts, tags and person tagging. It is
 **not** part of upstream's `language/de_DE/help/` and must not be moved there — an upstream merge
 rewrites those files. See
-[decision 0021](../../docs/agents/decisions/0021-german-handbook-location-and-demo-content.md).
+[decision 0024](../../docs/agents/decisions/0024-german-handbook-location-and-demo-content.md).
 
 ## The three commands
 

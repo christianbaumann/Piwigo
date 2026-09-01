@@ -1033,7 +1033,7 @@ Close the loop so a later reader cites the decision instead of re-litigating it.
 ### Changes Required
 
 #### [x] 1. The decision
-**File**: `docs/agents/decisions/0021-german-handbook-location-and-demo-content.md` (new)
+**File**: `docs/agents/decisions/0024-german-handbook-location-and-demo-content.md` (new)
 **Changes**: Next free number, confirmed 2026-08-31 (0020 is the highest). Records three
 decisions and their rejected alternatives: the handbook lives in `docs/handbuch/` rather than
 `language/de_DE/help/`; screenshots come from generated synthetic content rather than blurred
@@ -1093,7 +1093,7 @@ proved the `MIN_BYTES` guard reachable, are in `docs/agents/TESTING.md`.
 ### Success Criteria
 
 #### Automated Verification
-- [x] `docs/agents/decisions/0021-*.md` exists and no other file claims number 0021
+- [x] `docs/agents/decisions/0024-*.md` exists and no other file claims number 0024
 - [x] `CLAUDE.md` is under 100 lines
 - [x] Every file in `.claude/rules/` is under 500 lines
 - [x] Every command quoted in the updated docs actually runs
