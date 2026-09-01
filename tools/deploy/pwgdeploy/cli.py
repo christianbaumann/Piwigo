@@ -28,6 +28,9 @@ LABEL_WIDTH = 12
 # The shell's own convention for a process ended by SIGINT (128 + 2).
 INTERRUPTED_EXIT_CODE = 130
 BYTES_PER_MB = 1024 * 1024
+# Enough to act on without turning the report into the deletion list itself; the tail
+# says how many were not named.
+MAX_REPORTED_GALLERY_DELETIONS = 10
 
 # tools/deploy/ relative to this file: pwgdeploy/ -> deploy/ -> tools/ -> repository root.
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -164,6 +167,7 @@ def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_
         f"{len(result.diff.new)} new, {len(result.diff.changed)} changed, "
         f"{result.unchanged_count} unchanged, {removed} removed ({verb})",
     )
+    _report_gallery_deletions(out, args, config, result)
     if result.dirs_created:
         _line(out, "dirs", f"{len(result.dirs_created)} created")
     if not args.dry_run:
@@ -174,6 +178,33 @@ def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_
             + ("  ok" if result.chmod_supported else "  no SITE CHMOD (warning)"),
         )
     return result
+
+
+def _report_gallery_deletions(out, args, config, result) -> None:
+    """Name the tracked scans a prune reached, on a dry run and on a real one alike.
+
+    Those files are published on purpose — deleting one from the working copy is meant to
+    propagate — but they are the only published files no later run could put back, so the
+    count alone is not enough to act on. decision 0026.
+    """
+    if args.no_prune:
+        return
+    pruned = result.diff.removed if args.dry_run else result.deleted
+    photos = fileset.gallery_paths(config.ftp.remote_root, pruned)
+    if not photos:
+        return
+
+    verb = "would delete" if args.dry_run else "deleted"
+    _line(
+        out,
+        "galleries",
+        f"{len(photos)} of the {len(pruned)} {verb} a tracked photo:",
+    )
+    for path in photos[:MAX_REPORTED_GALLERY_DELETIONS]:
+        _continuation(out, path)
+    unnamed = len(photos) - MAX_REPORTED_GALLERY_DELETIONS
+    if unnamed > 0:
+        _continuation(out, f"… and {unnamed} more")
 
 
 def _bootstrap(out, config, state_dir, transport_factory, client_factory):
@@ -215,6 +246,11 @@ def _report_target(out, config: DeployConfig) -> None:
 
 def _line(out, label: str, value: str) -> None:
     print(f"  {label:{LABEL_WIDTH}}{value}", file=out)
+
+
+def _continuation(out, value: str) -> None:
+    """A further line under the label above it, aligned with that line's value."""
+    print(f"  {'':{LABEL_WIDTH}}{value}", file=out)
 
 
 if __name__ == "__main__":

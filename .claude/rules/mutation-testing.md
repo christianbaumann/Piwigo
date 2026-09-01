@@ -64,6 +64,16 @@ same false "survived".
 
 Both failure modes were hit while building the provenance plugin's Phase 1 table, 2026-08-29.
 
+Python has its own version of the same shift, and it bites *after* the revert rather than
+before it. CPython decides a cached `.pyc` is current from the source's **mtime and size**
+only — never its contents. A mutant that keeps the byte length (transposing two
+interpolations, flipping a comparison) and is reverted within the same second therefore
+leaves the mutated bytecode in place, and the next run reports the mutant's behaviour
+against unmutated source. So after reverting a Python mutant, either wait out the second or
+`find . -name __pycache__ -type d -exec rm -rf {} +` before re-running. Hit in
+`tools/deploy`, 2026-09-01: a transposed report line survived its own revert and the suite
+stayed red with the correct source on disk.
+
 ## Record what did not die, honestly
 
 "Nothing else moved" is a real, useful claim: it means a mutant killed exactly the tests

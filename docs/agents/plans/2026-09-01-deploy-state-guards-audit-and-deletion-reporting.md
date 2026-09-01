@@ -267,7 +267,7 @@ the design as a decision rather than leaving it implicit in `.gitignore`.
 
 ### Changes Required
 
-#### [ ] 1. A pure classifier
+#### [x] 1. A pure classifier
 **File**: `tools/deploy/pwgdeploy/fileset.py`
 
 ```python
@@ -281,7 +281,7 @@ def gallery_paths(root: str, remote_paths: Iterable[str]) -> list[str]:
 
 Uses `urls.remote_path(root, GALLERY_PREFIX)` as the prefix so a non-empty `remote_root` works.
 
-#### [ ] 2. The report line
+#### [x] 2. The report line
 **File**: `tools/deploy/pwgdeploy/cli.py:157-166`
 
 ```python
@@ -293,13 +293,13 @@ It reports `result.diff.removed` on a dry run (nothing was deleted) and `result.
 real one, matching the existing prediction/truth split. Suppressed entirely under
 `--no-prune`, which deletes nothing.
 
-#### [ ] 3. Decision 0026
+#### [x] 3. Decision 0026
 **File**: `docs/agents/decisions/0026-tracked-gallery-photos-are-prune-eligible.md`
 **Changes**: records that deleting a scan from the working copy *should* propagate to the
 remote, that this is why `galleries/` is in the file set at all, and that the compensating
 control is the named report line rather than an exclusion.
 
-#### [ ] 4. README
+#### [x] 4. README
 **File**: `tools/deploy/README.md`
 **Changes**: the "what is protected from the prune" material gains the `galleries/` row and a
 pointer to decision 0026. Check `test_readme.py::test_every_relative_link_in_the_readme_resolves`
@@ -308,13 +308,20 @@ stays green.
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `cd tools/deploy && uv run pytest` passes
-- [ ] `uv run pwg-deploy --dry-run deploy.local.json` prints no `galleries` line against the
+- [x] `cd tools/deploy && uv run pytest` passes
+- [x] `uv run pwg-deploy --dry-run deploy.local.json` prints no `galleries` line against the
       current working copy (nothing is removed)
 
 #### Manual Verification
-- [ ] Temporarily `git rm --cached` one `galleries/` file, run `--dry-run`, confirm the line
-      names that exact path and that the count matches the `removed` total; restore.
+- [x] ~~Temporarily `git rm --cached` one `galleries/` file, run `--dry-run`, confirm the line
+      names that exact path and that the count matches the `removed` total; restore.~~
+      **Automated, so it leaves no ledger entry.** Run once by hand 2026-09-01 (it named
+      `galleries/1992_Rund_um_Sefferweich/1992_Rund_um_Sefferweich_01_0.png` on a `1 removed`
+      run), then replaced by two tests: `test_the_real_file_set_publishes_tracked_gallery_photos`
+      covers the half the fake cannot — that this checkout's published set really does contain
+      paths the classifier calls photos — and `test_a_dry_run_names_the_photo_it_would_delete`
+      now prunes two strangers, one of them a photo, and reads the second figure off the
+      `upload` line instead of transcribing it.
 
 **Implementation Note**: pause for confirmation before Phase 3.
 
@@ -716,21 +723,21 @@ is a recorded gap, not a silent one.
 
 #### Phase 2 — gallery deletions (`tests/test_fileset.py`, `tests/test_cli.py`)
 
-- [ ] `test_gallery_paths_finds_a_tracked_photo` `[HAPPY]`
-- [ ] `test_gallery_paths_ignores_a_core_file` `[NEG]`
-- [ ] `test_gallery_paths_respects_a_nested_remote_root` — `/piwigo/galleries/x.png` under root
+- [x] `test_gallery_paths_finds_a_tracked_photo` `[HAPPY]`
+- [x] `test_gallery_paths_ignores_a_core_file` `[NEG]`
+- [x] `test_gallery_paths_respects_a_nested_remote_root` — `/piwigo/galleries/x.png` under root
       `/piwigo`, and `/other/galleries/x.png` under the same root must not match `[BVA]`
-- [ ] `test_gallery_paths_of_an_empty_list_is_empty` `[BVA]`
-- [ ] `test_a_path_merely_containing_galleries_is_not_a_photo` — `plugins/galleriesx/a.php`
+- [x] `test_gallery_paths_of_an_empty_list_is_empty` `[BVA]`
+- [x] `test_a_path_merely_containing_galleries_is_not_a_photo` — `plugins/galleriesx/a.php`
       `[ERR]`
-- [ ] `test_a_dry_run_names_the_photo_it_would_delete` `[HAPPY]`
-- [ ] `test_a_real_prune_names_the_photo_it_deleted` `[HAPPY]`
-- [ ] `test_no_gallery_line_when_the_prune_touches_no_photo` — absence, so the line is signal
+- [x] `test_a_dry_run_names_the_photo_it_would_delete` `[HAPPY]`
+- [x] `test_a_real_prune_names_the_photo_it_deleted` `[HAPPY]`
+- [x] `test_no_gallery_line_when_the_prune_touches_no_photo` — absence, so the line is signal
       `[NEG]`
-- [ ] `test_no_prune_prints_no_gallery_line` `[NEG]`
-- [ ] `test_more_gallery_deletions_than_the_cap_are_summarised` — `MAX_REPORTED_GALLERY_DELETIONS`
+- [x] `test_no_prune_prints_no_gallery_line` `[NEG]`
+- [x] `test_more_gallery_deletions_than_the_cap_are_summarised` — `MAX_REPORTED_GALLERY_DELETIONS`
       + 1 `[BVA]`
-- [ ] **Regression**: `test_dry_run_reports_what_it_would_delete`,
+- [x] **Regression**: `test_dry_run_reports_what_it_would_delete`,
       `test_dry_run_with_no_prune_reports_no_deletion`, `test_a_pruned_file_is_deleted_by_default`,
       `test_no_prune_keeps_a_file_the_manifest_no_longer_covers` — the `upload` line's wording
       must not change

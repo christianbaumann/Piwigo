@@ -9,6 +9,7 @@ cannot witness is the two real factories they replace; those are the phase's man
 """
 
 import io
+import re
 
 import pytest
 
@@ -187,6 +188,113 @@ def test_dry_run_with_no_prune_reports_no_deletion(run, tmp_path):
     run("--dry-run", "--no-prune")
 
     assert "0 removed" in run.text
+
+
+GALLERY_REMOTE_PATH = "/piwigo/galleries/PHOTO_ALBUM/img_0421.png"
+
+
+def _gallery_lines(text: str) -> list[str]:
+    """Every line the `galleries` label opened, continuations included.
+
+    Reads the label width off production rather than counting spaces here, and matches
+    the label rather than the word — a report line naming a path under galleries/ would
+    otherwise satisfy a bare substring check.
+    """
+    label = f"  {'galleries':{cli.LABEL_WIDTH}}"
+    lines = text.splitlines()
+    opened = [i for i, line in enumerate(lines) if line.startswith(label)]
+    if not opened:
+        return []
+    start = opened[0]
+    rest = [
+        line
+        for line in lines[start + 1 :]
+        if line.startswith(" " * (2 + cli.LABEL_WIDTH))
+    ]
+    return [lines[start], *rest]
+
+
+def test_a_dry_run_names_the_photo_it_would_delete(run, tmp_path):
+    """[HAPPY] The 106 tracked scans are prune-eligible by design (decision 0026), and
+    they are the only published files no later run could restore. `3 removed` hides
+    which three; this line is the compensating control.
+
+    Two strangers, one of them a photo, so both figures on the line are discriminating:
+    the second is read off the `upload` line rather than transcribed, which is the
+    "the count matches the removed total" half of the plan's manual check."""
+    run()
+    _record_a_stranger_in_the_manifest(tmp_path, GALLERY_REMOTE_PATH)
+    _record_a_stranger_in_the_manifest(tmp_path)
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    run("--dry-run")
+
+    lines = _gallery_lines(run.text)
+    assert lines
+    assert GALLERY_REMOTE_PATH in lines[1]
+    removed = int(re.search(r"(\d+) removed", run.text).group(1))
+    assert removed == 2, "the fixture must prune more than the photo, or the line is vacuous"
+    assert [int(n) for n in re.findall(r"\d+", lines[0])] == [1, removed]
+
+
+def test_a_real_prune_names_the_photo_it_deleted(run, tmp_path):
+    """[HAPPY] The truth half of the prediction above: a real run reports what it did,
+    read back from `result.deleted` rather than from the diff it predicted."""
+    run()
+    _record_a_stranger_in_the_manifest(tmp_path, GALLERY_REMOTE_PATH)
+    run.transport.files[GALLERY_REMOTE_PATH] = b"x"
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    run()
+
+    assert _gallery_lines(run.text)
+    assert GALLERY_REMOTE_PATH in run.text
+    assert GALLERY_REMOTE_PATH not in run.transport.files
+
+
+def test_no_gallery_line_when_the_prune_touches_no_photo(run, tmp_path):
+    """[NEG] Absence is what makes the line signal: a report that carried it on every
+    run would be read as decoration. Anti-vacuity — a deletion really did happen."""
+    run()
+    _record_a_stranger_in_the_manifest(tmp_path)
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    run("--dry-run")
+
+    assert "1 removed" in run.text
+    assert _gallery_lines(run.text) == []
+
+
+def test_no_prune_prints_no_gallery_line(run, tmp_path):
+    """[NEG] --no-prune deletes nothing, so there is no photo to warn about."""
+    run()
+    _record_a_stranger_in_the_manifest(tmp_path, GALLERY_REMOTE_PATH)
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    run("--dry-run", "--no-prune")
+
+    assert _gallery_lines(run.text) == []
+
+
+def test_more_gallery_deletions_than_the_cap_are_summarised(run, tmp_path):
+    """[BVA] One past MAX_REPORTED_GALLERY_DELETIONS: the report stays readable and
+    still says how many it did not name."""
+    over = cli.MAX_REPORTED_GALLERY_DELETIONS + 1
+    run()
+    for i in range(over):
+        _record_a_stranger_in_the_manifest(tmp_path, f"/piwigo/galleries/a/{i}.png")
+    run.out.truncate(0)
+    run.out.seek(0)
+
+    run("--dry-run")
+
+    lines = _gallery_lines(run.text)
+    assert len(lines) == 1 + cli.MAX_REPORTED_GALLERY_DELETIONS + 1
+    assert f"{over - cli.MAX_REPORTED_GALLERY_DELETIONS} more" in lines[-1]
 
 
 def test_the_report_names_what_the_sync_deleted(config_file, repo, tmp_path):

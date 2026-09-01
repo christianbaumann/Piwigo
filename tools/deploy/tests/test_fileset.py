@@ -27,6 +27,11 @@ MIN_SELECTED_PATHS = 2500
 # plugins/typetags held 157 tracked files, measured 2026-08-31.
 MIN_SUBMODULE_PATHS = 100
 
+# 106 recovered scans under galleries/, measured 2026-09-01. The floor sits well under
+# that so deleting a handful does not go red, while an empty result — a classifier that
+# matches nothing the real file set holds — still fails loudly.
+MIN_GALLERY_PHOTOS = 50
+
 # The payload a deploy actually pushes: 128.4 MiB (134.7 MB decimal, which is the figure
 # the plan's Phase 2 records) over 3307 selected paths, measured
 # 2026-08-31 with the typetags submodule checked out. The band is wide on purpose — a
@@ -341,6 +346,53 @@ def test_declared_submodule_paths_raises_on_a_real_git_failure():
     assert "bad config" in str(exc.value)
 
 
+# --- the photos a prune would reach ----------------------------------------
+
+
+def test_gallery_paths_finds_a_tracked_photo():
+    """[HAPPY] A scan under galleries/ exists nowhere but this working copy and the
+    server, so a prune that reaches one is worth naming rather than counting."""
+    assert fileset.gallery_paths("", ["galleries/PHOTO_ALBUM/img_0421.png"]) == [
+        "galleries/PHOTO_ALBUM/img_0421.png"
+    ]
+
+
+def test_gallery_paths_ignores_a_core_file():
+    """[NEG] Everything else the prune deletes is replaceable from this checkout."""
+    assert fileset.gallery_paths("", ["index.php", "themes/modus/theme.css"]) == []
+
+
+def test_gallery_paths_respects_a_nested_remote_root():
+    """[BVA] These are remote paths, so the root is part of them: a photo under a
+    different root on the same server was not published by this target."""
+    assert fileset.gallery_paths("/piwigo", ["/piwigo/galleries/a/x.png"]) == [
+        "/piwigo/galleries/a/x.png"
+    ]
+    assert fileset.gallery_paths("/piwigo", ["/other/galleries/a/x.png"]) == []
+
+
+def test_gallery_paths_of_an_empty_list_is_empty():
+    """[BVA] A prune that removed nothing has nothing to name."""
+    assert fileset.gallery_paths("", []) == []
+
+
+def test_a_path_merely_containing_galleries_is_not_a_photo():
+    """[ERR] galleries/ is a path prefix, not a substring — the same boundary
+    test_a_toolsish_path_outside_the_directory_is_kept guards for tools/."""
+    assert fileset.gallery_paths("", ["plugins/galleriesx/a.php"]) == []
+    assert fileset.gallery_paths("", ["galleriesx/a.png"]) == []
+
+
+def test_gallery_paths_keeps_the_order_it_was_given():
+    """[HAPPY] Anti-vacuity for every `== []` above: a classifier that returned nothing
+    at all would satisfy each of them."""
+    paths = ["index.php", "galleries/b/2.png", "galleries/a/1.png"]
+    assert fileset.gallery_paths("", paths) == [
+        "galleries/b/2.png",
+        "galleries/a/1.png",
+    ]
+
+
 # --- always-created directories --------------------------------------------
 
 
@@ -413,6 +465,26 @@ def test_the_selected_file_set_weighs_what_a_deploy_expects():
         f"the file set weighs {total / 1024 / 1024:.1f} MB, outside the band measured "
         "2026-08-31 — either the exclusion rules moved or the working copy is partial"
     )
+
+
+def test_the_real_file_set_publishes_tracked_gallery_photos():
+    """[ERR] Characterization, and the automated half of the plan's Phase 2 manual step:
+    `git rm --cached` a scan, dry-run, see it named. Every other gallery_paths test runs
+    over synthetic paths, so none of them would notice the classifier and the real file
+    set drifting apart — a `.gitignore` rewrite dropping the four `!` re-includes, or a
+    rename of the galleries/ prefix, would leave them all green while the report line
+    silently stopped firing against this checkout."""
+    selected = fileset.select(fileset.git_tracked_paths(REPO_ROOT))
+    assert len(selected) > MIN_SELECTED_PATHS, "nothing to classify"
+
+    photos = fileset.gallery_paths("", selected)
+
+    assert len(photos) > MIN_GALLERY_PHOTOS, (
+        f"only {len(photos)} published paths are tracked photos — either the scans left "
+        "the file set or GALLERY_PREFIX no longer matches them, and the prune's one "
+        "irreplaceable-deletion warning would never fire"
+    )
+    assert len(photos) < len(selected), "the classifier matched the whole file set"
 
 
 def test_total_bytes_of_nothing_is_zero():

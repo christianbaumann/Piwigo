@@ -124,13 +124,35 @@ server by hand — and equally why it can never clean up after anything that byp
 dropped from the manifest while still on the server is an orphan no future run can reach; it
 has to be deleted over FTP by hand.
 
+### The one prune worth reading twice
+
+The four recovered album directories under `galleries/` are tracked, published, and therefore
+prune-eligible like any other file: deleting a scan from the working copy deletes it from the
+server on the next run. That is intended — the working copy is the source of truth for the
+published gallery, and no database content is transferred either way. What is different is the
+cost of a mistake. Every other published path is a copy of something git holds and comes back on
+the next run; a wrongly pruned scan does not come back at all.
+
+So the prune names them. Whenever a run would delete — or did delete — a path under
+`galleries/`, the report carries an extra line listing the photos by name:
+
+```
+  upload      0 new, 0 changed, 3375 unchanged, 3 removed (would send)
+  galleries   1 of the 3 would delete a tracked photo:
+              galleries/1992_Rund_um_Sefferweich/img_0421.png
+```
+
+It appears on `--dry-run` as a prediction and on a real run as a report, and never under
+`--no-prune`. Its absence is the signal that nothing irreplaceable is at stake. See
+[decision 0026](../../docs/agents/decisions/0026-tracked-gallery-photos-are-prune-eligible.md).
+
 ## Testing
 
 ```bash
 cd tools/deploy && uv run pytest
 ```
 
-316 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
+328 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

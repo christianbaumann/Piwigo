@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 from pwgdeploy.errors import GitError
+from pwgdeploy.urls import remote_path
 
 # decision 7: plugins/typetags is a submodule, so a plain ls-files reports one gitlink
 # instead of the plugin's files.
@@ -80,6 +81,11 @@ GENERATED_REMOTE_PATHS = (GENERATED_CONFIG_PATH,)
 # directory listing of the directory that holds the database credentials.
 LOCAL_GUARD_PREFIX = "local/"
 LOCAL_GUARD_BASENAME = "index.php"
+
+# The four album directories .gitignore:14-21 re-includes. Those scans exist nowhere
+# else — the database rows and the originals under upload/ were lost on 2026-08-29 — so a
+# prune that reaches one is worth naming rather than counting. decision 0026.
+GALLERY_PREFIX = "galleries/"
 
 # tools/pwg_rel_create.sh:123-127
 REMOTE_DIRS_TO_CREATE = ("_data", "upload")
@@ -179,6 +185,16 @@ def _is_published(path: str) -> bool:
     if segments[-1] in EXCLUDED_BASENAMES:
         return False
     return not path.startswith(EXCLUDED_PREFIXES)
+
+
+def gallery_paths(root: str, remote_paths: Iterable[str]) -> list[str]:
+    """Which of these remote paths are tracked photos, in the order given.
+
+    Takes remote paths, not repository ones, so the caller can hand it a prune list
+    straight from `manifest.diff` or `UploadResult.deleted`.
+    """
+    prefix = remote_path(root, GALLERY_PREFIX) + "/"
+    return [path for path in remote_paths if path.startswith(prefix)]
 
 
 def _is_local_guard(path: str) -> bool:
