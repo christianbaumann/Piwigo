@@ -349,7 +349,7 @@ no emoji, plain verbs. `check.php` enforces the last two mechanically.
 
 ### Changes Required
 
-#### [ ] 1. Finding 2 — Batch Manager selection labels
+#### [x] 1. Finding 2 — Batch Manager selection labels
 **File**: `handbuch/02-fotos.html:112-116`
 **Changes**: The current text names only **Alles**. Say that the labels depend on whether the
 set fits one page, per `batch_manager_global.tpl:325-330`.
@@ -360,7 +360,7 @@ Alles alle Fotos des Sets. Bei mehreren Seiten stehen dort stattdessen Die ganze
 und Das ganze Set. Nichts hebt die Auswahl auf, Invertieren kehrt sie um.
 ```
 
-#### [ ] 2. Finding 3 — the 24-hour rule
+#### [x] 2. Finding 3 — the 24-hour rule
 **File**: `handbuch/04-schlagworte.html:104-110`
 **Changes**: The section implies the notice is immediate. Add the condition from
 `admin/include/functions.php:438-439`. The rest of the section is accurate and stays.
@@ -371,7 +371,7 @@ erst, wenn das Schlagwort seit mehr als einem Tag unbenutzt und unverändert ist
 gerade angelegtes Schlagwort taucht dort also noch nicht auf.
 ```
 
-#### [ ] 3. Finding 5 — the title is prefilled
+#### [x] 3. Finding 5 — the title is prefilled
 **File**: `handbuch/03-fototexte.html:28-31`
 **Changes**: "Bleibt sie leer, zeigt Piwigo den Dateinamen an" describes a state no ingest path
 produces (`functions_upload.inc.php:366-369`, `site_update.php:538`).
@@ -382,7 +382,7 @@ Endung ein und ersetzt Unterstriche durch Leerzeichen, aus zz_test_a.jpg wird al
 zz test a. Wird das Feld von Hand geleert, zeigt Piwigo wieder den Dateinamen an.
 ```
 
-#### [ ] 4. Finding 7a — colored and colorless tags share one line
+#### [x] 4. Finding 7a — colored and colorless tags share one line
 **File**: `handbuch/04-schlagworte.html:185` (figcaption) and `:205-209` (body)
 **Changes**: Both claim colorless tags stand as text below the badges. They do not
 (`picture.tpl:214`, one comma-separated `<dd>`).
@@ -395,7 +395,7 @@ zz test a. Wird das Feld von Hand geleert, zeigt Piwigo wieder den Dateinamen an
       gepflegt.
 ```
 
-#### [ ] 5. Finding 7b — where the `+` badges sit
+#### [x] 5. Finding 7b — where the `+` badges sit
 **File**: `handbuch/04-schlagworte.html:176-181`
 **Changes**: "darunter" reads as directly under the Schlagworte section. The block is injected
 at `{if isset($metadata)}` (`events_public.inc.php:5`), i.e. after `</dl>` — below every row
@@ -408,7 +408,7 @@ Spalte, unterhalb aller Angaben und damit auch unterhalb von Herkunft, jeweils m
 einem + davor.
 ```
 
-#### [ ] 6. Finding 8b — the heading over-promises adjacency
+#### [x] 6. Finding 8b — the heading over-promises adjacency
 **File**: `handbuch/03-fototexte.html:25`
 **Changes**: `picture_modify.tpl` puts Verknüpfte Alben, Album-Vorschaubild and Schlagworte
 between Aufnahmedatum and Beschreibung. Retitle so the heading claims no adjacency; the
@@ -421,7 +421,7 @@ existing "Die weiteren Felder derselben Seite" section already covers the rest.
 Add one sentence after the list: that the three fields below sit between Aufnahmedatum and
 Beschreibung on screen.
 
-#### [ ] 7. Finding 8c — the merge hint is above, not beside
+#### [x] 7. Finding 8c — the merge hint is above, not beside
 **File**: `handbuch/04-schlagworte.html:84-88`
 **Changes**: `tags.tpl:105` is a `<p>` above the `<select>` at `:107`.
 
@@ -429,7 +429,7 @@ Beschreibung on screen.
 Der Hinweis Die anderen Schlagworte werden entfernt steht darüber.
 ```
 
-#### [ ] 8. Finding 6 — what a guest actually sees
+#### [x] 8. Finding 6 — what a guest actually sees
 **File**: `handbuch/05-personen.html:13-18`
 **Changes**: "Nicht angemeldete Besucher sehen von alldem nichts" is true of the boxes and the
 Personen row, false of the name. Correct it here, and add a note where the tag mirror is
@@ -448,29 +448,34 @@ already explained (`:110-126`).
 Documentation prose has no automated oracle, and a checker that reads prose is forbidden. What
 runs:
 
-- [ ] `ddev exec php handbuch/tools/check.php` — references resolve, screenshots referenced
+- [x] `ddev exec php handbuch/tools/check.php` — references resolve, screenshots referenced
       both ways, well-formed XML, routes resolve, no em-dash or emoji `[NEG]`
-- [ ] Every edited page is still well-formed **XML**, which is what check 5 enforces — void
+- [x] Every edited page is still well-formed **XML**, which is what check 5 enforces — void
       elements self-closed, no named entity beyond the five XML predefines. An unclosed tag
       survives an HTML parser and is the mutant that motivated `loadXML()`
-- [ ] No screenshot reference added or removed, so the both-ways screenshot check still passes
+- [x] No screenshot reference added or removed, so the both-ways screenshot check still passes
 
 ### Success Criteria
 
 #### Automated Verification
-- [ ] `ddev exec php handbuch/tools/check.php` exits 0 and reports 6 pages, 20 screenshots all
-      referenced, and a byte count at or above its floor
-- [ ] `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; cd plugins/provenance && npx playwright test handbuch-pages.spec.js'` passes — the pages still
-      open over `file://` with the stylesheet applied and no console error
-- [ ] `git diff --stat handbuch/` touches only the files named above, and no `.png`
+- [x] `ddev exec php handbuch/tools/check.php` exits 0 and reports 6 pages, 20 screenshots all
+      referenced, and a byte count at or above its floor — measured 2026-09-01: 6 pages, 46
+      references, 20 screenshots all referenced, 8 admin routes resolve, 35829 bytes free of
+      em-dashes and emoji
+- [x] `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; cd plugins/provenance && npx playwright test handbuch-pages.spec.js'` passes — the pages still
+      open over `file://` with the stylesheet applied and no console error — 11 passed,
+      2026-09-01
+- [x] `git diff --stat handbuch/` touches only the files named above, and no `.png` — confirmed:
+      `02-fotos.html`, `03-fototexte.html`, `04-schlagworte.html`, `05-personen.html`
 
 #### Manual Verification
-- [ ] Each of the eight corrected statements now matches what the screen does, read against the
-      research finding it closes
-- [ ] The German reads naturally and matches the on-screen wording — no automated oracle
-      (`docs/agents/TESTING.md:789`)
-- [ ] Screenshots 14 and 15 still show what their amended captions describe. If either no
-      longer does, that is a re-shoot, which this plan otherwise excludes
+- [x] Each of the eight corrected statements now matches what the screen does, read against the
+      research finding it closes — confirmed by user 2026-09-01
+- [x] The German reads naturally and matches the on-screen wording — no automated oracle
+      (`docs/agents/TESTING.md:789`) — confirmed by user 2026-09-01
+- [x] Screenshots 14 and 15 still show what their amended captions describe. If either no
+      longer does, that is a re-shoot, which this plan otherwise excludes — confirmed by user
+      2026-09-01, no re-shoot needed
 
 **Implementation Note**: Documentation only. Pause for manual confirmation before Phase 3.
 
