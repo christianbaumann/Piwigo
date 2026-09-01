@@ -48,6 +48,7 @@ __pycache__/
 # Agent working state (local only)
 .rodney/
 .agent-tests/
+/.claude/worktrees/
 /.playwright-cli/
 .DS_Store
 /tools/deploy/.playwright-cli/
