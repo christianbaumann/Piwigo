@@ -169,6 +169,11 @@ class PicturePage {
    * enough to outlast the debounce, and the run is reset by any change. Still
    * causal rather than a sleep: what is waited for is the layout not moving, not
    * a duration.
+   *
+   * Frames alone cannot see a derivative still loading: until it arrives, the
+   * theme's inline CSS size from the previous load holds the photo still, so a
+   * slow i.php outlasts any frame count. image.complete stays false while the new
+   * src is pending, which is the causal fact for "no switch is in flight".
    */
   async settle() {
     await this.page.evaluate(() => {
@@ -188,6 +193,7 @@ class PicturePage {
         const overlayRect = overlay.getBoundingClientRect();
 
         const matched =
+          image.complete &&
           imageRect.width > 1 &&
           Math.abs(imageRect.width - overlayRect.width) < 1 &&
           Math.abs(imageRect.height - overlayRect.height) < 1 &&

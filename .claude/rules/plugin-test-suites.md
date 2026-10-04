@@ -160,7 +160,12 @@ these suites is safe against a production install.
 a resize the theme may swap in another derivative — which only changes the rendered size once that
 file has loaded — while `overlay.js` debounces its own redraw, so a check that merely asks whether
 the overlay matches the photo *right now* is satisfied by the layout from before the resize. It
-demands the layout hold still across `PicturePage.SETTLE_FRAMES` consecutive animation frames.
+demands the layout hold still across `PicturePage.SETTLE_FRAMES` consecutive animation frames
+**and** `#theMainImage.complete`. The frame count alone is not enough: until a new derivative
+arrives, the inline CSS size the theme set on the previous `load` holds the photo still, so a slow
+`i.php` outlasts any number of frames and the switch lands between two measurements. That was the
+2026-10-04 flake in the stepped-resize spec. With image responses delayed 600 ms, 11 of 20 runs
+failed on frames alone and 0 of 20 with `complete` added.
 
 Both the integration and the E2E suite mutate the database and restore it (`tests/Support/FixtureBuilder.php`; the E2E suite reaches the same builder through `tests/e2e/support/seed.php`, which persists the original state to the git-ignored `tests/e2e/.state/snapshot.json` so a later process can put it back). Neither is safe against a production install.
 

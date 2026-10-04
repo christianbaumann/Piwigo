@@ -32,14 +32,6 @@
 the `index.php` directory-listing guards ship; `local/config/` is excluded and the remote's config
 is generated. `tools/deploy/README.md` has the full list.)*
 
-## persons
-
-- **`overlay.spec.js` "the boxes track the photo across a stepped resize" is flaky.** Measured
-  2026-10-04: 3 of 10 (`--repeat-each=10`) on the current branch, 4 of 10 at `9533125e0`, before
-  the persons-live-row change. Each failure is a box off by 30-50 px, which looks like a layout
-  measured before the overlay caught up, despite `settle()`. Not investigated yet; per
-  `e2e-tests.md` it must be fixed, not retried.
-
 ## misc
 
 - l10n('Invalid tag name') has no translation
