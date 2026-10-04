@@ -84,6 +84,32 @@ final class AddRegionTest extends TestCase
             'the region never reached the image file');
     }
 
+    /**
+     * [ST] Adding a region keeps the ids of those already on the photo.
+     *
+     * An open page holds them, and deletes by them. Exactly one id in the
+     * answer is new, and that one is the region just added.
+     */
+    public function testAddingARegionKeepsTheIdsOfThoseAlreadyThere(): void
+    {
+        $first = $this->addRegion(self::JANE);
+        $this->assertSame('ok', $first['json']['stat'], $first['body']);
+        $before = array_column($first['json']['result']['regions'], 'id');
+        $this->assertCount(1, $before, 'anti-vacuity: the first call indexed no region');
+
+        $second = $this->addRegion(self::JOHN, array('x' => 0.2, 'y' => 0.2, 'w' => 0.1, 'h' => 0.1));
+        $this->assertSame('ok', $second['json']['stat'], $second['body']);
+
+        $after = array();
+        foreach ($second['json']['result']['regions'] as $region)
+        {
+            $after[$region['name']] = $region['id'];
+        }
+
+        $this->assertSame($before[0], $after[self::JANE], 'the region already on the photo was renumbered');
+        $this->assertNotContains($after[self::JOHN], $before);
+    }
+
     /** [HAPPY] A second person on the same photo does not displace the first. */
     public function testASecondPersonDoesNotRemoveTheFirst(): void
     {

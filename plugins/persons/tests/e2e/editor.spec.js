@@ -370,14 +370,12 @@ test.describe('removing a person', () => {
   });
 
   /**
-   * [NEG] Known gap, skipped until fixed - see docs/backlog.md, "persons".
+   * [ST] A box rendered with the page can still be deleted after a save.
    *
-   * Every write re-indexes the photo, which deletes and re-inserts its region
-   * rows under new ids. The boxes already on the page keep the ids they were
-   * rendered with, so once anything has been saved, deleting one of them sends
-   * an id that no longer exists and the delete is refused.
+   * Every write re-indexes the photo; the regions it did not touch keep their
+   * ids, so the ones the page was rendered with stay valid.
    */
-  test.fixme('a box rendered before a save can still be deleted after it', async ({ page }) => {
+  test('a box rendered before a save can still be deleted after it', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
@@ -394,6 +392,34 @@ test.describe('removing a person', () => {
     await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
     expect(readFileRegions(seeded.photo_id).regions.map((region) => region.name))
       .not.toContain(seeded.regions[0].name);
+  });
+
+  /**
+   * [ST] Deleting a box just added removes that box and nobody else.
+   *
+   * The new box takes its id from the save's answer - the one id the page did
+   * not know yet. Had the other regions been renumbered, that would be
+   * somebody else's.
+   */
+  test('a box added to a photo with faces deletes only itself', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(CLEAR_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length + 1);
+
+    await picture.deleteButtonOf(ADA).click();
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length);
+    await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
+
+    // Anti-vacuity: the seeded faces were in the file to be lost.
+    expect(seeded.regions.length).toBeGreaterThan(0);
+    expect(readFileRegions(seeded.photo_id).regions.map((region) => region.name))
+      .toEqual(seeded.regions.map((region) => region.name));
   });
 });
 
@@ -514,8 +540,6 @@ test.describe('the person row while tagging', () => {
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
-    // Delete before adding: every write re-indexes the photo and renumbers its
-    // regions, so a seeded id is only valid until the first save.
     await picture.enterTaggingMode();
     await picture.deleteButton(seeded.regions[0].region_id).click();
     await expect(picture.savedBoxes).toHaveCount(seeded.regions.length - 1);

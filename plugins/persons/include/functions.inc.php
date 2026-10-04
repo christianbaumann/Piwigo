@@ -1062,6 +1062,54 @@ function persons_region_matches($region, $matcher)
 }
 
 /**
+ * Gives each new index row the id its region had before the reindex.
+ *
+ * The rows are still built from the file alone; only the id is carried, and
+ * only for a region that is unchanged - same person, same type, every
+ * coordinate within PERSONS_REGION_MATCH_EPSILON. A page that is already open
+ * deletes by the ids it was rendered with, so a write must not renumber the
+ * regions it did not touch. Each previous id is used at most once; a region
+ * without a match gets null and the database assigns it a new id.
+ *
+ * @param array $previous the photo's rows before the reindex: id, person_id,
+ *   region_type, area_x, area_y, area_w, area_h
+ * @param array $rows the new rows, as persons_reindex_image() builds them
+ * @return array $rows, each with an 'id' key (int or null)
+ */
+function persons_carry_region_ids($previous, $rows)
+{
+  $unused = $previous;
+
+  foreach ($rows as $i => $row)
+  {
+    $rows[$i]['id'] = null;
+
+    foreach ($unused as $key => $old)
+    {
+      if ((int)$old['person_id'] !== (int)$row['person_id']
+        or (string)$old['region_type'] !== (string)$row['region_type'])
+      {
+        continue;
+      }
+
+      foreach (array('area_x', 'area_y', 'area_w', 'area_h') as $column)
+      {
+        if (abs((float)$old[$column] - (float)$row[$column]) > PERSONS_REGION_MATCH_EPSILON)
+        {
+          continue 2;
+        }
+      }
+
+      $rows[$i]['id'] = (int)$old['id'];
+      unset($unused[$key]);
+      break;
+    }
+  }
+
+  return $rows;
+}
+
+/**
  * @param array $region
  * @param array $matchers
  * @return bool

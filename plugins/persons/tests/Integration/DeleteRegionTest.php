@@ -86,6 +86,36 @@ final class DeleteRegionTest extends TestCase
         $this->assertSame(array(self::JOHN), $this->namesInFile());
     }
 
+    /**
+     * [ST] An id read before a delete still names its region after it.
+     *
+     * What an open page does: it deletes one box, then another, by the ids it
+     * was rendered with.
+     */
+    public function testARegionCanBeDeletedByTheIdItHadBeforeAnotherDelete(): void
+    {
+        $this->add(self::JANE, 0.25, 0.25, 0.2, 0.2);
+        $this->add(self::JOHN, 0.75, 0.75, 0.2, 0.2);
+
+        $janeId = $this->regionId(self::JANE);
+        $johnId = $this->regionId(self::JOHN);
+
+        $first = $this->ws->call('pwg.persons.deleteRegion', array(
+            'region_id' => $janeId,
+            'pwg_token' => $this->ws->token(),
+            ));
+        $this->assertSame('ok', $first['json']['stat'], $first['body']);
+
+        $second = $this->ws->call('pwg.persons.deleteRegion', array(
+            'region_id' => $johnId,
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $second['json']['stat'], $second['body']);
+        $this->assertSame(array(), $second['json']['result']['regions']);
+        $this->assertSame(array(), $this->namesInFile());
+    }
+
     /** [ST] The last region for a person on a photo takes the mirrored tag with it. */
     public function testRemovingTheLastRegionRemovesTheImageTagRow(): void
     {

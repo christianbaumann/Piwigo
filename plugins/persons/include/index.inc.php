@@ -5,8 +5,10 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  * The derived index: two tables that say exactly what the image files say.
  *
  * Every rebuild is destructive by design - this image's rows are replaced by
- * what the file holds right now. Nothing is ever computed from the previous
- * index, so a wrong row cannot outlive one rescan.
+ * what the file holds right now. Nothing but a row's id is taken from the
+ * previous index, so a wrong row cannot outlive one rescan. The id is carried
+ * for an unchanged region so an open page's ids stay valid across a write
+ * (decision 0032).
  *
  * No explicit transaction wraps a rebuild. Core ships no transaction helper,
  * and piwigo_image_tag is MyISAM, so the tag mirror could not join one anyway.
@@ -68,6 +70,14 @@ function persons_reindex_image($image_id, $file_path)
       'source'            => $clipped['source'],
       );
   }
+
+  $previous = query2array('
+SELECT id, person_id, region_type, area_x, area_y, area_w, area_h
+  FROM '.PERSONS_REGION_TABLE.'
+  WHERE image_id = '.$image_id.'
+  ORDER BY id
+;');
+  $rows = persons_carry_region_ids($previous, $rows);
 
   pwg_query('DELETE FROM '.PERSONS_REGION_TABLE.' WHERE image_id = '.$image_id.';');
 

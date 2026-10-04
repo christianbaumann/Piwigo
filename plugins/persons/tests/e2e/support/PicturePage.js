@@ -243,6 +243,18 @@ class PicturePage {
     return this.box(regionId).locator('.person-box-delete');
   }
 
+  /**
+   * The delete control of the saved box labelled with a name - for a box
+   * whose id the spec cannot know, because the browser just created it.
+   *
+   * @param {string} name
+   */
+  deleteButtonOf(name) {
+    return this.savedBoxes
+      .filter({ has: this.page.locator('.person-box-label', { hasText: name }) })
+      .locator('.person-box-delete');
+  }
+
   /** Turns the photo into a drawing surface, and waits until it really is one. */
   async enterTaggingMode() {
     await this.tagToggle.click();

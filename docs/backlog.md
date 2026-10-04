@@ -34,15 +34,11 @@ is generated. `tools/deploy/README.md` has the full list.)*
 
 ## persons
 
-- **Every write renumbers the photo's region ids; the editor keeps the old ones.** Found
-  2026-10-04 while building the live Personen row. `persons_reindex_image()` deletes and
-  re-inserts the photo's rows (`include/index.inc.php`), but boxes already on the page keep the
-  `data-person-region` they were rendered with. After any save or delete, deleting another box
-  sends an id that no longer exists and is refused. Likely worse: `commit()` in `editor.js`
-  adopts the first returned id it does not know - after a renumbering that is every id, so a box
-  added to a photo that already has faces probably takes the *first* region's id, and deleting it
-  would remove somebody else. Reproduced by the skipped spec `a box rendered before a save can
-  still be deleted after it` (`plugins/persons/tests/e2e/editor.spec.js`).
+- **`overlay.spec.js` "the boxes track the photo across a stepped resize" is flaky.** Measured
+  2026-10-04: 3 of 10 (`--repeat-each=10`) on the current branch, 4 of 10 at `9533125e0`, before
+  the persons-live-row change. Each failure is a box off by 30-50 px, which looks like a layout
+  measured before the overlay caught up, despite `settle()`. Not investigated yet; per
+  `e2e-tests.md` it must be fixed, not retried.
 
 ## misc
 
