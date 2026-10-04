@@ -15,7 +15,10 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * 'empty' is the untagged photo the editor specs start from; it writes nothing
  * into the file, so what is found there afterwards was written by the browser.
  *
- * @param {'overlay'|'stale'|'empty'} scenario
+ * 'neighbours' is an untagged photo with a previous and a next one in the same
+ * album, and also returns their previous_path and next_path.
+ *
+ * @param {'overlay'|'stale'|'empty'|'neighbours'} scenario
  */
 function seed(scenario) {
   return JSON.parse(execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`], { encoding: 'utf8' }));

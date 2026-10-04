@@ -130,11 +130,13 @@ that proves a normal account is refused overrides the storage state for itself.
 `tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
 into that photo's file with a plain exiftool call, indexes them, and prints the box corners the
 specs assert against — computed with the same pure helpers the page uses, so no spec carries a
-second copy of the conversion. Three scenarios: `--scenario=overlay` writes the photo's own
+second copy of the conversion. Four scenarios: `--scenario=overlay` writes the photo's own
 `AppliedToDimensions`, so nothing is stale; `--scenario=stale` writes a ratio no crop of the photo
 could have, which is what a region written before a re-crop looks like; `--scenario=empty` writes
 nothing into the file at all, which is what the editor specs start from — anything found in that
-file afterwards was put there by the browser. `seed.php --read-file-regions=<id>` reads one photo's
+file afterwards was put there by the browser; `--scenario=neighbours` is `empty` plus a previous
+and a next photo in the same album, their upload dates forced so the seeded photo is the middle
+one, which `picture-display.spec.js` clicks the theme's navigation zones on. `seed.php --read-file-regions=<id>` reads one photo's
 regions back with a plain exiftool call in its own process, which is how a spec asserts a write
 landed without asking the plugin's own parser. `seed.php --person-counts` prints every person's
 photo and region counts straight from the database, which is the oracle the persons admin

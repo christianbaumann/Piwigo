@@ -34,6 +34,16 @@ class PicturePage {
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
 
+    /* ── the theme's display controls ───────────────────────────────── */
+
+    /** Core's size menu button and the box it opens. */
+    this.sizeMenuButton = page.locator('#derivativeSwitchLink');
+    this.sizeMenu = page.locator('#derivativeSwitchBox');
+    /** The toolbar button that starts the slideshow. */
+    this.slideshowButton = page.locator('a:has(> .pwg-icon-slideshow)');
+    /** The photo inside the slideshow's own container, which only exists in slideshow mode. */
+    this.slideshowImage = page.locator('#slideshow #theMainImage');
+
     /* ── the editor ─────────────────────────────────────────────────── */
 
     this.tagToggle = page.locator('#persons-tag-toggle');
@@ -221,6 +231,102 @@ class PicturePage {
       // everything - a check that silently stops checking.
       return lengths.length ? Math.max(...lengths.map(parseFloat)) : 0;
     });
+  }
+
+  /**
+   * Waits until the photo file has loaded and its rendered box has stopped
+   * moving.
+   *
+   * For pages with no overlay to compare against - settle() needs one. The
+   * theme may swap the src after the first load, so `complete` alone could be
+   * the placeholder's; the rendered box has to hold still across
+   * SETTLE_FRAMES consecutive frames as well.
+   */
+  async settleImage() {
+    await this.page.evaluate(() => {
+      window.__pictureSettle = { key: null, frames: 0 };
+    });
+
+    await this.page.waitForFunction(
+      (needed) => {
+        const state = window.__pictureSettle;
+        const image = document.getElementById('theMainImage');
+        if (!state || !image || !image.complete || image.naturalWidth < 2) {
+          return false;
+        }
+
+        const r = image.getBoundingClientRect();
+        const key = [image.currentSrc, r.left, r.top, r.width, r.height].join('|');
+        if (r.width < 2 || state.key !== key) {
+          state.key = key;
+          state.frames = 0;
+          return false;
+        }
+
+        state.frames += 1;
+        return state.frames >= needed;
+      },
+      PicturePage.SETTLE_FRAMES,
+      { polling: 'raf' }
+    );
+  }
+
+  /**
+   * What the photo element is showing: its rendered box, the pixel size of the
+   * loaded file, and the map it points at.
+   */
+  async imageDisplay() {
+    return this.image.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        width: r.width,
+        height: r.height,
+        naturalWidth: el.naturalWidth,
+        naturalHeight: el.naturalHeight,
+        usemap: el.getAttribute('usemap'),
+      };
+    });
+  }
+
+  /**
+   * The photo's derivatives as the theme knows them (`RVAS.derivatives`), each
+   * with its pixel size and type, smallest first.
+   *
+   * @returns {Promise<Array<{w: number, h: number, type: string}>>}
+   */
+  async derivatives() {
+    return this.page.evaluate(() => RVAS.derivatives.map((d) => ({ w: d.w, h: d.h, type: d.type })));
+  }
+
+  /**
+   * Clicks the photo at a point given in fractions of its rendered size.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async clickImageAt(x, y) {
+    const image = await this.imageRect();
+    await this.page.mouse.click(image.left + image.width * x, image.top + image.height * y);
+  }
+
+  /**
+   * Picks one size in core's size menu, the way a visitor does.
+   *
+   * Each entry follows the check mark core emits with a per-type id, which is
+   * the only stable handle the menu offers.
+   *
+   * @param {string} type a derivative type, as in derivatives()
+   */
+  async chooseSize(type) {
+    await this.sizeMenuButton.click();
+    await this.sizeMenu.waitFor({ state: 'visible' });
+    await this.page.locator(`#derivativeChecked${type} + a`).click();
+  }
+
+  /** Starts the slideshow from the toolbar and waits until it is showing. */
+  async startSlideshow() {
+    await this.slideshowButton.click();
+    await this.slideshowImage.waitFor({ state: 'visible' });
   }
 
   /** Whether the photo still carries the <area> map; rvas_choose() removes it on a HiDPI screen. */

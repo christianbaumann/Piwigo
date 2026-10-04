@@ -18,6 +18,7 @@
  *   php tests/e2e/support/seed.php --scenario=overlay
  *   php tests/e2e/support/seed.php --scenario=stale
  *   php tests/e2e/support/seed.php --scenario=empty
+ *   php tests/e2e/support/seed.php --scenario=neighbours
  *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
  *   php tests/e2e/support/seed.php --exiftool=missing|present
  *   php tests/e2e/support/seed.php --restore
@@ -73,6 +74,51 @@ function applied_dimensions(string $scenario, array $image): array
     }
 
     return array((int)$image['width'], (int)$image['height']);
+}
+
+/** How far apart the neighbours' upload dates are put, so the album order is not left to a tie. */
+const NEIGHBOUR_DATE_STEP = '1 DAY';
+
+/**
+ * Puts a previous and a next photo either side of the seeded one.
+ *
+ * The album is ordered by date_available DESC first ($conf['order_by']), and
+ * all three rows were inserted in the same second, so the order would fall to
+ * the random file names. Forcing the dates makes the seeded photo the middle
+ * one, and the order is asserted rather than hoped for.
+ *
+ * @return array previous and next photo ids
+ */
+function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catId): array
+{
+    $previous = $builder->createTestImage();
+    $next = $builder->createTestImage();
+    $builder->attachImage((int)$previous['id'], $catId);
+    $builder->attachImage((int)$next['id'], $catId);
+
+    $db->query('UPDATE piwigo_images SET date_available = NOW() WHERE id = ' . $mainId);
+    $db->query('UPDATE piwigo_images SET date_available = NOW() + INTERVAL ' . NEIGHBOUR_DATE_STEP
+        . ' WHERE id = ' . (int)$previous['id']);
+    $db->query('UPDATE piwigo_images SET date_available = NOW() - INTERVAL ' . NEIGHBOUR_DATE_STEP
+        . ' WHERE id = ' . (int)$next['id']);
+
+    $order = array();
+    $result = $db->query(
+        'SELECT i.id FROM piwigo_images AS i JOIN piwigo_image_category AS ic ON ic.image_id = i.id'
+        . ' WHERE ic.category_id = ' . $catId . ' ORDER BY i.date_available DESC'
+    );
+    while ($row = $result->fetch_assoc())
+    {
+        $order[] = (int)$row['id'];
+    }
+
+    $expected = array((int)$previous['id'], $mainId, (int)$next['id']);
+    if ($order !== $expected)
+    {
+        fail('neighbours are not in the order previous, seeded, next: ' . json_encode($order));
+    }
+
+    return array('previous' => (int)$previous['id'], 'next' => (int)$next['id']);
 }
 
 function fail(string $message): void
@@ -299,9 +345,9 @@ if (isset($args['read-file-regions']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('overlay', 'stale', 'empty'), true))
+if (!in_array($scenario, array('overlay', 'stale', 'empty', 'neighbours'), true))
 {
-    fail('--scenario must be one of: overlay, stale, empty');
+    fail('--scenario must be one of: overlay, stale, empty, neighbours');
 }
 
 if (!$builder->tableExists('piwigo_person_region'))
@@ -314,10 +360,18 @@ $catId = $builder->createTestAlbum('Persons E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
 
+// 'neighbours' puts a previous and a next photo either side of the seeded one,
+// for the theme's click-to-navigate zones; like 'empty' it writes no regions.
+$neighbours = null;
+if ($scenario === 'neighbours')
+{
+    $neighbours = seed_neighbours($db, $builder, (int)$image['id'], $catId);
+}
+
 // 'empty' is the state the editor starts from: a photo nobody has tagged yet.
 // It writes no regions at all rather than writing some and deleting them, so
 // the file really is untouched when the first box is drawn onto it.
-if ($scenario !== 'empty')
+if (!in_array($scenario, array('empty', 'neighbours'), true))
 {
     list($appliedW, $appliedH) = applied_dimensions($scenario, $image);
     $builder->writeRegionsWithExiftool($image, SEEDED_REGIONS, $appliedW, $appliedH);
@@ -337,7 +391,7 @@ else
     $indexed = (int)$db->scalar('SELECT COUNT(*) FROM piwigo_person_region WHERE image_id = ' . (int)$image['id']);
     if ($indexed !== 0)
     {
-        fail("the 'empty' scenario expected an untagged photo, found $indexed regions");
+        fail("the '$scenario' scenario expected an untagged photo, found $indexed regions");
     }
 }
 
@@ -377,11 +431,18 @@ foreach (persons_indexed_regions((int)$image['id']) as $row)
 
 save_snapshot(array('test_objects' => $builder->exportTestObjects()));
 
-echo json_encode(array(
+$output = array(
     'scenario' => $scenario,
     'album_id' => $catId,
     'photo_id' => (int)$image['id'],
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
     'album_path' => '/index.php?/category/' . $catId,
     'regions' => $expected,
-    ), JSON_UNESCAPED_UNICODE), "\n";
+    );
+if ($neighbours !== null)
+{
+    $output['previous_path'] = '/picture.php?/' . $neighbours['previous'] . '/category/' . $catId;
+    $output['next_path'] = '/picture.php?/' . $neighbours['next'] . '/category/' . $catId;
+}
+
+echo json_encode($output, JSON_UNESCAPED_UNICODE), "\n";
