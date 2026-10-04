@@ -26,6 +26,8 @@ class PicturePage {
     this.overlay = page.locator('#persons-overlay');
     this.boxes = page.locator('#persons-overlay .person-box');
     /** The read-only names row in core's information list. */
+    /** Core's information list the person row sits in. */
+    this.infoList = page.locator('#standard');
     this.personRow = page.locator('#standard #Persons');
     /** The names cell of that row, without its label. */
     this.personRowNames = page.locator('#standard #Persons dd');
@@ -262,18 +264,35 @@ class PicturePage {
    * apart from none at all.
    *
    * The causal fact rather than a wait: a reload replaces the window object and
-   * with it the marker, so sameDocument() answers from what the page *is*, not
-   * from how long anybody waited for it to change.
+   * with it the marker. The mark is also cleared on beforeunload and pagehide,
+   * which Chromium fires as soon as a navigation starts - so a reload that has
+   * been asked for but not yet committed is seen even from the old document.
    */
   async markDocument() {
     await this.page.evaluate(() => {
       window.__personsDocumentMark = true;
+      const clear = () => {
+        window.__personsDocumentMark = false;
+      };
+      window.addEventListener('beforeunload', clear);
+      window.addEventListener('pagehide', clear);
     });
   }
 
-  /** Whether the document markDocument() marked is still the one loaded. */
+  /**
+   * Whether the document markDocument() marked is still the one loaded.
+   *
+   * A context destroyed under the call is a navigation too, and answers false.
+   */
   async sameDocument() {
-    return this.page.evaluate(() => window.__personsDocumentMark === true);
+    try {
+      return await this.page.evaluate(() => window.__personsDocumentMark === true);
+    } catch (error) {
+      if (/Execution context was destroyed|navigation/i.test(String(error))) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /**

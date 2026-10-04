@@ -400,7 +400,7 @@ test.describe('the person row while tagging (current behaviour)', () => {
     await picture.pickerInput.press('Enter');
     await expect(picture.savedBoxes).toHaveCount(seeded.regions.length + 1);
 
-    expect(await picture.personRowNames.textContent()).toBe(before);
+    await expect(picture.personRowNames).toHaveText(before);
     await expect(picture.personRow).not.toContainText(ADA);
   });
 
@@ -411,6 +411,8 @@ test.describe('the person row while tagging (current behaviour)', () => {
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
+    // Anti-vacuity: the list the row would sit in is there, so a count of 0 is about the row.
+    await expect(picture.infoList).toBeVisible();
     await expect(picture.personRow).toHaveCount(0);
 
     await picture.enterTaggingMode();
@@ -419,6 +421,7 @@ test.describe('the person row while tagging (current behaviour)', () => {
     await picture.pickerInput.press('Enter');
     await expect(picture.savedBoxes).toHaveCount(1);
 
+    await expect(picture.infoList).toBeVisible();
     await expect(picture.personRow).toHaveCount(0);
   });
 
