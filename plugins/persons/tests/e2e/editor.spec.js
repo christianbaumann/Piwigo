@@ -21,6 +21,9 @@ const { PicturePage } = require('./support/PicturePage');
 const FIRST_BOX = { left: 0.25, top: 0.3, w: 0.2, h: 0.25 };
 const SECOND_BOX = { left: 0.6, top: 0.3, w: 0.15, h: 0.2 };
 
+/** Clear of both regions the 'overlay' scenario seeds, so the drag starts on bare photo. */
+const CLEAR_BOX = { left: 0.05, top: 0.65, w: 0.15, h: 0.2 };
+
 /** Below PERSONS_MIN_BOX_FRACTION on both axes, which is 0.01. */
 const TOO_SMALL_BOX = { left: 0.5, top: 0.5, w: 0.004, h: 0.004 };
 
@@ -361,6 +364,102 @@ test.describe('removing a person', () => {
     const after = readFileRegions(seeded.photo_id);
     expect(after.regions.map((region) => region.name)).toEqual([survivor.name]);
     expect(after.persons).not.toContain(doomed.name);
+  });
+});
+
+/**
+ * The Personen row and leaving tagging mode, as they behave today.
+ *
+ * [ERR] characterization: the oracle is the current implementation, no
+ * requirement confirms it. These are the regression net for the
+ * persons-live-row change and are replaced by it on purpose - the row cases by
+ * task 02 (live update), the exit cases by task 03 (reload on exit).
+ */
+test.describe('the person row while tagging (current behaviour)', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  test.afterEach(() => {
+    restore();
+  });
+
+  /** [ERR] Replaced by task 02: the row keeps what the page was loaded with. */
+  test('a saved name does not reach the row without a reload', async ({ page }) => {
+    seeded = seed('overlay');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const before = await picture.personRowNames.textContent();
+    // Anti-vacuity: the seeded faces are listed, so "unchanged" means something.
+    expect(before).toContain(seeded.regions[0].name);
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(CLEAR_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length + 1);
+
+    expect(await picture.personRowNames.textContent()).toBe(before);
+    await expect(picture.personRow).not.toContainText(ADA);
+  });
+
+  /** [ERR] Replaced by task 02: a face-less photo has no row, so the first face has nowhere to go. */
+  test('the first face on a photo does not create the row', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await expect(picture.personRow).toHaveCount(0);
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(1);
+
+    await expect(picture.personRow).toHaveCount(0);
+  });
+
+  /** [ERR] Replaced by task 03: the toggle leaves the mode in place, after a save too. */
+  test('leaving through the toggle after a save does not navigate', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(1);
+
+    await picture.exitTaggingMode();
+
+    expect(await picture.sameDocument()).toBe(true);
+  });
+
+  /** [ERR] Replaced by task 03: Esc with no draft open leaves the mode in place, after a save too. */
+  test('leaving with Esc after a save does not navigate', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(1);
+    // Anti-vacuity: no draft is open, so Esc means "leave", not "discard".
+    await expect(picture.draft).toHaveCount(0);
+
+    await picture.exitTaggingModeWithEscape();
+
+    expect(await picture.sameDocument()).toBe(true);
   });
 });
 

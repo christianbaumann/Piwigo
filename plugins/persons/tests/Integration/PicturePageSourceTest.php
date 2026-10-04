@@ -324,6 +324,23 @@ final class PicturePageSourceTest extends TestCase
     }
 
     /**
+     * [ERR] A photo with no face gets no person row at all.
+     *
+     * Characterization: the oracle is the current template, no requirement
+     * confirms it. Task 02 of the persons-live-row change replaces it on
+     * purpose - the editor needs an (empty, hidden) row to patch when the
+     * first face on a photo is saved.
+     */
+    public function testAPhotoWithNoFaceCarriesNoPersonRow(): void
+    {
+        $markup = $this->markup($this->page());
+
+        $this->assertSame(0, $this->regionCount(), 'anti-vacuity: this photo was expected to carry no region');
+        $this->assertStringContainsString('<dl id="standard"', $markup, 'anti-vacuity: the info list the row would sit in is gone');
+        $this->assertStringNotContainsString('id="Persons"', $markup);
+    }
+
+    /**
      * [NEG] Markup in a person's name is rendered as text, never as markup.
      *
      * The name cannot arrive this way through the plugin's own write paths -

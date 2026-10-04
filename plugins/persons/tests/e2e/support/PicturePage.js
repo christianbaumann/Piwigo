@@ -27,6 +27,8 @@ class PicturePage {
     this.boxes = page.locator('#persons-overlay .person-box');
     /** The read-only names row in core's information list. */
     this.personRow = page.locator('#standard #Persons');
+    /** The names cell of that row, without its label. */
+    this.personRowNames = page.locator('#standard #Persons dd');
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
 
@@ -241,6 +243,37 @@ class PicturePage {
   async enterTaggingMode() {
     await this.tagToggle.click();
     await this.taggingStage.waitFor();
+  }
+
+  /** Leaves tagging mode through the toggle, and waits until the mode is really off. */
+  async exitTaggingMode() {
+    await this.tagToggle.click();
+    await this.taggingStage.waitFor({ state: 'detached' });
+  }
+
+  /** Leaves tagging mode with Esc - only valid with no draft open - and waits until it is off. */
+  async exitTaggingModeWithEscape() {
+    await this.page.keyboard.press('Escape');
+    await this.taggingStage.waitFor({ state: 'detached' });
+  }
+
+  /**
+   * Marks the document currently loaded, so a later navigation can be told
+   * apart from none at all.
+   *
+   * The causal fact rather than a wait: a reload replaces the window object and
+   * with it the marker, so sameDocument() answers from what the page *is*, not
+   * from how long anybody waited for it to change.
+   */
+  async markDocument() {
+    await this.page.evaluate(() => {
+      window.__personsDocumentMark = true;
+    });
+  }
+
+  /** Whether the document markDocument() marked is still the one loaded. */
+  async sameDocument() {
+    return this.page.evaluate(() => window.__personsDocumentMark === true);
   }
 
   /**
