@@ -45,6 +45,10 @@ function persons_picture_overlay()
 
   persons_assign_overlay($image_id, $image);
 
+  // Only this page has the information list a reload brings up to date; the
+  // admin tagging screen shares the overlay template and leaves this unset.
+  $template->assign('PERSONS_RELOAD_ON_EXIT', true);
+
   $template->set_prefilter('picture', 'persons_picture_prefilter');
 }
 

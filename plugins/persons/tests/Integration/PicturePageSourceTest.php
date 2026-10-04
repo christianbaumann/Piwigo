@@ -273,6 +273,21 @@ final class PicturePageSourceTest extends TestCase
         );
     }
 
+    /**
+     * [HAPPY] The public editor is told to reload the page when tagging mode
+     * ends after a change - the reload is what brings the links and core's tag
+     * row up to date.
+     */
+    public function testThePublicEditorReloadsOnExit(): void
+    {
+        $markup = $this->markup($this->page());
+
+        $this->assertMatchesRegularExpression(
+            '#<div id="persons-editor"[^>]*\sdata-persons-reload-on-exit[\s=>]#',
+            $markup
+        );
+    }
+
     /** [HAPPY] Every box offers a delete affordance the editor can bind to. */
     public function testEachBoxCarriesADeleteControl(): void
     {

@@ -16,6 +16,8 @@
 	data-persons-token="{$PERSONS_TOKEN}"
 	data-persons-rotation="{$PERSONS_ROTATION}"
 	data-persons-min-fraction="{$PERSONS_MIN_FRACTION}"
+	{* {strip} joins these lines with no whitespace, so the space is written out. *}
+	{if !empty($PERSONS_RELOAD_ON_EXIT)} data-persons-reload-on-exit="1"{/if}
 	data-persons-str-who="{'Who is this?'|@translate|escape}"
 	data-persons-str-create="{'Create'|@translate|escape}"
 	data-persons-str-hint="{'Enter commits - Esc cancels'|@translate|escape}"

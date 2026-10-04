@@ -55,6 +55,8 @@
 		var token = config.getAttribute('data-persons-token');
 		var rotation = Number(config.getAttribute('data-persons-rotation')) || 0;
 		var minFraction = Number(config.getAttribute('data-persons-min-fraction'));
+		/* Set only where a reload has something to update - see exit(). */
+		var reloadOnExit = config.hasAttribute('data-persons-reload-on-exit');
 
 		function str(name) {
 			return config.getAttribute('data-persons-str-' + name) || '';
@@ -65,6 +67,11 @@
 		var draft = null;
 		var searchTimer = null;
 		var highlight = -1;
+		/* Whether a save or a delete went through. Never reset: on the page that
+		   reads it, leaving the mode after a change starts a fresh document. */
+		var changed = false;
+		/* Writes sent and not yet answered; the page is not left under one. */
+		var pending = 0;
 
 		/* ── the picker ──────────────────────────────────────────────── */
 
@@ -274,6 +281,48 @@
 			}).then(function (response) { return response.json(); });
 		}
 
+		/**
+		 * The live row has plain-text names and core's tag row is not touched
+		 * at all, so after a change, with tagging mode left and no write still
+		 * on its way, the page is loaded again.
+		 *
+		 * A GET of the page's own URL rather than reload(): core renders the
+		 * page straight from a comment post, and a reload would post it again.
+		 */
+		function reloadAfterChange() {
+			if (!changed || !reloadOnExit || pending > 0) {
+				return false;
+			}
+			window.location.replace(window.location.href.split('#')[0]);
+			return true;
+		}
+
+		/**
+		 * One write and everything around it. A refused write arrives in the
+		 * resolved promise, not the rejected one: PwgError answers HTTP 200
+		 * with stat:"fail". An answer that lands after the mode was left
+		 * finishes the reload exit() had to put off.
+		 */
+		function write(method, params, onSuccess) {
+			pending++;
+
+			return post(method, params).then(function (data) {
+				if (data.stat !== 'ok') {
+					say(str('failed') + ' ' + (data.message || ''), true);
+					return;
+				}
+				changed = true;
+				onSuccess(data);
+			}).catch(function () {
+				say(str('failed'), true);
+			}).then(function () {
+				pending--;
+				if (!tagging) {
+					reloadAfterChange();
+				}
+			});
+		}
+
 		function knownRegionIds() {
 			return Array.prototype.map.call(
 				overlay.querySelectorAll('.person-box[data-person-region]'),
@@ -338,10 +387,8 @@
 		}
 
 		/**
-		 * A refused save arrives in the resolved promise, not the rejected one:
-		 * PwgError answers HTTP 200 with stat:"fail". The drawn box stays exactly
-		 * where it was so the user can retry or cancel it - it is never silently
-		 * dropped.
+		 * On a refused save the drawn box stays exactly where it was so the user
+		 * can retry or cancel it - it is never silently dropped.
 		 */
 		function commit(name) {
 			if (!draft || name === '') {
@@ -349,10 +396,11 @@
 			}
 
 			var stored = toStored(draft.box);
+			var saving = draft;
 
 			say('');
 
-			post('pwg.persons.addRegion', {
+			write('pwg.persons.addRegion', {
 				image_id: imageId,
 				name: name,
 				x: stored.x,
@@ -361,9 +409,12 @@
 				h: stored.h,
 				type: 'Face',
 				pwg_token: token
-			}).then(function (data) {
-				if (data.stat !== 'ok') {
-					say(str('failed') + ' ' + (data.message || ''), true);
+			}, function (data) {
+				renderPersonRow(data.result.regions);
+
+				/* The mode was left, or another box drawn, before the answer
+				   came: the box is no longer there to adopt. */
+				if (draft !== saving) {
 					return;
 				}
 
@@ -377,9 +428,6 @@
 				   other unknown id is a region somebody else added since this
 				   page loaded. */
 				adopt(added.length ? added[added.length - 1].id : 0, name);
-				renderPersonRow(data.result.regions);
-			}).catch(function () {
-				say(str('failed'), true);
 			});
 		}
 
@@ -469,18 +517,10 @@
 
 			say('');
 
-			post('pwg.persons.deleteRegion', { region_id: regionId, pwg_token: token })
-				.then(function (data) {
-					if (data.stat !== 'ok') {
-						say(str('failed') + ' ' + (data.message || ''), true);
-						return;
-					}
-					box.remove();
-					renderPersonRow(data.result.regions);
-				})
-				.catch(function () {
-					say(str('failed'), true);
-				});
+			write('pwg.persons.deleteRegion', { region_id: regionId, pwg_token: token }, function (data) {
+				box.remove();
+				renderPersonRow(data.result.regions);
+			});
 		});
 
 		/* ── the mode ────────────────────────────────────────────────── */
@@ -500,6 +540,10 @@
 		}
 
 		function exit() {
+			if (reloadAfterChange()) {
+				return;
+			}
+
 			tagging = false;
 			stage.classList.remove('persons-tagging');
 			toggle.textContent = str('tag');

@@ -33,6 +33,10 @@ class PicturePage {
     this.personRowNames = page.locator('#standard #Persons dd');
     /** Any element inside that cell; the live row holds plain text only. */
     this.personRowElements = page.locator('#standard #Persons dd *');
+    /** The links in that cell; only a server-rendered row has them. */
+    this.personRowLinks = page.locator('#standard #Persons dd a');
+    /** Core's tag row. Every person is also a tag, so a tagged name lands here too. */
+    this.tagRow = page.locator('#standard #Tags');
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
 
@@ -55,6 +59,31 @@ class PicturePage {
   async goto(path) {
     await this.page.goto(path);
     await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  /**
+   * The same page, reached the way core renders it after a comment: straight
+   * from a form post, with no redirect. The posted field is one picture.php
+   * ignores, so nothing is written.
+   *
+   * @param {string} path the picture_path the seed printed
+   */
+  async gotoByPost(path) {
+    await this.goto(path);
+    await Promise.all([
+      this.page.waitForEvent('load'),
+      this.page.evaluate((action) => {
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = action;
+        const field = document.createElement('input');
+        field.name = 'persons_e2e_probe';
+        field.value = '1';
+        form.appendChild(field);
+        document.body.appendChild(form);
+        form.submit();
+      }, path),
+    ]);
   }
 
   /** @param {number} regionId */
@@ -293,6 +322,25 @@ class PicturePage {
   async exitTaggingMode() {
     await this.tagToggle.click();
     await this.taggingStage.waitFor({ state: 'detached' });
+  }
+
+  /**
+   * Leaves tagging mode through the toggle and waits for the page to reload.
+   *
+   * The load event is listened for before the click, so a reload that is
+   * already over by the time the click resolves is not missed.
+   */
+  async exitTaggingModeAndAwaitReload() {
+    const loaded = this.page.waitForEvent('load');
+    await this.tagToggle.click();
+    await loaded;
+  }
+
+  /** Leaves tagging mode with Esc - only valid with no draft open - and waits for the page to reload. */
+  async exitTaggingModeWithEscapeAndAwaitReload() {
+    const loaded = this.page.waitForEvent('load');
+    await this.page.keyboard.press('Escape');
+    await loaded;
   }
 
   /** Leaves tagging mode with Esc - only valid with no draft open - and waits until it is off. */

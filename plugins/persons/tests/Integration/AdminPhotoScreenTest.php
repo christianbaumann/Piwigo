@@ -7,7 +7,8 @@ use PHPUnit\Framework\TestCase;
  * What the screen does with a real photo is an E2E concern - the editor is a
  * mouse drag - and admin.spec.js owns it. What lives here is the other half:
  * the two ways of reaching the URL with nothing to show, both of which have to
- * answer with a rendered page rather than a PHP error.
+ * answer with a rendered page rather than a PHP error. One case does load a
+ * real photo, to check the editor configuration the server emits there.
  *
  * They are worth their own test because the failure is quiet in the worst way:
  * an administrator following a stale link gets a fatal error on an admin
@@ -97,6 +98,30 @@ final class AdminPhotoScreenTest extends TestCase
             $this->assertSame(array(), $this->diagnosticsIn($res['body']), "image_id=$imageId produced a PHP diagnostic");
             $this->assertStringNotContainsString('persons-stage', $res['body'],
                 "image_id=$imageId reached the tagging screen");
+        }
+    }
+
+    /**
+     * [NEG] The admin screen's editor is not told to reload on exit. The screen
+     * has no information list, so a reload there would update nothing.
+     */
+    public function testTheAdminEditorDoesNotReloadOnExit(): void
+    {
+        $fixture = new FixtureBuilder($this->db);
+        $image = $fixture->createTestImage();
+
+        try
+        {
+            $res = $this->ws->fetchPage('/admin.php?page=plugin-persons&image_id=' . $image['id']);
+
+            $this->assertSame(200, $res['http_code']);
+            // Anti-vacuity: the editor is on the page, so its missing attribute means something.
+            $this->assertStringContainsString('id="persons-editor"', $res['body'], 'the tagging screen rendered no editor');
+            $this->assertStringNotContainsString('data-persons-reload-on-exit', $res['body']);
+        }
+        finally
+        {
+            $fixture->destroyTestImages();
         }
     }
 

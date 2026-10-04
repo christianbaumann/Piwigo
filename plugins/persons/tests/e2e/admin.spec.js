@@ -111,6 +111,25 @@ test.describe('the admin tagging screen', () => {
     await expect(screen.editorMessage).not.toHaveClass(/persons-editor-error/);
   });
 
+  /** [NEG] The screen has no information list, so a change gives a reload nothing to update. */
+  test('leaving tagging mode after a save does not reload', async ({ page }) => {
+    const screen = new AdminPhotoPage(page);
+    await screen.open(seeded.photo_id);
+    await screen.waitForPlacement();
+    await screen.markDocument();
+
+    await screen.enterTaggingMode();
+    await screen.dragBox(BOX);
+    await screen.typeName(ADA);
+    await screen.pickerInput.press('Enter');
+    // Anti-vacuity: a change was made, which is what would reload the public page.
+    await expect(screen.savedBoxes).toHaveCount(1);
+
+    await screen.exitTaggingMode();
+
+    expect(await screen.sameDocument()).toBe(true);
+  });
+
   /**
    * The two surfaces have to place the same region identically.
    *

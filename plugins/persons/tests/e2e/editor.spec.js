@@ -48,6 +48,32 @@ const GRACE = 'E2E Editor Grace';
 /** A name carrying markup; the row must show it as text. */
 const MARKUP_NAME = '<i>E2E Markup</i>';
 
+/** Saves one box under a name and waits until the server has answered with it. */
+async function tag(picture, box, name, expectedBoxes) {
+  await picture.dragBox(box);
+  await picture.typeName(name);
+  await picture.pickerInput.press('Enter');
+  await expect(picture.savedBoxes).toHaveCount(expectedBoxes);
+}
+
+/**
+ * Holds every addRegion response until the returned release() is called, so a
+ * spec can act while a save is still on its way. The request itself reaches
+ * the server at once; only its answer waits.
+ */
+async function holdSaves(page) {
+  let release;
+  const released = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route(/method=pwg\.persons\.addRegion/, async (route) => {
+    const response = await route.fetch();
+    await released;
+    await route.fulfill({ response });
+  });
+  return () => release();
+}
+
 test.describe('tagging a person', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
@@ -472,14 +498,6 @@ test.describe('the person row while tagging', () => {
     restore();
   });
 
-  /** Saves one box under a name and waits until the server has answered with it. */
-  async function tag(picture, box, name, expectedBoxes) {
-    await picture.dragBox(box);
-    await picture.typeName(name);
-    await picture.pickerInput.press('Enter');
-    await expect(picture.savedBoxes).toHaveCount(expectedBoxes);
-  }
-
   /** [HAPPY] */
   test('a saved name appears in the row with no navigation', async ({ page }) => {
     seeded = seed('overlay');
@@ -615,22 +633,23 @@ test.describe('the person row while tagging', () => {
 });
 
 /**
- * Leaving tagging mode, as it behaves today.
+ * Leaving tagging mode.
  *
- * [ERR] characterization: the oracle is the current implementation, no
- * requirement confirms it. The regression net for the persons-live-row change,
- * replaced by it on purpose in task 03 (reload on exit).
+ * After a change the public page reloads once, which brings back what the live
+ * row cannot show: the links to each person's page and core's tag row. Without
+ * a change there is nothing to bring back, so nothing reloads.
  */
-test.describe('leaving tagging mode (current behaviour)', () => {
+test.describe('leaving tagging mode', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
 
+  // restore() also drops the exiftool override the refused-save spec forces.
   test.afterEach(() => {
     restore();
   });
 
-  /** [ERR] Replaced by task 03: the toggle leaves the mode in place, after a save too. */
-  test('leaving through the toggle after a save does not navigate', async ({ page }) => {
+  /** [ST] tagging, changed -> left through the toggle -> reloaded */
+  test('leaving through the toggle after a save reloads the page', async ({ page }) => {
     seeded = seed('empty');
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
@@ -638,33 +657,205 @@ test.describe('leaving tagging mode (current behaviour)', () => {
     await picture.markDocument();
 
     await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+    // Anti-vacuity: before the reload the name is plain text and not yet a tag on the page.
+    await expect(picture.personRowNames).toHaveText(ADA);
+    await expect(picture.personRowLinks).toHaveCount(0);
+    await expect(picture.tagRow.filter({ hasText: ADA })).toHaveCount(0);
+
+    await picture.exitTaggingModeAndAwaitReload();
+
+    expect(await picture.sameDocument()).toBe(false);
+    await expect(picture.personRowLinks).toHaveText([ADA]);
+    await expect(picture.tagRow).toContainText(ADA);
+  });
+
+  /** [ST] tagging, changed -> left with Esc -> reloaded */
+  test('leaving with Esc after a save reloads the page', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+    // Anti-vacuity: no draft is open, so Esc means "leave", not "discard".
+    await expect(picture.draft).toHaveCount(0);
+
+    await picture.exitTaggingModeWithEscapeAndAwaitReload();
+
+    expect(await picture.sameDocument()).toBe(false);
+    await expect(picture.personRowLinks).toHaveText([ADA]);
+  });
+
+  /** [ST] tagging, deleted -> left -> reloaded */
+  test('leaving after a delete reloads the page', async ({ page }) => {
+    seeded = seed('overlay');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    const [removed, ...kept] = seeded.regions.map((region) => region.name);
+    // Anti-vacuity: the name to be removed is linked before, so its absence afterwards means something.
+    await expect(picture.personRowLinks.filter({ hasText: removed })).toHaveCount(1);
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
+    await picture.deleteButton(seeded.regions[0].region_id).click();
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length - 1);
+
+    await picture.exitTaggingModeAndAwaitReload();
+
+    expect(await picture.sameDocument()).toBe(false);
+    await expect(picture.personRowLinks).toHaveText(kept);
+  });
+
+  /**
+   * [NEG] A page core rendered straight from a form post - a comment does that -
+   * is reloaded with a GET. A plain reload would post the form again.
+   */
+  test('leaving after a save on a posted page sends no form again', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.gotoByPost(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    const navigations = [];
+    page.on('request', (request) => {
+      if (request.isNavigationRequest()) {
+        navigations.push(request.method());
+      }
+    });
+
+    await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+    await picture.exitTaggingModeAndAwaitReload();
+
+    expect(await picture.sameDocument()).toBe(false);
+    expect(navigations).toEqual(['GET']);
+  });
+
+  /** [ST] the first save is still on its way when the mode is left */
+  test('leaving while the first save is pending reloads once it lands', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    const release = await holdSaves(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
     await picture.dragBox(FIRST_BOX);
     await picture.typeName(ADA);
+    const saving = page.waitForRequest(/method=pwg\.persons\.addRegion/);
     await picture.pickerInput.press('Enter');
-    await expect(picture.savedBoxes).toHaveCount(1);
+    await saving;
 
+    await picture.exitTaggingMode();
+    // Anti-vacuity: nothing reloads before the answer is in.
+    expect(await picture.sameDocument()).toBe(true);
+
+    const loaded = page.waitForEvent('load');
+    release();
+    await loaded;
+
+    await expect(picture.personRowLinks).toHaveText([ADA]);
+  });
+
+  /** [ST] an earlier save landed, a later one is still on its way when the mode is left */
+  test('leaving while a later save is pending waits for it', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+
+    const release = await holdSaves(page);
+    await picture.dragBox(SECOND_BOX);
+    await picture.typeName(GRACE);
+    const saving = page.waitForRequest(/method=pwg\.persons\.addRegion/);
+    await picture.pickerInput.press('Enter');
+    await saving;
+
+    await picture.exitTaggingMode();
+    // Anti-vacuity: a change is already in, yet the page waits for the second one.
+    expect(await picture.sameDocument()).toBe(true);
+
+    const loaded = page.waitForEvent('load');
+    release();
+    await loaded;
+
+    await expect(picture.personRowLinks).toHaveText([ADA, GRACE]);
+  });
+
+  /** [ST] left and entered again before the answer: the new box is not the saved one */
+  test('a save answered after the mode was re-entered leaves the new box a draft', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    const release = await holdSaves(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    const saving = page.waitForRequest(/method=pwg\.persons\.addRegion/);
+    const answered = page.waitForResponse(/method=pwg\.persons\.addRegion/);
+    await picture.pickerInput.press('Enter');
+    await saving;
+
+    await picture.exitTaggingMode();
+    await picture.enterTaggingMode();
+    await picture.dragBox(SECOND_BOX);
+    // Anti-vacuity: a new box is waiting for its name when the old answer lands.
+    await expect(picture.draft).toHaveCount(1);
+
+    release();
+    await answered;
+
+    await expect(picture.personRowNames).toHaveText(ADA);
+    await expect(picture.draft).toHaveCount(1);
+    await expect(picture.savedBoxes).toHaveCount(0);
+    await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
+  });
+
+  /** [ST] tagging, unchanged -> left -> not reloaded */
+  test('leaving without a change does not reload', async ({ page }) => {
+    seeded = seed('overlay');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
     await picture.exitTaggingMode();
 
     expect(await picture.sameDocument()).toBe(true);
   });
 
-  /** [ERR] Replaced by task 03: Esc with no draft open leaves the mode in place, after a save too. */
-  test('leaving with Esc after a save does not navigate', async ({ page }) => {
+  /** [NEG] a refused save is no change */
+  test('leaving after a refused save does not reload', async ({ page }) => {
     seeded = seed('empty');
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
     await picture.markDocument();
 
+    // After the page is loaded, so the editor is offered and only the save fails.
+    setExiftool('missing');
+
     await picture.enterTaggingMode();
     await picture.dragBox(FIRST_BOX);
     await picture.typeName(ADA);
     await picture.pickerInput.press('Enter');
-    await expect(picture.savedBoxes).toHaveCount(1);
-    // Anti-vacuity: no draft is open, so Esc means "leave", not "discard".
-    await expect(picture.draft).toHaveCount(0);
+    // Anti-vacuity: the save really was attempted and refused.
+    await expect(picture.editorMessage).toHaveClass(/persons-editor-error/);
 
-    await picture.exitTaggingModeWithEscape();
+    await picture.exitTaggingMode();
 
     expect(await picture.sameDocument()).toBe(true);
   });
