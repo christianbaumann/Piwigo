@@ -237,10 +237,11 @@ class PicturePage {
    * Waits until the photo file has loaded and its rendered box has stopped
    * moving.
    *
-   * For pages with no overlay to compare against - settle() needs one. The
-   * theme may swap the src after the first load, so `complete` alone could be
-   * the placeholder's; the rendered box has to hold still across
-   * SETTLE_FRAMES consecutive frames as well.
+   * For pages with no overlay to compare against - settle() needs one. Until
+   * the derivative is chosen the photo shows the theme's loading GIF, which is
+   * `complete` at once and holds still, so a src equal to the loader's is
+   * rejected outright. After that the rendered box has to hold still across
+   * SETTLE_FRAMES consecutive frames, which a later src swap resets.
    */
   async settleImage() {
     await this.page.evaluate(() => {
@@ -252,6 +253,10 @@ class PicturePage {
         const state = window.__pictureSettle;
         const image = document.getElementById('theMainImage');
         if (!state || !image || !image.complete || image.naturalWidth < 2) {
+          return false;
+        }
+        const loader = document.querySelector('.img-loader-derivatives');
+        if (loader && image.currentSrc === loader.currentSrc) {
           return false;
         }
 

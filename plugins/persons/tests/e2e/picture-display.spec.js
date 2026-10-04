@@ -149,8 +149,8 @@ test.describe('the photo at its derivative size', () => {
     expect(after.height).toBe(chosen.h);
   });
 
-  // [ERR] Records that the slideshow shows the photo; no requirement confirms
-  // how it is sized, so only that it is there and loaded is recorded.
+  // [ERR] Records that the slideshow shows one of the photo's derivatives; no
+  // requirement confirms how it is sized, so the rendered size is not recorded.
   test('the slideshow shows the photo', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
@@ -159,7 +159,12 @@ test.describe('the photo at its derivative size', () => {
     await picture.settleImage();
 
     const shown = await picture.imageDisplay();
-    expect(shown.naturalWidth).toBeGreaterThan(1);
+    const derivative = (await picture.derivatives()).find(
+      (d) => d.w === shown.naturalWidth && d.h === shown.naturalHeight
+    );
+
+    // The loaded file is a derivative of the photo, not the loading GIF.
+    expect(derivative).toBeTruthy();
     expect(shown.width).toBeGreaterThan(1);
     expect(shown.height).toBeGreaterThan(1);
   });

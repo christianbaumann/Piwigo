@@ -82,10 +82,14 @@ const NEIGHBOUR_DATE_STEP = '1 DAY';
 /**
  * Puts a previous and a next photo either side of the seeded one.
  *
- * The album is ordered by date_available DESC first ($conf['order_by']), and
- * all three rows were inserted in the same second, so the order would fall to
- * the random file names. Forcing the dates makes the seeded photo the middle
- * one, and the order is asserted rather than hoped for.
+ * The album is ordered by date_available DESC first (order_by_inside_category),
+ * and all three rows were inserted in the same second, so the order would fall
+ * to the random file names. Forcing the dates makes the seeded photo the middle
+ * one, and the order is asserted - with the install's own ORDER BY clause, read
+ * from piwigo_config rather than typed here a second time.
+ *
+ * On a failed check the fixtures are removed before exiting: fail() runs before
+ * any snapshot is saved, so --restore would never find them.
  *
  * @return array previous and next photo ids
  */
@@ -102,10 +106,18 @@ function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catI
     $db->query('UPDATE piwigo_images SET date_available = NOW() - INTERVAL ' . NEIGHBOUR_DATE_STEP
         . ' WHERE id = ' . (int)$next['id']);
 
+    $orderBy = (string)$db->scalar("SELECT value FROM piwigo_config WHERE param = 'order_by_inside_category'");
+    if (stripos($orderBy, 'ORDER BY') === false)
+    {
+        $builder->destroyTestImages();
+        $builder->destroyTestAlbums();
+        fail("order_by_inside_category is not an ORDER BY clause: '$orderBy'");
+    }
+
     $order = array();
     $result = $db->query(
-        'SELECT i.id FROM piwigo_images AS i JOIN piwigo_image_category AS ic ON ic.image_id = i.id'
-        . ' WHERE ic.category_id = ' . $catId . ' ORDER BY i.date_available DESC'
+        'SELECT id FROM piwigo_images WHERE id IN'
+        . ' (SELECT image_id FROM piwigo_image_category WHERE category_id = ' . $catId . ') ' . $orderBy
     );
     while ($row = $result->fetch_assoc())
     {
@@ -115,6 +127,8 @@ function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catI
     $expected = array((int)$previous['id'], $mainId, (int)$next['id']);
     if ($order !== $expected)
     {
+        $builder->destroyTestImages();
+        $builder->destroyTestAlbums();
         fail('neighbours are not in the order previous, seeded, next: ' . json_encode($order));
     }
 

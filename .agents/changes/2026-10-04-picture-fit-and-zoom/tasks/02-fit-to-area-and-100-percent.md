@@ -42,7 +42,8 @@ Every photo opens fitted to the available area (small scans upscaled, the smalle
 * [ ] The size menu (`changeImgSrc()`) still shows the chosen file at natural size and leaves fit mode
 * [ ] Fit on the narrow layout too. Slideshow: fit, no buttons
 * [ ] Write `docs/agents/decisions/0032-…` recording the fork-local `modus` edit and its upstream merge risk. Update `CLAUDE.md`'s fork-local list if needed
-* [ ] Update task 01's `[ERR]` specs whose recorded behaviour this task deliberately replaces (dpr-1 natural size, `usemap`), each in its own cycle with the reason
+* [ ] Update task 01's `[ERR]` specs whose recorded behaviour this task deliberately replaces (dpr-1 natural size, `usemap`, and the three dpr-1 click-zone specs in `picture-display.spec.js`, whose `hasImageMap() === true` branch guard fails once fit removes the map), each in its own cycle with the reason
+* [ ] At `100 %` the photo can be shown at its file's natural size, where the design keeps `usemap` - the `<area>` links then navigate past the click guard in the `img` click handler. Make the `[NEG]` "click at 100 % does not navigate" case hold anyway (remove the map whenever zoom > fit, or guard the areas)
 
 ## Verification
 
