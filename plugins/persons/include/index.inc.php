@@ -5,10 +5,10 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  * The derived index: two tables that say exactly what the image files say.
  *
  * Every rebuild is destructive by design - this image's rows are replaced by
- * what the file holds right now. Nothing but a row's id is taken from the
- * previous index, so a wrong row cannot outlive one rescan. The id is carried
- * for an unchanged region so an open page's ids stay valid across a write
- * (decision 0032).
+ * what the file holds right now. No region content is taken from the previous
+ * index, so a wrong row cannot outlive one rescan - only an unchanged region's
+ * id, so an open page's ids stay valid across a write (decision 0032), and the
+ * stored rotation code a physical turn is detected by.
  *
  * No explicit transaction wraps a rebuild. Core ships no transaction helper,
  * and piwigo_image_tag is MyISAM, so the tag mirror could not join one anyway.
@@ -21,6 +21,11 @@ include_once(PERSONS_PATH.'include/exiftool.inc.php');
 /**
  * Replaces one image's index rows with what its file says.
  *
+ * Under the image's lock, which is re-entrant, so persons_apply_change() calls
+ * this while already holding it. A rescan does not, and two rebuilds of one
+ * photo interleaving their delete and insert would insert the same carried id
+ * twice.
+ *
  * @param int $image_id
  * @param string $file_path the image on disk
  * @return array array('ok' => bool, 'regions' => int, 'message' => string)
@@ -29,6 +34,40 @@ function persons_reindex_image($image_id, $file_path)
 {
   $image_id = (int)$image_id;
 
+  $image = pwg_db_fetch_assoc(pwg_query(
+    'SELECT path FROM '.IMAGES_TABLE.' WHERE id = '.$image_id.';'
+    ));
+
+  if (!$image)
+  {
+    return array('ok' => false, 'regions' => 0, 'message' => 'No such photo');
+  }
+
+  $lock = persons_lock_acquire($image['path']);
+  if ($lock === null)
+  {
+    return array('ok' => false, 'regions' => 0, 'message' => PERSONS_LOCK_TIMEOUT_MESSAGE);
+  }
+
+  try
+  {
+    return persons_reindex_image_locked($image_id, $file_path);
+  }
+  finally
+  {
+    persons_lock_release($lock);
+  }
+}
+
+/**
+ * persons_reindex_image() once the lock is held.
+ *
+ * @param int $image_id
+ * @param string $file_path
+ * @return array array('ok' => bool, 'regions' => int, 'message' => string)
+ */
+function persons_reindex_image_locked($image_id, $file_path)
+{
   $read = persons_read_regions($file_path);
 
   if (!$read['ok'])
@@ -169,8 +208,7 @@ SELECT rotation_at_write
   $lock = persons_lock_acquire($image['path']);
   if ($lock === null)
   {
-    return array('ok' => false, 'read' => $read,
-      'message' => 'Timed out waiting for another change to this photo');
+    return array('ok' => false, 'read' => $read, 'message' => PERSONS_LOCK_TIMEOUT_MESSAGE);
   }
 
   try
@@ -540,8 +578,7 @@ function persons_apply_change($image_id, $add, $remove)
   $lock = persons_lock_acquire($image['path']);
   if ($lock === null)
   {
-    return array('ok' => false, 'regions' => 0,
-      'message' => 'Timed out waiting for another change to this photo');
+    return array('ok' => false, 'regions' => 0, 'message' => PERSONS_LOCK_TIMEOUT_MESSAGE);
   }
 
   try

@@ -59,6 +59,9 @@ define('PERSONS_LAST_RESCAN_PARAM', 'persons_last_rescan');
 /** Seconds a writer waits for another writer's lock on the same file. */
 define('PERSONS_LOCK_TIMEOUT_SECONDS', 30);
 
+/** What a writer reports when another one held the image's lock past the timeout. */
+define('PERSONS_LOCK_TIMEOUT_MESSAGE', 'Timed out waiting for another change to this photo');
+
 /** How often a waiting writer retries the lock it could not take. */
 define('PERSONS_LOCK_RETRY_MICROSECONDS', 50000);
 

@@ -251,8 +251,36 @@ class PicturePage {
    */
   deleteButtonOf(name) {
     return this.savedBoxes
-      .filter({ has: this.page.locator('.person-box-label', { hasText: name }) })
+      .filter({ has: this.page.getByText(name, { exact: true }) })
       .locator('.person-box-delete');
+  }
+
+  /**
+   * Tags a person on this photo through the API, behind the page's back - what
+   * another tab or another user does while this page stays open. Uses the
+   * page's own session and token.
+   *
+   * @param {string} name
+   * @param {{x: number, y: number, w: number, h: number}} box in the API's stored convention
+   */
+  async addRegionBehindThePage(name, box) {
+    const config = this.page.locator('#persons-editor');
+    const response = await this.page.request.post('ws.php?format=json&method=pwg.persons.addRegion', {
+      form: {
+        image_id: String(await config.getAttribute('data-persons-image')),
+        pwg_token: String(await config.getAttribute('data-persons-token')),
+        name,
+        x: String(box.x),
+        y: String(box.y),
+        w: String(box.w),
+        h: String(box.h),
+        type: 'Face',
+      },
+    });
+    const data = await response.json();
+    if (data.stat !== 'ok') {
+      throw new Error(`addRegionBehindThePage: ${JSON.stringify(data)}`);
+    }
   }
 
   /** Turns the photo into a drawing surface, and waits until it really is one. */

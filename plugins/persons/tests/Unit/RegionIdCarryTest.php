@@ -74,25 +74,38 @@ final class RegionIdCarryTest extends TestCase
     }
 
     /** [BVA] A coordinate within PERSONS_REGION_MATCH_EPSILON is the same box. */
-    public function testACoordinateJustInsideTheToleranceKeepsTheId(): void
+    #[PHPUnit\Framework\Attributes\DataProvider('coordinates')]
+    public function testACoordinateJustInsideTheToleranceKeepsTheId(string $column): void
     {
         $rows = persons_carry_region_ids(
             array($this->previous(41, self::JANE, 0.3, 0.4, 0.1, 0.2)),
-            array($this->row(self::JANE, 0.3 + PERSONS_REGION_MATCH_EPSILON / 2, 0.4, 0.1, 0.2))
+            array($this->shifted($column, PERSONS_REGION_MATCH_EPSILON / 2))
         );
 
         $this->assertSame(array(41), array_column($rows, 'id'));
     }
 
     /** [BVA] A coordinate just beyond PERSONS_REGION_MATCH_EPSILON is a moved box. */
-    public function testACoordinateJustOutsideTheToleranceGetsNoId(): void
+    #[PHPUnit\Framework\Attributes\DataProvider('coordinates')]
+    public function testACoordinateJustOutsideTheToleranceGetsNoId(string $column): void
     {
         $rows = persons_carry_region_ids(
             array($this->previous(41, self::JANE, 0.3, 0.4, 0.1, 0.2)),
-            array($this->row(self::JANE, 0.3, 0.4, 0.1, 0.2 + PERSONS_REGION_MATCH_EPSILON * 2))
+            array($this->shifted($column, PERSONS_REGION_MATCH_EPSILON * 2))
         );
 
         $this->assertSame(array(null), array_column($rows, 'id'));
+    }
+
+    /** Every coordinate is compared, so every one gets its own boundary pair. */
+    public static function coordinates(): array
+    {
+        return array(
+            'x' => array('area_x'),
+            'y' => array('area_y'),
+            'w' => array('area_w'),
+            'h' => array('area_h'),
+        );
     }
 
     /** [ECP] Two identical boxes take one id each, never the same one twice. */
@@ -149,6 +162,15 @@ final class RegionIdCarryTest extends TestCase
             'area_w'      => (string)$w,
             'area_h'      => (string)$h,
         );
+    }
+
+    /** JANE's box from previous(), with one coordinate moved by $delta. */
+    private function shifted(string $column, float $delta): array
+    {
+        $row = $this->row(self::JANE, 0.3, 0.4, 0.1, 0.2);
+        $row[$column] += $delta;
+
+        return $row;
     }
 
     private function row(int $personId, float $x, float $y, float $w, float $h): array

@@ -373,7 +373,10 @@
 				});
 
 				closePicker();
-				adopt(added.length ? added[0].id : 0, name);
+				/* The highest unknown id: the new row is inserted last, and any
+				   other unknown id is a region somebody else added since this
+				   page loaded. */
+				adopt(added.length ? added[added.length - 1].id : 0, name);
 				renderPersonRow(data.result.regions);
 			}).catch(function () {
 				say(str('failed'), true);

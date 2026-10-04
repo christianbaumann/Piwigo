@@ -118,6 +118,44 @@ final class ReindexTest extends TestCase
     }
 
     /**
+     * [NEG] A reindex does not touch a photo whose lock another writer holds.
+     *
+     * Carried ids make an unlocked rebuild collide: two rebuilds of one photo
+     * interleaving delete, delete, insert, insert would insert the same id
+     * twice. Holding the lock from a second open file is what another request
+     * looks like; the reindex has to wait it out and report the timeout.
+     *
+     * Slow on purpose: it lasts PERSONS_LOCK_TIMEOUT_SECONDS.
+     */
+    public function testAReindexWaitsForTheLockOnItsPhoto(): void
+    {
+        $this->seed(array(
+            array('name' => self::JANE, 'x' => 0.5, 'y' => 0.4, 'w' => 0.1, 'h' => 0.2),
+        ));
+        persons_reindex_image($this->image['id'], $this->image['file']);
+        $before = $this->regionIds();
+        $this->assertCount(1, $before, 'anti-vacuity: the first pass indexed nothing');
+
+        persons_make_dir(PERSONS_LOCK_DIR);
+        $held = fopen(persons_lock_path($this->image['db_path']), 'c');
+        $this->assertTrue(flock($held, LOCK_EX | LOCK_NB), 'the test could not take the lock itself');
+
+        try
+        {
+            $result = persons_reindex_image($this->image['id'], $this->image['file']);
+        }
+        finally
+        {
+            flock($held, LOCK_UN);
+            fclose($held);
+        }
+
+        $this->assertFalse($result['ok'], 'the reindex ran while another writer held the lock');
+        $this->assertSame(PERSONS_LOCK_TIMEOUT_MESSAGE, $result['message']);
+        $this->assertSame($before, $this->regionIds());
+    }
+
+    /**
      * [ST] A person removed from the file is removed from the index and loses
      * the mirrored tag on that photo - the tag row itself survives, because it
      * may be on other photos.
@@ -293,6 +331,22 @@ final class ReindexTest extends TestCase
     private function seed(array $regions): void
     {
         $this->fixture->writeRegionsWithExiftool($this->image, $regions, self::APPLIED_W, self::APPLIED_H);
+    }
+
+    /** @return int[] */
+    private function regionIds(): array
+    {
+        $result = $this->db->query(
+            'SELECT id FROM piwigo_person_region WHERE image_id = ' . (int)$this->image['id'] . ' ORDER BY id'
+        );
+
+        $ids = array();
+        while ($row = $result->fetch_assoc())
+        {
+            $ids[] = (int)$row['id'];
+        }
+
+        return $ids;
     }
 
     private function regionCount(): int

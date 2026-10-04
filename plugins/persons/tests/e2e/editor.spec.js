@@ -402,6 +402,9 @@ test.describe('removing a person', () => {
    * somebody else's.
    */
   test('a box added to a photo with faces deletes only itself', async ({ page }) => {
+    // Anti-vacuity: the seeded faces are in the file to be lost.
+    expect(seeded.regions.length).toBeGreaterThan(0);
+
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
@@ -416,10 +419,38 @@ test.describe('removing a person', () => {
     await expect(picture.savedBoxes).toHaveCount(seeded.regions.length);
     await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
 
-    // Anti-vacuity: the seeded faces were in the file to be lost.
-    expect(seeded.regions.length).toBeGreaterThan(0);
     expect(readFileRegions(seeded.photo_id).regions.map((region) => region.name))
       .toEqual(seeded.regions.map((region) => region.name));
+  });
+
+  /**
+   * [ST] The same, when somebody else tagged the photo after this page loaded.
+   *
+   * Their region's id is one this page does not know either. The box just
+   * drawn must take the id of the region this save created, not theirs.
+   */
+  test('a box added after somebody else tagged the photo deletes only itself', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await picture.addRegionBehindThePage(GRACE, { x: 0.15, y: 0.15, w: 0.1, h: 0.1 });
+    // Anti-vacuity: the other region is in the file, and the page does not show it.
+    expect(readFileRegions(seeded.photo_id).regions.map((region) => region.name)).toContain(GRACE);
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length);
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(CLEAR_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length + 1);
+
+    await picture.deleteButtonOf(ADA).click();
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length);
+    await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
+
+    expect(readFileRegions(seeded.photo_id).regions.map((region) => region.name))
+      .toEqual([...seeded.regions.map((region) => region.name), GRACE]);
   });
 });
 
