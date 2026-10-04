@@ -67,6 +67,11 @@
     Mit <strong>Enter</strong> den in der Liste hervorgehobenen Eintrag übernehmen. Der Hinweis
     unter der Liste lautet <em>Enter übernimmt - Esc bricht ab</em>.
   </li>
+  <li>
+    Der Name steht sofort in der Zeile <strong>Personen</strong> in den Angaben neben dem Foto,
+    vorerst als einfacher Text ohne Verweis. Der Markierungsmodus bleibt offen, das nächste
+    Gesicht lässt sich gleich markieren.
+  </li>
 </ol>
 
 <figure>
@@ -104,9 +109,19 @@
   </li>
   <li>
     Eine gesetzte Markierung wird im Markierungsmodus über das <strong>x</strong> am Rahmen
-    gelöscht. Der Kurzhinweis lautet <em>Diese Person vom Foto entfernen</em>.
+    gelöscht. Der Kurzhinweis lautet <em>Diese Person vom Foto entfernen</em>. Der Name
+    verschwindet sofort aus der Zeile <strong>Personen</strong>; war es das letzte markierte
+    Gesicht, verschwindet die ganze Zeile.
   </li>
 </ul>
+
+<p>
+  Wurde im Markierungsmodus eine Person markiert oder entfernt, lädt die Seite beim Verlassen
+  des Modus neu, ob über <strong>Markieren beenden</strong> oder über <strong>Esc</strong>.
+  Erst danach sind die Namen in der Zeile <strong>Personen</strong> wieder anklickbar und erst
+  dann steht eine neu markierte Person auch in der Zeile <strong>Schlagworte</strong>. Wurde
+  nichts geändert, lädt die Seite nicht neu.
+</p>
 
 <h3>Nach Personen suchen</h3>
 
