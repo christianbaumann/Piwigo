@@ -84,6 +84,34 @@ test.describe('the admin tagging screen', () => {
   });
 
   /**
+   * [NEG] This screen has no Personen row, and the editor's row update must
+   * leave it alone. A slip there throws inside the save's promise, whose catch
+   * reports it as a failed save - so the editor's error state is the witness,
+   * not the console.
+   */
+  test('saving and deleting here, with no person row, reports no failure', async ({ page }) => {
+    const screen = new AdminPhotoPage(page);
+    await screen.open(seeded.photo_id);
+    await screen.waitForPlacement();
+
+    // Anti-vacuity: the row really is absent on this surface.
+    await expect(screen.personRow).toHaveCount(0);
+
+    await screen.enterTaggingMode();
+    await screen.dragBox(BOX);
+    await screen.typeName(ADA);
+    await screen.pickerInput.press('Enter');
+    await expect(screen.savedBoxes).toHaveCount(1);
+    await expect(screen.picker).toBeHidden();
+    await expect(screen.editorMessage).not.toHaveClass(/persons-editor-error/);
+
+    const [regionId] = await screen.savedRegionIds();
+    await screen.deleteButton(Number(regionId)).click();
+    await expect(screen.savedBoxes).toHaveCount(0);
+    await expect(screen.editorMessage).not.toHaveClass(/persons-editor-error/);
+  });
+
+  /**
    * The two surfaces have to place the same region identically.
    *
    * This is the Phase 7 manual box, automated. They render different

@@ -305,6 +305,7 @@ final class PicturePageSourceTest extends TestCase
         $this->assertStringContainsString(self::JANE, $row);
         $this->assertStringContainsString(self::JOHN, $row);
         $this->assertSame(2, substr_count($row, '<a href='), 'each name links to its tag gallery page');
+        $this->assertDoesNotMatchRegularExpression('#<div id="Persons"[^>]*\shidden[\s>]#', $row, 'a row with names must be visible');
     }
 
     /**
@@ -324,20 +325,27 @@ final class PicturePageSourceTest extends TestCase
     }
 
     /**
-     * [ERR] A photo with no face gets no person row at all.
+     * [ECP] A photo with no face still gets the row, hidden and empty.
      *
-     * Characterization: the oracle is the current template, no requirement
-     * confirms it. Task 02 of the persons-live-row change replaces it on
-     * purpose - the editor needs an (empty, hidden) row to patch when the
-     * first face on a photo is saved.
+     * The editor fills and unhides it when the first face on the photo is
+     * saved; without an element to patch, that face would only show after a
+     * reload.
      */
-    public function testAPhotoWithNoFaceCarriesNoPersonRow(): void
+    public function testAPhotoWithNoFaceCarriesAHiddenEmptyPersonRow(): void
     {
         $markup = $this->markup($this->page());
 
         $this->assertSame(0, $this->regionCount(), 'anti-vacuity: this photo was expected to carry no region');
-        $this->assertStringContainsString('<dl id="standard"', $markup, 'anti-vacuity: the info list the row would sit in is gone');
-        $this->assertStringNotContainsString('id="Persons"', $markup);
+
+        $listAt = strpos($markup, '<dl id="standard"');
+        $this->assertNotFalse($listAt, 'the standard info list is gone; the row had nowhere to land');
+        $rowAt = strpos($markup, 'id="Persons"');
+        $this->assertNotFalse($rowAt, 'a face-less photo must still carry the row the editor fills');
+        $this->assertGreaterThan($listAt, $rowAt);
+        $this->assertLessThan(strpos($markup, '</dl>', $listAt), $rowAt, 'the row was rendered outside <dl id="standard">');
+
+        $this->assertMatchesRegularExpression('#<div id="Persons"[^>]*\shidden[\s>]#', $markup, 'an empty row must be hidden');
+        $this->assertMatchesRegularExpression('#<dd>\s*</dd>#', $this->row($markup), 'an empty row must list nobody');
     }
 
     /**

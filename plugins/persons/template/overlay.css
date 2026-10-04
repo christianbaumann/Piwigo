@@ -92,3 +92,12 @@
 	opacity: 1;
 	box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
 }
+
+/*
+ * The person row is emitted empty and hidden on a photo with no face, so the
+ * editor has a row to fill. The theme's .imageInfo { display: table-row }
+ * would otherwise win over the hidden attribute.
+ */
+#Persons[hidden] {
+	display: none;
+}

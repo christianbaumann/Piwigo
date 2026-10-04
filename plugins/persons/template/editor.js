@@ -44,6 +44,8 @@
 		var toggle = document.getElementById('persons-tag-toggle');
 		var message = document.getElementById('persons-editor-message');
 		var image = document.getElementById('theMainImage');
+		/* Absent when the row is switched off and on the admin tagging screen. */
+		var personRow = document.getElementById('Persons');
 
 		if (!config || !stage || !overlay || !toggle || !message || !image) {
 			return;
@@ -308,6 +310,34 @@
 		}
 
 		/**
+		 * Rebuilds the Personen row from the region list both write methods
+		 * answer with - the rule persons_assign_overlay() renders it by: faces
+		 * only, each name once, in the order the list comes in. Plain text: the
+		 * links are core's index URLs, built server-side, and come back with the
+		 * next load of the page.
+		 *
+		 * One known difference: the server leaves out a face whose box cannot be
+		 * drawn (centre off the photo, no size), the API list does not. Such a
+		 * name shows here until the next load. Accepted - it needs a file tagged
+		 * elsewhere with a broken region, and only lasts until "Done".
+		 */
+		function renderPersonRow(regions) {
+			if (!personRow) {
+				return;
+			}
+
+			var names = [];
+			regions.forEach(function (region) {
+				if (region.type === 'Face' && names.indexOf(region.name) === -1) {
+					names.push(region.name);
+				}
+			});
+
+			personRow.querySelector('dd').textContent = names.join(', ');
+			personRow.hidden = names.length === 0;
+		}
+
+		/**
 		 * A refused save arrives in the resolved promise, not the rejected one:
 		 * PwgError answers HTTP 200 with stat:"fail". The drawn box stays exactly
 		 * where it was so the user can retry or cancel it - it is never silently
@@ -344,6 +374,7 @@
 
 				closePicker();
 				adopt(added.length ? added[0].id : 0, name);
+				renderPersonRow(data.result.regions);
 			}).catch(function () {
 				say(str('failed'), true);
 			});
@@ -442,6 +473,7 @@
 						return;
 					}
 					box.remove();
+					renderPersonRow(data.result.regions);
 				})
 				.catch(function () {
 					say(str('failed'), true);

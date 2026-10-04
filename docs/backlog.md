@@ -32,6 +32,18 @@
 the `index.php` directory-listing guards ship; `local/config/` is excluded and the remote's config
 is generated. `tools/deploy/README.md` has the full list.)*
 
+## persons
+
+- **Every write renumbers the photo's region ids; the editor keeps the old ones.** Found
+  2026-10-04 while building the live Personen row. `persons_reindex_image()` deletes and
+  re-inserts the photo's rows (`include/index.inc.php`), but boxes already on the page keep the
+  `data-person-region` they were rendered with. After any save or delete, deleting another box
+  sends an id that no longer exists and is refused. Likely worse: `commit()` in `editor.js`
+  adopts the first returned id it does not know - after a renumbering that is every id, so a box
+  added to a photo that already has faces probably takes the *first* region's id, and deleting it
+  would remove somebody else. Reproduced by the skipped spec `a box rendered before a save can
+  still be deleted after it` (`plugins/persons/tests/e2e/editor.spec.js`).
+
 ## misc
 
 - l10n('Invalid tag name') has no translation

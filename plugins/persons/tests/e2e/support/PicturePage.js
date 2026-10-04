@@ -31,6 +31,8 @@ class PicturePage {
     this.personRow = page.locator('#standard #Persons');
     /** The names cell of that row, without its label. */
     this.personRowNames = page.locator('#standard #Persons dd');
+    /** Any element inside that cell; the live row holds plain text only. */
+    this.personRowElements = page.locator('#standard #Persons dd *');
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
 

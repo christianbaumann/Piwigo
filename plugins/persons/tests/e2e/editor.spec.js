@@ -45,6 +45,9 @@ const PICKER_POSITIONS = [
 const ADA = 'E2E Editor Ada';
 const GRACE = 'E2E Editor Grace';
 
+/** A name carrying markup; the row must show it as text. */
+const MARKUP_NAME = '<i>E2E Markup</i>';
+
 test.describe('tagging a person', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
@@ -365,34 +368,19 @@ test.describe('removing a person', () => {
     expect(after.regions.map((region) => region.name)).toEqual([survivor.name]);
     expect(after.persons).not.toContain(doomed.name);
   });
-});
 
-/**
- * The Personen row and leaving tagging mode, as they behave today.
- *
- * [ERR] characterization: the oracle is the current implementation, no
- * requirement confirms it. These are the regression net for the
- * persons-live-row change and are replaced by it on purpose - the row cases by
- * task 02 (live update), the exit cases by task 03 (reload on exit).
- */
-test.describe('the person row while tagging (current behaviour)', () => {
-  /** @type {ReturnType<typeof seed>} */
-  let seeded;
-
-  test.afterEach(() => {
-    restore();
-  });
-
-  /** [ERR] Replaced by task 02: the row keeps what the page was loaded with. */
-  test('a saved name does not reach the row without a reload', async ({ page }) => {
-    seeded = seed('overlay');
+  /**
+   * [NEG] Known gap, skipped until fixed - see docs/backlog.md, "persons".
+   *
+   * Every write re-indexes the photo, which deletes and re-inserts its region
+   * rows under new ids. The boxes already on the page keep the ids they were
+   * rendered with, so once anything has been saved, deleting one of them sends
+   * an id that no longer exists and the delete is refused.
+   */
+  test.fixme('a box rendered before a save can still be deleted after it', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
-
-    const before = await picture.personRowNames.textContent();
-    // Anti-vacuity: the seeded faces are listed, so "unchanged" means something.
-    expect(before).toContain(seeded.regions[0].name);
 
     await picture.enterTaggingMode();
     await picture.dragBox(CLEAR_BOX);
@@ -400,29 +388,190 @@ test.describe('the person row while tagging (current behaviour)', () => {
     await picture.pickerInput.press('Enter');
     await expect(picture.savedBoxes).toHaveCount(seeded.regions.length + 1);
 
-    await expect(picture.personRowNames).toHaveText(before);
-    await expect(picture.personRow).not.toContainText(ADA);
+    await picture.deleteButton(seeded.regions[0].region_id).click();
+
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length);
+    await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
+    expect(readFileRegions(seeded.photo_id).regions.map((region) => region.name))
+      .not.toContain(seeded.regions[0].name);
+  });
+});
+
+/**
+ * The Personen row follows every save and delete while tagging, without a
+ * reload.
+ *
+ * The row is rebuilt from the region list the API answers with, so add, delete
+ * and a name tagged twice all go through one path. Names are plain text until
+ * the page is loaded again - the links are core's index URLs, built on the
+ * server.
+ */
+test.describe('the person row while tagging', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  // restore() also drops the exiftool override the refused-save spec forces.
+  test.afterEach(() => {
+    restore();
   });
 
-  /** [ERR] Replaced by task 02: a face-less photo has no row, so the first face has nowhere to go. */
-  test('the first face on a photo does not create the row', async ({ page }) => {
+  /** Saves one box under a name and waits until the server has answered with it. */
+  async function tag(picture, box, name, expectedBoxes) {
+    await picture.dragBox(box);
+    await picture.typeName(name);
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(expectedBoxes);
+  }
+
+  /** [HAPPY] */
+  test('a saved name appears in the row with no navigation', async ({ page }) => {
+    seeded = seed('overlay');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    // Anti-vacuity: the seeded faces are listed, and the new one is not yet.
+    await expect(picture.personRow).toContainText(seeded.regions[0].name);
+    await expect(picture.personRow).not.toContainText(ADA);
+
+    await picture.enterTaggingMode();
+    await tag(picture, CLEAR_BOX, ADA, seeded.regions.length + 1);
+
+    await expect(picture.personRowNames).toHaveText(
+      [...seeded.regions.map((region) => region.name), ADA].join(', ')
+    );
+    expect(await picture.sameDocument()).toBe(true);
+  });
+
+  /** [BVA] zero faces -> one -> zero */
+  test('the first face unhides the row and deleting the last one hides it', async ({ page }) => {
     seeded = seed('empty');
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
-    // Anti-vacuity: the list the row would sit in is there, so a count of 0 is about the row.
-    await expect(picture.infoList).toBeVisible();
-    await expect(picture.personRow).toHaveCount(0);
+    // Anti-vacuity: the row is there to be filled, just not shown.
+    await expect(picture.personRow).toHaveCount(1);
+    await expect(picture.personRow).toBeHidden();
 
     await picture.enterTaggingMode();
-    await picture.dragBox(FIRST_BOX);
+    await tag(picture, FIRST_BOX, ADA, 1);
+
+    await expect(picture.personRow).toBeVisible();
+    await expect(picture.personRowNames).toHaveText(ADA);
+
+    const [regionId] = await picture.savedRegionIds();
+    await picture.deleteButton(Number(regionId)).click();
+    await expect(picture.savedBoxes).toHaveCount(0);
+
+    await expect(picture.personRow).toBeHidden();
+    await expect(picture.personRowNames).toHaveText('');
+  });
+
+  /** [ECP] a name already listed */
+  test('a second box with the same name does not list it twice', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+    await tag(picture, SECOND_BOX, ADA, 2);
+
+    // Anti-vacuity: both boxes carry the name, so the row had two to collapse.
+    expect(await picture.savedNames()).toEqual([ADA, ADA]);
+    await expect(picture.personRowNames).toHaveText(ADA);
+  });
+
+  /** [NEG] the server refuses the write */
+  test('a refused save leaves the row unchanged', async ({ page }) => {
+    seeded = seed('overlay');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    const before = await picture.personRowNames.textContent();
+    // Anti-vacuity: the seeded faces are listed, so "unchanged" means something.
+    expect(before).toContain(seeded.regions[0].name);
+
+    // After the page is loaded, so the editor is offered and only the save fails.
+    setExiftool('missing');
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(CLEAR_BOX);
     await picture.typeName(ADA);
     await picture.pickerInput.press('Enter');
-    await expect(picture.savedBoxes).toHaveCount(1);
 
-    await expect(picture.infoList).toBeVisible();
-    await expect(picture.personRow).toHaveCount(0);
+    await expect(picture.editorMessage).toHaveClass(/persons-editor-error/);
+    await expect(picture.personRowNames).toHaveText(before);
+  });
+
+  /** [ECP] the JS rule and the PHP rule agree - drift between them shows here */
+  test('the row reads the same before and after a reload', async ({ page }) => {
+    seeded = seed('overlay');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    // Delete before adding: every write re-indexes the photo and renumbers its
+    // regions, so a seeded id is only valid until the first save.
+    await picture.enterTaggingMode();
+    await picture.deleteButton(seeded.regions[0].region_id).click();
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length - 1);
+    await tag(picture, CLEAR_BOX, ADA, seeded.regions.length);
+
+    const live = [...seeded.regions.slice(1).map((region) => region.name), ADA].join(', ');
+    await expect(picture.personRowNames).toHaveText(live);
+
+    await page.reload();
+    await picture.waitForPlacement();
+
+    await expect(picture.personRowNames).toHaveText(live);
+  });
+
+  /**
+   * [NEG] Markup in a name is rendered as text.
+   *
+   * The plugin's own write path strips tags from a name, so the API is made to
+   * answer with one here - the row must not trust that a name is clean.
+   */
+  test('markup in a name renders as text in the live row', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await page.route(/method=pwg\.persons\.addRegion/, async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      data.result.regions.forEach((region) => {
+        region.name = MARKUP_NAME;
+      });
+      await route.fulfill({ response, json: data });
+    });
+
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+
+    await expect(picture.personRowNames).toHaveText(MARKUP_NAME);
+    await expect(picture.personRowElements).toHaveCount(0);
+  });
+});
+
+/**
+ * Leaving tagging mode, as it behaves today.
+ *
+ * [ERR] characterization: the oracle is the current implementation, no
+ * requirement confirms it. The regression net for the persons-live-row change,
+ * replaced by it on purpose in task 03 (reload on exit).
+ */
+test.describe('leaving tagging mode (current behaviour)', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  test.afterEach(() => {
+    restore();
   });
 
   /** [ERR] Replaced by task 03: the toggle leaves the mode in place, after a save too. */
