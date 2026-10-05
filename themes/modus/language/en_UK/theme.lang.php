@@ -15,4 +15,9 @@ $lang['Default sizes'] = 'Default sizes';
 $lang['Default size for thumbnails'] = 'Default size for thumbnails';
 $lang['Default size for thumbnails on high density display (retina)'] = 'Default size for thumbnails on high density display (retina)';
 $lang['Display page banner'] = 'Display page banner';
+
+// Fork-local: the zoom control on the picture page
+$lang['Fit'] = 'Fit';
+$lang['Fit the photo to the window'] = 'Fit the photo to the window';
+$lang['Show the photo at its original size'] = 'Show the photo at its original size';
 ?>

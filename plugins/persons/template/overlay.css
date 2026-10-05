@@ -14,7 +14,7 @@
 
 /*
  * Sized and offset in pixels by overlay.js from the photo's measured box, never
- * by CSS: the displayed size changes with the derivative rvas_choose() picks.
+ * by CSS: the displayed size changes with the theme's fit and zoom.
  *
  * pointer-events: none keeps the theme's click-to-navigate handler and the
  * <area> map underneath working untouched - a click anywhere on the photo,

@@ -13,6 +13,10 @@ const { PicturePage } = require('./support/PicturePage');
  * here reports a change, not a defect - decide which it is before touching the
  * expectation.
  *
+ * Fit replaced two recorded behaviours: the photo at pixel ratio 1 shown 1:1
+ * with its <area> map (successors: the fit and file-choice cases in
+ * picture-fit.spec.js), and the map carrying the pixel-ratio-1 click zones.
+ *
  * Already covered elsewhere and not restated: overlay placement, the smallest
  * derivative making the photo narrower, and one upper-middle click navigating
  * away at both pixel ratios (overlay.spec.js).
@@ -36,11 +40,13 @@ const ZONES = {
 };
 
 /**
- * Pixel ratio 1 navigates through the <area> map, 2 through the click handler
- * (rvas_choose() drops the map on a HiDPI screen).
+ * Both pixel ratios navigate through the click handler. Until the fit-and-zoom
+ * change, pixel ratio 1 used the <area> map; fit now shows the photo at a size
+ * other than its file's, which drops the map (picture-fit.spec.js). Both stay,
+ * as each loads a different file.
  */
 const PIXEL_RATIOS = [
-  { dpr: 1, map: true },
+  { dpr: 1, map: false },
   { dpr: 2, map: false },
 ];
 
@@ -89,7 +95,7 @@ for (const { dpr, map } of PIXEL_RATIOS) {
   });
 }
 
-test.describe('the photo at its derivative size', () => {
+test.describe('the size menu and the slideshow', () => {
   test.use({ deviceScaleFactor: 1, viewport: DESKTOP });
 
   /** @type {ReturnType<typeof seed>} */
@@ -101,28 +107,6 @@ test.describe('the photo at its derivative size', () => {
 
   test.afterEach(() => {
     restore();
-  });
-
-  // [ERR] Records that rvas_choose() shows one derivative 1:1 at pixel ratio 1
-  // and points the map at that derivative; no requirement confirms it.
-  test('at pixel ratio 1 the photo carries a map and is shown at its file size', async ({ page }) => {
-    const picture = new PicturePage(page);
-    await picture.goto(seeded.picture_path);
-    await picture.settleImage();
-
-    const shown = await picture.imageDisplay();
-    const derivative = (await picture.derivatives()).find((d) => shown.usemap === `#map${d.type}`);
-
-    // Anti-vacuity: the map names one of this photo's derivatives.
-    expect(derivative).toBeTruthy();
-    if (!derivative) {
-      return;
-    }
-
-    expect(shown.naturalWidth).toBe(derivative.w);
-    expect(shown.naturalHeight).toBe(derivative.h);
-    expect(shown.width).toBe(derivative.w);
-    expect(shown.height).toBe(derivative.h);
   });
 
   // [ERR] Records that a size picked in core's size menu is shown at its own

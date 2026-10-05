@@ -369,7 +369,7 @@ function modus_loc_begin_picture()
 add_event_handler('render_element_content', 'modus_picture_content', EVENT_HANDLER_PRIORITY_NEUTRAL-1, 2 );
 function modus_picture_content($content, $element_info)
 {
-	global $conf, $picture, $template;
+	global $conf, $page, $picture, $template;
 
 	if ( !empty($content) ) // someone hooked us - so we skip;
 		return $content;
@@ -476,6 +476,24 @@ function modus_picture_content($content, $element_info)
 
 	if ($show_original)
 		$template->assign( 'U_ORIGINAL', $element_info['element_url'] );
+
+	// Fork-local: the original's size for the zoom (photo.zoom.js), in display
+	// orientation. Its file is offered only when it is an image (not a PDF or a
+	// video behind a representative) that is shown upright as it is.
+	$original_size = $element_info['src_image']->get_size();
+	$rvas_original = array(
+		'w' => $original_size ? (int)$original_size[0] : 0,
+		'h' => $original_size ? (int)$original_size[1] : 0,
+		);
+	if ($show_original and $element_info['src_image']->is_original() and $element_info['src_image']->rotation == 0)
+		$rvas_original['url'] = $element_info['element_url'];
+	$template->assign('RVAS_ORIGINAL', $rvas_original);
+
+	if (empty($page['slideshow']))
+	{
+		$template->set_filenames( array('zoom_buttons' => 'picture_zoom_buttons.tpl') );
+		$template->add_picture_button($template->parse('zoom_buttons', true));
+	}
 
 	$template->append('current', array(
 			'selected_derivative' => $selected_derivative,

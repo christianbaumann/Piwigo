@@ -14,6 +14,14 @@ class FixtureBuilder
     /** Where createTestImage() puts its copies, relative to the gallery root. */
     private const TEST_IMAGE_DIR = 'upload/persons-test/';
 
+    /** createTestImage() sources: the first gallery image by id, or the smallest by pixel area. */
+    public const SOURCE_FIRST = 'first';
+    public const SOURCE_SMALL = 'small';
+    private const SOURCE_ORDER = array(
+        self::SOURCE_FIRST => 'id',
+        self::SOURCE_SMALL => 'width * height, id',
+    );
+
     /** photos this fixture created, to be removed again in teardown */
     private array $testImages = array();
 
@@ -85,12 +93,21 @@ class FixtureBuilder
      * upload/persons-test/ and registered as an image row. destroyTestImages()
      * removes the row, the file, and anything exiftool left beside it.
      *
+     * The source is the first gallery image by id unless $source asks for the
+     * smallest one by pixel area (SOURCE_SMALL), which a picture page has to
+     * upscale to fill its area.
+     *
      * @return array id, db_path (as stored) and file (absolute)
      */
-    public function createTestImage(): array
+    public function createTestImage(string $source = self::SOURCE_FIRST): array
     {
+        if (!isset(self::SOURCE_ORDER[$source]))
+        {
+            throw new InvalidArgumentException("unknown fixture source '$source'");
+        }
         $source = (string)$this->db->scalar(
-            'SELECT path FROM piwigo_images WHERE path LIKE \'%.png\' ORDER BY id LIMIT 1'
+            'SELECT path FROM piwigo_images WHERE path LIKE \'%.png\' AND width IS NOT NULL AND height IS NOT NULL'
+            . ' ORDER BY ' . self::SOURCE_ORDER[$source] . ' LIMIT 1'
         );
         $sourceFile = PIWIGO_ROOT . ltrim($source, './');
         if (!is_file($sourceFile))

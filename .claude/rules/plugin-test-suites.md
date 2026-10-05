@@ -136,7 +136,10 @@ could have, which is what a region written before a re-crop looks like; `--scena
 nothing into the file at all, which is what the editor specs start from — anything found in that
 file afterwards was put there by the browser; `--scenario=neighbours` is `empty` plus a previous
 and a next photo in the same album, their upload dates forced so the seeded photo is the middle
-one, which `picture-display.spec.js` clicks the theme's navigation zones on. `seed.php --read-file-regions=<id>` reads one photo's
+one, which `picture-display.spec.js` clicks the theme's navigation zones on. Any scenario takes
+`--source=small`, which copies the smallest gallery image by pixel area instead of the first one,
+for `picture-fit.spec.js`'s upscaling case; every scenario prints the seeded photo's `width` and
+`height`, and the spec asserts the size it needs against them. `seed.php --read-file-regions=<id>` reads one photo's
 regions back with a plain exiftool call in its own process, which is how a spec asserts a write
 landed without asking the plugin's own parser. `seed.php --person-counts` prints every person's
 photo and region counts straight from the database, which is the oracle the persons admin

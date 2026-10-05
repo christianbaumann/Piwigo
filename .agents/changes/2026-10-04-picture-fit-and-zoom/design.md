@@ -12,7 +12,7 @@ On the single-photo page (`picture.php`, `modus` theme) the photo fills the avai
 with almost no whitespace. A zoom control lets the viewer go back to natural size (100 %) and
 zoom in further.
 
-Status: designed and split into tasks (`tasks/`). Not implemented.
+Status: designed and split into tasks (`tasks/`). Tasks 01 and 02 implemented.
 
 ## Current state (measured 2026-10-04)
 

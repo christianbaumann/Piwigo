@@ -43,6 +43,13 @@ class PicturePage {
     this.slideshowButton = page.locator('a:has(> .pwg-icon-slideshow)');
     /** The photo inside the slideshow's own container, which only exists in slideshow mode. */
     this.slideshowImage = page.locator('#slideshow #theMainImage');
+    /** The theme's zoom buttons in the toolbar. */
+    this.zoomFitButton = page.locator('#zoomFit');
+    this.zoomNaturalButton = page.locator('#zoomNatural');
+    this.zoomInButton = page.locator('#zoomIn');
+    this.zoomOutButton = page.locator('#zoomOut');
+    /** The ellipsis that opens modus' collapsed action menu on a narrow screen. */
+    this.actionMenuSwitch = page.locator('#imageActionsSwitch');
 
     /* ── the editor ─────────────────────────────────────────────────── */
 
@@ -315,6 +322,30 @@ class PicturePage {
   }
 
   /**
+   * Clicks the part of the photo that is on screen, at a point given in
+   * fractions of that part.
+   *
+   * A photo zoomed past its area is mostly scrolled out of #theImage, so a
+   * point given in fractions of the whole photo can lie outside the window.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async clickVisiblePhotoAt(x, y) {
+    const visible = await this.page.evaluate(() => {
+      const image = document.getElementById('theMainImage').getBoundingClientRect();
+      const area = document.getElementById('theImage');
+      const box = area.getBoundingClientRect();
+      const left = Math.max(image.left, box.left);
+      const top = Math.max(image.top, box.top);
+      const right = Math.min(image.right, box.left + area.clientWidth, window.innerWidth);
+      const bottom = Math.min(image.bottom, box.top + area.clientHeight, window.innerHeight);
+      return { left, top, width: right - left, height: bottom - top };
+    });
+    await this.page.mouse.click(visible.left + visible.width * x, visible.top + visible.height * y);
+  }
+
+  /**
    * Picks one size in core's size menu, the way a visitor does.
    *
    * Each entry follows the check mark core emits with a per-type id, which is
@@ -334,7 +365,76 @@ class PicturePage {
     await this.slideshowImage.waitFor({ state: 'visible' });
   }
 
-  /** Whether the photo still carries the <area> map; rvas_choose() removes it on a HiDPI screen. */
+  /**
+   * The area the photo is fitted into: the content width of #theImage, and the
+   * viewport height below the top of its content.
+   */
+  async fitArea() {
+    return this.page.evaluate(() => {
+      const area = document.getElementById('theImage');
+      const style = window.getComputedStyle(area);
+      const width = area.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const top = area.getBoundingClientRect().top + window.scrollY + parseFloat(style.paddingTop);
+      return { width, height: window.innerHeight - top };
+    });
+  }
+
+  /**
+   * Opens modus' collapsed action menu, which replaces the toolbar's action
+   * buttons below 600 px.
+   */
+  async openActionMenu() {
+    await this.actionMenuSwitch.click();
+    await this.zoomFitButton.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * Where each entry's label text starts, in px from the left of the window:
+   * the zoom buttons' own text, and every other action button's
+   * `.pwg-button-text`.
+   */
+  async actionLabelLefts() {
+    return this.page.evaluate(() => {
+      const textLeft = (el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect().left;
+      };
+      return {
+        zoom: ['zoomFit', 'zoomNatural'].map((id) => textLeft(document.getElementById(id))),
+        others: Array.from(
+          document.querySelectorAll('#imageToolBar .actionButtons .pwg-button:not(.zoomButton) .pwg-button-text')
+        ).map(textLeft),
+      };
+    });
+  }
+
+  /**
+   * Narrows the photo's area without resizing the window, the way a page
+   * scrollbar that appears after load does.
+   *
+   * @param {number} px
+   */
+  async narrowAreaBy(px) {
+    await this.page.evaluate((by) => {
+      const area = document.getElementById('theImage');
+      area.style.width = area.getBoundingClientRect().width - by + 'px';
+    }, px);
+  }
+
+  /** Presses `Einpassen` and waits until the photo has settled at the new size. */
+  async zoomToFit() {
+    await this.zoomFitButton.click();
+    await this.settleImage();
+  }
+
+  /** Presses `100 %` and waits until the photo has settled at the new size. */
+  async zoomToNatural() {
+    await this.zoomNaturalButton.click();
+    await this.settleImage();
+  }
+
+  /** Whether the photo still carries the <area> map; the theme removes it whenever the photo is not shown at its file size. */
   async hasImageMap() {
     return this.image.evaluate((el) => el.hasAttribute('usemap'));
   }

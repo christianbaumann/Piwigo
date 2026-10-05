@@ -1,15 +1,3 @@
-function rvas_get_scaled_size(d, available) {
-	var ratio_w = d.w / available.w
-		, ratio_h = d.h / available.h;
-	if (ratio_w>1 || ratio_h>1) {
-		if (ratio_w>ratio_h)
-			return {w: available.w / available.dpr, h: Math.floor(d.h / ratio_w / available.dpr)};
-		else
-			return {w: Math.floor(d.w / ratio_h / available.dpr), h: available.h / available.dpr};
-	}
-	return {w: Math.round(d.w / available.dpr), h: Math.round(d.h / available.dpr)};
-}
-
 function rvas_get_available_size(){
 		var width = $("#theImage").width(),
 			zoom = 1,
@@ -32,71 +20,29 @@ function rvas_get_available_size(){
 		return {w:width, h:height, dpr:dpr, zoom:zoom};
 }
 
-function rvas_choose(relaxed){
-	var best,
-		available = rvas_get_available_size(),
-		$img = $("#theMainImage"),
-		changed = true;
-	for (var i=0; i<RVAS.derivatives.length; i++){
-		var d = RVAS.derivatives[i];
-		if (d.w > available.w*available.zoom || d.h > available.h*available.zoom){
-			if (available.dpr>1 || !best)
-				best = d;
-			break;
-		}
-		else
-			best = d;
-	}
-	if (best) {
-		if (available.dpr > 1) {
-			var rescaled = rvas_get_scaled_size(best, available);
-			if ($img.attr("width") && available.zoom==1) {
-				var changeRatio = rescaled.h / $img.height()
-					, limit = relaxed ? 1.25 : 1.15;
-				if (changeRatio>=1 && changeRatio<limit
-					|| (changeRatio<1 && changeRatio>1/limit && $img.width()<available.w/available.dpr) )
-						return;
-			}
-			if (!$img.data("natural-w") || $img.data("natural-w") < best.w) {
-				$img.attr("width", rescaled.w).attr("height", rescaled.h)
-					.attr("src", best.url.replace(/&amp;/g, '&'))
-					.removeAttr("usemap")
-					.data("natural-w", best.w);
-			}
-			else {
-				$img.attr("width", rescaled.w).attr("height", rescaled.h);
-				changed = false;
-			}
-		}
-		else {
-			if ($img.attr("width")) {
-				var changeRatio = best.h / $img.height()
-					, limit = relaxed ? 2 : 1.15;
-				if (changeRatio>=1 && changeRatio<limit
-					|| (changeRatio<1 && changeRatio>1/limit && $img.width()<available.w) )
-						return;
-			}
-			$img
-				.attr("width", best.w).attr("height", best.h)
-				.attr("src", best.url.replace(/&amp;/g, '&'))
-				.attr("usemap", "#map"+best.type);
-		}
-		if (changed) {
-			$('#derivativeSwitchBox .switchCheck').css('visibility','hidden');
-			$('#derivativeChecked'+best.type).css('visibility','visible');
-		}
-	}
-	$img.off('load').on('load', function() {
-		const attrW = $(this).attr('width');
-		const attrH = $(this).attr('height');
-		$(this).css({
-			'width': attrW ? attrW : 'auto',
-			'height': attrH ? attrH : 'auto',
-		});
+/* Derivative sizes are rounded, so a file this much short of the display size still covers it. */
+var RVAS_ROUNDING_PX = 1;
 
-		$('.img-loader-derivatives').hide();
-		$('#theMainImage').show();
-	});
+/* The files the photo can be shown from, smallest first: the derivatives, then
+   the original when the viewer may see it and it is larger than all of them. */
+function rvas_files(){
+	var files = RVAS.derivatives.slice(),
+		largest = files[files.length-1];
+	if (RVAS.original.url && (!largest || RVAS.original.w > largest.w))
+		files.push({w:RVAS.original.w, h:RVAS.original.h, url:RVAS.original.url, type:'original'});
+	return files;
+}
+
+/* The smallest file that covers a display size given in CSS pixels on this
+   screen's pixel ratio, or the largest file when none does. */
+function rvas_choose(display){
+	var dpr = window.devicePixelRatio && window.devicePixelRatio>1 ? window.devicePixelRatio : 1,
+		files = rvas_files();
+	for (var i=0; i<files.length; i++){
+		if (files[i].w >= display.w*dpr - RVAS_ROUNDING_PX && files[i].h >= display.h*dpr - RVAS_ROUNDING_PX)
+			return files[i];
+	}
+	return files[files.length-1];
 }
 
 $(document).ready( function() {
@@ -138,11 +84,6 @@ $(document).ready( function() {
 			else
 				de.addClass("wide");
 		}
-
-		if (RVAS.disable)
-			rvas_get_available_size();
-		else
-			rvas_choose();
 	});
 
 	$("#theMainImage").click( function(e) {

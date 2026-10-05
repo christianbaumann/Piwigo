@@ -19,6 +19,7 @@
  *   php tests/e2e/support/seed.php --scenario=stale
  *   php tests/e2e/support/seed.php --scenario=empty
  *   php tests/e2e/support/seed.php --scenario=neighbours
+ *   php tests/e2e/support/seed.php --scenario=empty --source=small
  *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
  *   php tests/e2e/support/seed.php --exiftool=missing|present
  *   php tests/e2e/support/seed.php --restore
@@ -307,7 +308,7 @@ SELECT p.name,
     return $counts;
 }
 
-$args = getopt('', array('scenario::', 'restore', 'read-file-regions::', 'exiftool::', 'person-counts'));
+$args = getopt('', array('scenario::', 'source::', 'restore', 'read-file-regions::', 'exiftool::', 'person-counts'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -369,7 +370,17 @@ if (!$builder->tableExists('piwigo_person_region'))
     fail('the persons plugin is not installed; activate it before seeding');
 }
 
-$image = $builder->createTestImage();
+// --source=small copies the smallest gallery image instead of the first one,
+// for the picture page's upscaling case. Only the seeded photo, not its
+// neighbours. The spec asserts the size it needs against what is printed.
+try
+{
+    $image = $builder->createTestImage($args['source'] ?? FixtureBuilder::SOURCE_FIRST);
+}
+catch (InvalidArgumentException $e)
+{
+    fail('--source: ' . $e->getMessage());
+}
 $catId = $builder->createTestAlbum('Persons E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
@@ -449,6 +460,8 @@ $output = array(
     'scenario' => $scenario,
     'album_id' => $catId,
     'photo_id' => (int)$image['id'],
+    'width' => (int)$image['width'],
+    'height' => (int)$image['height'],
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
     'album_path' => '/index.php?/category/' . $catId,
     'regions' => $expected,
