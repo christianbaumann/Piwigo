@@ -28,6 +28,12 @@ const RESIZE_STEPS = [1200, 1000, 900, 800, 620];
 /** A point on the photo clear of both seeded boxes, as fractions of its rendered size. */
 const CLEAR_POINT = { fx: 0.5, fy: 0.12 };
 
+/** A box height well under the name label's, which is about 20px. */
+const SMALL_BOX_PX = 6;
+
+/** Enough presses of the theme's + zoom to move a box off a point near its corner. */
+const ZOOM_STEPS = 3;
+
 test.describe('person region overlay', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
@@ -292,6 +298,57 @@ test.describe('person region overlay', () => {
   });
 
   /**
+   * [BVA] A box shorter than its name: the pointer on the part of the name
+   * that overhangs the box still shows that name. Otherwise the photo would
+   * dim around an invisible, clickable link.
+   */
+  test('a name overhanging a small box shows while the pointer is on it', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    await picture.setBoxHeight(first, SMALL_BOX_PX);
+
+    const point = await picture.hoverLabel(first);
+    // Anti-vacuity: the pointer is on the overhang, outside the box itself.
+    expect(await picture.boxContains(first, point)).toBe(false);
+
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+  });
+
+  /**
+   * [ST] The photo zooms under a pointer that does not move: no mousemove
+   * fires, yet the box that left the pointer must drop its name.
+   */
+  test('a name hides when a zoom moves its box away from a still pointer', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    const point = await picture.hoverBoxCorner(first);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+
+    for (let i = 0; i < ZOOM_STEPS; i++) {
+      await picture.pressKey('+');
+    }
+    await picture.waitForPlacement();
+
+    // Anti-vacuity: the zoom really moved the box off the pointer, and the box
+    // itself is still shown, so a hidden name is the name rule's doing.
+    expect(await picture.boxContains(first, point)).toBe(false);
+    expect((await picture.boxStyle(first)).opacity).toBeGreaterThan(0.9);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBe(0);
+  });
+
+  /**
    * Hovering a name dims the photo outside that box.
    *
    * Implemented with `.person-box:has(.person-box-label:hover)`, and the label
@@ -430,6 +487,25 @@ test.describe('a stale person region', () => {
       expect(style.opacity).toBeLessThan(1);
       expect(style.title).not.toBe('');
     }
+  });
+
+  /** [HAPPY] A focused stale name keeps its box as dimmed as a hovered one. */
+  test('keeps its dimmed look while its name has keyboard focus', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    expect(seeded.regions[0].stale).toBe(true);
+    expect(await picture.stageIsHovered()).toBe(false);
+
+    await picture.focusLabel(first);
+
+    // Anti-vacuity: the focus did show the box at all.
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0);
+    expect((await picture.boxStyle(first)).opacity).toBeLessThan(1);
   });
 });
 

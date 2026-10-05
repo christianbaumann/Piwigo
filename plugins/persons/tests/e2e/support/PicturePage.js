@@ -1,5 +1,8 @@
 // @ts-check
 
+/** How far inside a box's corner hoverBoxCorner() puts the pointer, in CSS pixels. */
+const CORNER_INSET_PX = 3;
+
 /**
  * Page object for the public photo page with the person overlay on it.
  *
@@ -313,6 +316,19 @@ class PicturePage {
   }
 
   /**
+   * Moves the pointer just inside a box's top-left corner, and returns the
+   * point in viewport pixels. A zoom grows the box away from it.
+   *
+   * @param {number} regionId
+   */
+  async hoverBoxCorner(regionId) {
+    const box = await this.boxRect(regionId);
+    const point = { x: box.left + CORNER_INSET_PX, y: box.top + CORNER_INSET_PX };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
    * Whether a viewport point lies inside a box's rendered rect.
    *
    * @param {number} regionId
@@ -322,6 +338,36 @@ class PicturePage {
     const box = await this.boxRect(regionId);
     return point.x >= box.left && point.x <= box.left + box.width
       && point.y >= box.top && point.y <= box.top + box.height;
+  }
+
+  /**
+   * Moves the pointer to the centre of a box's name label, and returns the
+   * point in viewport pixels.
+   *
+   * @param {number} regionId
+   */
+  async hoverLabel(regionId) {
+    const r = await this.label(regionId).evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    });
+    const point = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
+   * Forces a box shorter than its name label, the way a small face on a
+   * scaled-down group photo renders. The label stays pinned to the box's
+   * bottom edge, so its upper part overhangs the box.
+   *
+   * @param {number} regionId
+   * @param {number} px
+   */
+  async setBoxHeight(regionId, px) {
+    await this.box(regionId).evaluate((el, h) => {
+      el.style.height = `${h}px`;
+    }, px);
   }
 
   /** @param {number} regionId */

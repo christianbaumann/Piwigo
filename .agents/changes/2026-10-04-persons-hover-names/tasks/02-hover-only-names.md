@@ -62,7 +62,7 @@ navigates.
   The spec passed against the old code as well (old CSS showed every name on any hover), so it
   was proven against a mutant instead: caching the box list once at init killed it, and only it
 * [x] Tagging mode shows every name
-  **Note:** Verified via task 01's `tagging mode shows every saved name without a hover`, unchanged and green; with labels hidden by default it now depends on the new `editor.css` rule
+  **Note:** Verified via task 01's `tagging mode shows every saved name without a hover`, unchanged and green; dropping the new `editor.css` rule turns it red (table below)
 * [x] Unchanged and still green: `clicking the photo outside a box still navigates`,
   `hovering a name dims the photo outside that box`, the stale-box specs
   **Note:** Verified via the overlay/editor/admin run, 57 passed
@@ -72,11 +72,43 @@ navigates.
   integration` OK (110 tests, 1 skipped, the skip was already there); `npx playwright test` in
   `plugins/persons` 117 passed (5.0m)
 
-## Mutants
+## Seen red against a deliberate break
 
-Each edit checked synced into the container (md5) before the run, then reverted.
+E2E specs, so this is the "proving a check can actually fail" step of
+`.claude/rules/test-design.md`, not mutation testing (which `.claude/rules/mutation-testing.md`
+keeps to the unit layer). Each edit checked synced into the container (md5) before the run,
+then reverted.
 
 | Mutant | Expected killer | Result |
 |---|---|---|
 | box list queried once at init instead of per move (`overlay.js`) | `a box drawn here shows its name on hover after tagging, with no reload` | killed; `hovering a box shows its name and no other` stayed green |
-| `mouseleave` handler not registered (`overlay.js`) | `a name hides again once the pointer leaves its box` | **survived**, overlay/editor/admin specs 57 passed. Not a weak test: off the photo every box is at opacity 0, so a left-over `.person-box-active` cannot be seen, and re-entering fires a `mousemove` that recomputes it. The handler is in the design but has no observable effect |
+| `mouseleave` handler not registered (`overlay.js`) | `a name hides again once the pointer leaves its box` | **survived**, overlay/editor/admin specs 57 passed. Not a weak test: off the photo every box is at opacity 0, so a left-over `.person-box-active` cannot be seen, and re-entering fires a `mousemove` that recomputes it. The handler is in the design but has no observable effect. Still true after the review follow-up below: it now clears the remembered pointer, which a later `place()` would otherwise re-test, but the box is hidden there either way |
+| `#persons-stage.persons-tagging .person-box-label` rule dropped (`editor.css`) | `tagging mode shows every saved name without a hover` | killed; the other three tests in the filtered run stayed green |
+| no re-test at the end of `place()` (`overlay.js`) | `a name hides when a zoom moves its box away from a still pointer` | killed; the other three tests in the filtered run stayed green |
+| label rect not counted in the hit test (`overlay.js`) | `a name overhanging a small box shows while the pointer is on it` | killed; the other three tests in the filtered run stayed green |
+
+## Review follow-up (2026-10-05)
+
+A review of the two commits found three behaviour gaps, fixed test-first. Each new spec failed
+for the expected reason before the fix:
+
+* **Small boxes:** on a box shorter than its name, the name overhangs the box. A pointer on the
+  overhang left the box inactive, so the name stayed hidden while hovering it still dimmed the
+  photo. **Deviation from the design:** the hit test also counts the box's own label rect.
+  Spec: `[BVA] a name overhanging a small box shows while the pointer is on it`
+* **Zoom under a still pointer:** a theme zoom moves the boxes but fires no `mousemove`. Checked
+  first in headless Chromium: after three `+` presses the box that left the pointer stayed
+  active. **Deviation from the design:** the design re-tests only on `mousemove`; `overlay.js`
+  now also remembers the pointer and re-tests at the end of `place()`, which runs on every
+  resize, load and zoom. Spec: `[ST] a name hides when a zoom moves its box away from a still pointer`
+* **Focused stale box** showed at full opacity, since `.person-box:focus-within` beat
+  `.person-box-stale`. `.person-box-stale:focus-within` now keeps 0.5. Spec: `keeps its dimmed
+  look while its name has keyboard focus` (asserts < 1, like the existing stale spec, rather
+  than copying 0.5 out of the CSS)
+
+Overlay, editor and admin specs: 60 passed; full persons E2E (`npx playwright test` in
+`plugins/persons`): 120 passed. Unit and integration not re-run: no PHP changed. Not fixed: the off-the-photo step of
+`a name hides again once the pointer leaves its box` and the anti-vacuity read in the admin spec
+cannot fail for the label rule, because the box is hidden there anyway (see the `mouseleave` row).
+
+**Status:** verified and approved 2026-10-05.

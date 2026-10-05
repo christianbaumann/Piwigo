@@ -61,7 +61,8 @@
 	opacity: 0;
 }
 
-#persons-stage:hover .person-box-stale {
+#persons-stage:hover .person-box-stale,
+.person-box-stale:focus-within {
 	opacity: 0.5;
 }
 

@@ -39,6 +39,28 @@
 		   the surface the first box is drawn on, and an unplaced overlay has no
 		   size to draw in. */
 
+		/* The boxes take no pointer events - a click on a face must still reach
+		   the theme's navigation - so :hover never matches them and the pointer
+		   is hit-tested here instead. Queried on every test: the editor adds and
+		   removes boxes, and a resize or zoom moves them. A box's own name counts
+		   as part of it, since on a small face the name overhangs the box. */
+		var pointer = null;
+
+		function contains(el, x, y) {
+			var r = el.getBoundingClientRect();
+			return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+		}
+
+		function markActive() {
+			var boxes = overlay.querySelectorAll('.person-box');
+			for (var i = 0; i < boxes.length; i++) {
+				var label = boxes[i].querySelector('.person-box-label');
+				var inside = pointer !== null && (contains(boxes[i], pointer.x, pointer.y)
+					|| (label !== null && contains(label, pointer.x, pointer.y)));
+				boxes[i].classList.toggle('person-box-active', inside);
+			}
+		}
+
 		function place() {
 			var imageRect = image.getBoundingClientRect();
 			var stageRect = stage.getBoundingClientRect();
@@ -53,6 +75,9 @@
 			overlay.style.top = (imageRect.top - stageRect.top) + 'px';
 			overlay.style.width = imageRect.width + 'px';
 			overlay.style.height = imageRect.height + 'px';
+
+			/* A zoom moves the boxes under a pointer that fires no mousemove. */
+			markActive();
 		}
 
 		var timer = null;
@@ -68,24 +93,13 @@
 		image.addEventListener('load', place);
 		window.addEventListener('resize', placeSoon);
 
-		/* The boxes take no pointer events - a click on a face must still reach
-		   the theme's navigation - so :hover never matches them and the pointer
-		   is hit-tested here instead. Queried on every move: the editor adds and
-		   removes boxes, and a resize moves them. */
 		stage.addEventListener('mousemove', function (event) {
-			var boxes = overlay.querySelectorAll('.person-box');
-			for (var i = 0; i < boxes.length; i++) {
-				var r = boxes[i].getBoundingClientRect();
-				var inside = event.clientX >= r.left && event.clientX <= r.right
-					&& event.clientY >= r.top && event.clientY <= r.bottom;
-				boxes[i].classList.toggle('person-box-active', inside);
-			}
+			pointer = { x: event.clientX, y: event.clientY };
+			markActive();
 		});
 		stage.addEventListener('mouseleave', function () {
-			var boxes = overlay.querySelectorAll('.person-box-active');
-			for (var i = 0; i < boxes.length; i++) {
-				boxes[i].classList.remove('person-box-active');
-			}
+			pointer = null;
+			markActive();
 		});
 
 		if (window.ResizeObserver) {
