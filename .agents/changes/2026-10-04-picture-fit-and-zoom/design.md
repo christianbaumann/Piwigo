@@ -12,7 +12,7 @@ On the single-photo page (`picture.php`, `modus` theme) the photo fills the avai
 with almost no whitespace. A zoom control lets the viewer go back to natural size (100 %) and
 zoom in further.
 
-Status: designed and split into tasks (`tasks/`). Not implemented.
+Status: designed and split into tasks (`tasks/`). Tasks 01 to 04 implemented.
 
 ## Current state (measured 2026-10-04)
 
@@ -243,7 +243,7 @@ Planned cases (tags per `.claude/rules/test-design.md`):
   themes/modus/js/photo.zoom.js  NEW  zoom state (fit | factor), buttons, keys, wheel,
                                       drag-pan, click guard → rvas_choose() + img width/height
   themes/modus/template/picture_content_asize.tpl   zoom buttons, RVAS.original {w, h, url?}
-  themes/modus/css/hf_base.css        #theImage overflow:auto, max-height, button styles
+  themes/modus/css/photo.zoom.css NEW #theImage overflow:auto, button styles (every skin)
   ```
 - **Reason:** The file choice stays where it already is, and interaction is kept in one new file.
   The buttons are in the modus content template, so `themes/default/` stays untouched.

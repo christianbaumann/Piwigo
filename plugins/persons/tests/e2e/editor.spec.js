@@ -106,6 +106,10 @@ test.describe('tagging a person', () => {
     await picture.typeName(ADA);
 
     const drawn = await picture.draftRect();
+    // Measured against the photo, not the viewport: with the photo fitted to
+    // the window, opening the picker can scroll the page, and the reload starts
+    // at the top again.
+    const imageWhenDrawn = await picture.imageRect();
 
     await picture.pickerInput.press('Enter');
 
@@ -127,8 +131,8 @@ test.describe('tagging a person', () => {
     const regionId = Number(await picture.savedBoxes.first().getAttribute('data-person-region'));
     const reloaded = await picture.boxRect(regionId);
 
-    expect(Math.abs(reloaded.left - drawn.left)).toBeLessThanOrEqual(TOLERANCE_PX);
-    expect(Math.abs(reloaded.top - drawn.top)).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(Math.abs((reloaded.left - image.left) - (drawn.left - imageWhenDrawn.left))).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(Math.abs((reloaded.top - image.top) - (drawn.top - imageWhenDrawn.top))).toBeLessThanOrEqual(TOLERANCE_PX);
     expect(Math.abs(reloaded.width - drawn.width)).toBeLessThanOrEqual(TOLERANCE_PX);
     expect(Math.abs(reloaded.height - drawn.height)).toBeLessThanOrEqual(TOLERANCE_PX);
   });

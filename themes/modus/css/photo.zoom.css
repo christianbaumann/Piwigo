@@ -1,0 +1,55 @@
+/* Fork-local (docs/agents/decisions/0032-modus-picture-fit-and-zoom-is-a-fork-local-theme-edit.md):
+   fit and zoom (js/photo.zoom.js). Loaded by picture_content_asize.tpl for every
+   skin - hf_base.css only reaches the skins that ship a stylesheet of their own.
+
+   A photo zoomed past its area scrolls inside #theImage; photo.zoom.js sets the
+   max-height while it is. */
+#theImage {
+	overflow: auto;
+}
+
+/* A block, so no line box adds space below it, and so a photo wider than the
+   area starts at its left edge instead of overflowing it on both sides. */
+#theMainImage {
+	display: block;
+	margin: 0 auto;
+}
+
+/* Drag-to-pan, set by photo.zoom.js while the photo overflows its area. */
+#theImage.zoomPannable #theMainImage {
+	cursor: grab;
+}
+
+#theImage.zoomPanning #theMainImage {
+	cursor: grabbing;
+}
+
+#imageToolBar .pwg-button.zoomButton {
+	width: auto;
+	padding: 0 8px;
+	line-height: 28px;
+}
+
+/* The label carries .pwg-icon so every skin gives it its icon colour in the
+   toolbar, and .pwg-button-text so the action menu gives it the label colour.
+   This undoes the icon size (base.css.tpl sets it !important) and shows the
+   text, which iconfontello.css.tpl hides outside the menu. */
+#imageToolBar .zoomButton .zoomLabel {
+	display: inline;
+	font-size: inherit !important;
+}
+
+/* + and - are for a mouse and a wide window; a phone pinches instead. */
+html:not(.wide) #imageToolBar .zoomStep {
+	display: none;
+}
+
+/* In the collapsed action menu (picture.css.tpl, max-width 600px) every other
+   entry is 5px padding + a 24px icon + a 5px gap before its label. These have
+   no icon, so their label - which brings the 5px gap as .pwg-button-text's
+   margin - is indented to the same column. */
+@media screen and (max-width:600px) {
+	#imageToolBar .actionButtons .pwg-button.zoomButton {
+		padding-left: 29px;
+	}
+}

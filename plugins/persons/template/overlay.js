@@ -7,11 +7,10 @@
  * exactly over the photo.
  *
  * The only truthful source of the photo's on-screen box is
- * getBoundingClientRect() on #theMainImage. rvas_choose() rewrites that
- * element's src, width and height on load and on every resize
- * (themes/modus/js/photo.autosize.js:35-100,145), so the width and height
- * attributes - and any measurement cached from them - are stale the moment the
- * window moves.
+ * getBoundingClientRect() on #theMainImage. The theme's zoom rewrites that
+ * element's src, width and height on load, on every resize and on every zoom
+ * (themes/modus/js/photo.zoom.js), so the width and height attributes - and any
+ * measurement cached from them - are stale the moment the window moves.
  *
  * No region math happens here. Every box was rotated into display orientation
  * and converted from MWG's centre origin to a top-left fraction by
@@ -70,7 +69,7 @@
 		window.addEventListener('resize', placeSoon);
 
 		if (window.ResizeObserver) {
-			/* rvas_choose() can change only the width and height attributes,
+			/* The zoom can change only the width and height attributes,
 			   leaving src alone - no load event, and nothing else would notice
 			   that the photo just changed size. */
 			new window.ResizeObserver(place).observe(image);

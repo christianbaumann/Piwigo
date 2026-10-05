@@ -40,6 +40,23 @@ class PicturePage {
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
 
+    /* ── the theme's display controls ───────────────────────────────── */
+
+    /** Core's size menu button and the box it opens. */
+    this.sizeMenuButton = page.locator('#derivativeSwitchLink');
+    this.sizeMenu = page.locator('#derivativeSwitchBox');
+    /** The toolbar button that starts the slideshow. */
+    this.slideshowButton = page.locator('a:has(> .pwg-icon-slideshow)');
+    /** The photo inside the slideshow's own container, which only exists in slideshow mode. */
+    this.slideshowImage = page.locator('#slideshow #theMainImage');
+    /** The theme's zoom buttons in the toolbar. */
+    this.zoomFitButton = page.locator('#zoomFit');
+    this.zoomNaturalButton = page.locator('#zoomNatural');
+    this.zoomInButton = page.locator('#zoomIn');
+    this.zoomOutButton = page.locator('#zoomOut');
+    /** The ellipsis that opens modus' collapsed action menu on a narrow screen. */
+    this.actionMenuSwitch = page.locator('#imageActionsSwitch');
+
     /* ── the editor ─────────────────────────────────────────────────── */
 
     this.tagToggle = page.locator('#persons-tag-toggle');
@@ -260,7 +277,392 @@ class PicturePage {
     });
   }
 
-  /** Whether the photo still carries the <area> map; rvas_choose() removes it on a HiDPI screen. */
+  /**
+   * Waits until the photo file has loaded and its rendered box has stopped
+   * moving.
+   *
+   * For pages with no overlay to compare against - settle() needs one. Until
+   * the derivative is chosen the photo shows the theme's loading GIF, which is
+   * `complete` at once and holds still, so a src equal to the loader's is
+   * rejected outright. After that the rendered box has to hold still across
+   * SETTLE_FRAMES consecutive frames, which a later src swap resets.
+   */
+  async settleImage() {
+    await this.page.evaluate(() => {
+      window.__pictureSettle = { key: null, frames: 0 };
+    });
+
+    await this.page.waitForFunction(
+      (needed) => {
+        const state = window.__pictureSettle;
+        const image = document.getElementById('theMainImage');
+        if (!state || !image || !image.complete || image.naturalWidth < 2) {
+          return false;
+        }
+        const loader = document.querySelector('.img-loader-derivatives');
+        if (loader && image.currentSrc === loader.currentSrc) {
+          return false;
+        }
+
+        const r = image.getBoundingClientRect();
+        const key = [image.currentSrc, r.left, r.top, r.width, r.height].join('|');
+        if (r.width < 2 || state.key !== key) {
+          state.key = key;
+          state.frames = 0;
+          return false;
+        }
+
+        state.frames += 1;
+        return state.frames >= needed;
+      },
+      PicturePage.SETTLE_FRAMES,
+      { polling: 'raf' }
+    );
+  }
+
+  /**
+   * What the photo element is showing: its rendered box, the pixel size of the
+   * loaded file, and the map it points at.
+   */
+  async imageDisplay() {
+    return this.image.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        width: r.width,
+        height: r.height,
+        naturalWidth: el.naturalWidth,
+        naturalHeight: el.naturalHeight,
+        usemap: el.getAttribute('usemap'),
+      };
+    });
+  }
+
+  /**
+   * The photo's derivatives as the theme knows them (`RVAS.derivatives`), each
+   * with its pixel size and type, smallest first.
+   *
+   * @returns {Promise<Array<{w: number, h: number, type: string}>>}
+   */
+  async derivatives() {
+    return this.page.evaluate(() => RVAS.derivatives.map((d) => ({ w: d.w, h: d.h, type: d.type })));
+  }
+
+  /**
+   * Clicks the photo at a point given in fractions of its rendered size.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async clickImageAt(x, y) {
+    const image = await this.imageRect();
+    await this.page.mouse.click(image.left + image.width * x, image.top + image.height * y);
+  }
+
+  /**
+   * Clicks the part of the photo that is on screen, at a point given in
+   * fractions of that part.
+   *
+   * A photo zoomed past its area is mostly scrolled out of #theImage, so a
+   * point given in fractions of the whole photo can lie outside the window.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async clickVisiblePhotoAt(x, y) {
+    const visible = await this.visiblePhotoRect();
+    await this.page.mouse.click(visible.left + visible.width * x, visible.top + visible.height * y);
+  }
+
+  /**
+   * Picks one size in core's size menu, the way a visitor does.
+   *
+   * Each entry follows the check mark core emits with a per-type id, which is
+   * the only stable handle the menu offers.
+   *
+   * @param {string} type a derivative type, as in derivatives()
+   */
+  async chooseSize(type) {
+    await this.sizeMenuButton.click();
+    await this.sizeMenu.waitFor({ state: 'visible' });
+    await this.page.locator(`#derivativeChecked${type} + a`).click();
+  }
+
+  /** Starts the slideshow from the toolbar and waits until it is showing. */
+  async startSlideshow() {
+    await this.slideshowButton.click();
+    await this.slideshowImage.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * The area the photo is fitted into: the content width of #theImage, and the
+   * viewport height below the top of its content.
+   */
+  async fitArea() {
+    return this.page.evaluate(() => {
+      const area = document.getElementById('theImage');
+      const style = window.getComputedStyle(area);
+      const width = area.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const top = area.getBoundingClientRect().top + window.scrollY + parseFloat(style.paddingTop);
+      return { width, height: window.innerHeight - top };
+    });
+  }
+
+  /**
+   * Opens modus' collapsed action menu, which replaces the toolbar's action
+   * buttons below 600 px.
+   */
+  async openActionMenu() {
+    await this.actionMenuSwitch.click();
+    await this.zoomFitButton.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * Where each entry's label text starts, in px from the left of the window:
+   * the zoom buttons' own text, and every other action button's
+   * `.pwg-button-text`.
+   */
+  async actionLabelLefts() {
+    return this.page.evaluate(() => {
+      const textLeft = (el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect().left;
+      };
+      return {
+        zoom: ['zoomFit', 'zoomNatural'].map((id) => textLeft(document.getElementById(id))),
+        others: Array.from(
+          document.querySelectorAll('#imageToolBar .actionButtons .pwg-button:not(.zoomButton) .pwg-button-text')
+        ).map(textLeft),
+      };
+    });
+  }
+
+  /**
+   * Narrows the photo's area without resizing the window, the way a page
+   * scrollbar that appears after load does.
+   *
+   * @param {number} px
+   */
+  async narrowAreaBy(px) {
+    await this.page.evaluate((by) => {
+      const area = document.getElementById('theImage');
+      area.style.width = area.getBoundingClientRect().width - by + 'px';
+    }, px);
+  }
+
+  /** Presses `Einpassen` and waits until the photo has settled at the new size. */
+  async zoomToFit() {
+    await this.zoomFitButton.click();
+    await this.settleImage();
+  }
+
+  /** Presses `100 %` and waits until the photo has settled at the new size. */
+  async zoomToNatural() {
+    await this.zoomNaturalButton.click();
+    await this.settleImage();
+  }
+
+  /** Presses `+` and waits until the photo has settled at the new size. */
+  async zoomIn() {
+    await this.zoomInButton.click();
+    await this.settleImage();
+  }
+
+  /** Presses `−` and waits until the photo has settled at the new size. */
+  async zoomOut() {
+    await this.zoomOutButton.click();
+    await this.settleImage();
+  }
+
+  /**
+   * Presses a key with the focus wherever it is, and waits until the photo has
+   * settled.
+   *
+   * @param {string} key
+   */
+  async pressKey(key) {
+    await this.page.keyboard.press(key);
+    await this.settleImage();
+  }
+
+  /**
+   * Turns the mouse wheel over the middle of the visible photo, with Ctrl held
+   * or not, and waits until the photo has settled.
+   *
+   * Also reports whether the wheel event reached the window with its default
+   * prevented - the only part of "the browser does not zoom the page" a
+   * headless browser can show.
+   *
+   * @param {number} deltaY negative turns the wheel away from the viewer
+   * @param {{ctrl?: boolean}} [options]
+   * @returns {Promise<{defaultPrevented: boolean}>}
+   */
+  async wheelOverPhoto(deltaY, { ctrl = false } = {}) {
+    await this.page.evaluate(() => {
+      window.__pictureWheel = null;
+      window.addEventListener(
+        'wheel',
+        (e) => {
+          window.__pictureWheel = { defaultPrevented: e.defaultPrevented };
+        },
+        { once: true }
+      );
+    });
+    const visible = await this.visiblePhotoRect();
+    await this.page.mouse.move(visible.left + visible.width / 2, visible.top + visible.height / 2);
+    if (ctrl) {
+      await this.page.keyboard.down('Control');
+    }
+    await this.page.mouse.wheel(0, deltaY);
+    if (ctrl) {
+      await this.page.keyboard.up('Control');
+    }
+    await this.page.waitForFunction(() => window.__pictureWheel !== null);
+    await this.settleImage();
+    return this.page.evaluate(() => window.__pictureWheel);
+  }
+
+  /** How far the page and #theImage are scrolled, in CSS pixels. */
+  async scrollPositions() {
+    return this.page.evaluate(() => {
+      const area = document.getElementById('theImage');
+      return { pageY: window.scrollY, areaLeft: area.scrollLeft, areaTop: area.scrollTop };
+    });
+  }
+
+  /**
+   * Scrolls #theImage to a position given in fractions of how far it can scroll.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async scrollAreaTo(x, y) {
+    await this.page.evaluate(
+      ([fx, fy]) => {
+        const area = document.getElementById('theImage');
+        area.scrollLeft = (area.scrollWidth - area.clientWidth) * fx;
+        area.scrollTop = (area.scrollHeight - area.clientHeight) * fy;
+      },
+      [x, y]
+    );
+  }
+
+  /**
+   * The point of the photo at the middle of what #theImage shows - its client
+   * box, cut to the window - in fractions of the photo's size.
+   */
+  async centredPhotoPoint() {
+    return this.page.evaluate(() => {
+      const image = document.getElementById('theMainImage').getBoundingClientRect();
+      const area = document.getElementById('theImage');
+      const box = area.getBoundingClientRect();
+      const left = Math.max(box.left + area.clientLeft, 0);
+      const right = Math.min(box.left + area.clientLeft + area.clientWidth, window.innerWidth);
+      const top = Math.max(box.top + area.clientTop, 0);
+      const bottom = Math.min(box.top + area.clientTop + area.clientHeight, window.innerHeight);
+      const x = (left + right) / 2;
+      const y = (top + bottom) / 2;
+      return { x: (x - image.left) / image.width, y: (y - image.top) / image.height };
+    });
+  }
+
+  /**
+   * Makes the page longer below the photo, the way a long description or
+   * comment thread does.
+   *
+   * @param {number} px
+   */
+  async lengthenPageBy(px) {
+    await this.page.evaluate((by) => {
+      const spacer = document.createElement('div');
+      // min-height, not height: modus' body is a flex column, which shrinks a plain height away.
+      spacer.style.minHeight = by + 'px';
+      document.body.appendChild(spacer);
+    }, px);
+  }
+
+  /**
+   * Scrolls the page itself down, and returns how far it got.
+   *
+   * @param {number} y
+   */
+  async scrollPageTo(y) {
+    return this.page.evaluate((to) => {
+      window.scrollTo(0, to);
+      return window.scrollY;
+    }, y);
+  }
+
+  /** The part of the photo that is on screen: inside #theImage and inside the window. */
+  async visiblePhotoRect() {
+    return this.page.evaluate(() => {
+      const image = document.getElementById('theMainImage').getBoundingClientRect();
+      const area = document.getElementById('theImage');
+      const box = area.getBoundingClientRect();
+      const left = Math.max(image.left, box.left);
+      const top = Math.max(image.top, box.top);
+      const right = Math.min(image.right, box.left + area.clientWidth, window.innerWidth);
+      const bottom = Math.min(image.bottom, box.top + area.clientHeight, window.innerHeight);
+      return { left, top, width: right - left, height: bottom - top };
+    });
+  }
+
+  /**
+   * The zoom buttons' boxes and label colours, in toolbar order, and the
+   * colours of the icon and the label text on the toolbar's other action
+   * buttons - the toolbar shows icons, the phone's action menu labels.
+   */
+  async zoomControlLook() {
+    return this.page.evaluate(() => {
+      const other = '#imageToolBar .actionButtons .pwg-button:not(.zoomButton)';
+      const icon = document.querySelector(`${other} .pwg-icon`);
+      const text = document.querySelector(`${other} .pwg-button-text`);
+      return {
+        iconColor: icon ? window.getComputedStyle(icon).color : null,
+        textColor: text ? window.getComputedStyle(text).color : null,
+        buttons: ['zoomOut', 'zoomFit', 'zoomNatural', 'zoomIn'].map((id) => {
+          const button = document.getElementById(id);
+          const r = button.getBoundingClientRect();
+          const label = button.querySelector('.zoomLabel') || button;
+          const range = document.createRange();
+          range.selectNodeContents(button);
+          const text = range.getBoundingClientRect();
+          return {
+            id,
+            left: r.left,
+            right: r.right,
+            top: r.top,
+            textLeft: text.left,
+            textRight: text.right,
+            color: window.getComputedStyle(label).color,
+          };
+        }),
+      };
+    });
+  }
+
+  /**
+   * How wide #theImage's content is against what it shows, whether it actually
+   * scrolls - a scrollLeft that sticks at 0 means it does not - and how wide the
+   * page is against the window. Leaves #theImage scrolled back to the left.
+   */
+  async overflowWidths() {
+    return this.page.evaluate(() => {
+      const area = document.getElementById('theImage');
+      area.scrollLeft = 1;
+      const scrolls = area.scrollLeft > 0;
+      area.scrollLeft = 0;
+      return {
+        areaScroll: area.scrollWidth,
+        areaClient: area.clientWidth,
+        areaScrolls: scrolls,
+        pageScroll: document.documentElement.scrollWidth,
+        window: document.documentElement.clientWidth,
+      };
+    });
+  }
+
+  /** Whether the photo still carries the <area> map; the theme removes it whenever the photo is not shown at its file size. */
   async hasImageMap() {
     return this.image.evaluate((el) => el.hasAttribute('usemap'));
   }
@@ -414,6 +816,90 @@ class PicturePage {
     // Stepped, so the drag produces mousemove events rather than one jump.
     await this.page.mouse.move(toX, toY, { steps: 10 });
     await this.page.mouse.up();
+  }
+
+  /**
+   * Drags with the mouse across the part of the photo that is on screen, from
+   * one point to another given in fractions of that part, and returns how far
+   * the pointer travelled in CSS pixels.
+   *
+   * @param {{x: number, y: number}} from
+   * @param {{x: number, y: number}} to
+   * @returns {Promise<{dx: number, dy: number}>}
+   */
+  async dragVisiblePhoto(from, to) {
+    const visible = await this.visiblePhotoRect();
+    const fromX = visible.left + visible.width * from.x;
+    const fromY = visible.top + visible.height * from.y;
+    const toX = visible.left + visible.width * to.x;
+    const toY = visible.top + visible.height * to.y;
+
+    await this.page.mouse.move(fromX, fromY);
+    await this.page.mouse.down();
+    // Stepped, so the drag produces mousemove events rather than one jump.
+    await this.page.mouse.move(toX, toY, { steps: 10 });
+    await this.page.mouse.up();
+    return { dx: toX - fromX, dy: toY - fromY };
+  }
+
+  /**
+   * Presses the left mouse button at a point of the visible photo, given in
+   * fractions of that part, and returns the point in window coordinates.
+   *
+   * @param {{x: number, y: number}} at
+   */
+  async pressVisiblePhoto(at) {
+    const visible = await this.visiblePhotoRect();
+    const point = { x: visible.left + visible.width * at.x, y: visible.top + visible.height * at.y };
+    await this.page.mouse.move(point.x, point.y);
+    await this.page.mouse.down();
+    return point;
+  }
+
+  /**
+   * Moves the mouse to a point in window coordinates, in steps.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async moveMouseTo(x, y) {
+    await this.page.mouse.move(x, y, { steps: 10 });
+  }
+
+  async releaseMouse() {
+    await this.page.mouse.up();
+  }
+
+  /**
+   * Sends the page a mouse move that reports no button held, the way a page
+   * sees the mouse after a release it never received - one a context menu or
+   * another window took.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async moveWithNoButtonTo(x, y) {
+    await this.page.evaluate(
+      ([cx, cy]) => {
+        document
+          .getElementById('theMainImage')
+          .dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: cx, clientY: cy, buttons: 0 }));
+      },
+      [x, y]
+    );
+  }
+
+  /** Whether the photo is bigger than #theImage shows, on either axis. */
+  async areaOverflows() {
+    return this.page.evaluate(() => {
+      const area = document.getElementById('theImage');
+      return area.scrollWidth > area.clientWidth || area.scrollHeight > area.clientHeight;
+    });
+  }
+
+  /** The mouse cursor the photo shows. */
+  async photoCursor() {
+    return this.image.evaluate((el) => window.getComputedStyle(el).cursor);
   }
 
   /**

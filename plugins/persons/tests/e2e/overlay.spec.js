@@ -317,12 +317,13 @@ test.describe('a stale person region', () => {
 });
 
 /**
- * The HiDPI branch of rvas_choose().
+ * The photo on a HiDPI screen.
  *
- * At devicePixelRatio > 1 it rescales the photo and *removes* the <area> map
- * (themes/modus/js/photo.autosize.js:57-66), so navigation falls to the theme's
- * own click handler and the photo's rendered size no longer equals the
- * derivative's pixel size. Both are things the overlay sits on top of.
+ * At devicePixelRatio > 1 the theme loads a file with more pixels than the
+ * rendered size and *removes* the <area> map (themes/modus/js/photo.zoom.js),
+ * so navigation falls to the theme's own click handler and the photo's rendered
+ * size no longer equals the file's pixel size. Both are things the overlay sits
+ * on top of.
  */
 test.describe('the overlay on a HiDPI screen', () => {
   test.use({ deviceScaleFactor: 2 });

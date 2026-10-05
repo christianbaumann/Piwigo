@@ -15,10 +15,20 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * 'empty' is the untagged photo the editor specs start from; it writes nothing
  * into the file, so what is found there afterwards was written by the browser.
  *
- * @param {'overlay'|'stale'|'empty'} scenario
+ * 'neighbours' is an untagged photo with a previous and a next one in the same
+ * album, and also returns their previous_path and next_path.
+ *
+ * The returned width and height are the seeded photo's pixel size as stored
+ * in piwigo_images. `source: 'small'` copies the smallest gallery image instead
+ * of the first one, for the picture page's upscaling case.
+ *
+ * @param {'overlay'|'stale'|'empty'|'neighbours'} scenario
+ * @param {{source?: 'first'|'small'}} [options]
  */
-function seed(scenario) {
-  return JSON.parse(execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`], { encoding: 'utf8' }));
+function seed(scenario, { source = 'first' } = {}) {
+  return JSON.parse(
+    execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`, `--source=${source}`], { encoding: 'utf8' })
+  );
 }
 
 /** Remove whatever the seed created. Safe to call unseeded. */
