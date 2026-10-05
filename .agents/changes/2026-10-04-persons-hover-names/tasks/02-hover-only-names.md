@@ -29,7 +29,7 @@ navigates.
   * `[ST]` box 1 → empty photo area → off the stage: label 1 hides at each step
   * `[HAPPY]` label 1 focused by keyboard: label 1 visible
 * [ ] Add `hoverBox(regionId)` to `PicturePage.js` (pointer to the centre of that box's rect)
-* [ ] Rewrite task 01's `[ERR]` "every label visible on photo hover" case in its own cycle; the
+* [ ] Rewrite task 01's `[ERR]` `hovering the photo outside every box shows every name` case (`overlay.spec.js`) in its own cycle; the
   commit message names the decision that replaced it
 * [ ] `overlay.js`: on `#persons-stage` `mousemove`, toggle `.person-box-active` on every
   `.person-box` whose `getBoundingClientRect()` contains the pointer; on `mouseleave`, clear it.

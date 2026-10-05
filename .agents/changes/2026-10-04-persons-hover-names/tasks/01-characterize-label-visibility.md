@@ -34,13 +34,16 @@ today. Task 02 then runs against these tests as its regression net.
 * [x] Break the behaviour each new test watches once (e.g. drop the `#persons-stage:hover` rule,
   drop the tagging-mode opacity rule) and watch it go red. Record in the commit message which
   change made each one fail
-  **Note:** each edit checked synced into the container (md5) before the run, then reverted
+  **Note:** each edit checked synced into the container (md5) before the run, then reverted. Each
+  run was filtered with `-g` to the three new tests, so "killed only by its own test" holds within
+  those three. Outside them, the existing `a box is hidden until the photo is hovered` watches the
+  rules M1 and M2 break and was not part of the mutant runs
 
   | Mutant | Expected killer | Result |
   |---|---|---|
-  | M1 `.person-box { opacity: 0 }` → `1` (`overlay.css`) | `every name is hidden before the photo is hovered` | killed, nothing else moved |
-  | M2 drop `#persons-stage:hover .person-box` (`overlay.css`) | `hovering the photo outside every box shows every name` | killed, nothing else moved |
-  | M3 drop `#persons-stage.persons-tagging .person-box` (`editor.css`) | `tagging mode shows every saved name without a hover` | first **survived**: the toggle sits inside the stage, so the boxes were already shown by the hover and the poll read the 0.15 s fade-out above 0.9. Fixed by making `labelStyle()` wait for the stage's CSS transitions; then killed, nothing else moved |
+  | M1 `.person-box { opacity: 0 }` → `1` (`overlay.css`) | `every name is hidden before the photo is hovered` | killed; the other two new tests stayed green |
+  | M2 drop `#persons-stage:hover .person-box` (`overlay.css`) | `hovering the photo outside every box shows every name` | killed; the other two new tests stayed green |
+  | M3 drop `#persons-stage.persons-tagging .person-box` (`editor.css`) | `tagging mode shows every saved name without a hover` | first **survived**: the toggle sits inside the stage, so the boxes were already shown by the hover and the poll read the 0.15 s fade-out above 0.9. Fixed by making `labelStyle()` wait for the stage's CSS transitions; then killed; the other two new tests stayed green |
 
 ## Verification
 
