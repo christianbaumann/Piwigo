@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from pwgdeploy import fileset, manifest
-from pwgdeploy.config import DeployConfig, SiteConfig
+from pwgdeploy.config import DeployConfig, MailConfig, SiteConfig
 from pwgdeploy.errors import InstallError, RemoteHttpError
 from pwgdeploy.http import SYNC_TIMEOUT_SECONDS
 from pwgdeploy.urls import remote_path, site_url
@@ -155,7 +155,7 @@ def scrape_errors(body: str) -> list[str]:
 # --- the generated config -------------------------------------------------------------
 
 
-def config_php(site: SiteConfig) -> str:
+def config_php(site: SiteConfig, mail: MailConfig | None = None) -> str:
     """Decision 8: generated from the credential JSON, never uploaded from the local copy.
 
     `assume_https` is written even though nothing in core reads it — it is what the local
@@ -168,6 +168,19 @@ def config_php(site: SiteConfig) -> str:
         f"$conf['assume_https'] = {'true' if site.assume_https else 'false'};\n"
         f"$conf['provenance_exiftool_path'] = {_php_string(site.exiftool_path)};\n"
         f"$conf['persons_exiftool_path'] = {_php_string(site.exiftool_path)};\n"
+        + (_mail_php(mail) if mail else "")
+    )
+
+
+def _mail_php(mail: MailConfig) -> str:
+    """Without these lines core falls back to PHP mail() (functions_mail.inc.php)."""
+    return (
+        f"$conf['smtp_host'] = {_php_string(f'{mail.host}:{mail.port}')};\n"
+        f"$conf['smtp_secure'] = {_php_string(mail.secure)};\n"
+        f"$conf['smtp_user'] = {_php_string(mail.user)};\n"
+        f"$conf['smtp_password'] = {_php_string(mail.password)};\n"
+        f"$conf['mail_sender_email'] = {_php_string(mail.sender_email)};\n"
+        f"$conf['mail_sender_name'] = {_php_string(mail.sender_name)};\n"
     )
 
 
@@ -190,7 +203,7 @@ def upload_config(config: DeployConfig, state_dir: Path, transport) -> bool:
 
     with tempfile.TemporaryDirectory() as scratch:
         local = Path(scratch) / "config.inc.php"
-        local.write_text(config_php(config.site), encoding="utf-8")
+        local.write_text(config_php(config.site, config.mail), encoding="utf-8")
         digest = manifest.file_hash(local)
         if entries.get(remote) == digest:
             return False

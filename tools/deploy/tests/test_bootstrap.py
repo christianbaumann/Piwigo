@@ -38,8 +38,21 @@ MIN_PLUGINS = 3
 MIN_CONFIG_BYTES = 40
 
 
+MAIL = {
+    "host": "smtp.example.test",
+    "port": 465,
+    "secure": "ssl",
+    "user": "noreply@example.test",
+    "password": "mailsecret",
+    "sender_email": "noreply@example.test",
+    "sender_name": "Bilder",
+}
+
+
 def config(**overrides):
     raw = {section: dict(values) for section, values in RAW.items()}
+    if "mail" in overrides:
+        raw["mail"] = dict(MAIL)
     for section, values in overrides.items():
         raw[section].update(values)
     return load(raw)
@@ -185,6 +198,50 @@ def test_generated_config_quotes_an_exiftool_path_safely():
     php = bootstrap.config_php(config(site={"exiftool_path": "/o'brien/bin/"}).site)
 
     assert "$conf['persons_exiftool_path'] = '/o\\'brien/bin/';" in php
+
+
+def test_generated_config_leaves_mail_to_core_without_a_mail_section(cfg):
+    """[ECP] No section, no lines: core's own defaults (PHP mail()) stay in force."""
+    php = bootstrap.config_php(cfg.site, cfg.mail)
+
+    assert len(php) > MIN_CONFIG_BYTES
+    assert "smtp" not in php
+    assert "mail_sender" not in php
+
+
+def test_generated_config_carries_the_smtp_settings():
+    """[HAPPY] functions_mail.inc.php splits smtp_host on ':' for the port."""
+    cfg = config(mail={})
+
+    php = bootstrap.config_php(cfg.site, cfg.mail)
+
+    assert "$conf['smtp_host'] = 'smtp.example.test:465';" in php
+    assert "$conf['smtp_secure'] = 'ssl';" in php
+    assert "$conf['smtp_user'] = 'noreply@example.test';" in php
+    assert "$conf['smtp_password'] = 'mailsecret';" in php
+    assert "$conf['mail_sender_email'] = 'noreply@example.test';" in php
+    assert "$conf['mail_sender_name'] = 'Bilder';" in php
+
+
+def test_generated_config_quotes_an_smtp_password_safely():
+    """[NEG] A generated password may well hold ' or \\ — unescaped, the remote config
+    would not parse and every page of the gallery would be blank."""
+    cfg = config(mail={"password": "a'b\\c"})
+
+    php = bootstrap.config_php(cfg.site, cfg.mail)
+
+    assert "$conf['smtp_password'] = 'a\\'b\\\\c';" in php
+
+
+def test_adding_a_mail_section_re_uploads_the_config(cfg, tmp_path):
+    """[ST] A deploy after filling in `mail` is what puts SMTP live on the remote."""
+    bootstrap.upload_config(cfg, tmp_path, FakeTransport())
+    second = FakeTransport()
+
+    uploaded = bootstrap.upload_config(config(mail={}), tmp_path, second)
+
+    assert uploaded is True
+    assert b"smtp_host" in second.files["/piwigo/local/config/config.inc.php"]
 
 
 def test_config_upload_lands_at_the_remote_config_path(cfg, tmp_path):

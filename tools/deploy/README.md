@@ -49,6 +49,10 @@ Any `deploy.*.json` other than the example is git-ignored, in the repository roo
 | | `language` | install language, default `de_DE` |
 | | `assume_https` | written into the generated config |
 | | `exiftool_path` | `""` when the binary is on the host's `PATH` |
+| `mail` | `host` `port` `user` `password` | optional section — SMTP login of the mailbox that sends the gallery's mail; every field but `sender_name` is required. **Delete the whole section** to keep PHP `mail()`: the example's placeholders would otherwise go live and every gallery mail fails |
+| | `secure` | `ssl` (port 465) or `tls` (STARTTLS, port 587) — nothing else is accepted; a mismatched pair fails on the remote, not here |
+| | `sender_email` | the From address; use the SMTP mailbox itself, or receivers reject it |
+| | `sender_name` | the From name; `""` means the gallery title |
 
 Values are validated locally against the same rules the remote enforces, so a bad table prefix
 or a quote in the webmaster name fails in milliseconds instead of after a 128 MB upload. Every
@@ -230,7 +234,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-404 tests, measured 2026-09-01. Everything that decides *what* to do is a pure function and is
+436 tests, measured 2026-10-05. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

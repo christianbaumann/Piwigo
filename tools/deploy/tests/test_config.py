@@ -268,6 +268,125 @@ def test_remote_root_is_normalised(given, expected):
     assert config.load(raw).ftp.remote_root == expected
 
 
+# --- mail ------------------------------------------------------------------
+
+
+def test_the_mail_section_is_loaded():
+    """[HAPPY] SMTP settings for the generated config, read from the example."""
+    mail = config.load(valid()).mail
+
+    assert mail == config.MailConfig(
+        host="smtp.example.net",
+        port=465,
+        secure="ssl",
+        user="noreply@example.net",
+        password="REPLACE_ME",
+        sender_email="noreply@example.net",
+        sender_name="",
+    )
+
+
+def test_the_mail_section_is_optional():
+    """[ECP] Without it the remote keeps core's default: PHP mail()."""
+    raw = valid()
+    del raw["mail"]
+
+    assert config.load(raw).mail is None
+
+
+def test_mail_sender_name_defaults_to_empty():
+    """[HAPPY] Empty means core falls back to the gallery title."""
+    raw = valid()
+    del raw["mail"]["sender_name"]
+
+    assert config.load(raw).mail.sender_name == config.DEFAULT_MAIL_SENDER_NAME
+
+
+@pytest.mark.parametrize("secure", ["ssl", "tls"])
+def test_mail_secure_accepts_both_values_core_knows(secure):
+    """[ECP] functions_mail.inc.php passes only 'ssl' and 'tls' on to PHPMailer."""
+    raw = valid()
+    raw["mail"]["secure"] = secure
+
+    assert config.load(raw).mail.secure == secure
+
+
+@pytest.mark.parametrize("secure", ["", "none", "SSL", "starttls"])
+def test_mail_secure_rejects_anything_else(secure):
+    """[NEG] Core silently drops an unknown value, leaving only opportunistic STARTTLS
+    between the SMTP password and the wire."""
+    raw = valid()
+    raw["mail"]["secure"] = secure
+
+    with pytest.raises(ConfigError, match="mail.secure"):
+        config.load(raw)
+
+
+@pytest.mark.parametrize(
+    ("port", "accepted"),
+    [(0, False), (1, True), (65535, True), (65536, False), ("465", False)],
+)
+def test_mail_port_bounds(port, accepted):
+    """[BVA] Same range as the FTP port; a string is a type error, not a port."""
+    raw = valid()
+    raw["mail"]["port"] = port
+    if accepted:
+        assert config.load(raw).mail.port == port
+    else:
+        with pytest.raises(ConfigError, match="mail.port"):
+            config.load(raw)
+
+
+@pytest.mark.parametrize(
+    "host", ["smtp.x.net:587", "ssl://smtp.x.net", "a.net;b.net", "smtp x.net", "::1"]
+)
+def test_mail_host_must_be_a_bare_host_name(host):
+    """[NEG] Core splits smtp_host on ':' and PHPMailer splits it on ';' — either would
+    send the mail somewhere other than host:port, and only on the remote."""
+    raw = valid()
+    raw["mail"]["host"] = host
+
+    with pytest.raises(ConfigError, match="mail.host"):
+        config.load(raw)
+
+
+@pytest.mark.parametrize("key", ["port", "secure"])
+def test_a_missing_mail_key_names_it(key):
+    """[NEG] Neither has a default: the right pair depends on the hoster."""
+    raw = valid()
+    del raw["mail"][key]
+
+    with pytest.raises(ConfigError, match=key):
+        config.load(raw)
+
+
+def test_mail_port_must_not_be_a_boolean():
+    """[NEG] `true` is an int to Python; it must not become port 1."""
+    raw = valid()
+    raw["mail"]["port"] = True
+
+    with pytest.raises(ConfigError, match="mail.port"):
+        config.load(raw)
+
+
+def test_unknown_key_inside_mail_is_rejected():
+    """[NEG] A typo such as `smtp_host` must not silently fall back to mail()."""
+    raw = valid()
+    raw["mail"]["smtp_host"] = "smtp.example.net"
+
+    with pytest.raises(ConfigError, match="smtp_host"):
+        config.load(raw)
+
+
+def test_mail_must_be_an_object():
+    """[NEG]"""
+    raw = valid()
+    raw["mail"] = "smtp.example.net"
+
+    with pytest.raises(ConfigError, match="mail"):
+        config.load(raw)
+
+
 # --- the messages a person actually has to act on --------------------------
 
 
@@ -284,6 +403,10 @@ REJECTIONS = [
     ("ftp.password", lambda r: r["ftp"].__setitem__("password", "")),
     ("mysql", lambda r: r.pop("mysql")),
     ("host", lambda r: r["ftp"].pop("host")),
+    ("mail.secure", lambda r: r["mail"].__setitem__("secure", "starttls")),
+    ("mail.port", lambda r: r["mail"].__setitem__("port", 0)),
+    ("mail.sender_email", lambda r: r["mail"].__setitem__("sender_email", "nobody")),
+    ("mail.password", lambda r: r["mail"].__setitem__("password", "")),
 ]
 
 

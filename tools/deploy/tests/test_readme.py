@@ -152,6 +152,9 @@ def test_every_exit_code_the_tool_can_return_is_documented(readme):
 # --- the credential file ------------------------------------------------------------------
 
 
+ALL_SECTIONS = config.SECTIONS + config.OPTIONAL_SECTIONS
+
+
 def documented_credential_fields(readme: str) -> set[str]:
     """The second column of the credential table, which is where field names live."""
     fields: set[str] = set()
@@ -159,14 +162,14 @@ def documented_credential_fields(readme: str) -> set[str]:
         if not line.startswith("| "):
             continue
         columns = [c.strip() for c in line.strip("|").split("|")]
-        if len(columns) >= 3 and columns[0] in ("", *config.SECTIONS, *(f"`{s}`" for s in config.SECTIONS)):
+        if len(columns) >= 3 and columns[0] in ("", *ALL_SECTIONS, *(f"`{s}`" for s in ALL_SECTIONS)):
             fields.update(backticked(columns[1]))
     return fields
 
 
 def real_credential_fields() -> set[str]:
     example = (README.parent / "deploy.example.json").read_text(encoding="utf-8")
-    return set(re.findall(r'"(\w+)":', example)) - set(config.SECTIONS)
+    return set(re.findall(r'"(\w+)":', example)) - set(ALL_SECTIONS)
 
 
 def test_every_documented_credential_field_is_in_the_example(readme):
@@ -189,7 +192,7 @@ def test_every_field_of_the_example_is_documented(readme):
 def test_every_section_of_the_example_is_documented(readme):
     """[HAPPY] Anti-vacuity for the two tests above: the table is read by section, so a
     section missing from it would silently take its fields with it."""
-    for section in config.SECTIONS:
+    for section in ALL_SECTIONS:
         assert f"| `{section}` |" in readme, f"section {section} has no row in the table"
 
 

@@ -34,8 +34,17 @@ DEFAULT_PREFIX = "piwigo_"
 DEFAULT_LANGUAGE = "de_DE"
 DEFAULT_ASSUME_HTTPS = True
 DEFAULT_EXIFTOOL_PATH = ""
+DEFAULT_MAIL_SENDER_NAME = ""
+
+# functions_mail.inc.php hands PHPMailer these two and silently drops anything else,
+# leaving only opportunistic STARTTLS between the SMTP password and the wire.
+MAIL_SECURE_VALUES = ("ssl", "tls")
+
+# Core splits smtp_host on ':' for the port, PHPMailer splits it on ';' into a host list.
+MAIL_HOST_FORBIDDEN = re.compile(r"[:/;\s]")
 
 SECTIONS = ("ftp", "mysql", "admin", "site")
+OPTIONAL_SECTIONS = ("mail",)
 
 
 @dataclass(frozen=True)
@@ -72,11 +81,23 @@ class SiteConfig:
 
 
 @dataclass(frozen=True)
+class MailConfig:
+    host: str
+    port: int
+    secure: str
+    user: str
+    password: str
+    sender_email: str
+    sender_name: str = DEFAULT_MAIL_SENDER_NAME
+
+
+@dataclass(frozen=True)
 class DeployConfig:
     ftp: FtpConfig
     mysql: MysqlConfig
     admin: AdminConfig
     site: SiteConfig
+    mail: MailConfig | None = None
 
 
 def load(raw: Mapping[str, Any]) -> DeployConfig:
@@ -84,11 +105,12 @@ def load(raw: Mapping[str, Any]) -> DeployConfig:
     if not isinstance(raw, Mapping):
         raise ConfigError("the credential file must hold a JSON object at the top level")
 
-    _reject_unknown_keys(raw, SECTIONS, "top level")
+    _reject_unknown_keys(raw, SECTIONS + OPTIONAL_SECTIONS, "top level")
     for name in SECTIONS:
         if name not in raw:
             raise ConfigError(f"missing section '{name}' in the credential file")
-        if not isinstance(raw[name], Mapping):
+    for name in SECTIONS + OPTIONAL_SECTIONS:
+        if name in raw and not isinstance(raw[name], Mapping):
             raise ConfigError(f"section '{name}' must be a JSON object")
 
     return DeployConfig(
@@ -96,6 +118,7 @@ def load(raw: Mapping[str, Any]) -> DeployConfig:
         mysql=_mysql(raw["mysql"]),
         admin=_admin(raw["admin"]),
         site=_site(raw["site"]),
+        mail=_mail(raw["mail"]) if "mail" in raw else None,
     )
 
 
@@ -117,7 +140,7 @@ def _ftp(raw: Mapping[str, Any]) -> FtpConfig:
         host=_required_string(raw, "host", "ftp"),
         user=_required_string(raw, "user", "ftp"),
         password=_required_string(raw, "password", "ftp"),
-        port=_port(raw.get("port", DEFAULT_PORT)),
+        port=_port(raw.get("port", DEFAULT_PORT), "ftp.port"),
         remote_root=_remote_root(raw.get("remote_root", DEFAULT_REMOTE_ROOT)),
     )
 
@@ -172,6 +195,43 @@ def _site(raw: Mapping[str, Any]) -> SiteConfig:
     )
 
 
+def _mail(raw: Mapping[str, Any]) -> MailConfig:
+    _reject_unknown_keys(
+        raw,
+        ("host", "port", "secure", "user", "password", "sender_email", "sender_name"),
+        "mail",
+    )
+    secure = raw.get("secure")
+    if secure not in MAIL_SECURE_VALUES:
+        raise ConfigError(
+            f"mail.secure must be one of {', '.join(MAIL_SECURE_VALUES)}, got {secure!r}"
+        )
+    sender_email = _required_string(raw, "sender_email", "mail")
+    if not MAIL_SHAPE.match(sender_email):
+        raise ConfigError(
+            f"mail.sender_email {sender_email!r} is not shaped like a mail address (xxx@yyy.eee)"
+        )
+    sender_name = raw.get("sender_name", DEFAULT_MAIL_SENDER_NAME)
+    if not isinstance(sender_name, str):
+        raise ConfigError("mail.sender_name must be a string (empty means: the gallery title)")
+    if "port" not in raw:
+        raise ConfigError("missing 'port' in section 'mail'")
+    host = _required_string(raw, "host", "mail")
+    if MAIL_HOST_FORBIDDEN.search(host):
+        raise ConfigError(
+            f"mail.host must be a bare host name without port, scheme or list, got {host!r}"
+        )
+    return MailConfig(
+        host=host,
+        port=_port(raw["port"], "mail.port"),
+        secure=secure,
+        user=_required_string(raw, "user", "mail"),
+        password=_required_string(raw, "password", "mail"),
+        sender_email=sender_email,
+        sender_name=sender_name,
+    )
+
+
 def _reject_unknown_keys(
     raw: Mapping[str, Any], allowed: tuple[str, ...], where: str
 ) -> None:
@@ -193,11 +253,11 @@ def _required_string(raw: Mapping[str, Any], key: str, section: str) -> str:
     return value
 
 
-def _port(value: Any) -> int:
+def _port(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ConfigError("ftp.port must be an integer")
+        raise ConfigError(f"{field} must be an integer")
     if not PORT_MIN <= value <= PORT_MAX:
-        raise ConfigError(f"ftp.port must be between {PORT_MIN} and {PORT_MAX}, got {value}")
+        raise ConfigError(f"{field} must be between {PORT_MIN} and {PORT_MAX}, got {value}")
     return value
 
 

@@ -23,5 +23,14 @@
     "language": "de_DE",
     "assume_https": true,
     "exiftool_path": ""
+  },
+  "mail": {
+    "host": "smtp.example.net",
+    "port": 465,
+    "secure": "ssl",
+    "user": "noreply@example.net",
+    "password": "REPLACE_ME",
+    "sender_email": "noreply@example.net",
+    "sender_name": ""
   }
 }

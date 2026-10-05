@@ -13,7 +13,7 @@ uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
-uv run pytest                                    # 404 tests, measured 2026-09-01
+uv run pytest                                    # 436 tests, measured 2026-10-05
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -42,6 +42,11 @@ unchanged — nothing catches a forgotten `admin.password` before it is submitte
 as the real webmaster password. Confirmed 2026-09-01: a deploy ran clean with `admin.password`
 still `REPLACE_ME`, and that literal string became the working login. Diff every field in a new
 `deploy.*.json` against the example before the first run against a given target.
+
+The optional `mail` section has the same trap with a louder failure: copied unedited, it points the
+remote at `smtp.example.net` and every gallery mail fails. Delete the section to keep PHP `mail()`.
+`mail.host` is validated as a bare name because core splits it on `:` for the port and PHPMailer
+on `;` into a host list - `smtp.x.net:587` would otherwise go live as port 587, not `mail.port`.
 
 ## What is published
 
