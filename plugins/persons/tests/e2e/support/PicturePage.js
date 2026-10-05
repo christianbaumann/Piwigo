@@ -299,6 +299,36 @@ class PicturePage {
     return point;
   }
 
+  /**
+   * Moves the pointer to the centre of a box, and returns the point in
+   * viewport pixels.
+   *
+   * @param {number} regionId
+   */
+  async hoverBox(regionId) {
+    const box = await this.boxRect(regionId);
+    const point = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
+   * Whether a viewport point lies inside a box's rendered rect.
+   *
+   * @param {number} regionId
+   * @param {{x: number, y: number}} point
+   */
+  async boxContains(regionId, point) {
+    const box = await this.boxRect(regionId);
+    return point.x >= box.left && point.x <= box.left + box.width
+      && point.y >= box.top && point.y <= box.top + box.height;
+  }
+
+  /** @param {number} regionId */
+  async focusLabel(regionId) {
+    await this.label(regionId).focus();
+  }
+
   /** Whether the pointer is anywhere over the photo and its overlay. */
   async stageIsHovered() {
     return this.stage.evaluate((el) => el.matches(':hover'));

@@ -131,6 +131,38 @@ test.describe('the admin tagging screen', () => {
   });
 
   /**
+   * [HAPPY] A box the editor added shows its name on hover once tagging mode
+   * is left. This screen does not reload on leaving, so the box is the one
+   * editor.js put into the page, not one the server rendered.
+   */
+  test('a box drawn here shows its name on hover after tagging, with no reload', async ({ page }) => {
+    const screen = new AdminPhotoPage(page);
+    await screen.open(seeded.photo_id);
+    await screen.waitForPlacement();
+    await screen.markDocument();
+
+    await screen.enterTaggingMode();
+    await screen.dragBox(BOX);
+    await screen.typeName(ADA);
+    await screen.pickerInput.press('Enter');
+    await expect(screen.savedBoxes).toHaveCount(1);
+    await screen.exitTaggingMode();
+
+    const [regionId] = (await screen.savedRegionIds()).map(Number);
+    await screen.moveMouseTo(0, 0);
+    // Anti-vacuity: the name is hidden before the hover, so the hover is what
+    // shows it.
+    expect((await screen.labelStyle(regionId)).opacity).toBe(0);
+
+    await screen.hoverBox(regionId);
+
+    await expect
+      .poll(async () => (await screen.labelStyle(regionId)).opacity)
+      .toBeGreaterThan(0.9);
+    expect(await screen.sameDocument()).toBe(true);
+  });
+
+  /**
    * The two surfaces have to place the same region identically.
    *
    * This is the Phase 7 manual box, automated. They render different

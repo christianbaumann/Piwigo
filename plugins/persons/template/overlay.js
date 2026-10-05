@@ -3,8 +3,8 @@
  *
  * The boxes themselves are rendered by template/public_overlay.tpl and laid out
  * in percent inside #persons-overlay, so they are correct for any size that
- * element happens to have. This file has exactly one job: keep that element
- * exactly over the photo.
+ * element happens to have. This file keeps that element exactly over the
+ * photo, and marks the boxes under the pointer so their names show.
  *
  * The only truthful source of the photo's on-screen box is
  * getBoundingClientRect() on #theMainImage. The theme's zoom rewrites that
@@ -67,6 +67,26 @@
 		   normally noticed. */
 		image.addEventListener('load', place);
 		window.addEventListener('resize', placeSoon);
+
+		/* The boxes take no pointer events - a click on a face must still reach
+		   the theme's navigation - so :hover never matches them and the pointer
+		   is hit-tested here instead. Queried on every move: the editor adds and
+		   removes boxes, and a resize moves them. */
+		stage.addEventListener('mousemove', function (event) {
+			var boxes = overlay.querySelectorAll('.person-box');
+			for (var i = 0; i < boxes.length; i++) {
+				var r = boxes[i].getBoundingClientRect();
+				var inside = event.clientX >= r.left && event.clientX <= r.right
+					&& event.clientY >= r.top && event.clientY <= r.bottom;
+				boxes[i].classList.toggle('person-box-active', inside);
+			}
+		});
+		stage.addEventListener('mouseleave', function () {
+			var boxes = overlay.querySelectorAll('.person-box-active');
+			for (var i = 0; i < boxes.length; i++) {
+				boxes[i].classList.remove('person-box-active');
+			}
+		});
 
 		if (window.ResizeObserver) {
 			/* The zoom can change only the width and height attributes,

@@ -19,8 +19,9 @@
  * pointer-events: none keeps the theme's click-to-navigate handler and the
  * <area> map underneath working untouched - a click anywhere on the photo,
  * including on a box, reaches the image exactly as it did before the plugin.
- * The cost is that a box cannot be hovered; the name label opts back in below,
- * and is what triggers the dimming.
+ * So a box can never match :hover; overlay.js hit-tests the pointer and sets
+ * .person-box-active instead. The name label opts back in to pointer events
+ * below, and is what triggers the dimming.
  *
  * overflow: hidden clips the dimming shadow to the photo instead of letting it
  * darken the whole page.
@@ -43,8 +44,10 @@
 	transition: opacity 0.15s ease-in-out;
 }
 
-/* Boxes stay out of the way until the visitor looks at the photo. */
-#persons-stage:hover .person-box {
+/* Boxes stay out of the way until the visitor looks at the photo, or tabs
+   to a name - a focused link must not be invisible. */
+#persons-stage:hover .person-box,
+.person-box:focus-within {
 	opacity: 1;
 }
 
@@ -76,6 +79,13 @@
 	white-space: nowrap;
 	text-decoration: none;
 	pointer-events: auto;
+	opacity: 0;
+}
+
+/* A name only for the box under the pointer, so names do not cover faces. */
+.person-box-active .person-box-label,
+.person-box:focus-within .person-box-label {
+	opacity: 1;
 }
 
 .person-box-label:hover {
