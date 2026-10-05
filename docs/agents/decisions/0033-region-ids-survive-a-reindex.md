@@ -1,4 +1,4 @@
-# 0032 — An unchanged region keeps its id across a reindex
+# 0033 — An unchanged region keeps its id across a reindex
 
 Date: 2026-10-04
 Status: accepted

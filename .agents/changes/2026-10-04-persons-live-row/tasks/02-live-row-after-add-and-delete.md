@@ -88,7 +88,7 @@ This includes the first face on a photo that had none.
   *different* region's id. Recorded in `docs/backlog.md` (section *persons*) and as the skipped
   spec `a box rendered before a save can still be deleted after it`, which was seen red with the
   skip lifted. The drift spec deletes before it adds so it does not depend on this bug.
-  **Fixed afterwards on user request** ([decision 0032](../../../../docs/agents/decisions/0032-region-ids-survive-a-reindex.md)):
+  **Fixed afterwards on user request** ([decision 0033](../../../../docs/agents/decisions/0033-region-ids-survive-a-reindex.md)):
   the reindex carries the id of an unchanged region (`persons_carry_region_ids()`). The skip is
   lifted, a spec for the worse variant was added (seen red: deleting the box just added removed a
   seeded face from the file), and the backlog entry was removed.

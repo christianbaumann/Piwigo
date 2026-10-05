@@ -7,7 +7,7 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  * Every rebuild is destructive by design - this image's rows are replaced by
  * what the file holds right now. No region content is taken from the previous
  * index, so a wrong row cannot outlive one rescan - only an unchanged region's
- * id, so an open page's ids stay valid across a write (decision 0032), and the
+ * id, so an open page's ids stay valid across a write (decision 0033), and the
  * stored rotation code a physical turn is detected by.
  *
  * No explicit transaction wraps a rebuild. Core ships no transaction helper,
