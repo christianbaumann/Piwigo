@@ -7,9 +7,9 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
 /**
  * Creates a throwaway album with one copied photo and returns what was made.
  *
- * @param {'photo'|'marked'} scenario
+ * @param {'photo'|'marked'|'regions'} scenario
  * @returns {{photo_id: number, album_id: number, width: number, height: number,
- *   picture_path: string, album_path: string}}
+ *   kept_name: string, cut_name: string, picture_path: string, album_path: string}}
  */
 function seed(scenario) {
   return JSON.parse(execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`], { encoding: 'utf8' }));

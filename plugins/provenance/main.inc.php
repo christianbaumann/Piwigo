@@ -52,6 +52,13 @@ add_event_handler('associate_images_to_categories', 'provenance_inherit_associat
 add_event_handler('site_update_associate_images', 'provenance_inherit_site_update',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_inherit.inc.php');
 
+// plugins/photoedit rewrites the file; no write-back may run meanwhile.
+// Registered everywhere: photoedit fires these from ws.php.
+add_event_handler('photoedit_begin', 'provenance_photoedit_begin',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_photoedit.inc.php');
+add_event_handler('photoedit_end', 'provenance_photoedit_end',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_photoedit.inc.php');
+
 // The public row. Registered only on the picture page, and the file behind it is
 // pulled in only when the event actually fires.
 if (script_basename() == 'picture')

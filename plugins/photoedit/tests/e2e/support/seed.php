@@ -10,6 +10,7 @@
  * Usage:
  *   php tests/e2e/support/seed.php --scenario=photo    a copy of a gallery PNG
  *   php tests/e2e/support/seed.php --scenario=marked   a generated 300x200 PNG, for specs that save
+ *   php tests/e2e/support/seed.php --scenario=regions  marked, plus two person regions in the file
  *   php tests/e2e/support/seed.php --age-derivatives   backdate the seeded photo's derivatives
  *   php tests/e2e/support/seed.php --restore
  *
@@ -81,6 +82,8 @@ if (isset($args['restore']))
 
     $builder->importTestObjects($snapshot);
     $builder->destroyTestImages();
+    // A save made persons index the regions --scenario=regions wrote.
+    $builder->destroyPersons(array(FixtureBuilder::REGION_KEPT['name'], FixtureBuilder::REGION_CUT['name']));
     $builder->destroyTestAlbums();
     unlink(SNAPSHOT_FILE);
 
@@ -89,9 +92,9 @@ if (isset($args['restore']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('photo', 'marked'), true))
+if (!in_array($scenario, array('photo', 'marked', 'regions'), true))
 {
-    fail('--scenario must be: photo, marked');
+    fail('--scenario must be: photo, marked, regions');
 }
 
 if (is_file(SNAPSHOT_FILE))
@@ -109,7 +112,12 @@ catch (RuntimeException $e)
 }
 
 // marked: a generated landscape PNG, which a save rewrites - never a copy of a scan.
-$image = $scenario === 'marked' ? $builder->createMarkedImage() : $builder->createTestImage();
+$image = $scenario === 'photo' ? $builder->createTestImage() : $builder->createMarkedImage();
+if ($scenario === 'regions')
+{
+    // Only the file: the editor's warning reads the regions from there.
+    $builder->writeRegions($image, array(FixtureBuilder::REGION_KEPT, FixtureBuilder::REGION_CUT));
+}
 $catId = $builder->createTestAlbum('Photoedit E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
@@ -126,6 +134,8 @@ echo json_encode(array(
     'album_id' => $catId,
     'width' => $image['width'],
     'height' => $image['height'],
+    'kept_name' => FixtureBuilder::REGION_KEPT['name'],
+    'cut_name' => FixtureBuilder::REGION_CUT['name'],
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
     'album_path' => '/index.php?/category/' . $catId,
     )), "\n";

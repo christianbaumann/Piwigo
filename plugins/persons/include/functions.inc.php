@@ -345,6 +345,80 @@ function persons_rotate_region($region, $rotation_code)
 }
 
 /**
+ * Moves a region with a photoedit turn and crop of its file.
+ *
+ * The transform is the one plugins/photoedit hands its events: the raw file is
+ * turned by rotation_before + turns quarter turns clockwise, then cropped to
+ * crop_px, given in pixels of the turned file. Regions are stored before Exif
+ * Orientation, so they follow the raw file, not the view.
+ *
+ * A turn moves every region and loses none. After a crop a region goes through
+ * the same MWG rule as one read from a file (persons_clip_region()): a centre
+ * outside the crop means the face was cut away, a box overrunning it is
+ * clipped. What is left must still clear persons_minimum_box_ok().
+ *
+ * @param array $region x, y, w, h (plus any other keys, preserved)
+ * @param array $transform rotation_before, turns, crop_px (x, y, w, h or null),
+ *   width_before, height_before
+ * @return array|null the moved region, or null when the edit removes it
+ */
+function persons_transform_region($region, $transform)
+{
+  $turns = ((int)$transform['rotation_before'] + (int)$transform['turns']) % 4;
+  $region = persons_rotate_region($region, $turns);
+
+  $rect = $transform['crop_px'];
+  if ($rect === null)
+  {
+    return $region;
+  }
+
+  $width = (float)($turns % 2 == 0 ? $transform['width_before'] : $transform['height_before']);
+  $height = (float)($turns % 2 == 0 ? $transform['height_before'] : $transform['width_before']);
+
+  $moved = persons_clip_region(array_merge($region, array(
+    'x' => ($region['x'] * $width - $rect['x']) / $rect['w'],
+    'y' => ($region['y'] * $height - $rect['y']) / $rect['h'],
+    'w' => $region['w'] * $width / $rect['w'],
+    'h' => $region['h'] * $height / $rect['h'],
+    )));
+
+  if ($moved === null or !persons_minimum_box_ok($moved['w'], $moved['h']))
+  {
+    return null;
+  }
+
+  return $moved;
+}
+
+/**
+ * Moves every region of a file with a photoedit edit, and names the ones it removes.
+ *
+ * @param array $regions as persons_parse_regioninfo() returns them
+ * @param array $transform see persons_transform_region()
+ * @return array 'kept' (the moved regions), 'lost' (names of removed regions,
+ *   one entry per region)
+ */
+function persons_transform_regions($regions, $transform)
+{
+  $kept = array();
+  $lost = array();
+
+  foreach ($regions as $region)
+  {
+    $moved = persons_transform_region($region, $transform);
+    if ($moved === null)
+    {
+      $lost[] = $region['name'];
+      continue;
+    }
+    $kept[] = $moved;
+  }
+
+  return array('kept' => $kept, 'lost' => $lost);
+}
+
+/**
  * Whether a region's recorded AppliedToDimensions no longer describes the image.
  *
  * Compared as an aspect ratio, not as pixel counts: a proportional downscale

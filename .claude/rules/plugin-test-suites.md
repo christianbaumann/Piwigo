@@ -207,11 +207,18 @@ and only an authenticated administrator failing to get it proves the gate is not
 marks the install with `photoedit_throwaway_install`, which its `FixtureBuilder` refuses to run
 without. Both suites need the plugin active (Administration > Plugins, or
 `pwg.plugins.performAction`) and fail naming it otherwise, through `FixtureBuilder::assertPluginActive()`;
-`edit-mode.spec.js` also needs persons active, since its overlay is part of what edit mode hides. The E2E specs run as the webmaster; `auth.setup.js` saves all three sessions and the
+`edit-mode.spec.js` also needs persons active, since its overlay is part of what edit mode hides.
+`ApplyRegionsTest` needs persons active and `ExclusionTest` needs persons and provenance active, and
+both check that through the same method. `ApplyRegionsTest` deactivates persons for one case and
+reactivates it in `tearDown`. If a run is killed in between, persons stays off; reactivate it by hand.
+`ExclusionTest` loads both plugins' `events_photoedit.inc.php` in-process and asks `flock(1)` from a
+child process whether their lock is held. The E2E specs run as the webmaster; `auth.setup.js` saves all three sessions and the
 visibility spec opens its own context per role. `tests/e2e/support/seed.php --scenario=photo`
 creates a throwaway album with one photo copied into `upload/photoedit-test/`, never a real scan;
 `--scenario=marked` generates a 300x200 palette PNG there instead (red corner marker, XMP caption,
-centre of interest), for the specs that save; `--restore` removes either, with its backups under
+centre of interest), for the specs that save; `--scenario=regions` is `marked` plus two MWG regions
+written into the file (`FixtureBuilder::REGION_KEPT`, `REGION_CUT`), for the lost-region warning;
+`--restore` removes any of them, and the persons rows a save indexed from those regions, with its backups under
 `_data/photoedit/originals/`. The integration suite's `ApplyTurnTest` runs its corner and caption
 cases once per core image library by setting the `graphics_library` config row, because only GD
 drops a PNG's metadata - with ImageMagick the exiftool copy-back is invisible. `FailedWriteTest`

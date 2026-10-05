@@ -32,6 +32,10 @@ class FixtureBuilder
     /** Its centre of interest: l 0.2, t 0, r 0.4, b 0.36 in admin/picture_coi.php's a..z encoding. */
     public const COI = 'fakj';
 
+    /** seed.php --scenario=regions: a face in the left half, kept by cropping to it, and one in the right half, cut away. */
+    public const REGION_KEPT = array('name' => 'Photoedit Kept', 'x' => 0.25, 'y' => 0.5, 'w' => 0.2, 'h' => 0.3);
+    public const REGION_CUT = array('name' => 'Photoedit Cut', 'x' => 0.8, 'y' => 0.5, 'w' => 0.1, 'h' => 0.2);
+
     private array $testImages = array();
     private array $testAlbums = array();
     private array $savedConfig = array();
@@ -63,14 +67,14 @@ class FixtureBuilder
         }
     }
 
-    /** Fails naming the plugin when it is not active; every suite needs it on the page. */
-    public function assertPluginActive(): void
+    /** Fails naming the plugin when it is not active; every suite needs photoedit, some need persons too. */
+    public function assertPluginActive(string $plugin = 'photoedit'): void
     {
-        $state = $this->db->scalar("SELECT state FROM piwigo_plugins WHERE id = 'photoedit'");
+        $state = $this->db->scalar("SELECT state FROM piwigo_plugins WHERE id = '" . $this->db->escape($plugin) . "'");
         if ($state !== 'active')
         {
             throw new RuntimeException(
-                'The photoedit plugin is not active (state: ' . var_export($state, true) . ').' . "\n" .
+                'The ' . $plugin . ' plugin is not active (state: ' . var_export($state, true) . ').' . "\n" .
                 'Activate it on Administration > Plugins before running the suites.'
             );
         }
@@ -339,6 +343,10 @@ class FixtureBuilder
             $this->db->query('DELETE FROM piwigo_images WHERE id = ' . $id);
             $this->db->query('DELETE FROM piwigo_image_category WHERE image_id = ' . $id);
             $this->db->query('DELETE FROM piwigo_image_tag WHERE image_id = ' . $id);
+            if ($this->db->scalar("SHOW TABLES LIKE 'piwigo_person_region'") !== null)
+            {
+                $this->db->query('DELETE FROM piwigo_person_region WHERE image_id = ' . $id);
+            }
 
             foreach (glob($image['file'] . '*') as $leftover)
             {
@@ -382,6 +390,70 @@ class FixtureBuilder
                 "UPDATE piwigo_config SET value = '" . $this->db->escape(json_encode((object)$kept)) .
                 "' WHERE param = 'photoedit_versions'"
             );
+        }
+    }
+
+    /**
+     * Writes MWG person regions into a photo with a plain exiftool call - not
+     * through plugins/persons, whose handling of them is what is under test.
+     *
+     * @param array $regions list of array(name, x, y, w, h), normalized, centre origin
+     */
+    public function writeRegions(array $image, array $regions): void
+    {
+        if (count($regions) === 0)
+        {
+            throw new RuntimeException('anti-vacuity: seeding no regions would make every assertion trivial');
+        }
+
+        $list = array();
+        $names = array();
+        foreach ($regions as $region)
+        {
+            $list[] = array(
+                'Area' => array('X' => $region['x'], 'Y' => $region['y'], 'W' => $region['w'], 'H' => $region['h'], 'Unit' => 'normalized'),
+                'Name' => $region['name'],
+                'Type' => 'Face',
+                );
+            $names[$region['name']] = true;
+        }
+
+        $json = $image['file'] . '.seed.json';
+        file_put_contents($json, json_encode(array(array(
+            'RegionInfo' => array(
+                'AppliedToDimensions' => array('W' => $image['width'], 'H' => $image['height'], 'Unit' => 'pixel'),
+                'RegionList' => $list,
+                ),
+            'PersonInImage' => array_keys($names),
+            ))));
+        try
+        {
+            self::run('exiftool -q -overwrite_original -json=' . escapeshellarg($json) . ' ' . escapeshellarg($image['file']));
+        }
+        finally
+        {
+            @unlink($json);
+        }
+    }
+
+    /** Removes the persons the persons index created for these names, and their mirrored tags. */
+    public function destroyPersons(array $names): void
+    {
+        foreach ($names as $name)
+        {
+            $escaped = $this->db->escape($name);
+            $tagId = $this->db->scalar("SELECT tag_id FROM piwigo_persons WHERE name = '$escaped'");
+            if ($tagId !== null)
+            {
+                $this->db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$tagId);
+                $this->db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$tagId);
+            }
+            $personId = $this->db->scalar("SELECT id FROM piwigo_persons WHERE name = '$escaped'");
+            if ($personId !== null)
+            {
+                $this->db->query('DELETE FROM piwigo_person_region WHERE person_id = ' . (int)$personId);
+            }
+            $this->db->query("DELETE FROM piwigo_persons WHERE name = '$escaped'");
         }
     }
 
