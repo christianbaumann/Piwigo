@@ -54,4 +54,8 @@ appears when the pointer is on its box.
 
 ## Manual checks remaining
 
-* [ ] (manual testing required) Whether the reworded German reads naturally
+* [x] Whether the reworded German reads naturally
+  **Note:** Verified via a critical review by a sub-agent (2026-10-05). Its findings were applied:
+  shorter opening sentence, consistent *Mauszeiger*, *Smartphone*, *rechts neben dem Foto*,
+  corrected `alt` and caption, and *am unteren Rand des Rahmens* (a name can overhang a small
+  box since `f4a13a462`). Recorded in the hand-check ledger of `docs/agents/TESTING.md`
