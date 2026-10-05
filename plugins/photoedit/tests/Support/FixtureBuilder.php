@@ -32,6 +32,9 @@ class FixtureBuilder
     /** Its centre of interest: l 0.2, t 0, r 0.4, b 0.36 in admin/picture_coi.php's a..z encoding. */
     public const COI = 'fakj';
 
+    /** The quality createMarkedJpeg() saves with: not core's or photoedit's default, so a kept quality shows. */
+    public const JPEG_QUALITY = 85;
+
     /** seed.php --scenario=regions: a face in the left half, kept by cropping to it, and one in the right half, cut away. */
     public const REGION_KEPT = array('name' => 'Photoedit Kept', 'x' => 0.25, 'y' => 0.5, 'w' => 0.2, 'h' => 0.3);
     public const REGION_CUT = array('name' => 'Photoedit Cut', 'x' => 0.8, 'y' => 0.5, 'w' => 0.1, 'h' => 0.2);
@@ -181,12 +184,85 @@ class FixtureBuilder
             throw new RuntimeException('the generated photo does not carry its caption');
         }
 
+        return $this->registerMarkedImage($name, $file, 0);
+    }
+
+    /**
+     * The marked photo as a JPEG at JPEG_QUALITY, carrying EXIF Orientation
+     * $orientation. Its row gets the rotation code core itself derives from
+     * that tag (pwg_image::get_rotation_angle()), as upload or i.php would.
+     *
+     * @param int $orientation EXIF Orientation, 1 to 8
+     * @return array as createMarkedImage(), plus 'rotation'
+     */
+    public function createMarkedJpeg(int $orientation): array
+    {
+        $dir = PIWIGO_ROOT . self::TEST_IMAGE_DIR;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+
+        $name = 'photoedit-test-' . bin2hex(random_bytes(8)) . '.jpg';
+        $file = $dir . $name;
+        $last = self::MARKER_SIZE - 1;
+
+        self::run(sprintf(
+            'convert -size %dx%d xc:%s -fill %s -draw %s -quality %d %s',
+            self::MARKED_WIDTH, self::MARKED_HEIGHT,
+            escapeshellarg(self::BACKGROUND_COLOUR), escapeshellarg(self::MARKER_COLOUR),
+            escapeshellarg("rectangle 0,0 $last,$last"), self::JPEG_QUALITY, escapeshellarg($file)
+        ));
+        self::run(sprintf(
+            'exiftool -overwrite_original -XMP-dc:Description=%s -Orientation#=%d %s',
+            escapeshellarg(self::CAPTION), $orientation, escapeshellarg($file)
+        ));
+        if ((int)trim(self::run('identify -format "%Q" ' . escapeshellarg($file))) !== self::JPEG_QUALITY)
+        {
+            throw new RuntimeException('the generated JPEG does not have the quality asked for');
+        }
+
+        PiwigoRuntime::boot();
+        include_once PIWIGO_ROOT . 'admin/include/image.class.php';
+        $rotation = (int)pwg_image::get_rotation_code_from_angle(pwg_image::get_rotation_angle($file));
+        if ($orientation !== 1 && $rotation === 0)
+        {
+            throw new RuntimeException("core reads no rotation from Orientation $orientation");
+        }
+
+        return $this->registerMarkedImage($name, $file, $rotation) + array('rotation' => $rotation);
+    }
+
+    /**
+     * A small GIF, a type photoedit does not write.
+     *
+     * @return array as createMarkedImage()
+     */
+    public function createGif(): array
+    {
+        $dir = PIWIGO_ROOT . self::TEST_IMAGE_DIR;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+
+        $name = 'photoedit-test-' . bin2hex(random_bytes(8)) . '.gif';
+        $file = $dir . $name;
+        self::run(sprintf('convert -size %dx%d xc:%s %s',
+            self::MARKED_WIDTH, self::MARKED_HEIGHT, escapeshellarg(self::BACKGROUND_COLOUR), escapeshellarg($file)));
+
+        return $this->registerMarkedImage($name, $file, 0);
+    }
+
+    /** Inserts the row for a generated MARKED_WIDTH x MARKED_HEIGHT photo and asserts it took. */
+    private function registerMarkedImage(string $name, string $file, int $rotation): array
+    {
         $md5 = md5_file($file);
         $dbPath = './' . self::TEST_IMAGE_DIR . $name;
         $this->db->query(
-            'INSERT INTO piwigo_images (file, path, date_available, filesize, width, height, md5sum, coi) VALUES (' .
+            'INSERT INTO piwigo_images (file, path, date_available, filesize, width, height, md5sum, coi, rotation) VALUES (' .
             "'" . $this->db->escape($name) . "', '" . $this->db->escape($dbPath) . "', NOW(), " .
-            (int)floor(filesize($file) / 1024) . ', ' . self::MARKED_WIDTH . ', ' . self::MARKED_HEIGHT . ", '$md5', '" . self::COI . "')"
+            (int)floor(filesize($file) / 1024) . ', ' . self::MARKED_WIDTH . ', ' . self::MARKED_HEIGHT . ", '$md5', '" . self::COI . "', $rotation)"
         );
         $id = $this->db->insertId();
         if ($id <= 0 || $this->db->scalar("SELECT coi FROM piwigo_images WHERE id = $id") !== self::COI)
@@ -362,7 +438,7 @@ class FixtureBuilder
             }
 
             // The derivatives i.php generated while a spec looked at the photo.
-            $derivatives = PIWIGO_ROOT . '_data/i/' . substr(ltrim($image['db_path'], './'), 0, -strlen('.png'));
+            $derivatives = PIWIGO_ROOT . '_data/i/' . substr(ltrim($image['db_path'], './'), 0, -strlen('.' . pathinfo($image['db_path'], PATHINFO_EXTENSION)));
             foreach (glob($derivatives . '-*') as $derivative)
             {
                 @unlink($derivative);

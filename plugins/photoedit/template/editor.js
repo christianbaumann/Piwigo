@@ -222,7 +222,14 @@
 			root.classList.add('photoedit-saving');
 			post({ turns: requested, crop: requestedCrop, dry_run: 'true' }).then(function (preview) {
 				var lost = preview.lost_regions || [];
-				if (lost.length && !window.confirm(toggle.dataset.confirmLost + ' ' + lost.join(', '))) {
+				var warnings = [];
+				if (lost.length) {
+					warnings.push(toggle.dataset.confirmLost + ' ' + lost.join(', '));
+				}
+				if (preview.lossy) {
+					warnings.push(toggle.dataset.confirmLossy);
+				}
+				if (warnings.length && !window.confirm(warnings.join('\n\n'))) {
 					return false;
 				}
 				written = true;

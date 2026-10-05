@@ -218,10 +218,13 @@ creates a throwaway album with one photo copied into `upload/photoedit-test/`, n
 `--scenario=marked` generates a 300x200 palette PNG there instead (red corner marker, XMP caption,
 centre of interest), for the specs that save; `--scenario=regions` is `marked` plus two MWG regions
 written into the file (`FixtureBuilder::REGION_KEPT`, `REGION_CUT`), for the lost-region warning;
+`--scenario=jpeg` is `marked` as an upright JPEG, for the re-encode note;
 `--restore` removes any of them, and the persons rows a save indexed from those regions, with its backups under
 `_data/photoedit/originals/`. The integration suite's `ApplyTurnTest` runs its corner and caption
 cases once per core image library by setting the `graphics_library` config row, because only GD
-drops a PNG's metadata - with ImageMagick the exiftool copy-back is invisible. `FailedWriteTest`
+drops a PNG's metadata - with ImageMagick the exiftool copy-back is invisible. `ApplyJpegTest` does
+the same for JPEG, with `FixtureBuilder::createMarkedJpeg($orientation)`, whose row gets the
+rotation code core itself derives from the EXIF Orientation (code 3 for Orientation 6; decision 0035). `FailedWriteTest`
 calls the pipeline in-process (`tests/Support/PiwigoRuntime.php`) to listen to its events.
 `turn-cache.spec.js` seeds a real-size copy and runs `seed.php --age-derivatives`, which backdates
 the copy's derivatives: only an old `Last-Modified` makes the browser reuse a cached photo, which is

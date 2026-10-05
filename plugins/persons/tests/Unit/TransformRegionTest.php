@@ -19,11 +19,11 @@ final class TransformRegionTest extends TestCase
         return array('name' => $name, 'type' => 'Face', 'x' => $x, 'y' => $y, 'w' => $w, 'h' => $h);
     }
 
-    private static function transform(int $turns, ?array $crop, int $rotationBefore = 0): array
+    /** @param int $turns quarter turns clockwise of the raw file, as photoedit hands them over */
+    private static function transform(int $turns, ?array $crop): array
     {
         return array(
-            'rotation_before' => $rotationBefore,
-            'turns' => $turns,
+            'raw_turns' => $turns,
             'crop_px' => $crop,
             'width_before' => 300,
             'height_before' => 200,
@@ -41,8 +41,8 @@ final class TransformRegionTest extends TestCase
         return array(
             '[HAPPY] a quarter turn moves it, as persons_rotate_region() does' => array(
                 $face, self::transform(1, null), array(0.5, 0.25, 0.3, 0.2)),
-            '[ECP] the stored rotation adds to the turns (raw file frame)' => array(
-                $face, self::transform(1, null, 1), array(0.75, 0.5, 0.2, 0.3)),
+            '[ECP] a half turn of the raw file' => array(
+                $face, self::transform(2, null), array(0.75, 0.5, 0.2, 0.3)),
             // x 75 px of 150 -> 0.5; w 60 px of 150 -> 0.4
             '[HAPPY] inside the left half it is moved and scaled' => array(
                 $face, self::transform(0, self::rect(0, 0, 150, 200)), array(0.5, 0.5, 0.4, 0.3)),

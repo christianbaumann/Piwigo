@@ -33,6 +33,28 @@ trait ReadsImageFiles
         return trim($out);
     }
 
+    /** EXIF Orientation as ImageMagick names it: TopLeft is upright, RightTop is Orientation 6. */
+    private function orientation(): string
+    {
+        return trim(FixtureBuilder::run('identify -format "%[orientation]" ' . escapeshellarg($this->image['file'])));
+    }
+
+    /** The JPEG quality ImageMagick estimates from the file's quantization tables. */
+    private function jpegQuality(): int
+    {
+        return (int)trim(FixtureBuilder::run('identify -format "%Q" ' . escapeshellarg($this->image['file'])));
+    }
+
+    /** Whether a sampled colour is the marker's red, allowing for JPEG's drift. */
+    private static function isRed(string $pixel): bool
+    {
+        if (!preg_match('/^s?rgba?\((\d+),(\d+),(\d+)/', str_replace(' ', '', $pixel), $m))
+        {
+            return false;
+        }
+        return (int)$m[1] > 200 && (int)$m[2] < 60 && (int)$m[3] < 60;
+    }
+
     /** Which corners are red, sampled a few pixels in from each. */
     private function redCorners(): array
     {
@@ -48,11 +70,40 @@ trait ReadsImageFiles
         $found = array();
         foreach ($corners as $name => list($x, $y))
         {
-            if (preg_match('/^s?rgba?\(255,0,0/', str_replace(' ', '', $this->pixel($x, $y))))
+            if (self::isRed($this->pixel($x, $y)))
             {
                 $found[] = $name;
             }
         }
         return $found;
     }
+
+    /**
+     * The regions in the file, from ImageMagick's raw XMP packet.
+     *
+     * @return array name => array(x, y, w, h), plus '' => applied (w, h)
+     */
+    private function regionsInFile(): array
+    {
+        $packet = FixtureBuilder::run('convert ' . escapeshellarg($this->image['file']) . ' xmp:-');
+        $dom = new DOMDocument();
+        $this->assertTrue(@$dom->loadXML($packet), 'not an XMP packet: ' . $packet);
+        $xpath = new DOMXPath($dom);
+        $xpath->registerNamespace('mwg-rs', 'http://www.metadataworkinggroup.com/schemas/regions/');
+        $xpath->registerNamespace('stArea', 'http://ns.adobe.com/xmp/sType/Area#');
+        $xpath->registerNamespace('stDim', 'http://ns.adobe.com/xap/1.0/sType/Dimensions#');
+
+        $regions = array();
+        foreach ($xpath->query('//mwg-rs:RegionList//mwg-rs:Area/..') as $li)
+        {
+            $value = fn (string $tag) => (float)$xpath->evaluate("string(mwg-rs:Area/stArea:$tag)", $li);
+            $regions[$xpath->evaluate('string(mwg-rs:Name)', $li)] = array($value('x'), $value('y'), $value('w'), $value('h'));
+        }
+        $regions[''] = array(
+            (int)$xpath->evaluate('string(//mwg-rs:AppliedToDimensions/stDim:w)'),
+            (int)$xpath->evaluate('string(//mwg-rs:AppliedToDimensions/stDim:h)'),
+            );
+        return $regions;
+    }
+
 }

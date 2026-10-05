@@ -16,6 +16,9 @@ define('PHOTOEDIT_LOCK_RETRY_MICROSECONDS', 100000);
 /** The shortest side, in pixels, a crop may leave. */
 define('PHOTOEDIT_MIN_CROP_PX', 16);
 
+/** JPEG quality for a re-encode when the source's own cannot be read. */
+define('PHOTOEDIT_DEFAULT_JPEG_QUALITY', 95);
+
 /**
  * Checks the edit a request asks for.
  *
@@ -129,6 +132,24 @@ function photoedit_turned_size($width, $height, $turns)
 }
 
 /**
+ * Quarter turns clockwise from the raw file to the edited photo.
+ *
+ * images.rotation counts quarter turns *counter-clockwise*: core turns the
+ * raw file by get_rotation_angle_from_code() through pwg_image::rotate(),
+ * which turns counter-clockwise (EXIF Orientation 6, shown turned 90 degrees
+ * clockwise, is code 3; measured 2026-10-05). The page shows the raw file
+ * turned (4 - code) quarters clockwise, and the request's turns come on top.
+ *
+ * @param int $rotation_code images.rotation, 0..3
+ * @param int $turns quarter turns clockwise relative to the page
+ * @return int 0..3
+ */
+function photoedit_raw_turns($rotation_code, $turns)
+{
+  return ((4 - (int)$rotation_code % 4) % 4 + (int)$turns) % 4;
+}
+
+/**
  * The angle pwg_image::rotate() takes for a number of quarter turns clockwise.
  *
  * pwg_image::rotate() turns counter-clockwise (admin/include/image.class.php:
@@ -182,16 +203,23 @@ function photoedit_crop_rect($box, $width, $height)
  * What a validated request does to a photo of a given size: turn first, then
  * crop the turned photo.
  *
+ * A stored rotation is baked into the pixels as well, so the raw file turns
+ * by photoedit_raw_turns(); the crop is drawn on what the page then shows,
+ * which is the raw file turned that far.
+ *
  * @param int $width the raw file's width
  * @param int $height the raw file's height
- * @param int $turns quarter turns clockwise
+ * @param int $turns quarter turns clockwise relative to the page
  * @param array|null $box the crop as fractions of the turned photo, or null
- * @return array 'ok', 'error' (empty when ok), 'transform' ('turns',
- *   'crop_px' or null, 'width_before', 'height_before', 'width_after', 'height_after')
+ * @param int $rotation_code images.rotation before the edit
+ * @return array 'ok', 'error' (empty when ok), 'transform' ('rotation_before',
+ *   'turns', 'raw_turns', 'crop_px' or null, 'width_before', 'height_before',
+ *   'width_after', 'height_after')
  */
-function photoedit_plan_edit($width, $height, $turns, $box)
+function photoedit_plan_edit($width, $height, $turns, $box, $rotation_code = 0)
 {
-  list($turned_width, $turned_height) = photoedit_turned_size($width, $height, $turns);
+  $raw_turns = photoedit_raw_turns($rotation_code, $turns);
+  list($turned_width, $turned_height) = photoedit_turned_size($width, $height, $raw_turns);
 
   $rect = null;
   if ($box !== null)
@@ -204,6 +232,8 @@ function photoedit_plan_edit($width, $height, $turns, $box)
     $rect = $crop['rect'];
   }
 
+  // Whether the page would show anything new: a stored rotation the turns
+  // undo still leaves the file to rewrite upright.
   if ((int)$turns == 0 and $rect === null)
   {
     return array('ok' => false, 'error' => 'nothing to do: neither turned nor cropped', 'transform' => null);
@@ -213,7 +243,9 @@ function photoedit_plan_edit($width, $height, $turns, $box)
     'ok' => true,
     'error' => '',
     'transform' => array(
+      'rotation_before' => (int)$rotation_code,
       'turns' => (int)$turns,
+      'raw_turns' => $raw_turns,
       'crop_px' => $rect,
       'width_before' => (int)$width,
       'height_before' => (int)$height,
@@ -260,6 +292,10 @@ function photoedit_crop_box($box, $rect, $width, $height)
  * l, t, r, b, see admin/picture_coi.php - with the photo. One left wholly
  * outside the crop is dropped.
  *
+ * The centre of interest is drawn on the shown photo, and i.php applies it
+ * after turning (i.php: rotate, then crop), so it turns by the request's
+ * turns only, never by the stored rotation.
+ *
  * Uses core's char_to_fraction() / fraction_to_char()
  * (include/derivative_params.inc.php, loaded on every request).
  *
@@ -286,7 +322,7 @@ function photoedit_transform_coi($coi, $transform)
 
   if ($transform['crop_px'] !== null)
   {
-    list($width, $height) = photoedit_turned_size($transform['width_before'], $transform['height_before'], $transform['turns']);
+    list($width, $height) = photoedit_turned_size($transform['width_before'], $transform['height_before'], $transform['raw_turns']);
     $box = photoedit_crop_box($box, $transform['crop_px'], $width, $height);
     if ($box === null)
     {

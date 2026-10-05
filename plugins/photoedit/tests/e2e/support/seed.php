@@ -11,6 +11,7 @@
  *   php tests/e2e/support/seed.php --scenario=photo    a copy of a gallery PNG
  *   php tests/e2e/support/seed.php --scenario=marked   a generated 300x200 PNG, for specs that save
  *   php tests/e2e/support/seed.php --scenario=regions  marked, plus two person regions in the file
+ *   php tests/e2e/support/seed.php --scenario=jpeg     marked, as an upright JPEG
  *   php tests/e2e/support/seed.php --age-derivatives   backdate the seeded photo's derivatives
  *   php tests/e2e/support/seed.php --restore
  *
@@ -50,7 +51,7 @@ if (isset($args['age-derivatives']))
     $aged = 0;
     foreach ($snapshot['images'] as $image)
     {
-        $stem = PIWIGO_ROOT . '_data/i/' . substr(ltrim($image['db_path'], './'), 0, -strlen('.png'));
+        $stem = PIWIGO_ROOT . '_data/i/' . substr(ltrim($image['db_path'], './'), 0, -strlen('.' . pathinfo($image['db_path'], PATHINFO_EXTENSION)));
         foreach (glob($stem . '-*') as $derivative)
         {
             touch($derivative, time() - DERIVATIVE_AGE_SECONDS);
@@ -92,9 +93,9 @@ if (isset($args['restore']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('photo', 'marked', 'regions'), true))
+if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg'), true))
 {
-    fail('--scenario must be: photo, marked, regions');
+    fail('--scenario must be: photo, marked, regions, jpeg');
 }
 
 if (is_file(SNAPSHOT_FILE))
@@ -112,7 +113,18 @@ catch (RuntimeException $e)
 }
 
 // marked: a generated landscape PNG, which a save rewrites - never a copy of a scan.
-$image = $scenario === 'photo' ? $builder->createTestImage() : $builder->createMarkedImage();
+if ($scenario === 'photo')
+{
+    $image = $builder->createTestImage();
+}
+elseif ($scenario === 'jpeg')
+{
+    $image = $builder->createMarkedJpeg(1);
+}
+else
+{
+    $image = $builder->createMarkedImage();
+}
 if ($scenario === 'regions')
 {
     // Only the file: the editor's warning reads the regions from there.

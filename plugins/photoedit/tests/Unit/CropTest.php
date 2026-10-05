@@ -90,7 +90,9 @@ final class CropTest extends TestCase
 
         $this->assertTrue($result['ok'], $result['error']);
         $this->assertSame(array(
+            'rotation_before' => 0,
             'turns' => $turns,
+            'raw_turns' => $turns,
             'crop_px' => $rect,
             'width_before' => self::WIDTH,
             'height_before' => self::HEIGHT,
@@ -115,6 +117,34 @@ final class CropTest extends TestCase
 
         $this->assertFalse($result['ok']);
         $this->assertStringContainsString('nothing to do', $result['error']);
+    }
+
+    /**
+     * [DT] A stored rotation (EXIF Orientation 6, code 3) is baked in: the page
+     * shows the 300x200 file as 200x300, the crop is drawn on that, and the
+     * raw file turns once more than asked.
+     */
+    public function testAStoredRotationIsBakedIntoTheEdit(): void
+    {
+        $result = photoedit_plan_edit(self::WIDTH, self::HEIGHT, 0, self::box(0, 0, 1, 0.5), 3);
+
+        $this->assertTrue($result['ok'], $result['error']);
+        $this->assertSame(1, $result['transform']['raw_turns']);
+        $this->assertSame(array('x' => 0, 'y' => 0, 'w' => 200, 'h' => 150), $result['transform']['crop_px']);
+        $this->assertSame(array(200, 150), array($result['transform']['width_after'], $result['transform']['height_after']));
+    }
+
+    /**
+     * [BVA] Turns that undo a stored rotation leave the raw file unturned, but
+     * the page changes, so it is an edit: the file is rewritten upright.
+     */
+    public function testTurnsThatUndoAStoredRotationAreStillAnEdit(): void
+    {
+        $result = photoedit_plan_edit(self::WIDTH, self::HEIGHT, 1, null, 1);
+
+        $this->assertTrue($result['ok'], $result['error']);
+        $this->assertSame(0, $result['transform']['raw_turns']);
+        $this->assertSame(array(300, 200), array($result['transform']['width_after'], $result['transform']['height_after']));
     }
 
     /** [NEG] A frame below the minimum refuses the whole edit, turn or not. */
@@ -168,9 +198,15 @@ final class CropTest extends TestCase
             'a box reaching 3 px into the crop is inside');
     }
 
-    private static function transform(int $turns, ?array $rect): array
+    private static function transform(int $turns, ?array $rect, int $rotation = 0): array
     {
-        return array('turns' => $turns, 'crop_px' => $rect, 'width_before' => 300, 'height_before' => 200);
+        return array(
+            'turns' => $turns,
+            'raw_turns' => photoedit_raw_turns($rotation, $turns),
+            'crop_px' => $rect,
+            'width_before' => 300,
+            'height_before' => 200,
+            );
     }
 
     public static function cois(): array
@@ -186,6 +222,18 @@ final class CropTest extends TestCase
             // -> l 0.28 'h', t 0.4 'k', r 1 'z', b 0.8 'u'
             '[DT] turned, then cropped' => array(1, array('x' => 100, 'y' => 0, 'w' => 100, 'h' => 150), 'hkzu'),
             );
+    }
+
+    /**
+     * [ECP] The centre of interest is drawn on the shown photo, so a stored
+     * rotation does not turn it; only the crop of the shown 200x300 view moves it.
+     * 'fakj' on the view: x 40..80 of 200, y 0..108 of 300; crop the top half
+     * (200x150): l 0.2 'f', t 0 'a', r 0.4 'k', b 0.72 (18 -> 's').
+     */
+    public function testAStoredRotationDoesNotTurnTheCentreOfInterest(): void
+    {
+        $this->assertSame('faks', photoedit_transform_coi('fakj',
+            self::transform(0, array('x' => 0, 'y' => 0, 'w' => 200, 'h' => 150), 3)));
     }
 
     #[DataProvider('cois')]

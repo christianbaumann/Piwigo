@@ -75,7 +75,7 @@ function photoedit_add_methods($arr)
       'dry_run' => array('default' => false, 'type' => WS_TYPE_BOOL, 'info' => 'Report what the edit would do, write nothing'),
       'pwg_token' => array(),
       ),
-    'Turns a photo, crops it and writes the result into its image file. Webmaster only.',
+    'Turns a photo, crops it and writes the result into its image file (PNG or JPEG). Webmaster only.',
     PHOTOEDIT_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );

@@ -11,11 +11,11 @@ tags: [photoedit, picture-page, rotation, crop, persons, provenance, fork-local]
 A webmaster turns a photo in 90° steps and crops it to a free rectangle, on the public picture
 page. The result is written **into the image file**, so it survives a deploy and a rescan.
 
-Status: designed and split into tasks (`tasks/`). Tasks 01-04 implemented.
+Status: designed and split into tasks (`tasks/`). Tasks 01-05 implemented.
 
 ## Current state (measured 2026-10-05)
 
-- `images.rotation` (code 0..3, quarter turns clockwise) is core's only rotation. It is a
+- `images.rotation` (code 0..3) is core's only rotation. **Correction (task 05):** the code counts quarter turns *counter-clockwise* (Orientation 6 is code 3), not clockwise; see decision 0035. It is a
   display transform: `i.php:536` turns the derivative, `include/derivative.inc.php:82` swaps
   width and height. Core sets it only from EXIF Orientation (upload,
   `admin/include/functions_upload.inc.php:335`, or lazily in `i.php:481`).

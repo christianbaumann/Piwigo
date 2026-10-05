@@ -21,10 +21,52 @@ define('PHOTOEDIT_LOCK_DIR', PHOTOEDIT_DATA_DIR.'locks/');
 define('PHOTOEDIT_ORIGINALS_DIR', PHOTOEDIT_DATA_DIR.'originals/');
 define('PHOTOEDIT_WORK_DIR', PHOTOEDIT_DATA_DIR.'work/');
 
-/** File types the pipeline writes. JPEG follows in a later step. */
+/** File types the pipeline writes. */
 function photoedit_supported_extensions()
 {
-  return array('png');
+  return array('png', 'jpg', 'jpeg');
+}
+
+/**
+ * Whether writing this type re-encodes it with loss.
+ *
+ * @param string $extension lower case
+ * @return bool
+ */
+function photoedit_is_lossy($extension)
+{
+  return in_array($extension, array('jpg', 'jpeg'));
+}
+
+/**
+ * The quality a JPEG was saved with, as ImageMagick estimates it from its
+ * quantization tables, or PHOTOEDIT_DEFAULT_JPEG_QUALITY when that cannot be
+ * read (no Imagick extension, or a file that does not say).
+ *
+ * @param string $file
+ * @return int
+ */
+function photoedit_jpeg_quality($file)
+{
+  if (class_exists('Imagick'))
+  {
+    try
+    {
+      $image = new Imagick($file);
+      $quality = (int)$image->getImageCompressionQuality();
+      $image->clear();
+      if ($quality > 0)
+      {
+        return $quality;
+      }
+    }
+    catch (Exception $e)
+    {
+      // fall through to the default
+    }
+  }
+
+  return PHOTOEDIT_DEFAULT_JPEG_QUALITY;
 }
 
 /**
@@ -134,13 +176,13 @@ function photoedit_image_row($image_id)
  */
 function photoedit_transform($image, $turns, $box)
 {
-  $plan = photoedit_plan_edit($image['width'], $image['height'], $turns, $box);
+  $plan = photoedit_plan_edit($image['width'], $image['height'], $turns, $box, (int)$image['rotation']);
   if (!$plan['ok'])
   {
     return photoedit_failure('invalid', $plan['error']);
   }
 
-  return array('ok' => true, 'rotation_before' => (int)$image['rotation']) + $plan['transform'];
+  return array('ok' => true) + $plan['transform'];
 }
 
 /**
@@ -234,12 +276,6 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
     return photoedit_failure('write_failed', 'The image file is missing or its folder is not writable');
   }
 
-  // Core sets a rotation only from a JPEG's EXIF Orientation; baking it in comes with JPEG support.
-  if ((int)$image['rotation'] != 0)
-  {
-    return photoedit_failure('unsupported', 'A photo with a stored rotation cannot be edited yet');
-  }
-
   $reason = photoedit_unavailable_reason();
   if ($reason !== '')
   {
@@ -257,7 +293,7 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
 
   if ($dry_run)
   {
-    return array('ok' => true, 'lost_regions' => array_values((array)$lost), 'lossy' => false);
+    return array('ok' => true, 'lost_regions' => array_values((array)$lost), 'lossy' => photoedit_is_lossy($extension));
   }
 
   $lock = photoedit_lock_acquire($image['path']);
@@ -311,7 +347,7 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
   return array(
     'ok' => true,
     'lost_regions' => array_values((array)$lost),
-    'lossy' => false,
+    'lossy' => photoedit_is_lossy($extension),
     'width' => $result['width'],
     'height' => $result['height'],
     );
@@ -348,13 +384,17 @@ function photoedit_write($image, $file, $extension, $transform, $work_dir)
   $temp = $work_dir.'edited.'.$extension;
 
   $editor = new pwg_image($file);
+  if (photoedit_is_lossy($extension))
+  {
+    $editor->set_compression_quality(photoedit_jpeg_quality($backup));
+  }
   // libgd aborts the whole process turning a palette image by 180 degrees
   // (measured 2026-10-05, PHP 8.4 in DDEV); a truecolour copy turns fine.
   if ($editor->library == 'gd' and !imageistruecolor($editor->image->image))
   {
     imagepalettetotruecolor($editor->image->image);
   }
-  $editor->rotate(photoedit_rotate_angle($transform['turns']));
+  $editor->rotate(photoedit_rotate_angle($transform['raw_turns']));
   $rect = $transform['crop_px'];
   if ($rect !== null)
   {
@@ -382,12 +422,14 @@ function photoedit_write($image, $file, $extension, $transform, $work_dir)
 
   // The libraries keep some metadata and drop the rest; copy all of it back
   // from the untouched backup. -overwrite_original: the temp file needs no
-  // second copy of itself.
+  // second copy of itself. The orientation is in the pixels now, so the
+  // copied Orientation tag is set back to upright after the copy.
   $command =
     escapeshellcmd(photoedit_exiftool_binary()).
     ' -charset filename=UTF8 -overwrite_original'.
-    ' -tagsFromFile '.escapeshellarg($backup).' -all:all '.
-    escapeshellarg($temp).
+    ' -tagsFromFile '.escapeshellarg($backup).' -all:all'.
+    (photoedit_is_lossy($extension) ? ' -Orientation#=1' : '').
+    ' '.escapeshellarg($temp).
     ' 2>&1';
   $output = array();
   $status = 1;

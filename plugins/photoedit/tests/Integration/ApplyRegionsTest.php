@@ -14,6 +14,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class ApplyRegionsTest extends TestCase
 {
+    use ReadsImageFiles;
+
     private const METHOD = 'pwg.photoedit.apply';
 
     /** x 45..105, y 70..130 px: wholly in the left half. */
@@ -80,34 +82,6 @@ final class ApplyRegionsTest extends TestCase
         $this->fixture->writeRegions($this->image, $regions);
         $this->call('pwg.persons.rescan', array('image_ids' => (string)$this->image['id']));
         $this->assertCount(count($regions), $this->indexedNames(), 'anti-vacuity: persons indexed none of the seeded regions');
-    }
-
-    /**
-     * The regions in the file, from ImageMagick's raw XMP packet.
-     *
-     * @return array name => array(x, y, w, h), plus '' => applied (w, h)
-     */
-    private function regionsInFile(): array
-    {
-        $packet = FixtureBuilder::run('convert ' . escapeshellarg($this->image['file']) . ' xmp:-');
-        $dom = new DOMDocument();
-        $this->assertTrue(@$dom->loadXML($packet), 'not an XMP packet: ' . $packet);
-        $xpath = new DOMXPath($dom);
-        $xpath->registerNamespace('mwg-rs', 'http://www.metadataworkinggroup.com/schemas/regions/');
-        $xpath->registerNamespace('stArea', 'http://ns.adobe.com/xmp/sType/Area#');
-        $xpath->registerNamespace('stDim', 'http://ns.adobe.com/xap/1.0/sType/Dimensions#');
-
-        $regions = array();
-        foreach ($xpath->query('//mwg-rs:RegionList//mwg-rs:Area/..') as $li)
-        {
-            $value = fn (string $tag) => (float)$xpath->evaluate("string(mwg-rs:Area/stArea:$tag)", $li);
-            $regions[$xpath->evaluate('string(mwg-rs:Name)', $li)] = array($value('x'), $value('y'), $value('w'), $value('h'));
-        }
-        $regions[''] = array(
-            (int)$xpath->evaluate('string(//mwg-rs:AppliedToDimensions/stDim:w)'),
-            (int)$xpath->evaluate('string(//mwg-rs:AppliedToDimensions/stDim:h)'),
-            );
-        return $regions;
     }
 
     private function assertRegion(array $expected, array $actual, string $name): void

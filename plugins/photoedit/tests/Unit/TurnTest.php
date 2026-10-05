@@ -78,6 +78,26 @@ final class TurnTest extends TestCase
         $this->assertSame($expected, photoedit_rotate_angle($turns));
     }
 
+    public static function rawTurns(): array
+    {
+        // images.rotation counts counter-clockwise (decision 0035): code 3 is
+        // EXIF Orientation 6, shown a quarter turn clockwise.
+        return array(
+            '[BVA] no rotation, no turn' => array(0, 0, 0),
+            '[HAPPY] Orientation 6 is shown a quarter clockwise' => array(3, 0, 1),
+            '[ECP] Orientation 8 is shown three quarters clockwise' => array(1, 0, 3),
+            '[ECP] a half turn is a half turn either way' => array(2, 0, 2),
+            '[ECP] the turns add on top' => array(3, 1, 2),
+            '[BVA] turns that undo the rotation' => array(1, 1, 0),
+            );
+    }
+
+    #[DataProvider('rawTurns')]
+    public function testTheRawFileTurnsByTheShownRotationPlusTheTurns(int $code, int $turns, int $expected): void
+    {
+        $this->assertSame($expected, photoedit_raw_turns($code, $turns));
+    }
+
     public static function cois(): array
     {
         return array(
@@ -94,7 +114,7 @@ final class TurnTest extends TestCase
     #[DataProvider('cois')]
     public function testTheCentreOfInterestTurns(?string $coi, int $turns, ?string $expected): void
     {
-        $transform = array('turns' => $turns, 'crop_px' => null, 'width_before' => 300, 'height_before' => 200);
+        $transform = array('turns' => $turns, 'raw_turns' => $turns, 'crop_px' => null, 'width_before' => 300, 'height_before' => 200);
 
         $this->assertSame($expected, photoedit_transform_coi($coi, $transform));
     }

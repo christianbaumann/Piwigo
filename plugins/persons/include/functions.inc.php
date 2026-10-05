@@ -348,9 +348,10 @@ function persons_rotate_region($region, $rotation_code)
  * Moves a region with a photoedit turn and crop of its file.
  *
  * The transform is the one plugins/photoedit hands its events: the raw file is
- * turned by rotation_before + turns quarter turns clockwise, then cropped to
- * crop_px, given in pixels of the turned file. Regions are stored before Exif
- * Orientation, so they follow the raw file, not the view.
+ * turned by raw_turns quarter turns clockwise - the stored rotation baked in
+ * plus the turns asked for, worked out by photoedit_raw_turns() - then cropped
+ * to crop_px, given in pixels of the turned file. Regions are stored before
+ * Exif Orientation, so they follow the raw file, not the view.
  *
  * A turn moves every region and loses none. After a crop a region goes through
  * the same MWG rule as one read from a file (persons_clip_region()): a centre
@@ -358,13 +359,13 @@ function persons_rotate_region($region, $rotation_code)
  * clipped. What is left must still clear persons_minimum_box_ok().
  *
  * @param array $region x, y, w, h (plus any other keys, preserved)
- * @param array $transform rotation_before, turns, crop_px (x, y, w, h or null),
+ * @param array $transform raw_turns, crop_px (x, y, w, h or null),
  *   width_before, height_before
  * @return array|null the moved region, or null when the edit removes it
  */
 function persons_transform_region($region, $transform)
 {
-  $turns = ((int)$transform['rotation_before'] + (int)$transform['turns']) % 4;
+  $turns = (int)$transform['raw_turns'] % 4;
   $region = persons_rotate_region($region, $turns);
 
   $rect = $transform['crop_px'];
