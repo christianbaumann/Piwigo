@@ -49,6 +49,11 @@
 	opacity: 0.5;
 }
 
+/* While tagging, every name: the user must see who is already tagged. */
+#persons-stage.persons-tagging .person-box-label {
+	opacity: 1;
+}
+
 /* The box being drawn, before it has a name. */
 .person-draft {
 	border-style: dashed;

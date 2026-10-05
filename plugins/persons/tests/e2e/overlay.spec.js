@@ -25,6 +25,15 @@ const NARROW = { width: 800, height: 700 };
 /** The widths the stepped resize walks through, wide to narrow. */
 const RESIZE_STEPS = [1200, 1000, 900, 800, 620];
 
+/** A point on the photo clear of both seeded boxes, as fractions of its rendered size. */
+const CLEAR_POINT = { fx: 0.5, fy: 0.12 };
+
+/** A box height well under the name label's, which is about 20px. */
+const SMALL_BOX_PX = 6;
+
+/** Enough presses of the theme's + zoom to move a box off a point near its corner. */
+const ZOOM_STEPS = 3;
+
 test.describe('person region overlay', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
@@ -175,6 +184,171 @@ test.describe('person region overlay', () => {
   });
 
   /**
+   * [ERR] Characterization: records today's label visibility, no requirement
+   * confirms it. A label is a child of its box, so it is hidden with it.
+   */
+  test('every name is hidden before the photo is hovered', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    // Anti-vacuity: "every label" over fewer than two regions cannot tell one
+    // label's rule from all of them, and over none asserts nothing.
+    expect(seeded.regions.length).toBeGreaterThanOrEqual(2);
+    expect(await picture.stageIsHovered()).toBe(false);
+
+    for (const region of seeded.regions) {
+      expect((await picture.labelStyle(region.region_id)).opacity).toBe(0);
+    }
+  });
+
+  /**
+   * [HAPPY] Hovering the photo shows the boxes but no name: on a group photo
+   * the names would cover the faces they name.
+   */
+  test('hovering the photo outside every box shows the boxes without names', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    expect(seeded.regions.length).toBeGreaterThanOrEqual(2);
+
+    const point = await picture.hoverPhotoAt(CLEAR_POINT.fx, CLEAR_POINT.fy);
+
+    // Anti-vacuity: the pointer must really be outside every box, or this would
+    // only re-assert what a hovered box does.
+    for (const region of seeded.regions) {
+      expect(await picture.boxContains(region.region_id, point)).toBe(false);
+    }
+
+    for (const region of seeded.regions) {
+      // Anti-vacuity: a hidden name inside a hidden box says nothing.
+      await expect
+        .poll(async () => (await picture.boxStyle(region.region_id)).opacity)
+        .toBeGreaterThan(0.9);
+      expect((await picture.labelStyle(region.region_id)).opacity).toBe(0);
+    }
+  });
+
+  /** [HAPPY] / [NEG] The hovered box shows its own name, and only its own. */
+  test('hovering a box shows its name and no other', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    expect(seeded.regions.length).toBeGreaterThanOrEqual(2);
+    const first = seeded.regions[0].region_id;
+    const second = seeded.regions[1].region_id;
+
+    const point = await picture.hoverBox(first);
+    // Anti-vacuity: the two seeded boxes do not overlap at that point, or the
+    // second name would show by the overlap rule.
+    expect(await picture.boxContains(second, point)).toBe(false);
+
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+    expect((await picture.boxStyle(second)).opacity).toBeGreaterThan(0.9);
+    expect((await picture.labelStyle(second)).opacity).toBe(0);
+  });
+
+  /** [ST] box -> bare photo -> off the photo: the name hides at each step. */
+  test('a name hides again once the pointer leaves its box', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+
+    await picture.hoverBox(first);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+
+    await picture.hoverPhotoAt(CLEAR_POINT.fx, CLEAR_POINT.fy);
+    expect(await picture.stageIsHovered()).toBe(true);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBe(0);
+
+    await picture.moveMouseTo(0, 0);
+    expect(await picture.stageIsHovered()).toBe(false);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBe(0);
+  });
+
+  /** [HAPPY] A name link in the tab order is visible while it has focus. */
+  test('a name with keyboard focus is visible', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    // Anti-vacuity: the pointer is nowhere near the photo, so only focus can
+    // show the name.
+    expect(await picture.stageIsHovered()).toBe(false);
+    expect((await picture.labelStyle(first)).opacity).toBe(0);
+
+    await picture.focusLabel(first);
+
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+  });
+
+  /**
+   * [BVA] A box shorter than its name: the pointer on the part of the name
+   * that overhangs the box still shows that name. Otherwise the photo would
+   * dim around an invisible, clickable link.
+   */
+  test('a name overhanging a small box shows while the pointer is on it', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    await picture.setBoxHeight(first, SMALL_BOX_PX);
+
+    const point = await picture.hoverLabel(first);
+    // Anti-vacuity: the pointer is on the overhang, outside the box itself.
+    expect(await picture.boxContains(first, point)).toBe(false);
+
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+  });
+
+  /**
+   * [ST] The photo zooms under a pointer that does not move: no mousemove
+   * fires, yet the box that left the pointer must drop its name.
+   */
+  test('a name hides when a zoom moves its box away from a still pointer', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    const point = await picture.hoverBoxCorner(first);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0.9);
+
+    for (let i = 0; i < ZOOM_STEPS; i++) {
+      await picture.pressKey('+');
+    }
+    await picture.waitForPlacement();
+
+    // Anti-vacuity: the zoom really moved the box off the pointer, and the box
+    // itself is still shown, so a hidden name is the name rule's doing.
+    expect(await picture.boxContains(first, point)).toBe(false);
+    expect((await picture.boxStyle(first)).opacity).toBeGreaterThan(0.9);
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBe(0);
+  });
+
+  /**
    * Hovering a name dims the photo outside that box.
    *
    * Implemented with `.person-box:has(.person-box-label:hover)`, and the label
@@ -313,6 +487,25 @@ test.describe('a stale person region', () => {
       expect(style.opacity).toBeLessThan(1);
       expect(style.title).not.toBe('');
     }
+  });
+
+  /** [HAPPY] A focused stale name keeps its box as dimmed as a hovered one. */
+  test('keeps its dimmed look while its name has keyboard focus', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const first = seeded.regions[0].region_id;
+    expect(seeded.regions[0].stale).toBe(true);
+    expect(await picture.stageIsHovered()).toBe(false);
+
+    await picture.focusLabel(first);
+
+    // Anti-vacuity: the focus did show the box at all.
+    await expect
+      .poll(async () => (await picture.labelStyle(first)).opacity)
+      .toBeGreaterThan(0);
+    expect((await picture.boxStyle(first)).opacity).toBeLessThan(1);
   });
 });
 

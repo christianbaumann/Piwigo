@@ -300,6 +300,17 @@ async function waitForOverlayPlacement(page) {
   }, null, { timeout: ELEMENT_TIMEOUT });
 }
 
+/**
+ * Waits until no CSS transition under #persons-stage is running: boxes and
+ * names fade over 0.15s, and a shot taken mid-fade catches them half drawn.
+ */
+async function waitForStageTransitions(page) {
+  await page.waitForFunction(() => document.getAnimations().every(
+    (a) => !(a instanceof CSSTransition) || a.playState !== 'running'
+      || !(a.effect && a.effect.target && a.effect.target.closest('#persons-stage'))
+  ), null, { timeout: ELEMENT_TIMEOUT });
+}
+
 /** Drags a rectangle over one of the drawn faces, in rendered pixels. */
 async function dragOverFace(page, face) {
   const box = await page.locator('#theMainImage').boundingBox();
@@ -521,9 +532,27 @@ const SHOTS = [
       if (found !== demo.persons.length) {
         throw new Error('expected ' + demo.persons.length + ' region boxes, found ' + found);
       }
-      // The boxes are transparent until the photo is hovered.
+      // The boxes show while the photo is hovered, a name only while the
+      // pointer is inside its box: aim at the centre of the leftmost box.
       await page.locator('#persons-stage').scrollIntoViewIfNeeded();
       await page.locator('#theMainImage').hover();
+      const target = await boxes.evaluateAll((els) => els
+        .map((el) => el.getBoundingClientRect())
+        .sort((a, b) => a.left - b.left)
+        .map((r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 }))[0]);
+      await page.mouse.move(target.x, target.y, { steps: 5 });
+      await waitForStageTransitions(page);
+      const named = await page.locator('#persons-overlay .person-box-label')
+        .evaluateAll((els) => els.filter((el) => {
+          let opacity = 1;
+          for (let node = el; node && node.id !== 'persons-stage'; node = node.parentElement) {
+            opacity *= Number(window.getComputedStyle(node).opacity);
+          }
+          return opacity > 0.5;
+        }).length);
+      if (named !== 1) {
+        throw new Error('expected exactly one visible name, found ' + named);
+      }
       await shoot(page.locator('#persons-stage'), this.file, demo.image_dir);
     },
   },

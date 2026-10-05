@@ -1,5 +1,8 @@
 // @ts-check
 
+/** How far inside a box's corner hoverBoxCorner() puts the pointer, in CSS pixels. */
+const CORNER_INSET_PX = 3;
+
 /**
  * Page object for the public photo page with the person overlay on it.
  *
@@ -256,6 +259,125 @@ class PicturePage {
   /** @param {number} regionId */
   label(regionId) {
     return this.box(regionId).locator('.person-box-label');
+  }
+
+  /**
+   * How visible a box's name label is, as the visitor sees it.
+   *
+   * CSS opacity is not inherited - a label inside a box at opacity 0 still
+   * computes to 1 on its own - so the effective value is the product over the
+   * label and every ancestor up to the stage.
+   *
+   * Read only once every CSS transition on the stage has finished: the boxes
+   * fade over 0.15s, and a reading taken mid-fade passes a "visible" check on
+   * a box that is on its way out.
+   *
+   * @param {number} regionId
+   */
+  async labelStyle(regionId) {
+    await this.page.waitForFunction(() => document.getAnimations().every(
+      (a) => !(a instanceof CSSTransition) || a.playState !== 'running'
+        || !(a.effect && a.effect.target && a.effect.target.closest('#persons-stage'))
+    ));
+    return this.label(regionId).evaluate((el) => {
+      let opacity = 1;
+      for (let node = el; node && node.id !== 'persons-stage'; node = node.parentElement) {
+        opacity *= Number(window.getComputedStyle(node).opacity);
+      }
+      return { opacity };
+    });
+  }
+
+  /**
+   * Moves the pointer onto the photo at a fraction of its rendered size, and
+   * returns the point in viewport pixels.
+   *
+   * @param {number} fx
+   * @param {number} fy
+   */
+  async hoverPhotoAt(fx, fy) {
+    const image = await this.imageRect();
+    const point = { x: image.left + image.width * fx, y: image.top + image.height * fy };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
+   * Moves the pointer to the centre of a box, and returns the point in
+   * viewport pixels.
+   *
+   * @param {number} regionId
+   */
+  async hoverBox(regionId) {
+    const box = await this.boxRect(regionId);
+    const point = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
+   * Moves the pointer just inside a box's top-left corner, and returns the
+   * point in viewport pixels. A zoom grows the box away from it.
+   *
+   * @param {number} regionId
+   */
+  async hoverBoxCorner(regionId) {
+    const box = await this.boxRect(regionId);
+    const point = { x: box.left + CORNER_INSET_PX, y: box.top + CORNER_INSET_PX };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
+   * Whether a viewport point lies inside a box's rendered rect.
+   *
+   * @param {number} regionId
+   * @param {{x: number, y: number}} point
+   */
+  async boxContains(regionId, point) {
+    const box = await this.boxRect(regionId);
+    return point.x >= box.left && point.x <= box.left + box.width
+      && point.y >= box.top && point.y <= box.top + box.height;
+  }
+
+  /**
+   * Moves the pointer to the centre of a box's name label, and returns the
+   * point in viewport pixels.
+   *
+   * @param {number} regionId
+   */
+  async hoverLabel(regionId) {
+    const r = await this.label(regionId).evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    });
+    const point = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /**
+   * Forces a box shorter than its name label, the way a small face on a
+   * scaled-down group photo renders. The label stays pinned to the box's
+   * bottom edge, so its upper part overhangs the box.
+   *
+   * @param {number} regionId
+   * @param {number} px
+   */
+  async setBoxHeight(regionId, px) {
+    await this.box(regionId).evaluate((el, h) => {
+      el.style.height = `${h}px`;
+    }, px);
+  }
+
+  /** @param {number} regionId */
+  async focusLabel(regionId) {
+    await this.label(regionId).focus();
+  }
+
+  /** Whether the pointer is anywhere over the photo and its overlay. */
+  async stageIsHovered() {
+    return this.stage.evaluate((el) => el.matches(':hover'));
   }
 
   /**

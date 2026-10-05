@@ -3,8 +3,8 @@
  *
  * The boxes themselves are rendered by template/public_overlay.tpl and laid out
  * in percent inside #persons-overlay, so they are correct for any size that
- * element happens to have. This file has exactly one job: keep that element
- * exactly over the photo.
+ * element happens to have. This file keeps that element exactly over the
+ * photo, and marks the boxes under the pointer so their names show.
  *
  * The only truthful source of the photo's on-screen box is
  * getBoundingClientRect() on #theMainImage. The theme's zoom rewrites that
@@ -39,6 +39,28 @@
 		   the surface the first box is drawn on, and an unplaced overlay has no
 		   size to draw in. */
 
+		/* The boxes take no pointer events - a click on a face must still reach
+		   the theme's navigation - so :hover never matches them and the pointer
+		   is hit-tested here instead. Queried on every test: the editor adds and
+		   removes boxes, and a resize or zoom moves them. A box's own name counts
+		   as part of it, since on a small face the name overhangs the box. */
+		var pointer = null;
+
+		function contains(el, x, y) {
+			var r = el.getBoundingClientRect();
+			return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+		}
+
+		function markActive() {
+			var boxes = overlay.querySelectorAll('.person-box');
+			for (var i = 0; i < boxes.length; i++) {
+				var label = boxes[i].querySelector('.person-box-label');
+				var inside = pointer !== null && (contains(boxes[i], pointer.x, pointer.y)
+					|| (label !== null && contains(label, pointer.x, pointer.y)));
+				boxes[i].classList.toggle('person-box-active', inside);
+			}
+		}
+
 		function place() {
 			var imageRect = image.getBoundingClientRect();
 			var stageRect = stage.getBoundingClientRect();
@@ -53,6 +75,9 @@
 			overlay.style.top = (imageRect.top - stageRect.top) + 'px';
 			overlay.style.width = imageRect.width + 'px';
 			overlay.style.height = imageRect.height + 'px';
+
+			/* A zoom moves the boxes under a pointer that fires no mousemove. */
+			markActive();
 		}
 
 		var timer = null;
@@ -67,6 +92,15 @@
 		   normally noticed. */
 		image.addEventListener('load', place);
 		window.addEventListener('resize', placeSoon);
+
+		stage.addEventListener('mousemove', function (event) {
+			pointer = { x: event.clientX, y: event.clientY };
+			markActive();
+		});
+		stage.addEventListener('mouseleave', function () {
+			pointer = null;
+			markActive();
+		});
 
 		if (window.ResizeObserver) {
 			/* The zoom can change only the width and height attributes,
