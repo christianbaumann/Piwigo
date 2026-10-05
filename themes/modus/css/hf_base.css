@@ -879,34 +879,6 @@ li.path-ext-svg a img {
 }
 }
 
-/* Fork-local: fit and zoom (js/photo.zoom.js). A photo zoomed past its area
-   scrolls inside #theImage; photo.zoom.js sets the max-height while it is. */
-#theImage {
-	overflow: auto;
-}
-
-/* A block, so no line box adds space below it, and so a photo wider than the
-   area starts at its left edge instead of overflowing it on both sides. */
-#theMainImage {
-	display: block;
-	margin: 0 auto;
-}
-
-#imageToolBar .pwg-button.zoomButton {
-	width: auto;
-	padding: 0 8px;
-	line-height: 28px;
-}
-
-/* In the collapsed action menu (picture.css.tpl, max-width 600px) every other
-   entry is 5px padding + a 24px icon + a 5px gap before its label. These have
-   no icon, so their label is indented to the same column. */
-@media screen and (max-width:600px) {
-	#imageToolBar .actionButtons .pwg-button.zoomButton {
-		padding-left: 34px;
-	}
-}
-
 .gallery-icon-search-folder:before{
   font-size:17px;
 }

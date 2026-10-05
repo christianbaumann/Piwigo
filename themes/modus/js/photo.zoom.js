@@ -1,12 +1,23 @@
 /* Fork-local (docs/agents/decisions/0032-modus-picture-fit-and-zoom-is-a-fork-local-theme-edit.md).
-   The photo on the picture page is fitted to its area, or shown at 100 % of the
-   original. Zoom sets the photo's layout size rather than a transform, so
+   The photo on the picture page is fitted to its area, shown at 100 % of the
+   original, or zoomed in steps between the two bounds. Zoom sets the photo's layout size rather than a transform, so
    anything watching its box - the persons overlay - follows it. */
 var pwgZoom = (function($){
 	var FIT = 'fit', NATURAL = 'natural';
+	/* One +/- step multiplies the zoom by this; MAX_SCALE is 400 % of the original. */
+	var STEP = 1.25, MAX_SCALE = 4;
+	/* Scales this close are equal: a step there and back is not exact in floating point. */
+	var SCALE_EPSILON = 1e-9;
+	/* Wheel travel per step: one notch of a mouse wheel. A touchpad pinch sends
+	   many small deltas, which add up to a step instead of making one each. */
+	var WHEEL_STEP_PX = 100;
+	/* mode is FIT, NATURAL, or a scale against the original's size. */
 	var mode = FIT,
+		scale = null,
+		fit = null,
 		zoomedIn = false,
-		areaWidth = null;
+		areaWidth = null,
+		wheelTravel = 0;
 
 	/* The photo's pixel size as the gallery stores it, in display orientation.
 	   Without one, the largest derivative stands in; undefined without either. */
@@ -41,8 +52,10 @@ var pwgZoom = (function($){
 			loader = $('.img-loader-derivatives').attr('src');
 
 		/* Before the first file arrives the element holds the loading GIF, which
-		   the load handler sizes once the photo is there. */
-		if (img.complete && $img.attr('src') !== loader)
+		   the load handler sizes once the photo is there. Any other file takes
+		   the new size at once, so a zoom step can be centred before a bigger
+		   file has loaded. */
+		if ($img.attr('src') !== loader)
 			$img.css({width: display.w, height: display.h});
 		$img.attr({width: display.w, height: display.h});
 
@@ -67,9 +80,12 @@ var pwgZoom = (function($){
 			return;
 		a = a || area();
 		areaWidth = a.w;
-		var fit = fitScale(a),
-			scale = mode == FIT ? fit : naturalScale(),
-			o = original(),
+		fit = fitScale(a);
+		/* A step the area has outgrown is fit, and stays fit when it shrinks again. */
+		if (mode != FIT && mode != NATURAL && mode <= fit * (1 + SCALE_EPSILON))
+			mode = FIT;
+		scale = mode == FIT ? fit : mode == NATURAL ? naturalScale() : mode;
+		var o = original(),
 			display = {w: Math.floor(o.w * scale), h: Math.floor(o.h * scale)};
 
 		zoomedIn = scale > fit;
@@ -85,11 +101,59 @@ var pwgZoom = (function($){
 		apply();
 	}
 
+	/* The middle of what #theImage shows - its client box, cut to the window -
+	   in window coordinates. */
+	function areaCentre(){
+		var area = document.getElementById('theImage'),
+			box = area.getBoundingClientRect(),
+			left = box.left + area.clientLeft,
+			top = box.top + area.clientTop;
+		return {
+			x: (Math.max(left, 0) + Math.min(left + area.clientWidth, window.innerWidth)) / 2,
+			y: (Math.max(top, 0) + Math.min(top + area.clientHeight, window.innerHeight)) / 2
+		};
+	}
+
+	/* One step in or out, clamped to [fit, MAX_SCALE], keeping the photo point
+	   at the middle of the area where it was. */
+	function step(factor){
+		if (fit === null)
+			return;
+		var img = document.getElementById('theMainImage'),
+			o = original(),
+			shown = img.getBoundingClientRect().width,
+			/* After the size menu the photo shows its file, not the last zoom. */
+			from = RVAS.disable ? shown / o.w : scale,
+			to = Math.min(Math.max(from * factor, fit), Math.max(fit, MAX_SCALE));
+		/* Nothing to step from while the size menu's file is still loading (the
+		   photo is hidden then), and zooming out never enlarges a photo shown
+		   below fit - a small one at 100 %. */
+		if (!shown || (factor < 1 && to > from) || Math.abs(to - from) <= SCALE_EPSILON * from)
+			return;
+
+		var c = areaCentre(),
+			r = img.getBoundingClientRect(),
+			point = {x: (c.x - r.left) / r.width, y: (c.y - r.top) / r.height};
+
+		setMode(to <= fit * (1 + SCALE_EPSILON) ? FIT : to);
+
+		var area = document.getElementById('theImage');
+		c = areaCentre();
+		r = img.getBoundingClientRect();
+		area.scrollLeft += r.left + point.x * r.width - c.x;
+		area.scrollTop += r.top + point.y * r.height - c.y;
+	}
+
+	function overPhoto(e){
+		var r = document.getElementById('theMainImage').getBoundingClientRect();
+		return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+	}
+
 	function init(){
 		var $img = $('#theMainImage');
 		/* A PDF shown embedded has no photo to zoom. */
 		if (!$img.length){
-			$('#zoomFit, #zoomNatural').remove();
+			$('#zoomFit, #zoomNatural, #zoomIn, #zoomOut').remove();
 			return;
 		}
 
@@ -131,6 +195,40 @@ var pwgZoom = (function($){
 
 			$('#zoomFit').click(function(e){ e.preventDefault(); setMode(FIT); });
 			$('#zoomNatural').click(function(e){ e.preventDefault(); setMode(NATURAL); });
+			$('#zoomIn').click(function(e){ e.preventDefault(); step(STEP); });
+			$('#zoomOut').click(function(e){ e.preventDefault(); step(1 / STEP); });
+
+			/* Keys and wheel only where the control is: not in the slideshow. */
+			if ($('#zoomFit').length){
+				$(document).keydown(function(e){
+					/* Ctrl/Cmd with these keys is the browser's own page zoom; and
+					   an input - the persons name picker - takes them as text. */
+					if (e.ctrlKey || e.metaKey || e.altKey || $(e.target).is(':input') || e.target.isContentEditable)
+						return;
+					if (e.key == '+')
+						step(STEP);
+					else if (e.key == '-')
+						step(1 / STEP);
+					else if (e.key == '0')
+						setMode(FIT);
+					else
+						return;
+					e.preventDefault();
+				});
+
+				/* Ctrl/Cmd + wheel over the photo zooms it instead of the page;
+				   a plain wheel keeps scrolling. */
+				document.getElementById('theImage').addEventListener('wheel', function(e){
+					if (!(e.ctrlKey || e.metaKey) || !overPhoto(e))
+						return;
+					e.preventDefault();
+					wheelTravel += e.deltaMode ? Math.sign(e.deltaY) * WHEEL_STEP_PX : e.deltaY;
+					if (Math.abs(wheelTravel) < WHEEL_STEP_PX)
+						return;
+					step(wheelTravel < 0 ? STEP : 1 / STEP);
+					wheelTravel = 0;
+				}, {passive: false});
+			}
 
 			/* A click on a photo zoomed past fit is meant for the photo, so it
 			   must not reach the navigation handler in photo.autosize.js. */

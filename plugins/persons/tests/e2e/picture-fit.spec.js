@@ -265,10 +265,12 @@ test.describe('fit on a phone', () => {
     expectFitted(shown, area, seeded);
     expect(Math.abs(shown.width - area.width)).toBeLessThanOrEqual(FIT_TOLERANCE_PX);
 
-    // Anti-vacuity: the zoom control is on the page, only without + and -.
+    // + and - are in the page, for a window that widens, but not shown.
     await expect(picture.zoomFitButton).toHaveCount(1);
-    await expect(picture.zoomInButton).toHaveCount(0);
-    await expect(picture.zoomOutButton).toHaveCount(0);
+    await expect(picture.zoomInButton).toHaveCount(1);
+    await expect(picture.zoomOutButton).toHaveCount(1);
+    await expect(picture.zoomInButton).toBeHidden();
+    await expect(picture.zoomOutButton).toBeHidden();
   });
 });
 
@@ -319,5 +321,7 @@ test.describe('the slideshow', () => {
     expectFitted(await picture.imageDisplay(), await picture.fitArea(), seeded);
     await expect(picture.zoomFitButton).toHaveCount(0);
     await expect(picture.zoomNaturalButton).toHaveCount(0);
+    await expect(picture.zoomInButton).toHaveCount(0);
+    await expect(picture.zoomOutButton).toHaveCount(0);
   });
 });

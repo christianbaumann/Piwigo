@@ -20,4 +20,6 @@ $lang['Display page banner'] = 'Display page banner';
 $lang['Fit'] = 'Fit';
 $lang['Fit the photo to the window'] = 'Fit the photo to the window';
 $lang['Show the photo at its original size'] = 'Show the photo at its original size';
+$lang['Zoom in'] = 'Zoom in';
+$lang['Zoom out'] = 'Zoom out';
 ?>

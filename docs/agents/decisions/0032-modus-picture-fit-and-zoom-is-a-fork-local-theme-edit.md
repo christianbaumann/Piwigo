@@ -21,12 +21,14 @@ Edit `themes/modus/` in place:
 
 - `js/photo.autosize.js`: `rvas_choose(display)` returns the smallest file covering a display
   size; the old sizing and `<area>`-map handling are gone from it
-- `js/photo.zoom.js` (new): fit and `100 %`, the click guard, the size-menu hand-off
-- `template/picture_content_asize.tpl`: `RVAS.original`, loads `photo.zoom.js`
+- `js/photo.zoom.js` (new): fit and `100 %`, the click guard, the size-menu hand-off; `+`/`−`
+  steps, the keys `+`, `-` and `0`, and Ctrl/Cmd + wheel (task 03)
+- `template/picture_content_asize.tpl`: `RVAS.original`, loads `photo.zoom.js` and `photo.zoom.css`
 - `template/picture_zoom_buttons.tpl` (new) and `themeconf.inc.php`: the toolbar buttons
   through core's `add_picture_button()`, and `RVAS_ORIGINAL`
-- `css/hf_base.css`: `#theImage` scrolls, `#theMainImage` is a block
-- `language/en_UK` and `language/de_DE`: three strings
+- `css/photo.zoom.css` (new): `#theImage` scrolls, `#theMainImage` is a block, the buttons'
+  size and colours, `+`/`−` hidden on the narrow layout
+- `language/en_UK` and `language/de_DE`: five strings
 
 `themes/default/` stays untouched.
 
@@ -41,5 +43,9 @@ Edit `themes/modus/` in place:
 - An upstream merge that touches any of the files above conflicts. `photo.autosize.js` and
   `picture_content_asize.tpl` are the likely ones; resolve them by keeping the fork's
   `rvas_choose(display)` signature, which `photo.zoom.js` calls.
-- The behaviour is covered by `plugins/persons/tests/e2e/picture-fit.spec.js` and
-  `picture-display.spec.js`; the theme has no suite of its own.
+- The CSS must not go into `css/hf_base.css`, where task 02 first put it: `header.tpl` loads that
+  file only for the skins that ship a stylesheet of their own, so 7 of the 18 skins (`clear`,
+  `dark`, `dark_*`, `debug`, `grey`) got none of it - no scrolling at 100 %, overlapping labels.
+  Found and moved 2026-10-05; `picture-zoom.spec.js` now runs once per skin.
+- The behaviour is covered by `plugins/persons/tests/e2e/picture-fit.spec.js`,
+  `picture-zoom.spec.js` and `picture-display.spec.js`; the theme has no suite of its own.

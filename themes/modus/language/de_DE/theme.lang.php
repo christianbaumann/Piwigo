@@ -19,3 +19,5 @@ $lang['Admin'] = 'Verwaltung';
 $lang['Fit'] = 'Einpassen';
 $lang['Fit the photo to the window'] = 'Foto in das Fenster einpassen';
 $lang['Show the photo at its original size'] = 'Foto in Originalgröße anzeigen';
+$lang['Zoom in'] = 'Vergrößern';
+$lang['Zoom out'] = 'Verkleinern';
