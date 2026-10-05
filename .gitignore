@@ -5,6 +5,7 @@
 !/plugins/typetags
 !/plugins/provenance
 !/plugins/persons
+!/plugins/photoedit
 /themes/*
 !/themes/index.php
 !/themes/default

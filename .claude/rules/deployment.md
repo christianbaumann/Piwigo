@@ -147,3 +147,38 @@ and photos are re-created by the `site_update` scan; person regions by `pwg.pers
 of the image files. **Provenance columns have no path to the remote at all** — they live in the
 database and the file is only an export target — so a photo whose provenance was not written back
 before upload has none on the remote.
+
+## Photo edits travel as files
+
+A turn made with `plugins/photoedit` rewrites the image file and nothing else that a deploy could
+carry ([decision 0034](../../docs/agents/decisions/0034-photo-edits-change-the-file.md)). So the
+flow is: edit locally on the picture page → commit the changed file under `galleries/` → deploy →
+on the remote, re-read the edited photo's metadata and delete its derivatives → run
+`pwg.persons.rescan`, as after any deploy, so the person index is rebuilt from the edited file.
+
+Both remote steps are manual and easy to miss; do them in the Batch Manager with the edited photos
+selected:
+
+- *Synchronisieren von Metadaten*. The deploy's sync posts `sync_meta` without `meta_all`
+  (`SYNC_FIELDS` in `bootstrap.py`), and core then re-reads metadata only for photos it has never
+  read (`admin/site_update.php:841`, `date_metadata_update IS NULL` in
+  `admin/include/functions_metadata.php`). Without this an edited photo keeps its old
+  `width`/`height` and the page lays a turned photo out in the old shape.
+- *Mehrfache Bildgrößen entfernen*. With `derivative_url_style = 0` the page links an existing
+  derivative directly under `_data/i/` (`include/derivative.inc.php`, `DerivativeImage::build()`),
+  and only checks it against the size definitions, never against the source's mtime. So
+  `i.php` - which would rebuild a derivative older than its source - is never asked, and the
+  remote keeps serving the unturned thumbnails until they are deleted.
+
+Visitors' browsers can still show the old photo for a while after that: the URLs stay the same, and
+the web server sends derivatives with only `Last-Modified` (nginx locally does), which browsers turn into hours or days of reuse.
+Locally the plugin appends the file's version to an edited photo's URLs (`get_derivative_url`,
+`get_src_image_url`); on the remote it is inactive, so nothing does.
+
+`PLUGINS_TO_ACTIVATE` in `tools/deploy/pwgdeploy/bootstrap.py` leaves `photoedit` out on purpose.
+The plugin's files are published, but it stays inactive on the remote: an edit made there would
+change a file that is not in git, and the next deploy would overwrite it with the working copy's
+version (decision 0026).
+
+The backups under `_data/photoedit/originals/` are local only, like the rest of `_data`. For a
+photo under `galleries/` git holds the previous version as well.

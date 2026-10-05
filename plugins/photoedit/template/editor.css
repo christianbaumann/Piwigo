@@ -1,0 +1,54 @@
+/* The edit controls replace the toolbar's other buttons while edit mode is on
+   (editor.js puts .photoedit-active on <html>). */
+#imageToolBar .pwg-button.photoedit-button {
+	width: auto;
+	padding: 0 8px;
+	line-height: 28px;
+}
+
+/* A text label, styled like the theme's zoom control
+   (themes/modus/css/photo.zoom.css): the theme hides .pwg-button-text in the
+   toolbar and sizes .pwg-icon for a glyph. */
+#imageToolBar .photoedit-button .photoedit-label {
+	display: inline;
+	font-size: inherit !important;
+}
+
+#photoedit-controls,
+.photoedit-active #imageToolBar .actionButtons > *,
+.photoedit-active #persons-overlay,
+.photoedit-active #persons-editor {
+	display: none;
+}
+
+.photoedit-active #imageToolBar .actionButtons > #photoedit-controls {
+	display: inline;
+}
+
+/* The collapsed action menu of a narrow screen (themes/modus/css/picture.css.tpl)
+   closes on mouseleave; in edit mode it stays open, since it holds the only
+   controls. The indent lines the text labels up with the icon entries, as
+   themes/modus/css/photo.zoom.css does for the zoom control. */
+@media screen and (max-width:600px) {
+	.photoedit-active .actionButtonsWrapper .actionButtons {
+		display: block !important;
+	}
+
+	#imageToolBar .actionButtons .pwg-button.photoedit-button {
+		padding-left: 29px;
+	}
+}
+
+/* The preview turns about the photo's centre (editor.js sets the transform). */
+.photoedit-active #theMainImage {
+	transition: transform 0.2s;
+}
+
+.photoedit-saving #photoedit-controls {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+#imageToolBar .photoedit-button.photoedit-disabled {
+	opacity: 0.5;
+}

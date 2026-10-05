@@ -64,6 +64,14 @@ same false "survived".
 
 Both failure modes were hit while building the provenance plugin's Phase 1 table, 2026-08-29.
 
+PHP-FPM adds a second delay on top of Mutagen's. The web container runs with
+`opcache.validate_timestamps=On` and `opcache.revalidate_freq=2`, so for up to two seconds
+after the bytes arrive, a request through `ws.php` or a page still runs the cached
+pre-mutation code. A CLI test calling the function in-process is not affected; one going
+over HTTP is. So for an integration test over HTTP, wait at least `revalidate_freq` more
+after the checksums agree, on apply and on revert. Hit in `plugins/photoedit`, 2026-10-05:
+removing the webmaster check "survived" until the run waited three seconds, then died.
+
 Python has its own version of the same shift, and it bites *after* the revert rather than
 before it. CPython decides a cached `.pyc` is current from the source's **mtime and size**
 only — never its contents. A mutant that keeps the byte length (transposing two

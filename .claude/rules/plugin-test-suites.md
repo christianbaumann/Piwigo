@@ -17,7 +17,7 @@ non-coverage table, the unit suite's mutant table, and the hand-check ledger of 
 oracle. Check it before adding a test — an omission there may be a recorded decision rather
 than a gap.
 
-Piwigo core has no test suite. All three plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`), and all three carry a Playwright suite. The typetags commands:
+Piwigo core has no test suite. All four plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`, `plugins/photoedit/`), and all four carry a Playwright suite. The typetags commands:
 
 ```bash
 # Unit — pure functions, no DDEV, no DB, no HTTP
@@ -39,7 +39,7 @@ No plugin's suite takes a human's login. Each creates its own accounts with gene
 ddev exec php plugins/typetags/tests/Support/create-test-users.php
 ```
 
-That writes the git-ignored `local/config/typetags-test.env` and creates `typetags_webmaster` and `typetags_normal`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `git submodule update --init --recursive` **first** - `plugins/typetags` is a submodule, so a plain clone leaves that directory empty and every typetags command fails on a missing `composer.json` (measured 2026-08-31 against a real clone). Then `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'`, and the same two for `plugins/provenance` and `plugins/persons` (neither is a submodule, so both arrive with the clone). Dependency and run output (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by each plugin's own `.gitignore`.
+That writes the git-ignored `local/config/typetags-test.env` and creates `typetags_webmaster` and `typetags_normal`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `git submodule update --init --recursive` **first** - `plugins/typetags` is a submodule, so a plain clone leaves that directory empty and every typetags command fails on a missing `composer.json` (measured 2026-08-31 against a real clone). Then `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'`, and the same two for `plugins/provenance`, `plugins/persons` and `plugins/photoedit` (none is a submodule, so all three arrive with the clone). Dependency and run output (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by each plugin's own `.gitignore`.
 
 The provenance suite does not take a human's login. It creates its own accounts — see
 *Test accounts* in `.claude/rules/testing.md`:
@@ -57,7 +57,7 @@ ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
   cd plugins/provenance && npx playwright test'
 ```
 
-All three plugins share one pinned browser cache: `PLAYWRIGHT_BROWSERS_PATH` in `.ddev/config.yaml`
+All four plugins share one pinned browser cache: `PLAYWRIGHT_BROWSERS_PATH` in `.ddev/config.yaml`
 points at `plugins/typetags/.playwright-browsers`, so a fresh clone installs browsers once.
 
 That script writes the git-ignored `local/config/provenance-test.env` and creates
@@ -185,6 +185,44 @@ Two provenance E2E scenarios seed throwaway albums of their own rather than touc
 sidecars. `seed.php --read-photo=<id>` reads one photo's provenance columns back, for outcomes
 the browser cannot show.
 
+The photoedit suite works the same way:
+
+```bash
+# once per install (also rotates the passwords)
+ddev exec php plugins/photoedit/tests/Support/create-test-users.php
+
+ddev exec plugins/photoedit/vendor/bin/phpunit --testsuite unit --configuration plugins/photoedit/phpunit.xml
+ddev exec bash -c 'set -a; . local/config/photoedit-test.env; set +a; \
+  plugins/photoedit/vendor/bin/phpunit --testsuite integration --configuration plugins/photoedit/phpunit.xml'
+
+# E2E - drives Chromium in the container against the public picture page
+ddev exec bash -c 'set -a; . local/config/photoedit-test.env; set +a; \
+  cd plugins/photoedit && npx playwright test'
+```
+
+It writes the git-ignored `local/config/photoedit-test.env` and creates **three** accounts:
+`photoedit_webmaster`, `photoedit_admin` (an administrator who is not a webmaster) and
+`photoedit_normal`. The admin account exists because the edit button is gated by `is_webmaster()`,
+and only an authenticated administrator failing to get it proves the gate is not `is_admin()`. It
+marks the install with `photoedit_throwaway_install`, which its `FixtureBuilder` refuses to run
+without. Both suites need the plugin active (Administration > Plugins, or
+`pwg.plugins.performAction`) and fail naming it otherwise, through `FixtureBuilder::assertPluginActive()`;
+`edit-mode.spec.js` also needs persons active, since its overlay is part of what edit mode hides. The E2E specs run as the webmaster; `auth.setup.js` saves all three sessions and the
+visibility spec opens its own context per role. `tests/e2e/support/seed.php --scenario=photo`
+creates a throwaway album with one photo copied into `upload/photoedit-test/`, never a real scan;
+`--scenario=marked` generates a 300x200 palette PNG there instead (red corner marker, XMP caption,
+centre of interest), for the specs that save; `--restore` removes either, with its backups under
+`_data/photoedit/originals/`. The integration suite's `ApplyTurnTest` runs its corner and caption
+cases once per core image library by setting the `graphics_library` config row, because only GD
+drops a PNG's metadata - with ImageMagick the exiftool copy-back is invisible. `FailedWriteTest`
+calls the pipeline in-process (`tests/Support/PiwigoRuntime.php`) to listen to its events.
+`turn-cache.spec.js` seeds a real-size copy and runs `seed.php --age-derivatives`, which backdates
+the copy's derivatives: only an old `Last-Modified` makes the browser reuse a cached photo, which is
+the stale-photo case the plugin's `?v=` URLs exist for. An edit records each photo's version in the
+`photoedit_versions` config row; `destroyTestImages()` removes the suite's ids from it, since it
+deletes rows directly rather than through `delete_elements`. Its `package-lock.json` pins the same Playwright as persons, because
+the shared browser cache holds that version's Chromium only.
+
 E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in a page object under `tests/e2e/support/` (`PicturePage.js`, `AlbumPropertiesPage.js`, `PhotoPropertiesPage.js`, `BatchManagerPage.js`) — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 
 **Clear `_data/templates_c/` after editing a Smarty prefilter.** `Template::set_prefilter()` hashes only the filter's *callback name* into Smarty's `compile_id` (`include/template.class.php:1060-1070`), not the callback's source. Editing `typetags_picture_prefilter()` therefore leaves the previously compiled `picture.tpl` in place, and the page — and the integration suite reading it — keeps showing the old injection with no error.
@@ -193,7 +231,7 @@ Browser-level verification is done with `uvx rodney` (drive Chrome) and `uvx sho
 
 ## No lint, no CI
 
-Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags`, `plugins/provenance` and `plugins/persons` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
+Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags`, `plugins/provenance`, `plugins/persons` and `plugins/photoedit` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
 
 The mechanical checks available are:
 

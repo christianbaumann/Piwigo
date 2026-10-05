@@ -1,0 +1,7 @@
+/vendor/
+/node_modules/
+/test-results/
+/playwright-report/
+/.playwright-browsers/
+/.phpunit.result.cache
+/tests/e2e/.state/

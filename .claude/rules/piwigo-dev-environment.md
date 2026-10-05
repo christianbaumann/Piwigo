@@ -59,9 +59,25 @@ sit beside the image and are the only copy of the pre-write bytes.
 Measured 2026-08-30 against exiftool 13.25: `[]` deletes, `""` writes an empty structure, and
 `null` writes a literal null into the name list.
 
+## `_data/photoedit/` — the photo edit working area
+
+`plugins/photoedit` keeps three directories, defined once in
+`plugins/photoedit/include/pipeline.inc.php`:
+
+- `_data/photoedit/locks/` — one `<sha1(image path)>.lock` per photo, held across one edit.
+- `_data/photoedit/work/<operation id>/` — the turned temp file, built here and renamed over the
+  image only once its metadata is copied back; removed in a `finally`. A directory left behind
+  means the PHP process died mid-edit (the original is untouched then). Safe to delete when
+  nothing is writing.
+- `_data/photoedit/originals/<image id>-<timestamp>.<ext>` — the bytes of the file before each
+  edit. **Not** scratch: it is the only local backup of an edited photo outside `galleries/`, and
+  there is no undo button. Restoring is copying one back by hand.
+
+All three are covered by the root `.gitignore`'s `_data` entry and never reach the remote.
+
 ## Git-ignored working state
 
-`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
+`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
 
 `local/config/config.inc.php` and `local/config/database.inc.php` are git-ignored and hold the install's overrides and DB credentials.
 
