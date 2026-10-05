@@ -175,6 +175,57 @@ test.describe('person region overlay', () => {
   });
 
   /**
+   * [ERR] Characterization: records today's label visibility, no requirement
+   * confirms it. A label is a child of its box, so it is hidden with it.
+   */
+  test('every name is hidden before the photo is hovered', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    // Anti-vacuity: "every label" over fewer than two regions cannot tell one
+    // label's rule from all of them, and over none asserts nothing.
+    expect(seeded.regions.length).toBeGreaterThanOrEqual(2);
+    expect(await picture.stageIsHovered()).toBe(false);
+
+    for (const region of seeded.regions) {
+      expect((await picture.labelStyle(region.region_id)).opacity).toBe(0);
+    }
+  });
+
+  /**
+   * [ERR] Characterization: records today's label visibility, no requirement
+   * confirms it. Hovering anywhere on the photo shows every box and, with it,
+   * every name. Task 02 of the hover-names change replaces this on purpose:
+   * a name is to show only while its own box is hovered.
+   */
+  test('hovering the photo outside every box shows every name', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    expect(seeded.regions.length).toBeGreaterThanOrEqual(2);
+
+    // The upper-middle strip, clear of both seeded boxes.
+    const point = await picture.hoverPhotoAt(0.5, 0.12);
+
+    // Anti-vacuity: the pointer must really be outside every box, or this would
+    // only re-assert that a hovered box shows its own name.
+    for (const region of seeded.regions) {
+      const box = await picture.boxRect(region.region_id);
+      const inside = point.x >= box.left && point.x <= box.left + box.width
+        && point.y >= box.top && point.y <= box.top + box.height;
+      expect(inside).toBe(false);
+    }
+
+    for (const region of seeded.regions) {
+      await expect
+        .poll(async () => (await picture.labelStyle(region.region_id)).opacity)
+        .toBeGreaterThan(0.9);
+    }
+  });
+
+  /**
    * Hovering a name dims the photo outside that box.
    *
    * Implemented with `.person-box:has(.person-box-label:hover)`, and the label

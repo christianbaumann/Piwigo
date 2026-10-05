@@ -259,6 +259,52 @@ class PicturePage {
   }
 
   /**
+   * How visible a box's name label is, as the visitor sees it.
+   *
+   * CSS opacity is not inherited - a label inside a box at opacity 0 still
+   * computes to 1 on its own - so the effective value is the product over the
+   * label and every ancestor up to the stage.
+   *
+   * Read only once every CSS transition on the stage has finished: the boxes
+   * fade over 0.15s, and a reading taken mid-fade passes a "visible" check on
+   * a box that is on its way out.
+   *
+   * @param {number} regionId
+   */
+  async labelStyle(regionId) {
+    await this.page.waitForFunction(() => document.getAnimations().every(
+      (a) => !(a instanceof CSSTransition) || a.playState !== 'running'
+        || !(a.effect && a.effect.target && a.effect.target.closest('#persons-stage'))
+    ));
+    return this.label(regionId).evaluate((el) => {
+      let opacity = 1;
+      for (let node = el; node && node.id !== 'persons-stage'; node = node.parentElement) {
+        opacity *= Number(window.getComputedStyle(node).opacity);
+      }
+      return { opacity };
+    });
+  }
+
+  /**
+   * Moves the pointer onto the photo at a fraction of its rendered size, and
+   * returns the point in viewport pixels.
+   *
+   * @param {number} fx
+   * @param {number} fy
+   */
+  async hoverPhotoAt(fx, fy) {
+    const image = await this.imageRect();
+    const point = { x: image.left + image.width * fx, y: image.top + image.height * fy };
+    await this.page.mouse.move(point.x, point.y);
+    return point;
+  }
+
+  /** Whether the pointer is anywhere over the photo and its overlay. */
+  async stageIsHovered() {
+    return this.stage.evaluate((el) => el.matches(':hover'));
+  }
+
+  /**
    * The spread of a box's dimming shadow, in pixels.
    *
    * How "everything outside this box goes dark" is implemented: one shadow

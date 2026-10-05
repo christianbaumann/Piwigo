@@ -377,6 +377,31 @@ test.describe('removing a person', () => {
     await expect(picture.deleteButton(first)).toBeVisible();
   });
 
+  /**
+   * [ERR] Characterization: records today's label visibility, no requirement
+   * confirms it. Tagging mode shows every saved box without a hover, and the
+   * names with them - the user must see who is already tagged.
+   */
+  test('tagging mode shows every saved name without a hover', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    expect(seeded.regions.length).toBeGreaterThanOrEqual(2);
+
+    await picture.enterTaggingMode();
+    await picture.moveMouseTo(0, 0);
+    // Anti-vacuity: a pointer still over the photo would show the names through
+    // the hover rule, not the tagging one.
+    expect(await picture.stageIsHovered()).toBe(false);
+
+    for (const region of seeded.regions) {
+      await expect
+        .poll(async () => (await picture.labelStyle(region.region_id)).opacity)
+        .toBeGreaterThan(0.9);
+    }
+  });
+
   test('deleting a box removes it from the page and from the file', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
