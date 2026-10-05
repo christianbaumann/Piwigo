@@ -62,7 +62,7 @@ final class FailedWriteTest extends TestCase
         $this->assertFalse(is_writable(self::ORIGINALS_DIR),
             'anti-vacuity: the directory is still writable (running as root?)');
 
-        $result = photoedit_apply($id, 1, false);
+        $result = photoedit_apply($id, 1, null, false);
 
         $this->assertFalse($result['ok']);
         $this->assertSame('write_failed', $result['code']);
@@ -88,7 +88,7 @@ final class FailedWriteTest extends TestCase
         clearstatcache();
         $this->assertTrue(is_writable($this->image['file']), 'anti-vacuity: the file itself must stay writable');
 
-        $result = photoedit_apply((int)$this->image['id'], 1, false);
+        $result = photoedit_apply((int)$this->image['id'], 1, null, false);
 
         $this->assertFalse($result['ok']);
         $this->assertSame('write_failed', $result['code']);
@@ -101,7 +101,7 @@ final class FailedWriteTest extends TestCase
     {
         $id = (int)$this->image['id'];
 
-        $result = photoedit_apply($id, 1, false);
+        $result = photoedit_apply($id, 1, null, false);
 
         $this->assertTrue($result['ok'], $result['message'] ?? '');
         $this->assertNotSame($this->image['md5'], md5_file($this->image['file']));
@@ -111,7 +111,7 @@ final class FailedWriteTest extends TestCase
     /** [HAPPY] A dry run fires neither event. */
     public function testADryRunFiresNoWriteEvents(): void
     {
-        $result = photoedit_apply((int)$this->image['id'], 1, true);
+        $result = photoedit_apply((int)$this->image['id'], 1, null, true);
 
         $this->assertTrue($result['ok']);
         $this->assertSame(array(), $this->events);

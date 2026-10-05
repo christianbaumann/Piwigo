@@ -94,7 +94,9 @@ final class TurnTest extends TestCase
     #[DataProvider('cois')]
     public function testTheCentreOfInterestTurns(?string $coi, int $turns, ?string $expected): void
     {
-        $this->assertSame($expected, photoedit_turn_coi($coi, $turns));
+        $transform = array('turns' => $turns, 'crop_px' => null, 'width_before' => 300, 'height_before' => 200);
+
+        $this->assertSame($expected, photoedit_transform_coi($coi, $transform));
     }
 
     public static function versionedUrls(): array

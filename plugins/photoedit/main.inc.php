@@ -71,10 +71,11 @@ function photoedit_add_methods($arr)
     array(
       'image_id' => array('type' => WS_TYPE_ID),
       'turns' => array('default' => 0, 'info' => 'Quarter turns clockwise, 0 to 3, relative to what the page shows'),
+      'crop' => array('default' => '', 'info' => 'l,t,r,b as fractions of the turned photo; empty for no crop'),
       'dry_run' => array('default' => false, 'type' => WS_TYPE_BOOL, 'info' => 'Report what the edit would do, write nothing'),
       'pwg_token' => array(),
       ),
-    'Turns a photo and writes the result into its image file. Webmaster only.',
+    'Turns a photo, crops it and writes the result into its image file. Webmaster only.',
     PHOTOEDIT_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );

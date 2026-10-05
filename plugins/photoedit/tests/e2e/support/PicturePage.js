@@ -20,6 +20,8 @@ class PicturePage {
     this.turnRightButton = page.locator('#photoedit-turn-right');
     this.saveButton = page.locator('#photoedit-save');
     this.cancelButton = page.locator('#photoedit-cancel');
+    /** The Jcrop frame editor.js lays over the preview. */
+    this.cropFrame = page.locator('#photoedit-frame');
     /** <html> while edit mode is on. */
     this.editMode = page.locator('html.photoedit-active');
 
@@ -123,6 +125,34 @@ class PicturePage {
       this.saveButton.click(),
     ]);
     await this.waitForPhoto();
+  }
+
+  /** @param {'n'|'e'|'s'|'w'} edge */
+  cropHandle(edge) {
+    return this.cropFrame.locator(`.jcrop-handle.ord-${edge}`);
+  }
+
+  /**
+   * Drags one edge of the crop frame to a fraction of the frame's width (e, w)
+   * or height (n, s).
+   *
+   * @param {'n'|'e'|'s'|'w'} edge
+   * @param {number} fraction
+   */
+  async dragCropEdge(edge, fraction) {
+    const frame = await this.cropFrame.boundingBox();
+    const handle = await this.cropHandle(edge).boundingBox();
+    if (!frame || !handle) {
+      throw new Error(`no crop frame or no ${edge} handle to drag`);
+    }
+    const from = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 };
+    const to = edge === 'e' || edge === 'w'
+      ? { x: frame.x + frame.width * fraction, y: from.y }
+      : { x: from.x, y: frame.y + frame.height * fraction };
+    await this.page.mouse.move(from.x, from.y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(to.x, to.y, { steps: 5 });
+    await this.page.mouse.up();
   }
 
   /** The photo's rendered width in CSS pixels. */

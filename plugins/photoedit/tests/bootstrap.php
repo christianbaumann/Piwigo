@@ -21,3 +21,4 @@ require_once __DIR__ . '/Support/Db.php';
 require_once __DIR__ . '/Support/WsClient.php';
 require_once __DIR__ . '/Support/FixtureBuilder.php';
 require_once __DIR__ . '/Support/PiwigoRuntime.php';
+require_once __DIR__ . '/Support/ReadsImageFiles.php';

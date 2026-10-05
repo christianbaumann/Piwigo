@@ -79,7 +79,7 @@ function photoedit_image_file_path($db_path)
 /**
  * A failed edit, in the shape every pipeline function returns.
  *
- * @param string $code one of not_found, unsupported, unavailable, locked, write_failed
+ * @param string $code one of not_found, invalid, unsupported, unavailable, locked, write_failed
  * @param string $message
  * @return array
  */
@@ -128,21 +128,19 @@ function photoedit_image_row($image_id)
  *
  * @param array $image the image row
  * @param int $turns
- * @return array
+ * @param array|null $box the crop as fractions of the turned photo
+ * @return array the transform, or a failure ('ok' false) when the photo's
+ *   size makes the edit impossible or pointless
  */
-function photoedit_transform($image, $turns)
+function photoedit_transform($image, $turns, $box)
 {
-  list($width_after, $height_after) = photoedit_turned_size($image['width'], $image['height'], $turns);
+  $plan = photoedit_plan_edit($image['width'], $image['height'], $turns, $box);
+  if (!$plan['ok'])
+  {
+    return photoedit_failure('invalid', $plan['error']);
+  }
 
-  return array(
-    'rotation_before' => (int)$image['rotation'],
-    'turns' => (int)$turns,
-    'crop_px' => null,
-    'width_before' => (int)$image['width'],
-    'height_before' => (int)$image['height'],
-    'width_after' => $width_after,
-    'height_after' => $height_after,
-    );
+  return array('ok' => true, 'rotation_before' => (int)$image['rotation']) + $plan['transform'];
 }
 
 /**
@@ -203,16 +201,17 @@ function photoedit_delete_elements($ids)
 }
 
 /**
- * Turns one photo and writes the result into its file, or only reports what
- * that would do.
+ * Turns and crops one photo and writes the result into its file, or only
+ * reports what that would do.
  *
  * @param int $image_id
  * @param int $turns quarter turns clockwise, already validated
+ * @param array|null $box the crop as fractions of the turned photo, already validated
  * @param bool $dry_run
  * @return array 'ok' plus, on success, 'lost_regions', 'lossy' and after a
  *   write 'width', 'height'; on failure 'code' and 'message'
  */
-function photoedit_apply($image_id, $turns, $dry_run)
+function photoedit_apply($image_id, $turns, $box, $dry_run)
 {
   $image = photoedit_image_row($image_id);
 
@@ -247,7 +246,12 @@ function photoedit_apply($image_id, $turns, $dry_run)
     return photoedit_failure('unavailable', $reason);
   }
 
-  $transform = photoedit_transform($image, $turns);
+  $transform = photoedit_transform($image, $turns, $box);
+  if (!$transform['ok'])
+  {
+    return $transform;
+  }
+  unset($transform['ok']);
 
   $lost = trigger_change('photoedit_preview', array(), $image, $transform);
 
@@ -270,7 +274,13 @@ function photoedit_apply($image_id, $turns, $dry_run)
     photoedit_lock_release($lock);
     return photoedit_failure('not_found', 'No photo with this id');
   }
-  $transform = photoedit_transform($image, $turns);
+  $transform = photoedit_transform($image, $turns, $box);
+  if (!$transform['ok'])
+  {
+    photoedit_lock_release($lock);
+    return $transform;
+  }
+  unset($transform['ok']);
 
   $ok = false;
   $work_dir = PHOTOEDIT_WORK_DIR.uniqid((string)$image['id'].'-', true).'/';
@@ -345,6 +355,17 @@ function photoedit_write($image, $file, $extension, $transform, $work_dir)
     imagepalettetotruecolor($editor->image->image);
   }
   $editor->rotate(photoedit_rotate_angle($transform['turns']));
+  $rect = $transform['crop_px'];
+  if ($rect !== null)
+  {
+    $editor->crop($rect['w'], $rect['h'], $rect['x'], $rect['y']);
+    // Imagick keeps the cut-away canvas as the image's page, which a PNG
+    // carries out as an offset; the edited photo starts at its own corner.
+    if ($editor->library == 'imagick')
+    {
+      $editor->image->image->setImagePage(0, 0, 0, 0);
+    }
+  }
   // The libraries report failure as warnings (image_ext_imagick::write() raises
   // one per output line); the file on disk is checked below instead, so a
   // warning cannot end up inside a web-service response.
@@ -356,7 +377,7 @@ function photoedit_write($image, $file, $extension, $transform, $work_dir)
       or (int)$size[0] !== $transform['width_after']
       or (int)$size[1] !== $transform['height_after'])
   {
-    return photoedit_write_failure('The image library did not produce the turned photo', $temp);
+    return photoedit_write_failure('The image library did not produce the edited photo', $temp);
   }
 
   // The libraries keep some metadata and drop the rest; copy all of it back
@@ -390,7 +411,7 @@ function photoedit_write($image, $file, $extension, $transform, $work_dir)
     'height' => $transform['height_after'],
     'filesize' => floor(filesize($file) / 1024),
     'rotation' => 0,
-    'coi' => photoedit_turn_coi($image['coi'], $transform['turns']),
+    'coi' => photoedit_transform_coi($image['coi'], $transform),
     );
   if (!empty($image['md5sum']))
   {

@@ -13,6 +13,9 @@ define('PHOTOEDIT_MAX_TURNS', 3);
 define('PHOTOEDIT_LOCK_TIMEOUT_SECONDS', 30);
 define('PHOTOEDIT_LOCK_RETRY_MICROSECONDS', 100000);
 
+/** The shortest side, in pixels, a crop may leave. */
+define('PHOTOEDIT_MIN_CROP_PX', 16);
+
 /**
  * Checks the edit a request asks for.
  *
@@ -141,17 +144,130 @@ function photoedit_rotate_angle($turns)
 }
 
 /**
- * Turns a stored centre of interest - four characters a..z for l, t, r, b,
- * see admin/picture_coi.php - with the photo.
+ * A crop given as fractions of the turned photo, in whole pixels of it.
+ *
+ * Each edge is rounded to the nearest pixel. The fractions are already checked
+ * to lie in 0..1, so a rounded edge cannot leave the photo. A frame that rounds
+ * to the whole photo is no crop (rect null).
+ *
+ * @param array $box 'l', 't', 'r', 'b' as fractions 0..1, l < r and t < b
+ * @param int $width the turned photo's width
+ * @param int $height the turned photo's height
+ * @return array 'ok', 'error' (empty when ok), 'rect' ('x', 'y', 'w', 'h', or null)
+ */
+function photoedit_crop_rect($box, $width, $height)
+{
+  $x = (int)round($box['l'] * $width);
+  $y = (int)round($box['t'] * $height);
+  $w = (int)round($box['r'] * $width) - $x;
+  $h = (int)round($box['b'] * $height) - $y;
+
+  if ($w < PHOTOEDIT_MIN_CROP_PX or $h < PHOTOEDIT_MIN_CROP_PX)
+  {
+    return array(
+      'ok' => false,
+      'error' => 'crop must leave at least '.PHOTOEDIT_MIN_CROP_PX.' pixels on each side',
+      'rect' => null,
+      );
+  }
+
+  $rect = ($w == $width and $h == $height)
+    ? null
+    : array('x' => $x, 'y' => $y, 'w' => $w, 'h' => $h);
+
+  return array('ok' => true, 'error' => '', 'rect' => $rect);
+}
+
+/**
+ * What a validated request does to a photo of a given size: turn first, then
+ * crop the turned photo.
+ *
+ * @param int $width the raw file's width
+ * @param int $height the raw file's height
+ * @param int $turns quarter turns clockwise
+ * @param array|null $box the crop as fractions of the turned photo, or null
+ * @return array 'ok', 'error' (empty when ok), 'transform' ('turns',
+ *   'crop_px' or null, 'width_before', 'height_before', 'width_after', 'height_after')
+ */
+function photoedit_plan_edit($width, $height, $turns, $box)
+{
+  list($turned_width, $turned_height) = photoedit_turned_size($width, $height, $turns);
+
+  $rect = null;
+  if ($box !== null)
+  {
+    $crop = photoedit_crop_rect($box, $turned_width, $turned_height);
+    if (!$crop['ok'])
+    {
+      return array('ok' => false, 'error' => $crop['error'], 'transform' => null);
+    }
+    $rect = $crop['rect'];
+  }
+
+  if ((int)$turns == 0 and $rect === null)
+  {
+    return array('ok' => false, 'error' => 'nothing to do: neither turned nor cropped', 'transform' => null);
+  }
+
+  return array(
+    'ok' => true,
+    'error' => '',
+    'transform' => array(
+      'turns' => (int)$turns,
+      'crop_px' => $rect,
+      'width_before' => (int)$width,
+      'height_before' => (int)$height,
+      'width_after' => $rect === null ? $turned_width : $rect['w'],
+      'height_after' => $rect === null ? $turned_height : $rect['h'],
+      ),
+    );
+}
+
+/**
+ * A box given as fractions of the turned photo, as fractions of the crop.
+ *
+ * The part outside the crop is cut off; a box with nothing left inside it -
+ * touching the crop's edge is nothing - becomes null.
+ *
+ * @param array $box 'l', 't', 'r', 'b' as fractions of the turned photo
+ * @param array $rect the crop, 'x', 'y', 'w', 'h' in pixels of the turned photo
+ * @param int $width the turned photo's width
+ * @param int $height the turned photo's height
+ * @return array|null
+ */
+function photoedit_crop_box($box, $rect, $width, $height)
+{
+  $l = max($box['l'] * $width, $rect['x']);
+  $t = max($box['t'] * $height, $rect['y']);
+  $r = min($box['r'] * $width, $rect['x'] + $rect['w']);
+  $b = min($box['b'] * $height, $rect['y'] + $rect['h']);
+
+  if ($l >= $r or $t >= $b)
+  {
+    return null;
+  }
+
+  return array(
+    'l' => ($l - $rect['x']) / $rect['w'],
+    't' => ($t - $rect['y']) / $rect['h'],
+    'r' => ($r - $rect['x']) / $rect['w'],
+    'b' => ($b - $rect['y']) / $rect['h'],
+    );
+}
+
+/**
+ * Turns and crops a stored centre of interest - four characters a..z for
+ * l, t, r, b, see admin/picture_coi.php - with the photo. One left wholly
+ * outside the crop is dropped.
  *
  * Uses core's char_to_fraction() / fraction_to_char()
  * (include/derivative_params.inc.php, loaded on every request).
  *
  * @param string|null $coi
- * @param int $turns
+ * @param array $transform as photoedit_plan_edit() returns it
  * @return string|null
  */
-function photoedit_turn_coi($coi, $turns)
+function photoedit_transform_coi($coi, $transform)
 {
   if (empty($coi))
   {
@@ -165,8 +281,18 @@ function photoedit_turn_coi($coi, $turns)
       'r' => char_to_fraction($coi[2]),
       'b' => char_to_fraction($coi[3]),
       ),
-    $turns
+    $transform['turns']
     );
+
+  if ($transform['crop_px'] !== null)
+  {
+    list($width, $height) = photoedit_turned_size($transform['width_before'], $transform['height_before'], $transform['turns']);
+    $box = photoedit_crop_box($box, $transform['crop_px'], $width, $height);
+    if ($box === null)
+    {
+      return null;
+    }
+  }
 
   return fraction_to_char($box['l']).fraction_to_char($box['t']).fraction_to_char($box['r']).fraction_to_char($box['b']);
 }

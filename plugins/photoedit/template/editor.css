@@ -44,9 +44,19 @@
 	transition: transform 0.2s;
 }
 
-.photoedit-saving #photoedit-controls {
+.photoedit-saving #photoedit-controls,
+.photoedit-saving #photoedit-frame {
 	opacity: 0.5;
 	pointer-events: none;
+}
+
+/* The crop frame, laid over the turned preview by editor.js. Last in <body>,
+   it paints over the photo at z-index 0. That also keeps Jcrop's own inline
+   z-indexes (around 300) inside it, below the collapsed action menu of a narrow
+   screen (z-index 1), which holds the edit controls. */
+#photoedit-frame {
+	position: absolute;
+	z-index: 0;
 }
 
 #imageToolBar .photoedit-button.photoedit-disabled {

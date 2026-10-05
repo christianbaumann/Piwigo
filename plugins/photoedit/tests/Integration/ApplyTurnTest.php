@@ -11,10 +11,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class ApplyTurnTest extends TestCase
 {
-    private const METHOD = 'pwg.photoedit.apply';
+    use ReadsImageFiles;
 
-    /** Pixels in from each corner where the marker colour is sampled. */
-    private const SAMPLE_INSET = 5;
+    private const METHOD = 'pwg.photoedit.apply';
 
     /** The derivative size the derivative-deletion case asks i.php for. */
     private const DERIVATIVE = 'sq';
@@ -75,45 +74,6 @@ final class ApplyTurnTest extends TestCase
         $this->assertIsArray($res['json'], 'not JSON: ' . $res['body']);
         $this->assertSame('fail', $res['json']['stat'], $res['body']);
         $this->assertSame($code, (int)$res['json']['err'], $res['body']);
-    }
-
-    /** The file's size, as ImageMagick reads it. */
-    private function identify(): array
-    {
-        $out = FixtureBuilder::run('identify -format "%w %h" ' . escapeshellarg($this->image['file']));
-        return array_map('intval', explode(' ', trim($out)));
-    }
-
-    /** The colour of one pixel, as ImageMagick reads it, normalised to srgb(r,g,b). */
-    private function pixel(int $x, int $y): string
-    {
-        $out = FixtureBuilder::run(sprintf(
-            'convert %s -format "%%[pixel:p{%d,%d}]" info:',
-            escapeshellarg($this->image['file']), $x, $y
-        ));
-        return trim($out);
-    }
-
-    /** Which corners are red, sampled SAMPLE_INSET pixels in from each. */
-    private function redCorners(): array
-    {
-        list($w, $h) = $this->identify();
-        $corners = array(
-            'top-left' => array(self::SAMPLE_INSET, self::SAMPLE_INSET),
-            'top-right' => array($w - 1 - self::SAMPLE_INSET, self::SAMPLE_INSET),
-            'bottom-right' => array($w - 1 - self::SAMPLE_INSET, $h - 1 - self::SAMPLE_INSET),
-            'bottom-left' => array(self::SAMPLE_INSET, $h - 1 - self::SAMPLE_INSET),
-            );
-
-        $found = array();
-        foreach ($corners as $name => list($x, $y))
-        {
-            if (preg_match('/^s?rgba?\(255,0,0/', str_replace(' ', '', $this->pixel($x, $y))))
-            {
-                $found[] = $name;
-            }
-        }
-        return $found;
     }
 
     /** [HAPPY] One turn swaps the file's sides and the row follows; nothing else is lost. */
