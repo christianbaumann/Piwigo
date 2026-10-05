@@ -723,6 +723,90 @@ class PicturePage {
   }
 
   /**
+   * Drags with the mouse across the part of the photo that is on screen, from
+   * one point to another given in fractions of that part, and returns how far
+   * the pointer travelled in CSS pixels.
+   *
+   * @param {{x: number, y: number}} from
+   * @param {{x: number, y: number}} to
+   * @returns {Promise<{dx: number, dy: number}>}
+   */
+  async dragVisiblePhoto(from, to) {
+    const visible = await this.visiblePhotoRect();
+    const fromX = visible.left + visible.width * from.x;
+    const fromY = visible.top + visible.height * from.y;
+    const toX = visible.left + visible.width * to.x;
+    const toY = visible.top + visible.height * to.y;
+
+    await this.page.mouse.move(fromX, fromY);
+    await this.page.mouse.down();
+    // Stepped, so the drag produces mousemove events rather than one jump.
+    await this.page.mouse.move(toX, toY, { steps: 10 });
+    await this.page.mouse.up();
+    return { dx: toX - fromX, dy: toY - fromY };
+  }
+
+  /**
+   * Presses the left mouse button at a point of the visible photo, given in
+   * fractions of that part, and returns the point in window coordinates.
+   *
+   * @param {{x: number, y: number}} at
+   */
+  async pressVisiblePhoto(at) {
+    const visible = await this.visiblePhotoRect();
+    const point = { x: visible.left + visible.width * at.x, y: visible.top + visible.height * at.y };
+    await this.page.mouse.move(point.x, point.y);
+    await this.page.mouse.down();
+    return point;
+  }
+
+  /**
+   * Moves the mouse to a point in window coordinates, in steps.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async moveMouseTo(x, y) {
+    await this.page.mouse.move(x, y, { steps: 10 });
+  }
+
+  async releaseMouse() {
+    await this.page.mouse.up();
+  }
+
+  /**
+   * Sends the page a mouse move that reports no button held, the way a page
+   * sees the mouse after a release it never received - one a context menu or
+   * another window took.
+   *
+   * @param {number} x
+   * @param {number} y
+   */
+  async moveWithNoButtonTo(x, y) {
+    await this.page.evaluate(
+      ([cx, cy]) => {
+        document
+          .getElementById('theMainImage')
+          .dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: cx, clientY: cy, buttons: 0 }));
+      },
+      [x, y]
+    );
+  }
+
+  /** Whether the photo is bigger than #theImage shows, on either axis. */
+  async areaOverflows() {
+    return this.page.evaluate(() => {
+      const area = document.getElementById('theImage');
+      return area.scrollWidth > area.clientWidth || area.scrollHeight > area.clientHeight;
+    });
+  }
+
+  /** The mouse cursor the photo shows. */
+  async photoCursor() {
+    return this.image.evaluate((el) => window.getComputedStyle(el).cursor);
+  }
+
+  /**
    * Types a name into the picker and waits for the option carrying that name.
    *
    * Not merely for *an* option: the picker opens showing the most recently used

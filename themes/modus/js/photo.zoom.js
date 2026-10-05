@@ -11,11 +11,16 @@ var pwgZoom = (function($){
 	/* Wheel travel per step: one notch of a mouse wheel. A touchpad pinch sends
 	   many small deltas, which add up to a step instead of making one each. */
 	var WHEEL_STEP_PX = 100;
+	/* The class the persons editor puts on its stage while it draws regions
+	   with a mouse drag (plugins/persons/template/editor.js). */
+	var EDITOR_DRAWING = 'persons-tagging';
 	/* mode is FIT, NATURAL, or a scale against the original's size. */
 	var mode = FIT,
 		scale = null,
 		fit = null,
 		zoomedIn = false,
+		/* True from a drag-to-pan's press until the click its release fires. */
+		panning = false,
 		areaWidth = null,
 		wheelTravel = 0;
 
@@ -90,7 +95,8 @@ var pwgZoom = (function($){
 
 		zoomedIn = scale > fit;
 		/* Past fit the photo scrolls inside #theImage instead of the page. */
-		$('#theImage').css('max-height', zoomedIn ? Math.floor(a.h) : '');
+		$('#theImage').css('max-height', zoomedIn ? Math.floor(a.h) : '')
+			.toggleClass('zoomPannable', zoomedIn);
 		/* A pinch-zoomed page shows the photo larger than its layout size. */
 		show(rvas_choose({w: display.w * a.zoom, h: display.h * a.zoom}), display);
 	}
@@ -233,16 +239,57 @@ var pwgZoom = (function($){
 			/* A click on a photo zoomed past fit is meant for the photo, so it
 			   must not reach the navigation handler in photo.autosize.js. */
 			document.getElementById('theImage').addEventListener('click', function(e){
-				if (zoomedIn && e.target.id == 'theMainImage')
+				if ((zoomedIn || panning) && e.target.id == 'theMainImage')
 					e.stopPropagation();
 			}, true);
+
+			/* Past fit the photo follows a mouse drag - except while the persons
+			   editor draws a region with that drag. Its overlay takes the pointer
+			   then, so the target check alone keeps the drag off today; the class
+			   check keeps it off should the overlay ever let the pointer through.
+			   The guard above holds back the click a drag ends in, even when a
+			   zoom key has fitted the photo meanwhile. */
+			var theImage = document.getElementById('theImage');
+			theImage.addEventListener('mousedown', function(e){
+				if (!zoomedIn || e.button != 0 || e.target.id != 'theMainImage'
+					|| $(e.target).closest('.'+EDITOR_DRAWING).length)
+					return;
+				/* No native drag of the image file. */
+				e.preventDefault();
+				/* By deltas, so a zoom step during the drag carries on from where
+				   the step left the photo. */
+				var x = e.clientX, y = e.clientY;
+				panning = true;
+				$(theImage).addClass('zoomPanning');
+
+				function pan(m){
+					/* The release went elsewhere - a context menu, another window. */
+					if (!(m.buttons & 1)){
+						release();
+						return;
+					}
+					theImage.scrollLeft -= m.clientX - x;
+					theImage.scrollTop -= m.clientY - y;
+					x = m.clientX;
+					y = m.clientY;
+				}
+				function release(){
+					document.removeEventListener('mousemove', pan);
+					document.removeEventListener('mouseup', release);
+					$(theImage).removeClass('zoomPanning');
+					/* The click this release fires is dispatched before the timeout. */
+					setTimeout(function(){ panning = false; }, 0);
+				}
+				document.addEventListener('mousemove', pan);
+				document.addEventListener('mouseup', release);
+			});
 
 			/* The size menu shows its file at natural size and leaves the zoom. */
 			if (window.changeImgSrc){
 				var sizeMenu = changeImgSrc;
 				changeImgSrc = function(url, typeSave, typeMap){
 					zoomedIn = false;
-					$('#theImage').css('max-height', '');
+					$('#theImage').css('max-height', '').removeClass('zoomPannable');
 					$('#theMainImage').css({width: '', height: ''})
 						.data('rvas-file', RVAS.derivatives.filter(function(d){ return d.type == typeMap; })[0]);
 					sizeMenu.apply(undefined, arguments);

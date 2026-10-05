@@ -15,6 +15,15 @@
 	margin: 0 auto;
 }
 
+/* Drag-to-pan, set by photo.zoom.js while the photo overflows its area. */
+#theImage.zoomPannable #theMainImage {
+	cursor: grab;
+}
+
+#theImage.zoomPanning #theMainImage {
+	cursor: grabbing;
+}
+
 #imageToolBar .pwg-button.zoomButton {
 	width: auto;
 	padding: 0 8px;
