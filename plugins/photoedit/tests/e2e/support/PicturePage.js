@@ -127,6 +127,38 @@ class PicturePage {
     await this.waitForPhoto();
   }
 
+  /**
+   * The elements stacked above the photo at one point of the crop frame that
+   * paint a background, so hide or darken the photo there. Read from the
+   * rendered page (elementsFromPoint and computed styles), not from Jcrop's
+   * options.
+   *
+   * @param {number} fx the point, as a fraction of the frame's width
+   * @param {number} fy and of its height
+   * @returns {Promise<string[]>} one 'tag.class: colour' per covering element
+   */
+  async layersCoveringPhotoAt(fx, fy) {
+    const frame = await this.cropFrame.boundingBox();
+    if (!frame) {
+      throw new Error('no crop frame to look through');
+    }
+    return this.page.evaluate(({ x, y }) => {
+      const covering = [];
+      for (const el of document.elementsFromPoint(x, y)) {
+        if (el.id === 'theMainImage') {
+          return covering;
+        }
+        const colour = getComputedStyle(el).backgroundColor;
+        const alpha = /rgba\([^)]*,\s*([\d.]+)\)/.exec(colour);
+        const transparent = colour === 'transparent' || (alpha !== null && Number(alpha[1]) === 0);
+        if (!transparent) {
+          covering.push(`${el.tagName.toLowerCase()}.${el.className}: ${colour}`);
+        }
+      }
+      throw new Error('the photo is not under that point of the frame at all');
+    }, { x: frame.x + frame.width * fx, y: frame.y + frame.height * fy });
+  }
+
   /** @param {'n'|'e'|'s'|'w'} edge */
   cropHandle(edge) {
     return this.cropFrame.locator(`.jcrop-handle.ord-${edge}`);

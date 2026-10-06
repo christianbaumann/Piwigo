@@ -11,7 +11,7 @@ tags: [photoedit, picture-page, rotation, crop, persons, provenance, fork-local]
 A webmaster turns a photo in 90° steps and crops it to a free rectangle, on the public picture
 page. The result is written **into the image file**, so it survives a deploy and a rescan.
 
-Status: designed and split into tasks (`tasks/`). Tasks 01-05 implemented.
+Status: designed and split into tasks (`tasks/`). Tasks 01-06 implemented.
 
 ## Current state (measured 2026-10-05)
 

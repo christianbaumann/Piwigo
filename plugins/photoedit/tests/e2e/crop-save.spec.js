@@ -51,6 +51,20 @@ test('[HAPPY] the frame starts as the whole photo; its left half, saved, is the 
   expect(ratio(await picture.naturalSize())).toBeCloseTo((fixture.width / 2) / fixture.height, RATIO_TOLERANCE_DIGITS);
 });
 
+test('[HAPPY] the photo shows inside the frame and is darkened outside it', async ({ page }) => {
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+  await picture.editButton.click();
+  await expect(picture.cropFrame).toBeVisible();
+
+  expect(await picture.layersCoveringPhotoAt(0.5, 0.5), 'the whole-photo frame').toEqual([]);
+
+  await picture.dragCropEdge('e', 0.5);
+  expect(await picture.layersCoveringPhotoAt(0.25, 0.5), 'inside the left-half frame').toEqual([]);
+  expect((await picture.layersCoveringPhotoAt(0.75, 0.5)).length,
+    'outside the frame the photo is shaded').toBeGreaterThan(0);
+});
+
 test('[ST] the frame turns with the preview: left half, then a quarter turn, is the top half', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);

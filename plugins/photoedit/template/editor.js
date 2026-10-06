@@ -127,6 +127,13 @@
 
 			var drawn = crop;
 			jQuery(target).Jcrop({
+				/* Jcrop paints its holder in bgColor, which on an <img> sits
+				   behind its own copy of the photo. Here the photo is outside
+				   Jcrop, under the holder, so the holder must stay clear and
+				   only the shades outside the frame darken it. */
+				bgColor: 'transparent',
+				shade: true,
+				shadeColor: 'black',
 				bgOpacity: 0.5,
 				keySupport: false,
 				setSelect: [drawn.l * box.width, drawn.t * box.height, drawn.r * box.width, drawn.b * box.height],

@@ -36,7 +36,7 @@ Procedural PHP built around request-scoped globals: `$conf` (config), `$page` (p
 `ws.php` bootstraps via `include/ws_init.inc.php` and registers methods with `$service->addMethod()`; implementations live in `include/ws_functions/pwg.*.php`. Both JSON and XML output are supported.
 
 Two constraints that bite when adding methods:
-- `ws.php` does **not** include `admin/include/functions.php`, so WS handlers cannot call admin helpers — use core functions or direct SQL.
+- `ws.php` does **not** include `admin/include/functions.php`. A handler that needs an admin helper `include_once`s it itself, as core's own `ws_categories_add()` does (`include/ws_functions/pwg.categories.php:755`) and `plugins/photoedit` does for `delete_element_derivatives()`. Nothing else loads it for the handler.
 - The `admin_only` option in the method's options array gates access; omitting it lets any authenticated user call it. Guest checks go through `is_a_guest()`.
 
 ### Database layer

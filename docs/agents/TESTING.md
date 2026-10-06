@@ -423,6 +423,38 @@ The guard was then **watched reporting**: the mutant re-applied, the run came ba
 and 0 errors where it had been 6 failures and 1 error, then reverted. Suite after the fix:
 112 tests / 399 assertions (was 354), green.
 
+## Mutant table — `plugins/photoedit` unit suite (2026-10-05)
+
+**Partial, and said so.** The plan's closing pass over the whole unit suite (task 06 of
+`.agents/changes/2026-10-05-photo-rotate-crop/`) was **skipped at the owner's request**,
+2026-10-05. What is recorded here are the unit-layer mutants that tasks 02 and 03 ran by hand
+while they were built, with the method of `.claude/rules/mutation-testing.md` (the container's
+`md5sum` polled before each run; the file asserted to have changed). Each was killed. Nothing
+newer was mutation-tested, and the gaps are listed below the table.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| `photoedit_validate_request()`: `$turns > PHOTOEDIT_MAX_TURNS` → `>=` | `ValidateRequestTest` highest-turn `[BVA]` | killed |
+| nothing-to-do: `and` → `or` | `ValidateRequestTest::testACropWithoutATurnIsAccepted` | killed |
+| crop `l >= r` → `l > r` | `ValidateRequestTest` zero-width `[BVA]` | killed |
+| `photoedit_turn_box()`: the `t` edge swapped | `TurnTest::testABoxTurnsWithThePhoto` | killed |
+| `photoedit_rotate_angle()` clockwise instead of counter-clockwise | `TurnTest::testTheRotateAngleIsCounterClockwise` (and 6 of 9 integration corner cases) | killed |
+| `photoedit_crop_rect()`: minimum `<` → `<=` | `CropTest` minimum-width `[BVA]` | killed |
+| `photoedit_crop_rect()`: minimum height check dropped | `CropTest` one-below-minimum-height `[BVA]` | killed |
+| `photoedit_crop_rect()`: whole-photo `and` → `or` | `CropTest` minimum-height case (300 wide, so "whole") | killed |
+| `photoedit_crop_rect()`: `round` → `floor` on the right edge | `CropTest` nearest-pixel `[ECP]` | killed |
+| `photoedit_plan_edit()`: nothing-to-do `and` → `or` | `CropTest::testARequestTurnsFirstThenCrops` | killed |
+| `photoedit_crop_box()`: `>=` → `>` | `CropTest::testABoxEndingOnTheCropEdgeIsOutside` | killed |
+| `photoedit_crop_box()`: left clip dropped | `CropTest` partly-outside `[ECP]` | killed |
+| `photoedit_transform_coi()`: crop step skipped | `CropTest::testTheCentreOfInterestIsCutToTheCrop` | killed |
+| `photoedit_transform_coi()`: the unturned size used | `CropTest` turned-then-cropped `[DT]` | killed |
+
+**Not mutation-tested** (written in tasks 04 and 05, after the owner asked for no more mutation
+passes): `photoedit_raw_turns()`, the stored-rotation branch of `photoedit_plan_edit()`, and
+persons' `persons_transform_region()` / `persons_transform_regions()`. Each was written against
+hand-worked expected values (`TurnTest`, `CropTest`, persons' `TransformRegionTest`), but none of
+those tests has been watched killing a mutant. A pass over these is the obvious next audit.
+
 ## The two tooltips only a browser can witness (2026-08-31)
 
 `GermanScreenTest` asserts the picture page's `+` and `×` tooltips read German, but it reads
@@ -881,6 +913,7 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-10-05 | Whether the hover-names text under *Vorhandene Markierungen ansehen* reads naturally in German: critical read by a reviewing agent, checked against the screenshot. Fixed: a redundant opening sentence and Maus/Mauszeiger mixing, *Telefon* to *Smartphone*, *rechts neben dem Foto* as elsewhere on the page, an `alt` text whose subject made the pointer show the name (and named a pointer the shot does not show), a caption giving a frame *seinen* name. The name's position is *am unteren Rand des Rahmens*, not *im Rahmen*: on a box shorter than its label the name overhangs (`f4a13a462`). | Not replaceable: natural German has no oracle. |
 | 2026-10-05 | The handbook's new section *Das Foto vergrößern* and the tagging tip in `handbuch/05-personen.html` read by hand against what the modus fit-and-zoom change ships (`themes/modus/js/photo.zoom.js`, `picture_zoom_buttons.tpl`, `photo.zoom.css`): fit on open with small photos upscaled, the buttons `-`, `Einpassen`, `100 %`, `+` in the toolbar above the photo, steps of x1.25 up to 400 % of the original, keys `+` `-` `0`, Ctrl/Cmd + wheel over the photo, drag-to-pan except in tagging mode, no click navigation while zoomed, nothing remembered between photos, only `Einpassen` and `100 %` on the narrow layout. Shots 11, 17 and 18 re-shot because the photo page changed (zoom buttons, fitted photo); the other re-shot files reverted as churn. `check.php` counts U+2212 as an emoji, so the minus button is written as `-`. German then read critically by a reviewing agent; applied: no claim the photo fills the area, *unscharf* for *weich*, the lower bound of `-`, what a click does in fit mode, *Rahmen bleiben auf den Gesichtern*, the narrow-window case, the tagging tip's grammar, and the tip moved next to the steps. | Not replaceable: whether prose describes behaviour has no oracle. The behaviour is witnessed by the persons E2E suite (`picture-fit`, `picture-zoom`, `picture-pan` specs). |
 | 2026-10-05 | **Open.** SMTP from the remote: with a `mail` section in the credential file, a deploy writes the six `smtp_*`/`mail_sender_*` lines into the generated `config.inc.php`, and a mail sent by the gallery (e.g. *Passwort vergessen*) reaches an outside mailbox, not its spam folder. Not yet run - it needs the hoster's mailbox credentials. | Not automatable - there is no SMTP server or second mailbox in this repository. The falsifiable half is: `test_the_mail_section_is_loaded`, the `mail.*` rejections and `test_generated_config_carries_the_smtp_settings` in `tools/deploy/tests/`, and the generated file was parsed once by PHP 8.4 and read back value for value (2026-10-05). What no double proves is that the hoster accepts the login and that receivers accept the sender (SPF/DKIM). |
+| 2026-10-06 | photoedit's edit mode in the dark modus skins `dark` and `dark_sky` (task 06 of the photo-rotate-crop change): the toolbar's ↺ ↻ Speichern Abbrechen are legible, the dashed crop frame and its handles stand out, the photo shows inside the frame and is darkened outside it. Checked by the agent from full-page screenshots of a generated test photo (skin switched in `modus_theme` and put back byte for byte; screenshots in the git-ignored `.agent-tests/2026-10-06-photoedit-dark-skins/`). | Not replaced: legibility is a judgment. The falsifiable half - the photo is not covered inside the frame and is shaded outside it - is `crop-save.spec.js`'s covering-layers case, which found the opaque Jcrop holder this check would otherwise have found. |
 
 ### Open — no oracle, so no test
 

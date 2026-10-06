@@ -21,7 +21,8 @@
  * rectangle a screenshot drags over cannot drift apart.
  *
  * It signs in with the persons suite's test accounts, never a human's: the
- * webmaster for the administration screens, persons_normal for the public
+ * webmaster for the administration screens and for the photoedit button, which
+ * only a webmaster gets, persons_normal for the rest of the public
  * page, because the overlay and the tag badges are shown to any logged-in
  * non-guest and shooting them as an administrator would hide a permission
  * mistake.
@@ -327,6 +328,32 @@ async function dragOverFace(page, face) {
   await page.mouse.up();
 }
 
+/**
+ * Where the crop shot drags the top and bottom edge of the photoedit frame, as
+ * fractions of the frame's height: enough of a crop that the darkened border
+ * reads as one.
+ */
+const CROP_DEMO = { top: 0.15, bottom: 0.85 };
+
+/**
+ * Drags one edge of the photoedit crop frame to a fraction of its height (n, s).
+ *
+ * The same move as plugins/photoedit/tests/e2e/support/PicturePage.js
+ * dragCropEdge(), which is not reachable from here without its test runner.
+ */
+async function dragCropEdge(page, edge, fraction) {
+  const frame = await page.locator('#photoedit-frame').boundingBox();
+  const handle = await page.locator('#photoedit-frame .jcrop-handle.ord-' + edge).boundingBox();
+  if (!frame || !handle) {
+    throw new Error('no crop frame or no ' + edge + ' handle to drag');
+  }
+  const x = handle.x + handle.width / 2;
+  await page.mouse.move(x, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(x, frame.y + frame.height * fraction, { steps: 5 });
+  await page.mouse.up();
+}
+
 // -------------------------------------------------------------- the shot set
 
 /**
@@ -609,6 +636,50 @@ const SHOTS = [
       await open(page, '/admin.php?page=plugin-persons');
       await page.waitForSelector('#persons-table tbody tr', { timeout: ELEMENT_TIMEOUT });
       await shoot(page.locator('#content'), this.file, demo.image_dir);
+    },
+  },
+  {
+    file: '21-drehen-schaltflaeche.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      await open(page, demo.photos.werkstatt.picture_path);
+      await page.waitForSelector('#photoedit-toggle:not(.photoedit-disabled)', {
+        state: 'visible',
+        timeout: ELEMENT_TIMEOUT,
+      });
+      await shoot(page.locator('#imageToolBar'), this.file, demo.image_dir);
+    },
+  },
+  {
+    file: '22-drehen-rahmen.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      await open(page, demo.photos.werkstatt.picture_path);
+      await waitForOverlayPlacement(page);
+      await page.click('#photoedit-toggle');
+      await page.waitForSelector('html.photoedit-active #photoedit-frame .jcrop-handle.ord-e', {
+        timeout: ELEMENT_TIMEOUT,
+      });
+      await page.click('#photoedit-turn-right');
+      // The turn transitions and the frame is drawn again for the turned view.
+      await page.waitForFunction(() => document.getAnimations().every(
+        (a) => a.playState !== 'running'
+      ), null, { timeout: ELEMENT_TIMEOUT });
+      await page.waitForSelector('#photoedit-frame .jcrop-handle.ord-e', { timeout: ELEMENT_TIMEOUT });
+      await dragCropEdge(page, 'n', CROP_DEMO.top);
+      await dragCropEdge(page, 's', CROP_DEMO.bottom);
+      await page.mouse.move(0, 0);
+      // Jcrop paints its holder in its bgColor; an opaque one hides the photo
+      // the frame is meant to be drawn on, and the shot would show a black box.
+      const holderBackground = await page.locator('#photoedit-frame .jcrop-holder')
+        .evaluate((el) => window.getComputedStyle(el).backgroundColor);
+      if (!/^rgba\(.*, 0\)$|^transparent$/.test(holderBackground)) {
+        throw new Error('the crop frame covers the photo: its holder is ' + holderBackground);
+      }
+      // Cancelled, not saved: the handbook shows the frame, it does not need
+      // the demo photo's file rewritten.
+      await shoot(page.locator('#content'), this.file, demo.image_dir);
+      await page.click('#photoedit-cancel');
     },
   },
 ];

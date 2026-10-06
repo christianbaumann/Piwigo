@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Foto drehen und zuschneiden</title>
+<link rel="stylesheet" href="assets/handbuch.css" />
+</head>
+<body>
+
+<h2>Foto drehen und zuschneiden</h2>
+
+<p>
+  Ein seitlich eingescanntes Foto lässt sich aufrichten und ein Scanrand abschneiden. Gedreht
+  wird in Vierteldrehungen, zugeschnitten auf ein frei gezogenes Rechteck. Das Ergebnis wird in
+  die Bilddatei selbst geschrieben, nicht nur in die Anzeige. Das geschieht auf der öffentlichen
+  Fotoseite und ist dem Webmaster vorbehalten: andere Administratoren und angemeldete Benutzer
+  sehen die Schaltfläche nicht.
+</p>
+
+<div class="hinweis">
+  <p>
+    In der veröffentlichten Galerie ist die Funktion abgeschaltet. Gedreht und zugeschnitten
+    wird in der Arbeitskopie, aus der die Galerie veröffentlicht wird; das bearbeitete Foto
+    kommt mit der nächsten Veröffentlichung dorthin.
+  </p>
+</div>
+
+<h3>Ein Foto drehen und zuschneiden</h3>
+
+<ol>
+  <li>
+    Das Foto öffnen und in der Leiste über dem Bild auf <strong>Drehen/Zuschneiden</strong>
+    klicken. Der Kurzhinweis lautet <em>Foto drehen oder zuschneiden</em>.
+  </li>
+  <li>
+    An Stelle der übrigen Schaltflächen stehen jetzt vier in der Leiste: <strong>&#8634;</strong>
+    (<em>Nach links drehen</em>), <strong>&#8635;</strong> (<em>Nach rechts drehen</em>),
+    <strong>Speichern</strong> und <strong>Abbrechen</strong>. Über dem Foto liegt ein
+    gestrichelter Rahmen, der zunächst das ganze Foto umfasst.
+  </li>
+  <li>
+    Mit den beiden Pfeilen das Foto so lange drehen, bis es richtig herum steht. Jeder Klick
+    dreht um eine Vierteldrehung. Gedreht wird zunächst nur die Vorschau.
+  </li>
+  <li>
+    Zum Zuschneiden den Rahmen an seinen Kanten oder Ecken mit gedrückter Maustaste nach innen
+    ziehen. Was außerhalb des Rahmens liegt, erscheint abgedunkelt und wird beim Speichern
+    abgeschnitten. Der Rahmen lässt sich auch als Ganzes verschieben.
+  </li>
+  <li>
+    Auf <strong>Speichern</strong> klicken. Die Seite lädt neu und zeigt das bearbeitete Foto.
+  </li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/21-drehen-schaltflaeche.png" alt="Die Leiste über dem Foto mit der Schaltfläche Drehen/Zuschneiden" />
+  <figcaption>Die Schaltfläche Drehen/Zuschneiden in der Leiste über dem Foto.</figcaption>
+</figure>
+
+<figure>
+  <img src="assets/screenshots/22-drehen-rahmen.png" alt="Ein nach rechts gedrehtes Foto, darüber ein Rahmen, dessen obere und untere Kante nach innen gezogen sind. Die Bereiche darüber und darunter sind abgedunkelt." />
+  <figcaption>Nach rechts gedreht, oben und unten wird ein Streifen abgeschnitten.</figcaption>
+</figure>
+
+<p>
+  Erst gedreht, dann zugeschnitten: der Rahmen liegt immer auf dem Foto, wie es gerade gedreht
+  zu sehen ist, und genau dieser Ausschnitt wird gespeichert. Wird nach dem Ziehen des Rahmens
+  noch einmal gedreht, dreht sich der Rahmen mit.
+</p>
+
+<p>
+  Solange der Bearbeitungsmodus offen ist, lässt sich das Foto nicht vergrößern, ein Klick auf
+  das Foto führt nicht zum nächsten Foto und die Rahmen der Personen sind ausgeblendet. War
+  gerade der Markierungsmodus für Personen offen, wird er beim Öffnen beendet.
+</p>
+
+<h3>Abbrechen</h3>
+
+<ul>
+  <li>
+    <strong>Abbrechen</strong> oder <strong>Esc</strong> verlässt den Bearbeitungsmodus. Die
+    Vorschau springt zurück, an der Datei ändert sich nichts.
+  </li>
+  <li>
+    Ein Klick neben den Rahmen hebt den Zuschnitt auf: das ganze Foto bleibt erhalten.
+  </li>
+  <li>
+    <strong>Speichern</strong> ohne Drehung und ohne Zuschnitt verlässt den Modus ebenfalls,
+    ohne etwas zu schreiben.
+  </li>
+</ul>
+
+<h3>Rückfragen vor dem Speichern</h3>
+
+<p>
+  In zwei Fällen fragt die Seite vor dem Speichern nach. Mit <strong>OK</strong> wird
+  gespeichert, mit <strong>Abbrechen</strong> bleibt die Datei unverändert und der
+  Bearbeitungsmodus offen.
+</p>
+
+<ul>
+  <li>
+    <em>Diese Personen-Markierungen werden entfernt:</em> mit den Namen dahinter. Das kommt vor,
+    wenn der Zuschnitt ein markiertes Gesicht ganz oder zu mehr als der Hälfte abschneidet. Diese Markierungen
+    werden beim Speichern gelöscht. Alle anderen Markierungen wandern mit: nach dem Drehen und
+    Zuschneiden sitzen ihre Rahmen wieder auf denselben Gesichtern.
+  </li>
+  <li>
+    <em>Beim Speichern wird das JPEG neu komprimiert, dabei geht etwas Bildqualität
+    verloren.</em> Das betrifft nur Fotos im JPEG-Format, und zwar bei jedem Speichern erneut.
+    Ein Foto im JPEG-Format daher möglichst in einem Durchgang drehen und zuschneiden.
+  </li>
+</ul>
+
+<p>
+  Kommen beide Fälle zusammen, stehen beide Hinweise in derselben Rückfrage.
+</p>
+
+<h3>Rückgängig machen</h3>
+
+<p>
+  Eine Schaltfläche zum Rückgängigmachen gibt es nicht. Vor jedem Speichern legt die Galerie aber
+  eine Kopie der unveränderten Datei an. Ein bearbeitetes Foto lässt sich mit dieser Kopie
+  wiederherstellen; das ist ein Fall für die Serververwaltung.
+</p>
+
+<h3>Wenn die Schaltfläche grau ist</h3>
+
+<p>
+  Ist <strong>Drehen/Zuschneiden</strong> ausgegraut, kann dieses Foto nicht bearbeitet werden.
+  Der Kurzhinweis und ein Klick auf die Schaltfläche nennen den Grund:
+</p>
+
+<ul>
+  <li>
+    <em>Dieser Dateityp kann nicht bearbeitet werden.</em> Bearbeiten lassen sich nur Fotos im
+    PNG- und im JPEG-Format.
+  </li>
+  <li>
+    <em>exiftool ist auf diesem Server nicht vorhanden, deshalb kann das Foto nicht bearbeitet
+    werden.</em> oder <em>exec() ist auf diesem Server abgeschaltet, deshalb kann das Foto nicht
+    bearbeitet werden.</em> Beides ist ein Fall für die Serververwaltung.
+  </li>
+</ul>
+
+<nav class="zurueck">
+  <a href="index.html">Zurück zum Inhalt</a> ·
+  <a href="05-personen.html">Zurück: Personen auf Fotos markieren</a>
+</nav>
+
+</body>
+</html>

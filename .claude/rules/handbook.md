@@ -3,8 +3,9 @@
 Read before changing anything under `handbuch/`, before re-taking a screenshot, and before
 changing a German string a screenshot shows.
 
-`handbuch/` is the fork's German end-user documentation: six plain HTML pages plus a
-stylesheet, covering album creation, adding photos, photo texts, tags and person tagging. It is
+`handbuch/` is the fork's German end-user documentation: seven plain HTML pages plus a
+stylesheet, covering album creation, adding photos, photo texts, tags, person tagging and
+turning or cropping a photo. It is
 **not** part of upstream's `language/de_DE/help/` and must not be moved there — an upstream merge
 rewrites those files. See
 [decision 0024](../../docs/agents/decisions/0024-german-handbook-location-and-demo-content.md).
