@@ -68,6 +68,22 @@ $query = trigger_change('loc_begin_index_category_thumbnails_query', $query);
 $result = pwg_query($query);
 list($page['total_categories']) = pwg_db_fetch_row(pwg_query('SELECT FOUND_ROWS()'));
 
+// an admin's cache keeps albums without photos (feature 1053), this listing
+// does not: leave them out of the sub-album counters as well
+$hidden_subalbums = array();
+if (is_admin())
+{
+  $query = '
+SELECT id_uppercat, uppercats
+  FROM '.CATEGORIES_TABLE.' c
+    INNER JOIN '.USER_CACHE_CATEGORIES_TABLE.' ucc
+    ON id = cat_id
+    AND user_id = '.$user['id'].'
+  WHERE count_images = 0
+';
+  $hidden_subalbums = query2array($query);
+}
+
 $categories = array();
 $category_ids = array();
 $image_ids = array();
@@ -75,6 +91,7 @@ $user_representative_updates_for = array();
 
 while ($row = pwg_db_fetch_assoc($result))
 {
+  $row = discount_hidden_subalbums($row, $hidden_subalbums);
   $row['is_child_date_last'] = @$row['max_date_last']>@$row['date_last'];
 
   if (!empty($row['user_representative_picture_id']))
