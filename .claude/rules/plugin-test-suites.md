@@ -74,6 +74,10 @@ behaviour the fork depends on: `CoreAlbumCharacterizationTest`, `CorePhotoTextCh
 correct. They run inside the provenance integration suite — there is no separate command. Put a new
 core characterization case there rather than inventing a root `phpunit.xml`.
 
+The fork's own core fix (decision 0037) is tested there too, against a requirement rather than as
+`[ERR]`: `CoreHiddenSubalbumCountTest` in both `tests/Unit/` (the counting function) and
+`tests/Integration/` (the rendered thumbnail, as webmaster and as a normal user).
+
 The **unit** suite also guards the fork's German string overrides
 (`plugins/provenance/tests/Unit/GermanOverrideKeyTest.php`). `local/language/de_DE.lang.php` is a
 **tracked** file despite the blanket `/local/*` ignore rule — it has its own `!` re-include — and

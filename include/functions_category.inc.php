@@ -574,6 +574,35 @@ FROM '.CATEGORIES_TABLE.' as c
 }
 
 /**
+ * Removes the albums a thumbnail listing hides from a category's sub-album
+ * counters, so "N albums" matches the thumbnails shown inside it.
+ *
+ * @param array $category (at least id, uppercats, nb_categories, count_categories)
+ * @param array[] $hidden_albums (each at least id_uppercat, uppercats)
+ * @return array
+ */
+function discount_hidden_subalbums($category, $hidden_albums)
+{
+  $prefix = $category['uppercats'].',';
+
+  foreach ($hidden_albums as $hidden)
+  {
+    if (strpos($hidden['uppercats'], $prefix) !== 0)
+    {
+      continue;
+    }
+
+    $category['count_categories']--;
+    if ($hidden['id_uppercat'] == $category['id'])
+    {
+      $category['nb_categories']--;
+    }
+  }
+
+  return $category;
+}
+
+/**
  * Removes a category from computed array of categories and updates counters.
  *
  * @param array &$cats
