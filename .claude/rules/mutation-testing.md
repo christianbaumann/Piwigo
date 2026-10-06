@@ -64,6 +64,12 @@ same false "survived".
 
 Both failure modes were hit while building the provenance plugin's Phase 1 table, 2026-08-29.
 
+"The file changed" is not enough either: check that it changed **where you meant**. A pattern that
+also matches an identical line earlier in the file mutates that line instead, and the run then
+reports the tests of the wrong function as killers. Grep the pattern first and expect exactly one
+hit. Hit in `plugins/photoedit`, 2026-10-06: `if ($l >= $r or $t >= $b)` occurs in both the request
+validation and `photoedit_crop_box()`, and two recorded `crop_box` mutants had mutated the validation.
+
 PHP-FPM adds a second delay on top of Mutagen's. The web container runs with
 `opcache.validate_timestamps=On` and `opcache.revalidate_freq=2`, so for up to two seconds
 after the bytes arrive, a request through `ws.php` or a page still runs the cached

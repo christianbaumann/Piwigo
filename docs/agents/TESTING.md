@@ -425,12 +425,12 @@ and 0 errors where it had been 6 failures and 1 error, then reverted. Suite afte
 
 ## Mutant table — `plugins/photoedit` unit suite (2026-10-05)
 
-**Partial, and said so.** The plan's closing pass over the whole unit suite (task 06 of
-`.agents/changes/2026-10-05-photo-rotate-crop/`) was **skipped at the owner's request**,
-2026-10-05. What is recorded here are the unit-layer mutants that tasks 02 and 03 ran by hand
+**First run.** The plan's closing pass (task 06 of
+`.agents/changes/2026-10-05-photo-rotate-crop/`) was at first **skipped at the owner's request**,
+2026-10-05. This table holds the unit-layer mutants that tasks 02 and 03 ran by hand
 while they were built, with the method of `.claude/rules/mutation-testing.md` (the container's
-`md5sum` polled before each run; the file asserted to have changed). Each was killed. Nothing
-newer was mutation-tested, and the gaps are listed below the table.
+`md5sum` polled before each run; the file asserted to have changed). Each was killed. The second run
+below covers what tasks 04 and 05 added.
 
 | Mutant | Expected killer | Result |
 |---|---|---|
@@ -444,16 +444,74 @@ newer was mutation-tested, and the gaps are listed below the table.
 | `photoedit_crop_rect()`: whole-photo `and` → `or` | `CropTest` minimum-height case (300 wide, so "whole") | killed |
 | `photoedit_crop_rect()`: `round` → `floor` on the right edge | `CropTest` nearest-pixel `[ECP]` | killed |
 | `photoedit_plan_edit()`: nothing-to-do `and` → `or` | `CropTest::testARequestTurnsFirstThenCrops` | killed |
-| `photoedit_crop_box()`: `>=` → `>` | `CropTest::testABoxEndingOnTheCropEdgeIsOutside` | killed |
+| `photoedit_crop_box()`: `$l >= $r` → `$l > $r` | `CropTest::testABoxEndingOnTheCropEdgeIsOutside` | killed, **on the 2026-10-06 re-run**. The task-03 run's substitution hit the identical line in `photoedit_validate_request()`, which comes first in the file, so it never mutated `crop_box` (see the second run) |
 | `photoedit_crop_box()`: left clip dropped | `CropTest` partly-outside `[ECP]` | killed |
 | `photoedit_transform_coi()`: crop step skipped | `CropTest::testTheCentreOfInterestIsCutToTheCrop` | killed |
 | `photoedit_transform_coi()`: the unturned size used | `CropTest` turned-then-cropped `[DT]` | killed |
 
-**Not mutation-tested** (written in tasks 04 and 05, after the owner asked for no more mutation
-passes): `photoedit_raw_turns()`, the stored-rotation branch of `photoedit_plan_edit()`, and
-persons' `persons_transform_region()` / `persons_transform_regions()`. Each was written against
-hand-worked expected values (`TurnTest`, `CropTest`, persons' `TransformRegionTest`), but none of
-those tests has been watched killing a mutant. A pass over these is the obvious next audit.
+### Second run — the rotation math and persons' region transform (2026-10-06)
+
+The functions tasks 04 and 05 added, run at the owner's request after the first pass was skipped,
+then widened by a critical review of this table.
+
+**How it was run, and what went wrong with it.** The mutants were applied by a throwaway script in
+the session's scratchpad, never committed. That goes against *Keep it as prose, not a script* in
+`.claude/rules/mutation-testing.md`, and it failed in the two ways that rule predicts:
+
+1. phpunit colours its `OK` line, so the script's `^OK` match never fired. A mutant with no failing
+   test was therefore labelled "killed" with an empty list of killers. Only one row had an empty
+   list (M6); every other row names the tests that actually failed, which a mislabelled survivor
+   cannot produce. M6 was re-run by hand and survived. The script now strips the colour codes.
+2. A substitution without a line anchor takes the **first** match. `if ($l >= $r or $t >= $b)`
+   occurs in both `photoedit_validate_request()` and `photoedit_crop_box()`. The first M10/M11 runs
+   mutated the validation and reported validation tests as killers. They were re-run against the
+   second occurrence. The same trap had invalidated task 03's `crop_box` `>=` mutant (first table),
+   which was re-run too. Every other substitution pattern in both tables matches exactly one line
+   (checked 2026-10-06).
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| M1 `photoedit_raw_turns()` reads the code as clockwise (`code + turns`) | `TurnTest` raw-turns cases | killed: 4 `TurnTest` cases, `CropTest::testAStoredRotationIsBakedIntoTheEdit`, `testTurnsThatUndoAStoredRotationAreStillAnEdit` |
+| M2 `photoedit_raw_turns()` subtracts the turns: `((4 - code % 4) % 4 - turns + 4) % 4` | `TurnTest` "the turns add on top" | killed: 2 `TurnTest` cases, 3 `CropTest` `[DT]` plans (the half-turn plan survives, since -2 ≡ 2), the undo case |
+| M3 `photoedit_raw_turns()` final `% 4` dropped | the undo `[BVA]` (1 + 3 = 4) | killed: `TurnTest` undo case, `CropTest::testTurnsThatUndoAStoredRotationAreStillAnEdit` |
+| M4 `photoedit_plan_edit()` ignores the stored rotation | `CropTest::testAStoredRotationIsBakedIntoTheEdit` | killed: that and the undo case |
+| M5 "nothing to do" asks the raw turn instead of the requested one | `CropTest::testTurnsThatUndoAStoredRotationAreStillAnEdit` | killed: that alone |
+| M6 `rotation_before` always 0 in the transform | the stored-rotation plan | **survived**, then killed. No test asserted the field, and no plugin reads it since persons switched to `raw_turns`, but it is part of the event payload the design defines. `testAStoredRotationIsBakedIntoTheEdit` now asserts it, and the re-run died there |
+| M7 the COI crop sized by the requested turns instead of the raw turns | `CropTest::testAStoredRotationDoesNotTurnTheCentreOfInterest` | killed: that alone |
+| M8 the COI turned by the raw turns | the same | killed: that alone |
+| P1 `persons_transform_region()` ignores `raw_turns` | `TransformRegionTest` turn cases | killed: 3 turn cases |
+| P2 the sides swapped on even turns instead of odd | crop cases with no turn | killed: 4 `moved` cases and the centre-outside case |
+| P3 the crop's x offset added instead of subtracted | the turned-then-cropped `[DT]` | killed: that alone, the only case with a non-zero x offset |
+| P4 y shifted by the crop's x | the crop-from-the-top case | killed: that and the `[DT]` |
+| P5 width scaled by the height | the left-half case | killed: 4 `moved` cases |
+| P6 no MWG clip after the move | partly-outside and removed cases | killed: 5 cases, including `testTheLostRegionsAreNamed` |
+| P7 no minimum-box check | the clipped-below-minimum `[BVA]` | killed: that alone |
+| P8 a lost region is not named | `testTheLostRegionsAreNamed` | killed |
+| P9 a lost region is kept anyway | `testTheLostRegionsAreNamed` | killed |
+
+**Added after the review**, which predicted these would survive the suite as it was. The predicted
+survivors were not run against the old tests. Instead, each gap got its test first: the plan's
+`turns` asserted for a stored rotation, `CropTest::testABoxIsCutToACropFromTheTop` (a crop from
+the top, so the y axis carries an offset and both clips), and a half turn plus a crop in
+`TransformRegionTest`. Each mutant was then run once against the stronger suite.
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| M9 the plan reports `raw_turns` as `turns` (the centre of interest would turn by the stored rotation) | `testAStoredRotationIsBakedIntoTheEdit` | killed: that alone |
+| M10 `photoedit_crop_box()`: the `$t >= $b` clause dropped | the vertical cases above and on the band | killed: "above the band", "ending on the top edge" |
+| M11 `photoedit_crop_box()`: `$t >= $b` → `$t > $b` | the top-edge `[BVA]` | killed: that alone |
+| M12 `photoedit_crop_box()`: top clip removed | the vertical cases over and above the top edge | killed: 3 cases |
+| M13 `photoedit_crop_box()`: bottom clip removed | "over the bottom edge" | killed: that alone |
+| M14 `photoedit_crop_box()`: the crop's y offset added instead of subtracted | the vertical cases inside and over the band | killed: 3 cases |
+| P10 `persons_transform_region()`: sides chosen by `turns == 0` instead of parity | "a half turn, then cropped" | killed: that alone |
+
+Equivalent, not run: dropping the inner `% 4` in `photoedit_raw_turns()` (the outer one absorbs
+it), and dropping `% 4` on `raw_turns` in persons (`persons_rotate_region()` reduces modulo 4
+itself, and only the parity is read below).
+
+Not run, because they are not unit-layer code: `photoedit_jpeg_quality()`, `photoedit_is_lossy()` and
+the pipeline's use of both. `ApplyJpegTest` covers them in integration, and
+`.claude/rules/mutation-testing.md` keeps mutants to the unit layer.
 
 ## The two tooltips only a browser can witness (2026-08-31)
 

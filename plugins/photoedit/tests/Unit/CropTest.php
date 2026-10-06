@@ -129,6 +129,9 @@ final class CropTest extends TestCase
         $result = photoedit_plan_edit(self::WIDTH, self::HEIGHT, 0, self::box(0, 0, 1, 0.5), 3);
 
         $this->assertTrue($result['ok'], $result['error']);
+        $this->assertSame(3, $result['transform']['rotation_before'], 'the events report the stored rotation');
+        // The centre of interest turns by this, not by raw_turns (photoedit_transform_coi()).
+        $this->assertSame(0, $result['transform']['turns'], 'the requested turns, not the raw ones');
         $this->assertSame(1, $result['transform']['raw_turns']);
         $this->assertSame(array('x' => 0, 'y' => 0, 'w' => 200, 'h' => 150), $result['transform']['crop_px']);
         $this->assertSame(array(200, 150), array($result['transform']['width_after'], $result['transform']['height_after']));
@@ -175,6 +178,41 @@ final class CropTest extends TestCase
     public function testABoxIsCutToTheCrop(array $box, ?array $expected): void
     {
         $cropped = photoedit_crop_box($box, self::RIGHT_PART, self::WIDTH, self::HEIGHT);
+
+        if ($expected === null)
+        {
+            $this->assertNull($cropped);
+            return;
+        }
+        $this->assertNotNull($cropped);
+        foreach ($expected as $edge => $value)
+        {
+            $this->assertEqualsWithDelta($value, $cropped[$edge], 1e-9, "edge $edge");
+        }
+    }
+
+    /** A band through the middle of the photo: y 50 to 150. */
+    private const MIDDLE_BAND = array('x' => 0, 'y' => 50, 'w' => 300, 'h' => 100);
+
+    public static function verticallyCroppedBoxes(): array
+    {
+        return array(
+            // y 20..100 -> 50..100 of the band
+            '[ECP] over the top edge it is cut' => array(self::box(0, 0.1, 1, 0.5), self::box(0, 0, 1, 0.5)),
+            // y 120..180 -> 120..150 of the band
+            '[ECP] over the bottom edge it is cut' => array(self::box(0, 0.6, 1, 0.9), self::box(0, 0.7, 1, 1)),
+            // y 60..90 -> 0.1..0.4: moved by the band's offset
+            '[HAPPY] inside the band it moves up' => array(self::box(0, 0.3, 1, 0.45), self::box(0, 0.1, 1, 0.4)),
+            '[ECP] above the band it is gone' => array(self::box(0, 0, 1, 0.2), null),
+            // y 0..50 ends on the band's top edge
+            '[BVA] ending on the top edge it is gone' => array(self::box(0, 0, 1, 0.25), null),
+            );
+    }
+
+    #[DataProvider('verticallyCroppedBoxes')]
+    public function testABoxIsCutToACropFromTheTop(array $box, ?array $expected): void
+    {
+        $cropped = photoedit_crop_box($box, self::MIDDLE_BAND, self::WIDTH, self::HEIGHT);
 
         if ($expected === null)
         {

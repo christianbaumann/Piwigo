@@ -52,6 +52,9 @@ final class TransformRegionTest extends TestCase
             // y 100 - 50 = 50 of 100 -> 0.5; h 60 of 100 -> 0.6
             '[ECP] a crop from the top shifts it vertically' => array(
                 self::region(0.5, 0.5, 0.2, 0.3), self::transform(0, self::rect(0, 50, 300, 100)), array(0.5, 0.5, 0.2, 0.6)),
+            // a half turn keeps 300x200: centre (225, 100), 60x60 px; crop from x 150, 150x200
+            '[DT] a half turn, then cropped' => array(
+                $face, self::transform(2, self::rect(150, 0, 150, 200)), array(0.5, 0.5, 0.4, 0.3)),
             // turned 200x300: centre (100, 75), 60x60 px; crop from x 50, 150x150
             '[DT] turned, then cropped' => array(
                 $face, self::transform(1, self::rect(50, 0, 150, 150)), array(1 / 3, 0.5, 0.4, 0.4)),
