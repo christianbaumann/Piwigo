@@ -60,3 +60,5 @@ Mutation testing skipped on request (2026-10-05).
 ## Problem along the way
 
 * An early version of `ApplyRegionsTest` typed its WS helper `array`, but `pwg.plugins.performAction` returns `true`. The reactivation in `tearDown` then errored, and persons was left **inactive** on the dev install. Reactivated through the web service and fixed (`mixed`). The case is now documented in `.claude/rules/plugin-test-suites.md`.
+
+**Status: approved 2026-10-06.**

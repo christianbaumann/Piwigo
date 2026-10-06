@@ -54,3 +54,5 @@ Mutation testing skipped on request.
 
 * The copied EXIF `ExifImageWidth`/`ExifImageHeight` and the embedded EXIF thumbnail still describe the photo before the edit. Core reads neither (sizes come from `getimagesize()`); other viewers may show the old thumbnail.
 * Without the Imagick extension, the quality cannot be read and falls back to 95.
+
+**Status: approved 2026-10-06.**

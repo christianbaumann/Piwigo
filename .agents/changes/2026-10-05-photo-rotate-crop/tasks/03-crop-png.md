@@ -51,3 +51,5 @@ All killed. Unit: minimum `<` → `<=`, minimum height check dropped, whole-phot
 ## Refactoring done along the way
 
 * `ApplyTurnTest`'s ImageMagick readers (`identify`, `pixel`, `redCorners`) moved, unchanged, into the trait `tests/Support/ReadsImageFiles.php`, which `ApplyCropTest` uses too. `pageGeometry()` is new.
+
+**Status: approved 2026-10-06.**
