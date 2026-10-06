@@ -1,9 +1,8 @@
 // @ts-check
-const fs = require('fs');
-const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { seed, restore } = require('./support/seed');
 const { PicturePage } = require('./support/PicturePage');
+const { SKINS, MIN_SKINS } = require('./support/skins');
 
 /**
  * Continuous zoom on the picture page: `+`/`−` in ×1.25 steps between fit and
@@ -18,17 +17,6 @@ const { PicturePage } = require('./support/PicturePage');
 
 const DESKTOP = { width: 1920, height: 1080 };
 const PHONE = { width: 390, height: 844 };
-
-/**
- * Every modus skin. Only some of them ship a stylesheet of their own, and with
- * it hf_base.css (themes/modus/template/header.tpl), so CSS placed there reaches
- * only part of them. 18 skins, measured 2026-10-05.
- */
-const SKINS = fs
-  .readdirSync(path.join(__dirname, '../../../../themes/modus/skins'))
-  .filter((file) => file.endsWith('.inc.php'))
-  .map((file) => file.replace('.inc.php', ''));
-const MIN_SKINS = 10;
 
 /** The design's zoom step and upper bound. */
 const ZOOM_STEP = 1.25;

@@ -50,9 +50,11 @@ $template->assign(array(
     'U_IMG'    => DerivativeImage::url(IMG_LARGE, $image),
     'U_RETURN' => get_root_url().'admin.php?page=photo-'.$image_id,
     ),
-  // The overlay template is inlined into the picture page by a prefilter there;
-  // here it is a plain Smarty include, so the markup has exactly one source.
+  // The overlay and editor templates are inlined into the picture page by a
+  // prefilter there; here they are plain Smarty includes, so the markup has
+  // exactly one source.
   'PERSONS_OVERLAY_TPL' => realpath(PERSONS_PATH.'template/public_overlay.tpl'),
+  'PERSONS_EDITOR_TPL'  => realpath(PERSONS_PATH.'template/public_editor.tpl'),
   ));
 
 $template->set_filename('persons_admin_photo', realpath(PERSONS_PATH.'template/admin_photo.tpl'));

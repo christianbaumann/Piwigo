@@ -27,7 +27,7 @@ include_once(PERSONS_PATH.'include/index.inc.php');
 include_once(PERSONS_PATH.'include/exiftool.inc.php');
 
 /**
- * Assigns everything template/public_overlay.tpl reads.
+ * Assigns everything template/public_overlay.tpl and public_editor.tpl read.
  *
  * Both surfaces call this and then place the markup themselves - the public
  * page through a prefilter that wraps the photo, the admin screen by rendering

@@ -11,4 +11,5 @@
 <div id="persons-stage">
 	<img id="theMainImage" src="{$PERSONS_ADMIN_PHOTO.U_IMG}" alt="{$PERSONS_ADMIN_PHOTO.ALT|escape}">
 	{include file=$PERSONS_OVERLAY_TPL}
+	{include file=$PERSONS_EDITOR_TPL}
 </div>

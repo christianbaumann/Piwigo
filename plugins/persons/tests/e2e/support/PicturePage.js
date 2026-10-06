@@ -63,6 +63,14 @@ class PicturePage {
     /* ── the editor ─────────────────────────────────────────────────── */
 
     this.tagToggle = page.locator('#persons-tag-toggle');
+    /** The toggle where it belongs: its own row in the theme's information panel. */
+    this.tagToggleInInfoPanel = page.locator('#imageInfos #PersonsTagging #persons-tag-toggle');
+    /** The element carrying the editor's labels and configuration. */
+    this.editorConfig = page.locator('#persons-editor');
+    /** The theme's information list the editor row follows. */
+    this.standardInfoList = page.locator('#imageInfos #standard');
+    /** Set by modus when the information panel sits beside the photo rather than below it. */
+    this.wideLayout = page.locator('html.wide');
     this.editorMessage = page.locator('#persons-editor-message');
     this.picker = page.locator('#persons-picker');
     this.pickerInput = page.locator('#persons-picker-input');
@@ -726,6 +734,41 @@ class PicturePage {
       const right = Math.min(image.right, box.left + area.clientWidth, window.innerWidth);
       const bottom = Math.min(image.bottom, box.top + area.clientHeight, window.innerHeight);
       return { left, top, width: right - left, height: bottom - top };
+    });
+  }
+
+  /**
+   * The tag toggle's computed look beside a plain <input type="button"> placed
+   * in the same row for the measurement and removed again. The probe gets
+   * whatever the skin gives a button there, so the two agreeing means the
+   * toggle is styled by the skin rather than by the browser or the plugin.
+   * Also the horizontal edges of the toggle, the panel and the info list's
+   * first dd, for the overflow and the alignment check.
+   */
+  async tagToggleLook() {
+    return this.page.evaluate(() => {
+      const PROPS = ['backgroundColor', 'backgroundImage', 'color', 'borderTopColor',
+        'borderTopStyle', 'borderTopWidth', 'fontFamily', 'fontSize'];
+      const toggle = document.getElementById('persons-tag-toggle');
+      const row = document.getElementById('PersonsTagging');
+      const probe = document.createElement('input');
+      probe.type = 'button';
+      probe.value = 'probe';
+      row.appendChild(probe);
+      const look = (el) => {
+        const style = window.getComputedStyle(el);
+        return Object.fromEntries(PROPS.map((prop) => [prop, style[prop]]));
+      };
+      const result = {
+        toggle: look(toggle),
+        probe: look(probe),
+        toggleLeft: toggle.getBoundingClientRect().left,
+        toggleRight: toggle.getBoundingClientRect().right,
+        ddLeft: document.querySelector('#imageInfos #standard dd').getBoundingClientRect().left,
+        panelRight: document.getElementById('imageInfos').getBoundingClientRect().right,
+      };
+      probe.remove();
+      return result;
     });
   }
 

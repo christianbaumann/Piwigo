@@ -528,7 +528,7 @@
 		function enter() {
 			tagging = true;
 			stage.classList.add('persons-tagging');
-			toggle.textContent = str('done');
+			toggle.value = str('done');
 
 			/* The map would consume the mousedown that starts a drag. Taken off
 			   for the duration and put back on the way out, so navigation is
@@ -546,7 +546,7 @@
 
 			tagging = false;
 			stage.classList.remove('persons-tagging');
-			toggle.textContent = str('tag');
+			toggle.value = str('tag');
 			removeDraft();
 			say('');
 

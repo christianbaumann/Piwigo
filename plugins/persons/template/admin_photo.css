@@ -3,7 +3,8 @@
  *
  * Only what the screen itself needs: the boxes, the picker and the toggle are
  * styled by overlay.css and editor.css, which the shared overlay template pulls
- * in on both surfaces.
+ * in on both surfaces. The toggle itself is an input button, so the admin
+ * theme's button style applies to it.
  */
 
 #persons-stage {

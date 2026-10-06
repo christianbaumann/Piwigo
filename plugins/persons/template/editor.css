@@ -1,15 +1,32 @@
 /*
  * The tagging editor on the public picture page.
  *
- * Everything here is scoped to #persons-stage.persons-tagging, the class
- * editor.js sets while the mode lasts. Outside it the page keeps the read-only
- * behaviour overlay.css defines: boxes revealed on hover, no pointer events, no
- * controls.
+ * Apart from the toggle's row, everything here is scoped to
+ * #persons-stage.persons-tagging, the class editor.js sets while the mode
+ * lasts. Outside it the page keeps the read-only behaviour overlay.css defines:
+ * boxes revealed on hover, no pointer events, no controls.
  */
 
+/* Under the photo on the admin tagging screen; the picture page overrides it below. */
 #persons-editor {
 	margin: 6px 0;
 	text-align: right;
+}
+
+/*
+ * In the picture page's information panel, after <dl id="standard">. The
+ * button itself is left to the skin's INPUT[type="button"] rules, and the row
+ * carries the list's class, so it gets the list's padding in every skin.
+ * Narrow layout: centred like the list; wide layout: in line with the dd
+ * text, which the theme indents by a 10px dd margin.
+ */
+#PersonsTagging #persons-editor {
+	text-align: center;
+}
+
+.wide #PersonsTagging #persons-editor {
+	margin: 10px 0 10px 10px;
+	text-align: left;
 }
 
 #persons-tag-toggle {
@@ -21,13 +38,36 @@
 	opacity: 0.5;
 }
 
+/*
+ * At the top of the photo, inside the overlay, so a message about the box being
+ * drawn is seen in either layout. Transparent to the pointer, so it never takes
+ * a click meant for the photo; hidden while there is nothing to say.
+ */
 #persons-editor-message {
-	margin-left: 8px;
+	position: absolute;
+	top: 8px;
+	left: 50%;
+	transform: translateX(-50%);
+	/* left: 50% would otherwise wrap it at half the photo's width */
+	width: max-content;
+	max-width: calc(100% - 16px);
+	box-sizing: border-box;
+	padding: 4px 10px;
+	border-radius: 3px;
+	background: rgba(0, 0, 0, 0.75);
+	color: #fff;
 	font-size: 0.9em;
+	text-align: center;
+	pointer-events: none;
+	z-index: 5;
 }
 
-.persons-editor-error {
-	color: #c00;
+#persons-editor-message:empty {
+	display: none;
+}
+
+#persons-editor-message.persons-editor-error {
+	color: #f66;
 	font-weight: bold;
 }
 

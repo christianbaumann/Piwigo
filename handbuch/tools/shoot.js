@@ -591,7 +591,8 @@ const SHOTS = [
       await waitForOverlayPlacement(page);
       await page.click('#persons-tag-toggle');
       await page.waitForSelector('#persons-stage.persons-tagging', { timeout: ELEMENT_TIMEOUT });
-      await shoot(page.locator('#persons-stage'), this.file, demo.image_dir);
+      // The photo and the information panel: the toggle sits in the panel.
+      await shoot(page.locator('#theImageAndInfos'), this.file, demo.image_dir);
     },
   },
   {

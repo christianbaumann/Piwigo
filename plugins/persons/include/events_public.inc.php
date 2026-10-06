@@ -46,14 +46,15 @@ function persons_picture_overlay()
   persons_assign_overlay($image_id, $image);
 
   // Only this page has the information list a reload brings up to date; the
-  // admin tagging screen shares the overlay template and leaves this unset.
+  // admin tagging screen shares the editor template and leaves this unset.
   $template->assign('PERSONS_RELOAD_ON_EXIT', true);
 
   $template->set_prefilter('picture', 'persons_picture_prefilter');
 }
 
 /**
- * Wraps the photo in the overlay's positioning context and adds the person row.
+ * Wraps the photo in the overlay's positioning context, adds the person row and,
+ * after the information list, the editor's row.
  *
  * Both injections keep their anchor, so plugins/provenance - which prepends at
  * the same row anchor - keeps working whichever prefilter runs first.
@@ -71,16 +72,28 @@ function persons_picture_prefilter($content)
     return $content;
   }
 
+  // Without the row anchor the editor stays in the stage, as it was before it
+  // moved to the information panel, rather than vanishing beside its boxes.
+  $has_row = strpos($content, PERSONS_TPL_ROW_INJECT_POINT) !== false;
+
   $stage = '<div id="persons-stage">'
     .PERSONS_TPL_INJECT_POINT
     .persons_template_include('public_overlay.tpl')
+    .($has_row ? '' : persons_template_include('public_editor.tpl'))
     .'</div>';
 
   $content = str_replace(PERSONS_TPL_INJECT_POINT, $stage, $content);
 
+  // The editor follows the anchor rather than preceding it: it is a control,
+  // not a dt/dd pair, so it goes after </dl> instead of inside the list. The
+  // list's own class gives the row the list's padding, which differs by skin.
   return str_replace(
     PERSONS_TPL_ROW_INJECT_POINT,
-    persons_template_include('public_persons.tpl').PERSONS_TPL_ROW_INJECT_POINT,
+    persons_template_include('public_persons.tpl')
+      .PERSONS_TPL_ROW_INJECT_POINT
+      .'<div id="PersonsTagging" class="imageInfoTable">'
+      .persons_template_include('public_editor.tpl')
+      .'</div>',
     $content
     );
 }

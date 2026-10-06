@@ -253,6 +253,60 @@ final class PicturePageSourceTest extends TestCase
     }
 
     /**
+     * [HAPPY] The editor sits in the information panel, in a row of its own
+     * after <dl id="standard"> - below the person row it fills - and no longer
+     * inside the stage over the photo.
+     */
+    public function testTheEditorRowSitsInTheInfoPanelAfterTheStandardList(): void
+    {
+        $markup = $this->markup($this->page());
+
+        $panelAt = strpos($markup, '<div id="imageInfos"');
+        $this->assertNotFalse($panelAt, 'anti-vacuity: the theme rendered no information panel');
+        $listAt = strpos($markup, '<dl id="standard"', $panelAt);
+        $this->assertNotFalse($listAt, 'anti-vacuity: the standard info list is gone');
+        $listCloseAt = strpos($markup, '</dl>', $listAt);
+        $this->assertNotFalse($listCloseAt, 'anti-vacuity: the standard info list is never closed');
+
+        $rowAt = strpos($markup, '<div id="PersonsTagging" class="imageInfoTable">');
+        $this->assertNotFalse($rowAt, 'the editor row was not rendered');
+        $this->assertGreaterThan($listCloseAt, $rowAt, 'the editor row must follow the standard info list');
+
+        $this->assertMatchesRegularExpression(
+            '#<div id="PersonsTagging" class="imageInfoTable">\s*<div id="persons-editor"#',
+            $markup,
+            'the editor is not the content of its row'
+        );
+        $this->assertSame(1, substr_count($markup, 'id="persons-editor"'), 'the editor must be rendered once, and no longer in the stage');
+
+        $this->assertMatchesRegularExpression(
+            '#<input type="button" id="persons-tag-toggle"#',
+            $markup,
+            'the toggle must be an input button, which the theme\'s skin styles'
+        );
+    }
+
+    /**
+     * [HAPPY] The editor's status message sits on the photo, inside the
+     * overlay, not beside the toggle in the information panel: in the narrow
+     * layout the panel is below the photo, out of sight while a box is drawn.
+     */
+    public function testTheStatusMessageSitsInTheOverlayNotInTheEditorRow(): void
+    {
+        $markup = $this->markup($this->page());
+
+        $overlayAt = strpos($markup, 'id="persons-overlay"');
+        $this->assertNotFalse($overlayAt, 'anti-vacuity: the overlay was not rendered');
+        $rowAt = strpos($markup, 'id="PersonsTagging"');
+        $this->assertNotFalse($rowAt, 'anti-vacuity: the editor row was not rendered');
+
+        $this->assertSame(1, substr_count($markup, 'id="persons-editor-message"'));
+        $messageAt = strpos($markup, 'id="persons-editor-message"');
+        $this->assertGreaterThan($overlayAt, $messageAt, 'the message is not in the overlay');
+        $this->assertLessThan($rowAt, $messageAt, 'the message is still in the editor row');
+    }
+
+    /**
      * [HAPPY] The editor's configuration reaches the browser on the element
      * itself, not through a script block whose evaluation order would matter.
      */

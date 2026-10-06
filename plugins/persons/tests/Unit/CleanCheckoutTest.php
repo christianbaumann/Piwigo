@@ -33,6 +33,7 @@ final class CleanCheckoutTest extends TestCase
         'template/admin_photo.css',
         'template/admin_photo_link.tpl',
         'template/public_overlay.tpl',
+        'template/public_editor.tpl',
         'template/public_persons.tpl',
         'template/overlay.css',
         'template/overlay.js',

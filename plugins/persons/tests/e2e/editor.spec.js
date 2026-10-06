@@ -2,6 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { seed, restore, readFileRegions, setExiftool, personCounts } = require('./support/seed');
 const { PicturePage } = require('./support/PicturePage');
+const { SKINS, MIN_SKINS } = require('./support/skins');
 
 /**
  * Tagging a person on the public picture page, in a real browser.
@@ -340,6 +341,151 @@ test.describe('tagging a person', () => {
     await expect(picture.draft).toHaveCount(0);
     await expect(picture.savedBoxes).toHaveCount(0);
   });
+});
+
+/** Beside the photo (modus sets html.wide) and below it. */
+const WIDE_LAYOUT = { name: 'wide', viewport: { width: 1400, height: 900 }, wide: true };
+const LAYOUTS = [
+  WIDE_LAYOUT,
+  { name: 'narrow', viewport: { width: 700, height: 900 }, wide: false },
+];
+
+/** Sub-pixel rounding between two left edges laid out by different rules. */
+const ALIGN_TOLERANCE_PX = 1;
+
+test.describe('the tag button', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  test.beforeEach(() => {
+    seeded = seed('empty');
+  });
+
+  test.afterEach(() => {
+    restore();
+  });
+
+  for (const layout of LAYOUTS) {
+    // [ECP] one partition per layout: panel beside the photo, panel below it
+    test(`sits in the information panel below the info list, ${layout.name} layout`, async ({ page }) => {
+      await page.setViewportSize(layout.viewport);
+      const picture = new PicturePage(page);
+      await picture.goto(seeded.picture_path);
+      await picture.waitForPlacement();
+
+      // Anti-vacuity: the layout this case is named for is the one on screen.
+      await expect(picture.wideLayout).toHaveCount(layout.wide ? 1 : 0);
+
+      await expect(picture.tagToggleInInfoPanel).toBeVisible();
+      const list = await picture.standardInfoList.boundingBox();
+      const button = await picture.tagToggleInInfoPanel.boundingBox();
+      expect(list).not.toBeNull();
+      expect(button).not.toBeNull();
+      expect(button.y).toBeGreaterThanOrEqual(list.y + list.height);
+    });
+  }
+
+  // [HAPPY] the panel is below the photo here, so a message beside the toggle would be out of sight
+  test('a message while drawing shows on the photo, narrow layout', async ({ page }) => {
+    const narrow = LAYOUTS.find((layout) => !layout.wide);
+    await page.setViewportSize(narrow.viewport);
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await expect(picture.wideLayout).toHaveCount(0);
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(TOO_SMALL_BOX);
+
+    await expect(picture.editorMessage).not.toBeEmpty();
+    await expect(picture.editorMessage).toBeInViewport();
+    const image = await picture.imageRect();
+    const message = await picture.editorMessage.boundingBox();
+    expect(message).not.toBeNull();
+    expect(message.x).toBeGreaterThanOrEqual(image.left);
+    expect(message.y).toBeGreaterThanOrEqual(image.top);
+    expect(message.x + message.width).toBeLessThanOrEqual(image.left + image.width);
+    expect(message.y + message.height).toBeLessThanOrEqual(image.top + image.height);
+  });
+
+  // [ECP] a drag starting on the message rather than on bare photo. Holds because the
+  // message is inside the overlay, so the mousedown bubbles to the drag handler; a
+  // pointer-events mutant on the message alone does not break it (TESTING.md ledger).
+  test('a drag that starts on the message still draws a box', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.enterTaggingMode();
+    await picture.dragBox(TOO_SMALL_BOX);
+    await expect(picture.editorMessage).toBeVisible();
+
+    const image = await picture.imageRect();
+    const message = await picture.editorMessage.boundingBox();
+    expect(message).not.toBeNull();
+    const startsOnMessage = {
+      left: (message.x + message.width / 2 - image.left) / image.width,
+      top: (message.y + message.height / 2 - image.top) / image.height,
+      w: 0.2,
+      h: 0.2,
+    };
+    await picture.dragBox(startsOnMessage);
+
+    await expect(picture.picker).toBeVisible();
+    await expect(picture.draft).toHaveCount(1);
+  });
+
+  // [ST] idle -> tagging -> idle
+  test('its label follows the mode', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+
+    const tagLabel = await picture.editorConfig.getAttribute('data-persons-str-tag');
+    const doneLabel = await picture.editorConfig.getAttribute('data-persons-str-done');
+    expect(tagLabel).toBeTruthy();
+    expect(doneLabel).toBeTruthy();
+    expect(doneLabel).not.toBe(tagLabel);
+
+    await expect(picture.tagToggle).toHaveValue(tagLabel);
+    await picture.enterTaggingMode();
+    await expect(picture.tagToggle).toHaveValue(doneLabel);
+    await picture.exitTaggingMode();
+    await expect(picture.tagToggle).toHaveValue(tagLabel);
+  });
+});
+
+test.describe('the tag button in every skin', () => {
+  test.afterEach(() => {
+    restore();
+  });
+
+  // Anti-vacuity: the skin list was read at all.
+  test('the skins are found', () => {
+    expect(SKINS.length).toBeGreaterThanOrEqual(MIN_SKINS);
+    expect(SKINS).toContain('newspaper');
+  });
+
+  for (const skin of SKINS) {
+    // [ECP] one partition per skin: with and without a button style of its own
+    test(`looks like the skin's buttons and stays in the panel in ${skin}`, async ({ page }) => {
+      await page.setViewportSize(WIDE_LAYOUT.viewport);
+      const seeded = seed('empty');
+      const picture = new PicturePage(page);
+      await picture.goto(`${seeded.picture_path}&skin=${skin}`);
+      await expect(picture.tagToggleInInfoPanel).toBeVisible();
+      // Anti-vacuity: the alignment below is a wide-layout rule.
+      await expect(picture.wideLayout).toHaveCount(1);
+
+      const look = await picture.tagToggleLook();
+      // Anti-vacuity: the styles were really read, not two empty objects.
+      expect(look.toggle.fontFamily).not.toBe('');
+      expect(look.toggle.borderTopStyle).not.toBe('');
+      expect(look.toggle).toEqual(look.probe);
+      expect(look.toggleRight).toBeLessThanOrEqual(look.panelRight);
+      // In line with the info list's values, whatever padding the skin gives the list.
+      expect(Math.abs(look.toggleLeft - look.ddLeft)).toBeLessThanOrEqual(ALIGN_TOLERANCE_PX);
+    });
+  }
 });
 
 /**

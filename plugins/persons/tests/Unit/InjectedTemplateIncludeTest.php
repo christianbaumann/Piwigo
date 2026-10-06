@@ -26,6 +26,7 @@ final class InjectedTemplateIncludeTest extends TestCase
         return array(
             'picture stage' => array('persons_picture_prefilter', PERSONS_TPL_INJECT_POINT . PERSONS_TPL_ROW_INJECT_POINT, 'public_overlay.tpl'),
             'picture row' => array('persons_picture_prefilter', PERSONS_TPL_INJECT_POINT . PERSONS_TPL_ROW_INJECT_POINT, 'public_persons.tpl'),
+            'picture editor' => array('persons_picture_prefilter', PERSONS_TPL_INJECT_POINT . PERSONS_TPL_ROW_INJECT_POINT, 'public_editor.tpl'),
             'photo screen link' => array('persons_photo_prefilter', PERSONS_TPL_PHOTO_ANCHOR, 'admin_photo_link.tpl'),
         );
     }
