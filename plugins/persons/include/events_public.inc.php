@@ -73,14 +73,14 @@ function persons_picture_prefilter($content)
 
   $stage = '<div id="persons-stage">'
     .PERSONS_TPL_INJECT_POINT
-    .file_get_contents(PERSONS_PATH.'template/public_overlay.tpl')
+    .persons_template_include('public_overlay.tpl')
     .'</div>';
 
   $content = str_replace(PERSONS_TPL_INJECT_POINT, $stage, $content);
 
   return str_replace(
     PERSONS_TPL_ROW_INJECT_POINT,
-    file_get_contents(PERSONS_PATH.'template/public_persons.tpl').PERSONS_TPL_ROW_INJECT_POINT,
+    persons_template_include('public_persons.tpl').PERSONS_TPL_ROW_INJECT_POINT,
     $content
     );
 }

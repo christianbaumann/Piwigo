@@ -58,7 +58,7 @@ function provenance_picture_row()
  */
 function provenance_picture_prefilter($content)
 {
-  $injection = file_get_contents(PROVENANCE_PATH . 'template/public_provenance.tpl');
+  $injection = provenance_template_include('public_provenance.tpl');
 
   return str_replace(
     PROVENANCE_TPL_INJECT_POINT,

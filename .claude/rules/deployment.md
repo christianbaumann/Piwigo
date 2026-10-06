@@ -148,6 +148,17 @@ of the image files. **Provenance columns have no path to the remote at all** —
 database and the file is only an export target — so a photo whose provenance was not written back
 before upload has none on the remote.
 
+## The remote's compiled templates are never purged
+
+The deploy uploads files and nothing under `_data/templates_c/` is touched, so a compiled page on
+the remote survives every deploy. A change to an injected plugin `.tpl` reaches it anyway (it is
+`{include}`d), but a change to a prefilter's *code* does not, and neither does anything in
+`plugins/typetags/template/tags.tpl`
+([decision 0036](../../docs/agents/decisions/0036-prefilters-include-plugin-templates.md)). After
+such a deploy, purge by hand: Werkzeuge → Wartung → *Kompilierte Vorlagen entfernen*. The first
+deploy carrying decision 0036 needs that purge once, because the remote's compiled pages still hold
+the old pasted-in copies.
+
 ## Photo edits travel as files
 
 A turn made with `plugins/photoedit` rewrites the image file and nothing else that a deploy could

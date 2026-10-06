@@ -99,7 +99,7 @@ SELECT image_id
  */
 function provenance_album_prefilter($content)
 {
-  $injection = file_get_contents(PROVENANCE_PATH . 'template/album_provenance.tpl');
+  $injection = provenance_template_include('album_provenance.tpl');
 
   return str_replace(
     PROVENANCE_TPL_ALBUM_ANCHOR,
@@ -180,7 +180,7 @@ SELECT '.implode(', ', $columns).'
  */
 function provenance_photo_prefilter($content)
 {
-  $injection = file_get_contents(PROVENANCE_PATH . 'template/photo_provenance.tpl');
+  $injection = provenance_template_include('photo_provenance.tpl');
 
   return str_replace(
     PROVENANCE_TPL_PHOTO_ANCHOR,
@@ -219,7 +219,7 @@ function provenance_batch_move_panel()
  */
 function provenance_batch_prefilter($content)
 {
-  $injection = file_get_contents(PROVENANCE_PATH . 'template/batch_move_provenance.tpl');
+  $injection = provenance_template_include('batch_move_provenance.tpl');
 
   return str_replace(
     PROVENANCE_TPL_BATCH_MOVE_ANCHOR,

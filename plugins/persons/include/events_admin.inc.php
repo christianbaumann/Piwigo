@@ -55,7 +55,7 @@ function persons_admin_photo_link()
  */
 function persons_photo_prefilter($content)
 {
-  $injection = file_get_contents(PERSONS_PATH.'template/admin_photo_link.tpl');
+  $injection = persons_template_include('admin_photo_link.tpl');
 
   return str_replace(
     PERSONS_TPL_PHOTO_ANCHOR,

@@ -50,7 +50,7 @@ Two constraints that bite when adding methods:
 - A plugin is `plugins/<name>/main.inc.php`. Metadata (`Plugin Name`, `Version`, `Description`, `Has Settings`) is a header comment block parsed out of the first 2048 bytes by `admin/include/plugins.class.php` — there is no `plugin.xml`. Lifecycle hooks go in a `PluginMaintain` subclass in `maintain.class.php` (`install()`, `activate()`, `deactivate()`, `uninstall()`, `update()`).
 - Hooks: `add_event_handler($event, $callback, $priority, $include_path)` with default priority `EVENT_HANDLER_PRIORITY_NEUTRAL` (50). Core fires `trigger_notify($event)` for notifications and `trigger_change($event, $data)` for filters that return modified data (`include/functions_plugins.inc.php`).
 - `tools/triggers_list.php` is a reference catalogue of core events with their signatures and originating files.
-- Plugins alter core templates with Smarty prefilters rather than editing `.tpl` files.
+- Plugins alter core templates with Smarty prefilters rather than editing `.tpl` files. A prefilter injects `{include file='<absolute path>'}`, never a file's content: pasted-in content is frozen into the compiled page, because Smarty checks only the host template's mtime ([decision 0036](../../docs/agents/decisions/0036-prefilters-include-plugin-templates.md)).
 
 ### Themes
 

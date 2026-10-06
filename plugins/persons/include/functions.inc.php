@@ -126,6 +126,23 @@ define('PERSONS_TPL_ROW_INJECT_POINT', "{/strip}\n</dl>");
  */
 define('PERSONS_TPL_PHOTO_ANCHOR', "<div class='picture-preview-actions'>");
 
+/**
+ * The Smarty tag a prefilter puts in place of one of this plugin's templates.
+ *
+ * An include, never the file's content: Smarty checks a compiled template
+ * against the mtime of the template it compiled, not of a file a prefilter read
+ * along the way, so pasted-in content stays frozen in _data/templates_c/ on
+ * every install that compiled the page before the file changed. An included
+ * template is compiled and checked on its own.
+ *
+ * @param string $name file name under template/
+ * @return string
+ */
+function persons_template_include($name)
+{
+  return "{include file='".realpath(PERSONS_PATH.'template/'.$name)."'}";
+}
+
 /** The config parameter holding the picture page's row-visibility map. */
 define('PERSONS_DISPLAY_INFO_PARAM', 'picture_informations');
 
