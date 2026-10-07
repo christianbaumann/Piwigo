@@ -16,7 +16,7 @@ require_once PIWIGO_ROOT . 'include/functions_category.inc.php';
  * outcome per hidden album depends on one relation (child / deeper descendant /
  * unrelated), covered as equivalence classes.
  */
-final class CoreHiddenSubalbumCountTest extends TestCase
+final class DiscountHiddenSubalbumsTest extends TestCase
 {
     /** Album 1 > album 2, with the counters an admin's cache gives it. */
     private const CATEGORY = array(

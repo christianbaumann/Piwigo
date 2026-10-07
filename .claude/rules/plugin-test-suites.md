@@ -75,8 +75,10 @@ correct. They run inside the provenance integration suite — there is no separa
 core characterization case there rather than inventing a root `phpunit.xml`.
 
 The fork's own core fix (decision 0037) is tested there too, against a requirement rather than as
-`[ERR]`: `CoreHiddenSubalbumCountTest` in both `tests/Unit/` (the counting function) and
-`tests/Integration/` (the rendered thumbnail, as webmaster and as a normal user).
+`[ERR]`: `tests/Unit/DiscountHiddenSubalbumsTest` (the counting function) and
+`tests/Integration/CoreHiddenSubalbumCountTest` (the rendered thumbnail, as webmaster and as a
+normal user). Test class names must be unique across both suites: a run without `--testsuite`
+loads both directories into one process, and a duplicate name is a fatal redeclare.
 
 The **unit** suite also guards the fork's German string overrides
 (`plugins/provenance/tests/Unit/GermanOverrideKeyTest.php`). `local/language/de_DE.lang.php` is a
