@@ -52,24 +52,26 @@ final class LockTimeoutTest extends TestCase
     }
 
     /**
-     * [ERR] With the lock held elsewhere, the runner gives up after
-     * PROVENANCE_LOCK_TIMEOUT_SECONDS, reports a failure and leaves the file
-     * as it was. Oracle: the current implementation - the research measured
-     * that two concurrent writers destroy a file, but no requirement fixes
-     * how a waiting writer reports giving up.
+     * [ERR] With the lock held elsewhere, the runner gives up, reports a
+     * failure and leaves the file as it was. Neither the retry loop nor the
+     * message text is asserted: a wall-clock bound would be a machine-speed
+     * proxy, and the message is a literal only the runner holds. Oracle: the
+     * current implementation - the research measured that two concurrent
+     * writers destroy a file, but no requirement fixes how a waiting writer
+     * reports giving up.
      *
      * Slow on purpose: it lasts PROVENANCE_LOCK_TIMEOUT_SECONDS.
      */
-    public function testARunWaitsForTheLockAndGivesUpWithoutWriting(): void
+    public function testARunGivesUpOnAHeldLockWithoutWriting(): void
     {
         $before = $this->fileState();
 
         provenance_make_dir(PROVENANCE_LOCK_DIR);
         $held = fopen(provenance_lock_path($this->image['db_path']), 'c');
-        $this->assertTrue(flock($held, LOCK_EX | LOCK_NB), 'the test could not take the lock itself');
 
         try
         {
+            $this->assertTrue(flock($held, LOCK_EX | LOCK_NB), 'the test could not take the lock itself');
             $result = provenance_exiftool_run($this->argfile, $this->image['file'], $this->image['db_path']);
         }
         finally

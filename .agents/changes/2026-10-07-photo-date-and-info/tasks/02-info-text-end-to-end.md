@@ -29,6 +29,8 @@ This task also creates `plugins/photoinfo` and its test infrastructure.
 
 ## Work
 
+Read the *Handoff to task 02* section of `01-characterize-provenance-writeback.md` first: the argfile, composer, worker, picture-row and `-config` traps it lists all sit on this task's path.
+
 * [ ] Create `plugins/photoinfo` (`main.inc.php` header, `maintain.class.php`, license banners, core code style); add its `!` entry to `.gitignore`
 * [ ] Refuse activation when provenance is not active, with a message naming it
 * [ ] Provenance: add `trigger_change('provenance_caption_parts', $parts, $image)` where the caption is composed, and an optional exiftool config parameter to `provenance_exiftool_run()`; task 01's tests stay green

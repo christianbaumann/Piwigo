@@ -48,6 +48,20 @@ final class ComposeCaptionTest extends TestCase
         $this->assertStringStartsWith('Album: ', provenance_compose_caption(array_reverse($parts, true)));
     }
 
+    /**
+     * [ERR] A part under a key outside provenance_field_order() never reaches
+     * the caption. Oracle: the current implementation - recorded because a
+     * caption_parts filter that adds its own key collides with exactly this.
+     */
+    public function testAPartOutsideTheFieldOrderIsDropped(): void
+    {
+        $parts = $this->allParts();
+        $foreign = array('photoinfo' => 'Info: Hochzeit') + $parts;
+
+        $this->assertSame(provenance_compose_caption($parts), provenance_compose_caption($foreign));
+        $this->assertStringNotContainsString('Hochzeit', provenance_compose_caption($foreign));
+    }
+
     /** [ECP] An empty part is dropped; no doubled separator is left behind. */
     public function testEmptyPartIsOmitted(): void
     {
