@@ -66,3 +66,9 @@ now also a stated consequence of
 [decision 0015](agents/decisions/0015-provenance-columns-stay-out-of-the-metadata-mappings.md):
 because no provenance column is a key in `use_iptc_mapping` / `use_exif_mapping`, no
 synchronisation reads those columns back, so nothing notices a third-party edit.
+- **provenance stores request values with core's added slashes.** `include/common.inc.php` runs
+  `addslashes()` over every request value, and `ws_provenance_setPhotoInfo()` (and presumably
+  `setAlbumInfo()`) escape the slashed value again, so a note typed as `a"b\c'd` is stored as
+  `a\"b\\c\'d` and written into the file that way. Measured 2026-10-07 for `setPhotoInfo`.
+  Reproduced by the skipped `SetPhotoInfoTest::testQuotesAndBackslashesAreStoredAsTyped`.
+  `plugins/photoinfo`'s `setInfo` strips the slashes first; provenance needs the same.

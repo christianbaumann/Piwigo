@@ -18,6 +18,8 @@ define('PIWIGO_ROOT', dirname(__DIR__, 4) . '/');
 define('PHPWG_ROOT_PATH', PIWIGO_ROOT);
 define('PROVENANCE_XMP_CONFIG', PROVENANCE_PATH . 'exiftool/pwgprov.config');
 
+// provenance_write_back() fires a filter; with no plugin loaded it passes through.
+require_once PIWIGO_ROOT . 'include/functions_plugins.inc.php';
 require_once PROVENANCE_PATH . 'include/functions.inc.php';
 require_once PROVENANCE_PATH . 'include/history.inc.php';
 require_once PROVENANCE_PATH . 'include/exiftool.inc.php';

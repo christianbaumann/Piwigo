@@ -1,0 +1,362 @@
+<?php
+/**
+ * Forces a known database state and asserts it took effect, so a test never
+ * runs over a state it merely hoped for.
+ *
+ * Adapted from plugins/photoedit/tests/Support/FixtureBuilder.php, trimmed to
+ * what this suite uses. Cleanup removes what was recorded, but no assertion
+ * depends on cleanup having run.
+ */
+class FixtureBuilder
+{
+    private Db $db;
+
+    /** Where createTestImage() puts its copies, relative to the gallery root. */
+    private const TEST_IMAGE_DIR = 'upload/photoinfo-test/';
+
+    /** The piwigo_config row that marks an install as expendable; see create-test-users.php. */
+    private const THROWAWAY_PARAM = 'photoinfo_throwaway_install';
+
+    /** The provenance plugin's per-image lock, held while it writes a file. */
+    private const PROVENANCE_LOCK_DIR = '_data/provenance/locks/';
+
+    /** The photo columns setProvenance() may write. */
+    public const PROVENANCE_COLUMNS = array(
+        'provenance_physical_album',
+        'provenance_owner',
+        'provenance_scanned_on',
+        'provenance_album_note',
+        'provenance_note',
+        );
+
+    /** The tags readFileTags() asks for, mapped to the key exiftool's JSON names each one with. */
+    public const FILE_TAGS = array(
+        'XMP-dc:Description' => 'Description',
+        'IPTC:Caption-Abstract' => 'Caption-Abstract',
+        'EXIF:ImageDescription' => 'ImageDescription',
+        'XMP-pwginfo:Info' => 'Info',
+        );
+
+    private array $testImages = array();
+    private array $testAlbums = array();
+
+    public function __construct(Db $db)
+    {
+        $this->db = $db;
+        self::assertThrowawayInstall($db);
+    }
+
+    /**
+     * Refuses to build a fixture against an install that has not been declared
+     * expendable. Fails closed, naming the script that sets the marker.
+     */
+    public static function assertThrowawayInstall(Db $db): void
+    {
+        $marker = $db->scalar(
+            "SELECT value FROM piwigo_config WHERE param = '" . $db->escape(self::THROWAWAY_PARAM) . "'"
+        );
+
+        if ((string)$marker !== '1')
+        {
+            throw new RuntimeException(
+                "This install is not marked as a throwaway, and the photoinfo suites rewrite image files.\n" .
+                "Mark an install whose gallery you can afford to lose with:\n" .
+                "  ddev exec php plugins/photoinfo/tests/Support/create-test-users.php\n" .
+                "Never mark a production install."
+            );
+        }
+    }
+
+    /** Fails naming the plugin when it is not active; photoinfo needs provenance too. */
+    public function assertPluginActive(string $plugin = 'photoinfo'): void
+    {
+        $state = $this->db->scalar("SELECT state FROM piwigo_plugins WHERE id = '" . $this->db->escape($plugin) . "'");
+        if ($state !== 'active')
+        {
+            throw new RuntimeException(
+                'The ' . $plugin . ' plugin is not active (state: ' . var_export($state, true) . ').' . "\n" .
+                'Activate it on Administration > Plugins before running the suites.'
+            );
+        }
+    }
+
+    /**
+     * A photo of this suite's own: a copy of the first PNG of the gallery under
+     * upload/photoinfo-test/, registered as an image row. Never a real scan:
+     * a save writes the caption into the file in place. The gallery holds PNGs
+     * only, so the copy is a PNG.
+     *
+     * @return array id, db_path (as stored), file (absolute), width, height
+     */
+    public function createTestImage(): array
+    {
+        $source = (string)$this->db->scalar(
+            "SELECT path FROM piwigo_images WHERE path LIKE '%.png' AND width IS NOT NULL ORDER BY id LIMIT 1"
+        );
+        $sourceFile = PIWIGO_ROOT . ltrim($source, './');
+        if (!is_file($sourceFile))
+        {
+            throw new RuntimeException("no source photo to copy: $sourceFile");
+        }
+
+        $dir = PIWIGO_ROOT . self::TEST_IMAGE_DIR;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+
+        $name = 'photoinfo-test-' . bin2hex(random_bytes(8)) . '.png';
+        if (!copy($sourceFile, $dir . $name))
+        {
+            throw new RuntimeException("cannot copy $sourceFile to $dir$name");
+        }
+
+        $dimensions = @getimagesize($dir . $name);
+        if ($dimensions === false)
+        {
+            throw new RuntimeException('fixture image has no readable dimensions');
+        }
+
+        $dbPath = './' . self::TEST_IMAGE_DIR . $name;
+        $this->db->query(
+            'INSERT INTO piwigo_images (file, path, date_available, filesize, width, height) VALUES (' .
+            "'" . $this->db->escape($name) . "', '" . $this->db->escape($dbPath) . "', NOW(), " .
+            (int)ceil(filesize($dir . $name) / 1024) . ', ' . (int)$dimensions[0] . ', ' . (int)$dimensions[1] . ')'
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException('fixture image row was not inserted');
+        }
+
+        $this->testImages[] = array(
+            'id' => $id,
+            'db_path' => $dbPath,
+            'file' => $dir . $name,
+            'width' => (int)$dimensions[0],
+            'height' => (int)$dimensions[1],
+            );
+
+        return end($this->testImages);
+    }
+
+    /** Sets or clears (null) a photo's images.comment, asserting it took effect. */
+    public function setComment(int $imageId, ?string $comment): void
+    {
+        $value = $comment === null ? 'NULL' : "'" . $this->db->escape($comment) . "'";
+        $this->db->query("UPDATE piwigo_images SET comment = $value WHERE id = $imageId");
+
+        if ($this->imageRow($imageId)['comment'] !== $comment)
+        {
+            throw new RuntimeException("comment of photo $imageId was not set");
+        }
+    }
+
+    /**
+     * Sets a photo's provenance columns, asserting each took effect. A key
+     * outside PROVENANCE_COLUMNS is refused; null clears a column.
+     *
+     * @param array $values column => value
+     */
+    public function setProvenance(int $imageId, array $values): void
+    {
+        if (count($values) === 0)
+        {
+            throw new RuntimeException('anti-vacuity: setting no provenance column would make every assertion trivial');
+        }
+
+        $assignments = array();
+        foreach ($values as $column => $value)
+        {
+            if (!in_array($column, self::PROVENANCE_COLUMNS, true))
+            {
+                throw new RuntimeException("not a provenance column: $column");
+            }
+            $assignments[] = "`$column` = " . ($value === null ? 'NULL' : "'" . $this->db->escape((string)$value) . "'");
+        }
+        $this->db->query('UPDATE piwigo_images SET ' . implode(', ', $assignments) . " WHERE id = $imageId");
+
+        $row = $this->imageRow($imageId);
+        foreach ($values as $column => $value)
+        {
+            if ($row[$column] !== ($value === null ? null : (string)$value))
+            {
+                throw new RuntimeException("$column of photo $imageId was not set (got: " . var_export($row[$column], true) . ')');
+            }
+        }
+    }
+
+    /** One image row's columns, as stored. */
+    public function imageRow(int $id): array
+    {
+        $row = $this->db->query("SELECT * FROM piwigo_images WHERE id = $id")->fetch_assoc();
+        if ($row === null)
+        {
+            throw new RuntimeException("no image row $id");
+        }
+        return $row;
+    }
+
+    /**
+     * Reads the caption slots and the info tag back from a file with a plain
+     * exiftool call in its own process - not through either plugin, whose
+     * writing is what is under test. XMP carries its namespace, so the custom
+     * pwginfo tag reads back without a config.
+     *
+     * @return array FILE_TAGS key => value as a string, or null when absent
+     */
+    public static function readFileTags(string $file): array
+    {
+        if (!is_file($file))
+        {
+            throw new RuntimeException("no file to read tags from: $file");
+        }
+
+        $command = 'exiftool -j -struct -charset iptc=UTF8';
+        foreach (array_keys(self::FILE_TAGS) as $tag)
+        {
+            $command .= ' ' . escapeshellarg('-' . $tag);
+        }
+        $decoded = json_decode(self::run($command . ' ' . escapeshellarg($file)), true);
+        if (!is_array($decoded) or !isset($decoded[0]) or !is_array($decoded[0]))
+        {
+            throw new RuntimeException("exiftool returned no JSON object for $file");
+        }
+
+        $tags = array();
+        foreach (self::FILE_TAGS as $tag => $key)
+        {
+            $tags[$tag] = isset($decoded[0][$key]) ? (string)$decoded[0][$key] : null;
+        }
+        return $tags;
+    }
+
+    /**
+     * Runs a shell command, failing loudly on a non-zero exit. Its output is
+     * stdout only, so a warning on stderr cannot break the JSON readFileTags()
+     * decodes.
+     *
+     * @return string its output
+     */
+    public static function run(string $command): string
+    {
+        $output = array();
+        $status = 1;
+        exec($command, $output, $status);
+        if ($status !== 0)
+        {
+            throw new RuntimeException("`$command` exited with $status: " . implode("\n", $output));
+        }
+        return implode("\n", $output);
+    }
+
+    /** A public top-level album of this suite's own, visible to guests too. */
+    public function createTestAlbum(string $name): int
+    {
+        $this->db->query(
+            "INSERT INTO `piwigo_categories` (name, id_uppercat, uppercats, rank, global_rank, status, visible) " .
+            "VALUES ('" . $this->db->escape($name) . "', NULL, '', 1, '1', 'public', 'true')"
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException('fixture album row was not inserted');
+        }
+
+        $this->db->query("UPDATE `piwigo_categories` SET uppercats = '$id', global_rank = '$id' WHERE id = $id");
+        $this->testAlbums[] = $id;
+
+        $status = $this->db->scalar("SELECT status FROM `piwigo_categories` WHERE id = $id AND visible = 'true'");
+        if ($status !== 'public')
+        {
+            throw new RuntimeException("fixture album $id is not public and visible");
+        }
+
+        return $id;
+    }
+
+    /** Puts one photo in one album, asserting the link took effect. */
+    public function attachImage(int $imageId, int $catId): void
+    {
+        $this->db->query("INSERT INTO `piwigo_image_category` (image_id, category_id) VALUES ($imageId, $catId)");
+
+        $linked = (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM `piwigo_image_category` WHERE image_id = $imageId AND category_id = $catId"
+        );
+        if ($linked !== 1)
+        {
+            throw new RuntimeException("photo $imageId was not linked to album $catId");
+        }
+    }
+
+    /**
+     * Discards every user's cached permission summary, so an album created after
+     * it was computed is visible to the accounts that may see it.
+     */
+    public function invalidateUserCache(): void
+    {
+        $this->db->query("UPDATE `piwigo_user_cache` SET need_update = 'true'");
+    }
+
+    /** What this fixture created, for the E2E seed's separate restore process. */
+    public function exportTestObjects(): array
+    {
+        return array('images' => $this->testImages, 'albums' => $this->testAlbums);
+    }
+
+    public function importTestObjects(array $objects): void
+    {
+        $this->testImages = $objects['images'] ?? array();
+        $this->testAlbums = $objects['albums'] ?? array();
+    }
+
+    /**
+     * Removes every photo this fixture created: its rows, its file with
+     * exiftool's _original sidecar, provenance's lock and history rows for it,
+     * and its derivatives.
+     */
+    public function destroyTestImages(): void
+    {
+        foreach ($this->testImages as $image)
+        {
+            $id = (int)$image['id'];
+            $this->db->query('DELETE FROM piwigo_images WHERE id = ' . $id);
+            $this->db->query('DELETE FROM piwigo_image_category WHERE image_id = ' . $id);
+            $this->db->query('DELETE FROM piwigo_image_tag WHERE image_id = ' . $id);
+            if ($this->db->scalar("SHOW TABLES LIKE 'piwigo_provenance_history'") !== null)
+            {
+                $this->db->query("DELETE FROM piwigo_provenance_history WHERE object = 'photo' AND object_id = " . $id);
+            }
+
+            foreach (glob($image['file'] . '*') as $leftover)
+            {
+                @unlink($leftover);
+            }
+
+            @unlink(PIWIGO_ROOT . self::PROVENANCE_LOCK_DIR . sha1($image['db_path']) . '.lock');
+
+            // The derivatives i.php generated while a spec looked at the photo.
+            $derivatives = PIWIGO_ROOT . '_data/i/' . substr(ltrim($image['db_path'], './'), 0, -strlen('.' . pathinfo($image['db_path'], PATHINFO_EXTENSION)));
+            foreach (glob($derivatives . '-*') as $derivative)
+            {
+                @unlink($derivative);
+            }
+        }
+        $this->testImages = array();
+    }
+
+    /** Removes every album this fixture created. */
+    public function destroyTestAlbums(): void
+    {
+        foreach ($this->testAlbums as $id)
+        {
+            $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
+            if ($this->db->scalar("SHOW TABLES LIKE 'piwigo_provenance_history'") !== null)
+            {
+                $this->db->query("DELETE FROM piwigo_provenance_history WHERE object = 'album' AND object_id = " . (int)$id);
+            }
+        }
+        $this->testAlbums = array();
+    }
+}

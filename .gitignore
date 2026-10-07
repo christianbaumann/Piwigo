@@ -6,6 +6,7 @@
 !/plugins/provenance
 !/plugins/persons
 !/plugins/photoedit
+!/plugins/photoinfo
 /themes/*
 !/themes/index.php
 !/themes/default

@@ -151,13 +151,34 @@ final class BuildArgfileTest extends TestCase
         );
     }
 
-    /** [NEG] A caption containing a newline is collapsed too, in every slot. */
-    public function testNewlineInTheCaptionNeverProducesASecondLine(): void
+    /**
+     * [NEG] A caption with a line break never becomes a second argfile line.
+     *
+     * The caption keeps its blank line between blocks, so each slot names a
+     * value file instead of carrying the text: still one line, one argument.
+     * Requirement: design "One composed caption for info and provenance".
+     */
+    public function testAMultiLineCaptionNamesAValueFileInEverySlot(): void
     {
-        $lines = provenance_build_argfile($this->allValues(), "erste\nzweite");
+        $lines = provenance_build_argfile($this->allValues(), "erste\n\nzweite", '/ops/7-');
 
-        $this->assertCount(1, $this->linesStartingWith($lines, '-EXIF:ImageDescription'));
-        $this->assertSame('erste zweite', $this->lineFor($lines, '-EXIF:ImageDescription'));
+        foreach ($lines as $line)
+        {
+            $this->assertStringNotContainsString("\n", $line);
+        }
+        $this->assertContains('-EXIF:ImageDescription<=/ops/7-caption.txt', $lines);
+        $this->assertContains('-XMP-dc:Description<=/ops/7-caption.txt', $lines);
+        $this->assertContains('-IPTC:Caption-Abstract<=/ops/7-caption-iptc.txt', $lines);
+        $this->assertCount(5, array_filter($lines, static fn ($line) => strpos($line, '<=/ops/7-') !== false));
+    }
+
+    /** [ECP] A single-line caption stays on the line, so no value file is needed. */
+    public function testASingleLineCaptionNeedsNoValueFile(): void
+    {
+        $lines = provenance_build_argfile($this->allValues(), self::CAPTION, '/ops/7-');
+
+        $this->assertSame(self::CAPTION, $this->lineFor($lines, '-EXIF:ImageDescription'));
+        $this->assertSame(array(), provenance_argfile_value_files(provenance_caption_values(self::CAPTION), '/ops/7-'));
     }
 
     /**

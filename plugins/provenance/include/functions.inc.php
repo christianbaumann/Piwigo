@@ -197,6 +197,12 @@ function provenance_copy_down_map()
 /** Joins the labelled provenance parts inside one caption slot. */
 define('PROVENANCE_CAPTION_SEPARATOR', ' | ');
 
+/**
+ * Joins the caption's blocks - another plugin's text and provenance's - into
+ * one caption: a blank line between them.
+ */
+define('PROVENANCE_CAPTION_BLOCK_SEPARATOR', "\n\n");
+
 /** IPTC-IIM 2:120 Caption-Abstract byte cap (MWG 2.0 section 5.2). Bytes, not characters. */
 define('PROVENANCE_IPTC_MAX_BYTES', 2000);
 
@@ -346,6 +352,50 @@ function provenance_compose_caption($parts)
 }
 
 /**
+ * Provenance's block of the caption: the composed text on one line.
+ *
+ * A note typed across several lines is collapsed, as it always was in the file;
+ * only the blank line between blocks is a line break in the caption.
+ *
+ * @param array $values provenance field => raw value
+ * @param array $labels provenance field => label text
+ * @return string
+ */
+function provenance_caption_block($values, $labels)
+{
+  return provenance_sanitize_argfile_value(
+    provenance_compose_caption(provenance_caption_parts($values, $labels))
+    );
+}
+
+/**
+ * Joins the caption's blocks, in the order given, into the text the file gets.
+ *
+ * The blocks come out of the provenance_caption_parts filter: provenance's own
+ * composed text under 'provenance', and whatever another plugin put beside it.
+ * Empty blocks are dropped, so a photo with only one of them carries no blank
+ * line at either end.
+ *
+ * @param array $blocks name => text
+ * @return string
+ */
+function provenance_join_caption_blocks($blocks)
+{
+  $present = array();
+
+  foreach ($blocks as $block)
+  {
+    $block = trim(str_replace(array("\r\n", "\r"), "\n", (string)$block));
+    if ($block !== '')
+    {
+      $present[] = $block;
+    }
+  }
+
+  return implode(PROVENANCE_CAPTION_BLOCK_SEPARATOR, $present);
+}
+
+/**
  * Cuts text down to the IPTC byte budget on a UTF-8 character boundary.
  *
  * The cap is a byte cap, so strlen() is correct here and mb_strlen() is not. A
@@ -389,6 +439,118 @@ function provenance_sanitize_argfile_value($value)
 }
 
 /**
+ * Trims a caption and gives its line breaks one form.
+ *
+ * Unlike a single-line value the caption keeps its line breaks: the blank line
+ * between its blocks is part of it.
+ *
+ * @param string $caption
+ * @return string
+ */
+function provenance_normalize_caption($caption)
+{
+  return trim(str_replace(array("\r\n", "\r"), "\n", (string)$caption));
+}
+
+/**
+ * One argfile line setting a tag to a value.
+ *
+ * exiftool reads its argfile one argument per line with no escape that keeps
+ * every character: its #[CSTR] lines turn "$" and "@" into "\$" and "\@". So a
+ * value with a line break is not put on the line at all - the line names a file
+ * holding it ("-TAG<=file"), which provenance_argfile_value_files() lists for
+ * the caller to write. Any other value stays a plain line, byte for byte as
+ * before.
+ *
+ * @param string $tag
+ * @param string $value
+ * @param string $value_file where the value is written when it has a line break
+ * @return string
+ */
+function provenance_argfile_line($tag, $value, $value_file)
+{
+  if (!provenance_is_multiline($value))
+  {
+    return '-'.$tag.'='.$value;
+  }
+
+  return '-'.$tag.'<='.$value_file;
+}
+
+/**
+ * @param string $value
+ * @return bool
+ */
+function provenance_is_multiline($value)
+{
+  return strpos($value, "\n") !== false or strpos($value, "\r") !== false;
+}
+
+/**
+ * The texts the five caption slots take: the full caption, and the IPTC slot's
+ * copy cut to its byte budget. Keyed by the name of the value file each one is
+ * written to when it has a line break.
+ *
+ * @param string $caption normalized caption text
+ * @return array file name => text
+ */
+function provenance_caption_values($caption)
+{
+  $iptc = provenance_truncate_for_iptc($caption);
+
+  return array(
+    'caption.txt' => $caption,
+    'caption-iptc.txt' => $iptc['text'],
+    );
+}
+
+/**
+ * The argfile lines setting the five caption slots to one caption.
+ *
+ * An empty caption gives each slot an empty value, which exiftool reads as
+ * "delete this tag" - for a caller that has to clear a caption it wrote before.
+ *
+ * @param string $caption normalized caption text
+ * @param string $value_prefix path prefix of this photo's value files
+ * @return array
+ */
+function provenance_caption_argfile_lines($caption, $value_prefix)
+{
+  $values = provenance_caption_values($caption);
+  $lines = array();
+
+  foreach (provenance_caption_tags() as $tag)
+  {
+    $name = $tag == PROVENANCE_IPTC_CAPTION_TAG ? 'caption-iptc.txt' : 'caption.txt';
+    $lines[] = provenance_argfile_line($tag, $values[$name], $value_prefix.$name);
+  }
+
+  return $lines;
+}
+
+/**
+ * The value files the argfile lines name, to be written before exiftool runs.
+ *
+ * @param array $values file name => text
+ * @param string $value_prefix path prefix of this photo's value files
+ * @return array path => content, only for the values with a line break
+ */
+function provenance_argfile_value_files($values, $value_prefix)
+{
+  $files = array();
+
+  foreach ($values as $name => $text)
+  {
+    if (provenance_is_multiline($text))
+    {
+      $files[$value_prefix.$name] = $text;
+    }
+  }
+
+  return $files;
+}
+
+/**
  * Builds the exiftool argfile lines for one photo.
  *
  * A value never reaches a command line (decision C8): the tag and its value
@@ -397,21 +559,18 @@ function provenance_sanitize_argfile_value($value)
  *
  * @param array $values provenance field => raw value
  * @param string $caption composed caption text
+ * @param string $value_prefix path prefix of the photo's value files, see
+ *   provenance_argfile_line()
  * @return array argfile lines, empty when there is nothing to write
  */
-function provenance_build_argfile($values, $caption)
+function provenance_build_argfile($values, $caption, $value_prefix = '')
 {
-  $caption = provenance_sanitize_argfile_value($caption);
+  $caption = provenance_normalize_caption($caption);
   $lines = array();
 
   if ($caption !== '')
   {
-    $iptc = provenance_truncate_for_iptc($caption);
-
-    foreach (provenance_caption_tags() as $tag)
-    {
-      $lines[] = '-'.$tag.'='.($tag == PROVENANCE_IPTC_CAPTION_TAG ? $iptc['text'] : $caption);
-    }
+    $lines = provenance_caption_argfile_lines($caption, $value_prefix);
   }
 
   foreach (provenance_xmp_tag_map() as $field => $tag)

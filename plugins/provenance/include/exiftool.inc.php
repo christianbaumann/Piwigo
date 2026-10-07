@@ -108,14 +108,27 @@ function provenance_write_back($images, $labels)
         continue;
       }
 
-      $caption = provenance_compose_caption(provenance_caption_parts($image, $labels));
-      $lines = provenance_build_argfile($image, $caption);
+      // Another plugin may put its own text beside provenance's in the caption;
+      // the caption slots hold one text, so every writer has to compose all of it.
+      $blocks = trigger_change('provenance_caption_parts',
+        array('provenance' => provenance_caption_block($image, $labels)),
+        $image
+        );
+      $caption = provenance_join_caption_blocks($blocks);
+      $value_prefix = $operation_dir.$image_id.'-';
+      $lines = provenance_build_argfile($image, $caption, $value_prefix);
 
       if (empty($lines))
       {
         // Nothing to say about this photo. Invoking exiftool anyway would
         // rewrite the file - and create an _original sidecar - for no change.
         continue;
+      }
+
+      $value_files = provenance_argfile_value_files(provenance_caption_values($caption), $value_prefix);
+      foreach ($value_files as $path => $content)
+      {
+        file_put_contents($path, $content);
       }
 
       $argfile = $operation_dir.$image_id.'.args';
@@ -158,13 +171,16 @@ function provenance_write_back($images, $labels)
  * @param string $argfile
  * @param string $file the image on disk
  * @param string $db_path the stored path, which names the lock
+ * @param string|null $config exiftool config file; provenance's own when null.
+ *   exiftool takes one, so a caller writing another namespace passes a config
+ *   that declares every tag the argfile names
  * @return array array('ok' => bool, 'message' => string)
  */
-function provenance_exiftool_run($argfile, $file, $db_path)
+function provenance_exiftool_run($argfile, $file, $db_path, $config = null)
 {
   $command =
     escapeshellcmd(provenance_exiftool_binary()).
-    ' -config '.escapeshellarg(PROVENANCE_XMP_CONFIG).
+    ' -config '.escapeshellarg($config === null ? PROVENANCE_XMP_CONFIG : $config).
     ' -@ '.escapeshellarg($argfile).
     ' '.escapeshellarg($file).
     ' 2>&1';

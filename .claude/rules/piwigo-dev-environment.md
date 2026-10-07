@@ -21,7 +21,9 @@ The provenance plugin keeps its own scratch space under `_data/`, defined once i
   concurrent exiftool write (`provenance_lock_path()`). A **separate** file, never the image
   itself: exiftool replaces the image by rename, so a lock held on the old inode would exclude
   nothing from the second writer onwards.
-- `_data/provenance/args/<operation id>/` — the exiftool argfiles of one write-back operation
+- `_data/provenance/args/<operation id>/` — the exiftool argfiles of one write-back operation, or
+  of one `plugins/photoinfo` save, plus the value files a multi-line caption or info text travels
+  in (`<image id>-caption.txt`, `-caption-iptc.txt`, `-info.txt`; decision 0038)
   (`provenance_operation_dir()`), removed whole in a `finally`, so a crashed run leaves at most
   one directory behind instead of orphan files nobody can attribute.
 
@@ -77,7 +79,7 @@ All three are covered by the root `.gitignore`'s `_data` entry and never reach t
 
 ## Git-ignored working state
 
-`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
+`.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit`, `plugins/photoinfo`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
 
 `local/config/config.inc.php` and `local/config/database.inc.php` are git-ignored and hold the install's overrides and DB credentials.
 

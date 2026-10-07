@@ -26,8 +26,8 @@ about this codebase:
 
 ## Suites
 
-Piwigo core has no test suite. `plugins/typetags`, `plugins/provenance`, `plugins/persons` and
-`plugins/photoedit` each carry all three layers, with their own `phpunit.xml` and their own `playwright.config.js`.
+Piwigo core has no test suite. `plugins/typetags`, `plugins/provenance`, `plugins/persons`,
+`plugins/photoedit` and `plugins/photoinfo` each carry all three layers, with their own `phpunit.xml` and their own `playwright.config.js`.
 `plugins/persons` got its E2E layer with the public overlay in Phase 5 — see
 [decision 0017](decisions/0017-no-e2e-tests-for-persons-phases-1-to-4.md) for why the four phases
 before it had none.

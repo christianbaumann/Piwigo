@@ -1,0 +1,30 @@
+#PhotoInfo [hidden] {
+  display: none !important;
+}
+
+#photoinfo-info-view {
+  cursor: pointer;
+}
+
+#photoinfo-info-view:hover,
+#photoinfo-info-view:focus {
+  text-decoration: underline dotted;
+}
+
+.photoinfo-placeholder {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+#photoinfo-info-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.photoinfo-actions {
+  margin-top: 0.3em;
+}
+
+.photoinfo-message:empty {
+  display: none;
+}

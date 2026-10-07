@@ -101,6 +101,27 @@ final class SetPhotoInfoTest extends TestCase
         $this->assertNull($this->photo()['provenance_note']);
     }
 
+    /**
+     * [NEG] Quotes and backslashes are stored as typed.
+     *
+     * Known gap: include/common.inc.php adds slashes to every request value and
+     * the handler escapes the slashed value again, so `a"b\c'd` is stored as
+     * `a\"b\\c\'d` (measured 2026-10-07). See the "provenance stores request
+     * values with core's added slashes" item in docs/backlog.md; un-skipping this
+     * test is the fix's first step. plugins/photoinfo's setInfo strips them.
+     */
+    public function testQuotesAndBackslashesAreStoredAsTyped(): void
+    {
+        $this->markTestSkipped(
+            'known gap: the note is stored with core\'s added slashes - ' .
+            'see the "provenance stores request values with core\'s added slashes" item in docs/backlog.md'
+        );
+
+        $this->save('a"b\\c\'d');
+
+        $this->assertSame('a"b\\c\'d', $this->photo()['provenance_note']);
+    }
+
     /** [ECP] Markup is stripped; this text is bound for an EXIF packet. */
     public function testMarkupIsStripped(): void
     {
