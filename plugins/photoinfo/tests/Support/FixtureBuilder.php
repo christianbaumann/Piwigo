@@ -186,6 +186,20 @@ class FixtureBuilder
         }
     }
 
+    /** Sets or clears a photo's date columns directly, asserting they took effect. */
+    public function setDate(int $imageId, ?string $dateCreation, ?string $precision): void
+    {
+        $quote = fn(?string $v) => $v === null ? 'NULL' : "'" . $this->db->escape($v) . "'";
+        $this->db->query('UPDATE piwigo_images SET date_creation = ' . $quote($dateCreation) .
+            ', photoinfo_date_precision = ' . $quote($precision) . " WHERE id = $imageId");
+
+        $row = $this->imageRow($imageId);
+        if ($row['date_creation'] !== $dateCreation or $row['photoinfo_date_precision'] !== $precision)
+        {
+            throw new RuntimeException("date of photo $imageId was not set");
+        }
+    }
+
     /** One image row's columns, as stored. */
     public function imageRow(int $id): array
     {
@@ -229,6 +243,52 @@ class FixtureBuilder
             $tags[$tag] = isset($decoded[0][$key]) ? (string)$decoded[0][$key] : null;
         }
         return $tags;
+    }
+
+    /**
+     * Reads the date tags back with a plain exiftool call, as the file holds
+     * them: XMP-photoshop:DateCreated out of the raw XMP packet, since exiftool
+     * prints an XMP date with colons; the others as exiftool reads them.
+     *
+     * @return array tag => value as a string, or null when absent
+     */
+    public static function readDateTags(string $file): array
+    {
+        if (!is_file($file))
+        {
+            throw new RuntimeException("no file to read tags from: $file");
+        }
+
+        $decoded = json_decode(self::run('exiftool -j -G1 -IPTC:DateCreated -XMP-pwginfo:DateEDTF -EXIF:DateTimeOriginal ' .
+            escapeshellarg($file)), true);
+        if (!is_array($decoded) or !isset($decoded[0]) or !is_array($decoded[0]))
+        {
+            throw new RuntimeException("exiftool returned no JSON object for $file");
+        }
+
+        $packet = self::run('exiftool -b -XMP ' . escapeshellarg($file));
+        $xmp = preg_match('~<photoshop:DateCreated>([^<]*)</photoshop:DateCreated>|photoshop:DateCreated=[\'"]([^\'"]*)~', $packet, $m)
+            ? ($m[1] !== '' ? $m[1] : ($m[2] ?? ''))
+            : null;
+
+        $value = fn(string $key) => isset($decoded[0][$key]) ? (string)$decoded[0][$key] : null;
+
+        return array(
+            'XMP-photoshop:DateCreated' => $xmp,
+            'IPTC:DateCreated' => $value('IPTC:DateCreated'),
+            'XMP-pwginfo:DateEDTF' => $value('XMP-pwginfo:DateEDTF'),
+            'EXIF:DateTimeOriginal' => $value('ExifIFD:DateTimeOriginal'),
+            );
+    }
+
+    /** Puts a DateTimeOriginal into a fixture file, as a camera or a scanner would, and asserts it is there. */
+    public static function writeDateTimeOriginal(string $file, string $value): void
+    {
+        self::run('exiftool -q -overwrite_original ' . escapeshellarg('-EXIF:DateTimeOriginal=' . $value) . ' ' . escapeshellarg($file));
+        if (self::readDateTags($file)['EXIF:DateTimeOriginal'] !== $value)
+        {
+            throw new RuntimeException("DateTimeOriginal was not written into $file");
+        }
     }
 
     /**

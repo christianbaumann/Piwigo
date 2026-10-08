@@ -31,13 +31,33 @@ function readFile(imageId) {
 }
 
 /**
- * The photo's images.comment as stored.
+ * The photo's date tags, read by a plain exiftool call.
  *
  * @param {number} imageId
- * @returns {{comment: string|null}}
+ * @returns {{'XMP-photoshop:DateCreated': string|null, 'IPTC:DateCreated': string|null,
+ *   'XMP-pwginfo:DateEDTF': string|null, 'EXIF:DateTimeOriginal': string|null}}
+ */
+function readDate(imageId) {
+  return run(`--read-date=${imageId}`);
+}
+
+/**
+ * The photo's comment and date columns as stored.
+ *
+ * @param {number} imageId
+ * @returns {{comment: string|null, date_creation: string|null, photoinfo_date_precision: string|null}}
  */
 function readRow(imageId) {
   return run(`--read-row=${imageId}`);
+}
+
+/**
+ * Makes the photo's file unwritable, so the next save's file write fails.
+ *
+ * @param {number} imageId
+ */
+function makeReadOnly(imageId) {
+  run(`--read-only=${imageId}`);
 }
 
 /** Removes whatever the seed created. Safe to call unseeded. */
@@ -45,4 +65,4 @@ function restore() {
   run('--restore');
 }
 
-module.exports = { seed, readFile, readRow, restore };
+module.exports = { seed, readFile, readDate, readRow, makeReadOnly, restore };

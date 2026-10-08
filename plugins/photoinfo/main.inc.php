@@ -1,8 +1,8 @@
 <?php
 /*
 Plugin Name: Photo Info
-Version: 1.0.0
-Description: Edit a photo's description on the picture page and write it into the image file, ahead of its provenance. Requires the Provenance plugin.
+Version: 1.1.0
+Description: Edit a photo's date and description on the picture page and write them into the image file, ahead of its provenance. Requires the Provenance plugin.
 Plugin URI: https://github.com/christianbaumann/Piwigo
 Author: Christian Baumann
 Has Settings: false
@@ -37,16 +37,16 @@ add_event_handler('ws_add_methods', 'photoinfo_add_methods');
 add_event_handler('provenance_caption_parts', 'photoinfo_caption_parts_handler',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/writer.inc.php');
 
-// The Info row. Registered only on the picture page, and the file behind it is
+// The Datum and Info rows. Registered only on the picture page, and the file behind it is
 // pulled in only when the event actually fires.
 if (script_basename() == 'picture')
 {
-  add_event_handler('loc_end_picture', 'photoinfo_picture_row',
+  add_event_handler('loc_end_picture', 'photoinfo_picture_rows',
     EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_public.inc.php');
 }
 
 /**
- * Registers the plugin's web-service method.
+ * Registers the plugin's web-service methods.
  *
  * @param array $arr
  */
@@ -63,6 +63,23 @@ function photoinfo_add_methods($arr)
       'pwg_token' => array(),
       ),
     'Saves a photo\'s description and writes it into the image file, ahead of its provenance.',
+    PHOTOINFO_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
+  );
+
+  // Defaults of '' rather than required: core's ws layer reads an empty string
+  // as a missing parameter, and empty fields are how a date is cleared.
+  $service->addMethod(
+    'pwg.photoinfo.setDate',
+    'ws_photoinfo_setDate',
+    array(
+      'image_id' => array('type' => WS_TYPE_ID),
+      'year' => array('default' => '', 'info' => 'Four digits, 1800 to the current year; all three empty to clear the date'),
+      'month' => array('default' => '', 'info' => '1 to 12, or empty when unknown'),
+      'day' => array('default' => '', 'info' => 'Day of the month, or empty when unknown; needs a month'),
+      'pwg_token' => array(),
+      ),
+    'Saves a photo\'s date - a year, a month or a day - and writes it into the image file.',
     PHOTOINFO_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );

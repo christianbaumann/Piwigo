@@ -10,7 +10,9 @@
  * Usage:
  *   php tests/e2e/support/seed.php --scenario=photo    a copy of a gallery PNG
  *   php tests/e2e/support/seed.php --read-file=<id>    the photo's caption slots and info tag
- *   php tests/e2e/support/seed.php --read-row=<id>     the photo's images.comment
+ *   php tests/e2e/support/seed.php --read-row=<id>     the photo's comment and date columns
+ *   php tests/e2e/support/seed.php --read-date=<id>    the photo's date tags
+ *   php tests/e2e/support/seed.php --read-only=<id>    makes the photo's file unwritable, so a save's file write fails
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -27,7 +29,7 @@ function fail(string $message): void
     exit(1);
 }
 
-$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:'));
+$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -41,10 +43,35 @@ try
         exit(0);
     }
 
+    if (isset($args['read-only']))
+    {
+        // --restore deletes the file whatever its mode: the directory stays writable.
+        $file = PIWIGO_ROOT . ltrim((string)$builder->imageRow((int)$args['read-only'])['path'], './');
+        chmod($file, 0444);
+        clearstatcache();
+        if (is_writable($file))
+        {
+            fail("could not make $file read-only");
+        }
+        echo json_encode(array('read_only' => true)), "\n";
+        exit(0);
+    }
+
+    if (isset($args['read-date']))
+    {
+        $file = PIWIGO_ROOT . ltrim((string)$builder->imageRow((int)$args['read-date'])['path'], './');
+        echo json_encode(FixtureBuilder::readDateTags($file)), "\n";
+        exit(0);
+    }
+
     if (isset($args['read-row']))
     {
         $row = $builder->imageRow((int)$args['read-row']);
-        echo json_encode(array('comment' => $row['comment'])), "\n";
+        echo json_encode(array(
+            'comment' => $row['comment'],
+            'date_creation' => $row['date_creation'],
+            'photoinfo_date_precision' => $row['photoinfo_date_precision'],
+            )), "\n";
         exit(0);
     }
 }

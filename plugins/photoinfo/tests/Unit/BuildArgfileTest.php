@@ -81,4 +81,62 @@ final class BuildArgfileTest extends TestCase
         $this->assertSame('XMP-' . PHOTOINFO_XMP_PREFIX . ':Info', PHOTOINFO_INFO_TAG);
         $this->assertMatchesRegularExpression('/^\s*Info\s*=>/m', $config);
     }
+
+    /**
+     * [HAPPY] A date save: charset, every caption slot, then the three date
+     * tags - and never EXIF DateTimeOriginal.
+     */
+    public function testADateSaveWritesTheCaptionAndTheThreeDateTags(): void
+    {
+        $lines = photoinfo_build_date_argfile('März 1965 | P', array('year' => 1965, 'month' => 3, 'day' => null), self::PREFIX);
+
+        $this->assertSame(
+            array(
+                '-charset',
+                'iptc=UTF8',
+                '-EXIF:ImageDescription=März 1965 | P',
+                '-IPTC:Caption-Abstract=März 1965 | P',
+                '-XMP-dc:Description=März 1965 | P',
+                '-XMP-photoshop:Headline=März 1965 | P',
+                '-XMP-tiff:ImageDescription=März 1965 | P',
+                '-XMP-photoshop:DateCreated=1965-03',
+                '-IPTC:DateCreated=1965:03:00',
+                '-XMP-pwginfo:DateEDTF=1965-03',
+            ),
+            $lines
+        );
+        $this->assertSame(array(), preg_grep('/DateTimeOriginal/i', $lines));
+    }
+
+    /** [BVA] No date deletes all three date tags. */
+    public function testNoDateDeletesTheDateTags(): void
+    {
+        $lines = photoinfo_build_date_argfile('', null, self::PREFIX);
+
+        $this->assertSame(
+            array('-XMP-photoshop:DateCreated=', '-IPTC:DateCreated=', '-XMP-pwginfo:DateEDTF='),
+            array_slice($lines, -3)
+        );
+    }
+
+    /** [NEG] A multi-line caption names its value file, never a line break on a line. */
+    public function testAMultiLineCaptionInADateSaveTravelsInAValueFile(): void
+    {
+        $lines = photoinfo_build_date_argfile("1965\nInfo\n\nP", array('year' => 1965, 'month' => null, 'day' => null), self::PREFIX);
+
+        foreach ($lines as $line)
+        {
+            $this->assertStringNotContainsString("\n", $line);
+        }
+        $this->assertContains('-XMP-dc:Description<=' . self::PREFIX . 'caption.txt', $lines);
+    }
+
+    /** [HAPPY] The config declares the EDTF tag the writer names. */
+    public function testTheConfigDeclaresTheDateTag(): void
+    {
+        $config = file_get_contents(PHOTOINFO_PATH . 'exiftool/pwginfo.config');
+
+        $this->assertSame('XMP-' . PHOTOINFO_XMP_PREFIX . ':DateEDTF', PHOTOINFO_DATE_EDTF_TAG);
+        $this->assertMatchesRegularExpression('/^\s*DateEDTF\s*=>/m', $config);
+    }
 }

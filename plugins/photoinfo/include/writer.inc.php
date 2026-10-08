@@ -8,42 +8,50 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
  */
 
 /**
- * provenance_caption_parts: puts the photo's info text first in the caption.
+ * provenance_caption_parts: puts the photo's date and info text first in the
+ * caption.
  *
- * Provenance's own write-back selects no comment column, so the text is read
- * here when the row does not carry it.
+ * Provenance's own write-back selects none of photoinfo's columns, so they are
+ * read here when the row does not carry them.
  *
  * @param array $blocks name => text
- * @param array $image the image row: id, and comment when the caller has it
+ * @param array $image the image row: id, and photoinfo_written_columns() when the caller has them
  * @return array
  */
 function photoinfo_caption_parts_handler($blocks, $image)
 {
-  if (array_key_exists('comment', $image))
-  {
-    $info = $image['comment'];
-  }
-  else
+  $columns = photoinfo_written_columns();
+
+  if (count(array_diff($columns, array_keys($image))) > 0)
   {
     $query = '
-SELECT comment
+SELECT '.implode(', ', $columns).'
   FROM '.IMAGES_TABLE.'
   WHERE id = '.(int)$image['id'].'
 ;';
     $row = pwg_db_fetch_assoc(pwg_query($query));
-    $info = empty($row) ? '' : $row['comment'];
+    // What the caller passed wins over what is stored.
+    $image = array_merge(empty($row) ? array_fill_keys($columns, null) : $row, $image);
   }
 
-  return photoinfo_caption_blocks($blocks, $info);
+  $date = photoinfo_date_from_row($image['date_creation'], $image['photoinfo_date_precision']);
+
+  return photoinfo_caption_blocks($blocks, $image['comment'], photoinfo_date_display($date));
 }
 
+/** What a file write sets beside the caption: the info text, or the date. */
+define('PHOTOINFO_WRITE_INFO', 'info');
+define('PHOTOINFO_WRITE_DATE', 'date');
+
 /**
- * Writes one photo's composed caption and its info text into its file.
+ * Writes one photo's composed caption into its file, with either its info text
+ * or its date beside it.
  *
- * @param array $image id, path, comment and provenance's photo columns
+ * @param array $image id, path, photoinfo_written_columns() and provenance's photo columns
+ * @param string $field PHOTOINFO_WRITE_INFO or PHOTOINFO_WRITE_DATE
  * @return array array('ok' => bool, 'message' => string)
  */
-function photoinfo_write_file($image)
+function photoinfo_write_file($image, $field)
 {
   if (!provenance_exiftool_available())
   {
@@ -69,14 +77,24 @@ function photoinfo_write_file($image)
 
   $operation_dir = provenance_operation_dir(provenance_operation_id());
   $value_prefix = $operation_dir.(int)$image['id'].'-';
-  $lines = photoinfo_build_argfile($caption, $info, $value_prefix);
+
+  if ($field == PHOTOINFO_WRITE_DATE)
+  {
+    $date = photoinfo_date_from_row($image['date_creation'], $image['photoinfo_date_precision']);
+    $lines = photoinfo_build_date_argfile($caption, $date, $value_prefix);
+    $values = provenance_caption_values(provenance_normalize_caption($caption));
+  }
+  else
+  {
+    $lines = photoinfo_build_argfile($caption, $info, $value_prefix);
+    $values = photoinfo_argfile_values($caption, $info);
+  }
 
   try
   {
     provenance_make_dir($operation_dir);
 
-    $value_files = provenance_argfile_value_files(photoinfo_argfile_values($caption, $info), $value_prefix);
-    foreach ($value_files as $path => $content)
+    foreach (provenance_argfile_value_files($values, $value_prefix) as $path => $content)
     {
       file_put_contents($path, $content);
     }

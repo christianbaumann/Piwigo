@@ -8,6 +8,8 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
  * suite loads beside this file.
  */
 
+include_once(PHOTOINFO_PATH.'include/date.inc.php');
+
 /** The plugin photoinfo writes through: its exiftool runner, lock and caption slots. */
 define('PHOTOINFO_REQUIRED_PLUGIN', 'provenance');
 
@@ -22,23 +24,68 @@ define('PHOTOINFO_XMP_NAMESPACE_URI', 'http://piwigo.org/ns/photoinfo/1.0/');
 /** The tag carrying the info text alone, so a rescan can read it back. */
 define('PHOTOINFO_INFO_TAG', 'XMP-'.PHOTOINFO_XMP_PREFIX.':Info');
 
+/** The tag carrying the date as EDTF, qualifier and range included. */
+define('PHOTOINFO_DATE_EDTF_TAG', 'XMP-'.PHOTOINFO_XMP_PREFIX.':DateEDTF');
+
+/** The standard slots for the start date, see photoinfo_date_xmp() and photoinfo_date_iptc(). */
+define('PHOTOINFO_DATE_XMP_TAG', 'XMP-photoshop:DateCreated');
+define('PHOTOINFO_DATE_IPTC_TAG', 'IPTC:DateCreated');
+
+/**
+ * The photo columns this plugin adds to images, as column name => SQL
+ * definition. date_creation (core) holds the start of the date; these carry
+ * what a DATETIME cannot. The qualifier and the range end are unused until
+ * qualifiers and ranges are edited.
+ *
+ * @return array
+ */
+function photoinfo_image_columns()
+{
+  $precisions = "ENUM('".implode("','", photoinfo_date_precisions())."')";
+
+  return array(
+    'photoinfo_date_qualifier' => "ENUM('circa','before','after','between') DEFAULT NULL",
+    'photoinfo_date_precision' => $precisions.' DEFAULT NULL',
+    'photoinfo_date_end' => 'DATE DEFAULT NULL',
+    'photoinfo_date_end_precision' => $precisions.' DEFAULT NULL',
+    );
+}
+
+/**
+ * The image columns a file write needs from photoinfo's side: the info text and
+ * the date.
+ *
+ * @return array
+ */
+function photoinfo_written_columns()
+{
+  return array('comment', 'date_creation', 'photoinfo_date_precision');
+}
+
 /** This plugin's block in the provenance_caption_parts filter. */
 define('PHOTOINFO_CAPTION_BLOCK', 'photoinfo');
 
 /**
- * Puts the info text in front of the caption's other blocks.
+ * Puts the readable date and the info text, in that order and one line apart,
+ * in front of the caption's other blocks.
  *
  * Without markup: every program reading the caption slots shows them as plain
  * text. The text as stored, markup included, goes into XMP-pwginfo:Info.
  *
  * @param array $blocks name => text, as the provenance_caption_parts filter passes them
  * @param string|null $info the photo's description
+ * @param string $date the date as photoinfo_date_display() gives it
  * @return array
  */
-function photoinfo_caption_blocks($blocks, $info)
+function photoinfo_caption_blocks($blocks, $info, $date = '')
 {
+  $lines = array_filter(
+    array(trim((string)$date), trim(strip_tags((string)$info))),
+    'strlen'
+    );
+
   return array_merge(
-    array(PHOTOINFO_CAPTION_BLOCK => trim(strip_tags((string)$info))),
+    array(PHOTOINFO_CAPTION_BLOCK => implode("\n", $lines)),
     array_diff_key($blocks, array(PHOTOINFO_CAPTION_BLOCK => true))
     );
 }
@@ -102,6 +149,31 @@ function photoinfo_build_argfile($caption, $info, $value_prefix)
   return $lines;
 }
 
+/**
+ * The argfile lines for one date save: the composed caption in provenance's
+ * five slots and the date in its three tags. Never EXIF DateTimeOriginal: on a
+ * scan that is the scan date, and it cannot say "1965".
+ *
+ * Every line is emitted even when its value is empty: clearing the date must
+ * delete it from the file too.
+ *
+ * @param string $caption the composed caption, date and info text first
+ * @param array|null $date
+ * @param string $value_prefix path prefix of the caption's value files
+ * @return array
+ */
+function photoinfo_build_date_argfile($caption, $date, $value_prefix)
+{
+  $lines = array('-charset', 'iptc=UTF8');
+  $lines = array_merge($lines,
+    provenance_caption_argfile_lines(provenance_normalize_caption($caption), $value_prefix));
+  $lines[] = '-'.PHOTOINFO_DATE_XMP_TAG.'='.photoinfo_date_xmp($date);
+  $lines[] = '-'.PHOTOINFO_DATE_IPTC_TAG.'='.photoinfo_date_iptc($date);
+  $lines[] = '-'.PHOTOINFO_DATE_EDTF_TAG.'='.photoinfo_date_edtf($date);
+
+  return $lines;
+}
+
 /*
  * ---------------------------------------------------------------------------
  * Template anchors the picture prefilter matches against, in
@@ -117,6 +189,13 @@ function photoinfo_build_argfile($caption, $info, $value_prefix)
  * (Template::prefilter_white_space) strips it before any plugin's runs.
  */
 define('PHOTOINFO_TPL_ROW_ANCHOR', "{if \$display_info.posted_on}");
+
+/**
+ * Core's "Created on" row, which the Datum row replaces. A pattern rather than
+ * a literal: its lines keep their indent after core's whitespace prefilter, and
+ * the empty {if} left around it renders nothing.
+ */
+define('PHOTOINFO_TPL_DATE_ROW_PATTERN', '~<div id="datecreate" class="imageInfo">.*?</div>\s*~s');
 
 /** Core's description above the photo, which the Info row replaces. */
 define('PHOTOINFO_TPL_COMMENT_BLOCK',

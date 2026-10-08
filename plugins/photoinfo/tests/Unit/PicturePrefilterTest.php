@@ -54,4 +54,23 @@ final class PicturePrefilterTest extends TestCase
     {
         $this->assertMatchesRegularExpression("/^\\{include file='\\/.+public_info\\.tpl'\\}$/", photoinfo_template_include('public_info.tpl'));
     }
+
+    /** [HAPPY] Core's "Created on" row occurs once, so the pattern removes exactly it. */
+    public function testCoreTemplateCarriesOneCreatedOnRow(): void
+    {
+        $this->assertSame(1, preg_match_all(PHOTOINFO_TPL_DATE_ROW_PATTERN, self::pictureTemplate()));
+    }
+
+    /** [HAPPY] The prefilter removes "Created on" and puts the Datum row ahead of the Info row. */
+    public function testThePrefilterReplacesTheCreatedOnRow(): void
+    {
+        $template = self::pictureTemplate();
+        $this->assertStringContainsString('id="datecreate"', $template, 'anti-vacuity: the core row is not there to remove');
+
+        $out = photoinfo_picture_prefilter($template);
+
+        $this->assertStringNotContainsString('id="datecreate"', $out);
+        $this->assertSame(1, substr_count($out,
+            photoinfo_template_include('public_date.tpl') . photoinfo_template_include('public_info.tpl') . PHOTOINFO_TPL_ROW_ANCHOR));
+    }
 }

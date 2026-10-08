@@ -55,4 +55,22 @@ final class CaptionBlocksTest extends TestCase
 
         $this->assertSame("neu\n\nP", provenance_join_caption_blocks($blocks));
     }
+
+    /** [HAPPY] The readable date leads photoinfo's block, the info text on the next line. */
+    public function testTheDateLeadsTheBlock(): void
+    {
+        $this->assertSame(
+            "14. März 1965\nHochzeit\n\nOwner: Anna",
+            provenance_join_caption_blocks(photoinfo_caption_blocks(array('provenance' => 'Owner: Anna'), 'Hochzeit', '14. März 1965'))
+        );
+    }
+
+    /** [ECP] A date with no info text: the date alone, ahead of provenance. */
+    public function testOnlyTheDate(): void
+    {
+        $this->assertSame(
+            "1965\n\nOwner: Anna",
+            provenance_join_caption_blocks(photoinfo_caption_blocks(array('provenance' => 'Owner: Anna'), '', '1965'))
+        );
+    }
 }

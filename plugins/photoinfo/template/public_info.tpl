@@ -1,3 +1,4 @@
+{if $PHOTOINFO.INFO}
 <div id="PhotoInfo" class="imageInfo">
 	<dt>{'Info'|@translate}</dt>
 	<dd>
@@ -18,3 +19,4 @@
 {/if}
 	</dd>
 </div>
+{/if}

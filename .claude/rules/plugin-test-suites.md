@@ -261,10 +261,12 @@ text is editable by administrators) and `photoinfo_normal`. It marks the install
 provenance: both suites need photoinfo **and** provenance active (`FixtureBuilder::assertPluginActive()`).
 `FixtureBuilder::createTestImage()` copies the first gallery PNG into `upload/photoinfo-test/`, never
 a real scan in place, and `FixtureBuilder::readFileTags()` reads the three caption slots and
-`XMP-pwginfo:Info` back with a plain exiftool call. The E2E specs run as the webmaster;
+`XMP-pwginfo:Info` back with a plain exiftool call, `readDateTags()` the date tags -
+`XMP-photoshop:DateCreated` out of the raw XMP packet, because exiftool prints an XMP date with
+colons. The E2E specs run as the webmaster;
 `auth.setup.js` saves all three sessions. `tests/e2e/support/seed.php --scenario=photo` creates a
-public album with one copied photo, `--read-file=<id>` and `--read-row=<id>` print the file's tags
-and the photo's `comment`, and `--restore` removes the album, the row, the file and exiftool's
+public album with one copied photo, `--read-file=<id>` and `--read-date=<id>` print the file's caption
+and date tags, `--read-row=<id>` the photo's `comment` and date columns, and `--restore` removes the album, the row, the file and exiftool's
 `_original` sidecar. Never point it at a production install. `PluginActivationTest` deactivates
 photoinfo and provenance for one case and reactivates both in `tearDown`; a run killed in between
 leaves them off, so reactivate them by hand.

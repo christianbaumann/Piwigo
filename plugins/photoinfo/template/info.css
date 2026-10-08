@@ -1,13 +1,17 @@
-#PhotoInfo [hidden] {
+#PhotoInfo [hidden],
+#PhotoDate [hidden] {
   display: none !important;
 }
 
-#photoinfo-info-view {
+#photoinfo-info-view,
+#photoinfo-date-view {
   cursor: pointer;
 }
 
 #photoinfo-info-view:hover,
-#photoinfo-info-view:focus {
+#photoinfo-info-view:focus,
+#photoinfo-date-view:hover,
+#photoinfo-date-view:focus {
   text-decoration: underline dotted;
 }
 

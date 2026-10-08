@@ -18,6 +18,9 @@ final class PicturePageSourceTest extends TestCase
     private const FORM = 'id="photoinfo-info-form"';
     private const CORE_DESCRIPTION = 'class="imageComment"';
     private const COMMENT = 'Die Taufe im Garten';
+    private const DATE_ROW = 'id="PhotoDate"';
+    private const DATE_FORM = 'id="photoinfo-date-form"';
+    private const CORE_DATE_ROW = 'id="datecreate"';
 
     private FixtureBuilder $fixture;
     private array $image;
@@ -132,6 +135,61 @@ final class PicturePageSourceTest extends TestCase
         $this->assertStringNotContainsString(self::COMMENT, $m[1]);
     }
 
+    /**
+     * [DT] Everyone sees the date in German in the Datum row, core's "Created
+     * on" row is gone, and only administrators get the editor.
+     */
+    #[DataProvider('allAccounts')]
+    public function testTheDateShowsInTheDatumRow(?string $role, bool $editable): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
+
+        $page = $this->pageAs($role);
+
+        $this->assertStringContainsString('März 1965', $this->dateRowOf($page));
+        $this->assertStringNotContainsString(self::CORE_DATE_ROW, $page);
+        $this->assertSame($editable ? 1 : 0, substr_count($page, self::DATE_FORM));
+    }
+
+    /** [HAPPY] A reader's date links to the calendar at the date's own precision. */
+    public function testTheDateLinksToTheCalendar(): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
+
+        $this->assertMatchesRegularExpression('~href="[^"]*created-monthly-list-1965-03"~', $this->dateRowOf($this->pageAs(null)));
+    }
+
+    /** [ECP] With no date, a reader gets no Datum row - and no core row either. */
+    #[DataProvider('readers')]
+    public function testNoDateNoRowForAReader(?string $role): void
+    {
+        $page = $this->pageAs($role);
+
+        $this->assertSame(0, substr_count($page, self::DATE_ROW));
+        $this->assertSame(0, substr_count($page, self::CORE_DATE_ROW));
+    }
+
+    /** [ECP] With no date, an administrator gets the row to add one, with empty controls. */
+    public function testNoDateStillARowForAnAdministrator(): void
+    {
+        $row = $this->dateRowOf($this->pageAs(TestUsers::ADMIN));
+
+        $this->assertSame(1, substr_count($row, self::DATE_FORM));
+        $this->assertMatchesRegularExpression('~<input type="text" name="year" inputmode="numeric"[^>]* value="">~', $row);
+    }
+
+    /** [HAPPY] The editor starts from the saved date. */
+    public function testTheEditorStartsFromTheSavedDate(): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-03-14 00:00:00', 'day');
+
+        $row = $this->dateRowOf($this->pageAs(TestUsers::ADMIN));
+
+        $this->assertMatchesRegularExpression('~<input type="text" name="year"[^>]* value="1965">~', $row);
+        $this->assertStringContainsString('<option value="3" selected>März</option>', $row);
+        $this->assertStringContainsString('data-day="14"', $row);
+    }
+
     private function pageAs(?string $role): string
     {
         $client = new WsClient();
@@ -156,6 +214,18 @@ final class PicturePageSourceTest extends TestCase
         $start = strpos($page, self::ROW);
         $end = strpos($page, 'id="datepost"', $start);
         $this->assertNotFalse($end, 'anti-vacuity: the Info row does not sit before the "Posted on" row');
+
+        return substr($page, $start, $end - $start);
+    }
+
+    /** The Datum row's markup, up to the next row. */
+    private function dateRowOf(string $page): string
+    {
+        $this->assertSame(1, substr_count($page, self::DATE_ROW), 'expected exactly one Datum row');
+
+        $start = strpos($page, self::DATE_ROW);
+        $end = strpos($page, 'id="datepost"', $start);
+        $this->assertNotFalse($end, 'anti-vacuity: the Datum row does not sit before the "Posted on" row');
 
         return substr($page, $start, $end - $start);
     }

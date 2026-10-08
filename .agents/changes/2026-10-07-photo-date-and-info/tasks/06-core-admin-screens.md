@@ -33,4 +33,5 @@ plugin columns and the image file, so no screen can make them disagree.
 * [ ] A date set for several photos in the Batch Manager reaches each photo's file
 * [ ] A description changed in the photo edit screen is first in each file caption
 * [ ] A photo with `ca. 1965` whose date is changed in core shows the new exact date, without `ca.`
+* [ ] A photo saved as `1965` (precision `year`) whose date is set to 14.03.1965 in core shows `14. März 1965`, not `1965`: until this task hooks core's save paths, the plugin's precision outlives a core edit and silently drops the day (found in task 03's review)
 * [ ] photoinfo and provenance suites pass twice in a row
