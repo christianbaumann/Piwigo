@@ -271,7 +271,8 @@ public album with one copied photo, `--read-file=<id>` and `--read-date=<id>` pr
 and date tags, `--read-row=<id>` the photo's `comment` and date columns, and `--restore` removes the album, the row, the file and exiftool's
 `_original` sidecar. Never point it at a production install. `PluginActivationTest` deactivates
 photoinfo and provenance for one case and reactivates both in `tearDown`; a run killed in between
-leaves them off, so reactivate them by hand.
+leaves them off, so reactivate them by hand. `CoreEditWithoutProvenanceTest` does the same with provenance alone,
+and `CoreEditTest` makes its own copied photos read-only for the failed-write cases.
 
 E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in a page object under `tests/e2e/support/` (`PicturePage.js`, `AlbumPropertiesPage.js`, `PhotoPropertiesPage.js`, `BatchManagerPage.js`) — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 

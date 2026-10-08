@@ -16,6 +16,8 @@ final class CoreEditTest extends TestCase
     private const CAPTION_SLOTS = array('XMP-dc:Description', 'IPTC:Caption-Abstract', 'EXIF:ImageDescription');
     /** A rendered admin page shorter than this is an error page or a redirect. */
     private const MIN_PAGE_BYTES = 2000;
+    /** The message a read-only file puts on an admin page. */
+    private const WRITE_FAILED = PHOTOINFO_ADMIN_ERROR_PREFIX . PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE;
 
     private Db $db;
     private FixtureBuilder $fixture;
@@ -206,6 +208,66 @@ final class CoreEditTest extends TestCase
         $this->assertNull(FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info'], 'the file was written');
     }
 
+    // ── a file that cannot be written ─────────────────────────────────────
+
+    /** [ERR] [NEG] The properties screen keeps the save and says the file was not written. */
+    public function testAFailedWriteShowsOnThePropertiesScreen(): void
+    {
+        $this->lockFile($this->image);
+
+        $body = $this->postProperties($this->image['id'], array('date_creation' => '1965-03-14'));
+
+        $this->assertSame(1, substr_count($body, self::WRITE_FAILED), 'the failed write was not reported once');
+        $this->assertExactDay($this->image, '1965-03-14 00:00:00');
+    }
+
+    /** [ERR] [NEG] The Batch Manager reports a failure that repeats for every photo once. */
+    public function testAFailedBatchWriteIsReportedOnce(): void
+    {
+        $other = $this->newPhoto();
+        $this->lockFile($this->image);
+        $this->lockFile($other);
+
+        $body = $this->postBatchDate(array($this->image['id'], $other['id']), array('date_creation' => '1965-03-14'));
+
+        $this->assertSame(1, substr_count($body, self::WRITE_FAILED), 'the failed write was not reported once');
+        $this->assertExactDay($other, '1965-03-14 00:00:00');
+    }
+
+    /** [ERR] [NEG] pwg.images.setInfo keeps the save and answers that the file was not written. */
+    public function testAFailedWriteShowsInTheSetInfoAnswer(): void
+    {
+        $this->lockFile($this->image);
+
+        $res = $this->setInfo(array('comment' => 'Am See'));
+
+        $this->assertFalse($res['json']['result']['written'], $res['body']);
+        $this->assertSame('Am See', $this->fixture->imageRow($this->image['id'])['comment']);
+    }
+
+    /**
+     * [ERR] core's setInfo can save the row and still answer an error (here: tag_list
+     * beside tag_ids); the date it saved still resets the qualifier and reaches the file.
+     */
+    public function testSetInfoSyncsADateCoreSavedBeforeAnsweringAnError(): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-01-01 00:00:00', 'year');
+        $this->fixture->setQualifier($this->image['id'], 'circa');
+
+        $res = $this->ws->call('pwg.images.setInfo', array(
+            'image_id' => $this->image['id'],
+            'date_creation' => '1965-03-14',
+            'single_value_mode' => 'replace',
+            'tag_ids' => '',
+            'tag_list' => array('x'),
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('fail', $res['json']['stat'] ?? null, 'anti-vacuity: core must answer an error: ' . $res['body']);
+        $this->assertExactDay($this->image, '1965-03-14 00:00:00');
+        $this->assertSame('1965-03-14', FixtureBuilder::readDateTags($this->image['file'])['XMP-pwginfo:DateEDTF']);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function newPhoto(): array
@@ -216,6 +278,12 @@ final class CoreEditTest extends TestCase
     }
 
     private function saveProperties(int $imageId, array $fields): void
+    {
+        $body = $this->postProperties($imageId, $fields);
+        $this->assertStringNotContainsString(self::WRITE_FAILED, $body, 'the file write failed');
+    }
+
+    private function postProperties(int $imageId, array $fields): string
     {
         $row = $this->fixture->imageRow($imageId);
         $body = $this->ws->postPage('/admin.php?page=photo-' . $imageId . '-properties', array_merge(array(
@@ -230,10 +298,16 @@ final class CoreEditTest extends TestCase
             ), $fields));
 
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body), 'the properties screen did not answer');
-        $this->assertStringNotContainsString('Photo Info:', $body, 'the file write failed');
+        return $body;
     }
 
     private function batchDate(array $ids, array $fields): void
+    {
+        $body = $this->postBatchDate($ids, $fields);
+        $this->assertStringNotContainsString(self::WRITE_FAILED, $body, 'a file write failed');
+    }
+
+    private function postBatchDate(array $ids, array $fields): string
     {
         $body = $this->ws->postPage('/admin.php?page=batch_manager&mode=global', array_merge(array(
             'pwg_token' => $this->ws->token(),
@@ -243,7 +317,15 @@ final class CoreEditTest extends TestCase
             ), $fields));
 
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body), 'the Batch Manager did not answer');
-        $this->assertStringNotContainsString('Photo Info:', $body, 'a file write failed');
+        return $body;
+    }
+
+    /** Makes the photo's file read-only, which photoinfo's writer refuses before running exiftool. */
+    private function lockFile(array $photo): void
+    {
+        chmod($photo['file'], 0444);
+        clearstatcache();
+        $this->assertFalse(is_writable($photo['file']), 'anti-vacuity: the file must be read-only');
     }
 
     private function setInfo(array $fields): array

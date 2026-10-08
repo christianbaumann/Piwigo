@@ -35,7 +35,7 @@ function photoinfo_picture_modify_before_update($data)
  */
 function photoinfo_picture_modify_after_save()
 {
-  global $photoinfo_core_edit_before, $page;
+  global $photoinfo_core_edit_before;
 
   if (empty($photoinfo_core_edit_before))
   {
@@ -51,7 +51,9 @@ function photoinfo_picture_modify_after_save()
 /**
  * element_set_global_action: after a Batch Manager action on a selection. Only
  * "Set creation date" concerns this plugin; it sets the date outright, so every
- * selected photo counts as changed.
+ * selected photo counts as changed. Every row is brought in line before the
+ * first file is written: exiftool takes a moment per photo, and a request that
+ * runs out of time must not leave a "ca." beside a date it no longer belongs to.
  *
  * @param string $action
  * @param array $collection image ids
@@ -63,9 +65,18 @@ function photoinfo_element_set_global_action($action, $collection)
     return;
   }
 
+  $to_write = array();
   foreach ($collection as $image_id)
   {
-    photoinfo_report_core_edit(photoinfo_apply_core_edit($image_id, null));
+    if (photoinfo_store_core_edit($image_id, null))
+    {
+      $to_write[] = $image_id;
+    }
+  }
+
+  foreach ($to_write as $image_id)
+  {
+    photoinfo_report_core_edit(photoinfo_write_core_edit($image_id));
   }
 }
 
@@ -109,13 +120,14 @@ function ws_photoinfo_images_setInfo($params, &$service)
   $before = photoinfo_core_edit_snapshot($params['image_id']);
 
   $result = ws_images_setInfo($params, $service);
-  if ($result instanceof PwgError or $before === null)
+  if ($before === null)
   {
     return $result;
   }
 
+  // Core can answer an error after it saved the row; what it saved is still synced.
   $written = photoinfo_apply_core_edit($before['id'], $before);
-  if ($written === null)
+  if ($written === null or $result instanceof PwgError)
   {
     return $result;
   }
@@ -154,36 +166,58 @@ SELECT id, date_creation, comment
  */
 function photoinfo_apply_core_edit($image_id, $before)
 {
+  if (!photoinfo_store_core_edit($image_id, $before))
+  {
+    return null;
+  }
+
+  return photoinfo_write_core_edit($image_id);
+}
+
+/**
+ * Stores the plugin's date columns after a core save. Needs nothing of
+ * provenance, so the columns follow core's date even while it is off.
+ *
+ * @param int $image_id
+ * @param array|null $before as for photoinfo_apply_core_edit()
+ * @return bool whether the file needs writing
+ */
+function photoinfo_store_core_edit($image_id, $before)
+{
+  $after = photoinfo_core_edit_snapshot($image_id);
+  if ($after === null)
+  {
+    return false;
+  }
+
+  $edit = photoinfo_core_edit($before, $after);
+  if ($edit['columns'] !== null)
+  {
+    photoinfo_update_image($image_id, $edit['columns']);
+  }
+
+  return $edit['write'];
+}
+
+/**
+ * Writes everything photoinfo keeps in one photo's file.
+ *
+ * @param int $image_id
+ * @return array array('ok' => bool, 'message' => string)
+ */
+function photoinfo_write_core_edit($image_id)
+{
   if (!defined('PROVENANCE_PATH'))
   {
     return array('ok' => false, 'message' => PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE);
   }
 
-  $image = photoinfo_image_row($image_id);
-  if ($image === null)
-  {
-    return null;
-  }
-
-  $edit = photoinfo_core_edit($before, $image);
-
-  if ($edit['columns'] !== null)
-  {
-    photoinfo_update_image($image['id'], $edit['columns']);
-    $image = array_merge($image, $edit['columns']);
-  }
-
-  if (!$edit['write'])
-  {
-    return null;
-  }
-
-  return photoinfo_write_file($image, PHOTOINFO_WRITE_ALL);
+  return photoinfo_write_file(photoinfo_image_row($image_id), PHOTOINFO_WRITE_ALL);
 }
 
 /**
- * Shows a failed file write on the admin page that caused it. The database
- * stays saved.
+ * Shows a failed file write on the admin page that caused it, once however many
+ * photos it failed for. The database stays saved.
  *
  * @param array|null $result
  */
@@ -191,8 +225,14 @@ function photoinfo_report_core_edit($result)
 {
   global $page;
 
-  if ($result !== null and !$result['ok'])
+  if ($result === null or $result['ok'])
   {
-    $page['errors'][] = 'Photo Info: '.$result['message'];
+    return;
+  }
+
+  $message = PHOTOINFO_ADMIN_ERROR_PREFIX.$result['message'];
+  if (!isset($page['errors']) or !in_array($message, $page['errors']))
+  {
+    $page['errors'][] = $message;
   }
 }

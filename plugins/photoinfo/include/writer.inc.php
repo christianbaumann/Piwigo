@@ -60,7 +60,7 @@ function photoinfo_write_file($image, $field)
   $file = provenance_image_file_path($image['path']);
   if (!is_file($file) or !is_writable($file))
   {
-    return array('ok' => false, 'message' => 'File is missing or not writable');
+    return array('ok' => false, 'message' => PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE);
   }
 
   load_language('plugin.lang', PROVENANCE_PATH);

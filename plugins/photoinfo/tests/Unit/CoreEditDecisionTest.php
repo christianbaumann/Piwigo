@@ -75,12 +75,28 @@ final class CoreEditDecisionTest extends TestCase
         $this->assertSame(array('columns' => $columns, 'write' => $write), photoinfo_core_edit($before, $after));
     }
 
-    /** [BVA] A changed time of day alone is a changed date. */
-    public function testAChangedTimeIsAChangedDate(): void
+    /**
+     * [BVA] A changed time of day alone is no change: photoinfo holds a date to
+     * the day at most, and core's date picker drops the seconds of a stored
+     * time, so every save of a camera photo would otherwise count as a new date.
+     */
+    public function testAChangedTimeOfDayIsNoChange(): void
+    {
+        $this->assertSame(
+            array('columns' => null, 'write' => false),
+            photoinfo_core_edit(
+                array('date_creation' => '1965-03-14 12:34:56', 'comment' => null),
+                array('date_creation' => '1965-03-14 12:34:00', 'comment' => null)
+            )
+        );
+    }
+
+    /** [BVA] The next day is a change. */
+    public function testTheNextDayIsAChange(): void
     {
         $edit = photoinfo_core_edit(
-            array('date_creation' => '1965-03-14 00:00:00', 'comment' => null),
-            array('date_creation' => '1965-03-14 00:00:01', 'comment' => null)
+            array('date_creation' => '1965-03-14 23:59:59', 'comment' => null),
+            array('date_creation' => '1965-03-15 00:00:00', 'comment' => null)
         );
 
         $this->assertSame(self::EXACT_DAY, $edit['columns']);

@@ -17,6 +17,12 @@ define('PHOTOINFO_REQUIRED_PLUGIN', 'provenance');
 define('PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE',
   'Photo Info requires the Provenance plugin: activate Provenance first.');
 
+/** Why a file write was refused before exiftool ran. */
+define('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE', 'File is missing or not writable');
+
+/** What a failed file write on one of core's admin screens is introduced with. */
+define('PHOTOINFO_ADMIN_ERROR_PREFIX', 'Photo Info: ');
+
 /** XMP namespace the writer declares. Must match exiftool/pwginfo.config. */
 define('PHOTOINFO_XMP_PREFIX', 'pwginfo');
 define('PHOTOINFO_XMP_NAMESPACE_URI', 'http://piwigo.org/ns/photoinfo/1.0/');
@@ -214,7 +220,9 @@ function photoinfo_date_argfile_lines($dating)
  * The file is written whenever the date or the description changed.
  *
  * A date posted unchanged is no change: those screens post every field on
- * every save, and a "ca. 1965" must survive a new title.
+ * every save, and a "ca. 1965" must survive a new title. Nor is a changed time
+ * of day: photoinfo holds a date to the day at most, and core's date picker
+ * posts a stored time back without its seconds.
  *
  * @param array|null $before date_creation and comment before the save; null
  *   when the save set the date outright (the Batch Manager's global action)
@@ -224,7 +232,8 @@ function photoinfo_date_argfile_lines($dating)
  */
 function photoinfo_core_edit($before, $after)
 {
-  $date_changed = ($before === null or $before['date_creation'] !== $after['date_creation']);
+  $date_changed = ($before === null
+    or photoinfo_date_day($before['date_creation']) !== photoinfo_date_day($after['date_creation']));
 
   $columns = null;
   if ($date_changed)
@@ -239,6 +248,15 @@ function photoinfo_core_edit($before, $after)
     'columns' => $columns,
     'write' => ($date_changed or $before['comment'] !== $after['comment']),
     );
+}
+
+/**
+ * @param string|null $date_creation
+ * @return string|null the day part, YYYY-MM-DD
+ */
+function photoinfo_date_day($date_creation)
+{
+  return $date_creation === null ? null : substr($date_creation, 0, 10);
 }
 
 /**
