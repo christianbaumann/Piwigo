@@ -51,6 +51,16 @@ class WsClient
         return $this->request($path, array(CURLOPT_FOLLOWLOCATION => true));
     }
 
+    /** POST a form to a gallery page with this client's session; returns the body. */
+    public function postPage(string $path, array $fields): string
+    {
+        return $this->request($path, array(
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+            CURLOPT_FOLLOWLOCATION => true,
+        ));
+    }
+
     public function login(string $username, string $password): void
     {
         $res = $this->call('pwg.session.login', array('username' => $username, 'password' => $password));

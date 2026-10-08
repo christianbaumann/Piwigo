@@ -177,57 +177,96 @@ function photoinfo_build_date_argfile($caption, $dating, $value_prefix)
 }
 
 /**
- * What a metadata sync may take from a file as the photo's date. The field
- * mapped to date_creation is dropped when the photo has a date set with
- * photoinfo, and when the file carries no camera metadata (Make or Model): on a
- * scan, the file's date is the scan date.
+ * What a metadata sync may take from a file as the photo's date. A photo with a
+ * date set with photoinfo gets that date back in the field mapped to
+ * date_creation, even when the file had none or PHP read nothing: the
+ * filesystem sync can write a missing value as NULL ("meta_empty_overrides").
+ * Without one, the file's date is dropped unless the file carries camera
+ * metadata (Make or Model): on a scan, the file's date is the scan date.
  *
  * @param array|null $exif what core read from the file; null when it read nothing
  * @param string|null $date_field the EXIF field mapped to date_creation
- * @param bool $has_photoinfo_date
+ * @param string|null $stored_date the photo's date_creation when photoinfo set it
  * @return array|null
  */
-function photoinfo_sync_exif($exif, $date_field, $has_photoinfo_date)
+function photoinfo_sync_exif($exif, $date_field, $stored_date)
 {
-  if (!is_array($exif) or $date_field === null or !array_key_exists($date_field, $exif))
+  if ($date_field === null)
   {
     return $exif;
   }
 
-  $has_camera = false;
+  if ($stored_date !== null)
+  {
+    $exif = is_array($exif) ? $exif : array();
+    $exif[$date_field] = $stored_date;
+    return $exif;
+  }
+
+  if (!is_array($exif) or !array_key_exists($date_field, $exif))
+  {
+    return $exif;
+  }
+
   foreach (array('Make', 'Model') as $tag)
   {
     if (isset($exif[$tag]) and trim((string)$exif[$tag]) !== '')
     {
-      $has_camera = true;
+      return $exif;
     }
   }
 
-  if ($has_photoinfo_date or !$has_camera)
-  {
-    unset($exif[$date_field]);
-  }
-
+  unset($exif[$date_field]);
   return $exif;
 }
 
 /**
- * The images.path of a file, as core stores it: relative to the gallery root,
- * with a leading "./".
+ * The images.path of a file as core's sync names it: the root prefix followed
+ * by the stored path. Plain string work, so a symlinked galleries/ or upload/
+ * cannot move the file out of the root.
  *
- * @param string|false $file the file's resolved path (realpath)
- * @param string $root the gallery root's resolved path
+ * @param string $file
+ * @param string $root PHPWG_ROOT_PATH
  * @return string|null null for a file outside the root
  */
 function photoinfo_image_path($file, $root)
 {
-  $root = rtrim($root, '/').'/';
-  if ($file === false or strpos($file, $root) !== 0)
+  if (strpos($file, $root) !== 0)
   {
     return null;
   }
 
-  return './'.substr($file, strlen($root));
+  $relative = substr($file, strlen($root));
+  while (strpos($relative, './') === 0)
+  {
+    $relative = substr($relative, 2);
+  }
+
+  if ($relative === '' or preg_match('~(^|/)\.\.(/|$)~', $relative))
+  {
+    return null;
+  }
+
+  return './'.$relative;
+}
+
+/**
+ * The original a representative file stands for: original_to_representative()
+ * puts it under pwg_representative/ beside the original, with the original's
+ * name and the representative's extension.
+ *
+ * @param string $path images.path form of the file core read
+ * @return array|null the original's path up to and including the dot before
+ *   its extension, and the representative_ext; null for no representative
+ */
+function photoinfo_representative_original($path)
+{
+  if (!preg_match('~^(.*/)pwg_representative/([^/]+\.)([^./]+)$~', $path, $m))
+  {
+    return null;
+  }
+
+  return array($m[1].$m[2], $m[3]);
 }
 
 /*

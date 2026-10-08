@@ -44,7 +44,7 @@ final class CoreMetadataSyncCharacterizationTest extends TestCase
         $this->ws->logout();
     }
 
-    /** [HAPPY] A JPEG's DateTimeOriginal becomes date_creation, time included. */
+    /** [ERR] [HAPPY] A JPEG's DateTimeOriginal becomes date_creation, time included. */
     public function testAJpegsDateTimeOriginalBecomesTheCreationDate(): void
     {
         $image = $this->fixture->createTestImageAs('jpg');
@@ -56,7 +56,7 @@ final class CoreMetadataSyncCharacterizationTest extends TestCase
         $this->assertSame(self::CAMERA_DATE_IN_ROW, $this->dateCreation($image['id']));
     }
 
-    /** [ST] A JPEG's DateTimeOriginal overwrites a date the row already holds. */
+    /** [ERR] [ST] A JPEG's DateTimeOriginal overwrites a date the row already holds. */
     public function testAJpegsDateTimeOriginalOverwritesAStoredDate(): void
     {
         $image = $this->fixture->createTestImageAs('jpg');
@@ -69,7 +69,7 @@ final class CoreMetadataSyncCharacterizationTest extends TestCase
     }
 
     /**
-     * [NEG] A JPEG without DateTimeOriginal leaves a stored date alone: the
+     * [ERR] [NEG] A JPEG without DateTimeOriginal leaves a stored date alone: the
      * missing value is skipped (MASS_UPDATES_SKIP_EMPTY), not written as NULL.
      */
     public function testAJpegWithoutADateKeepsTheStoredDate(): void
@@ -83,7 +83,7 @@ final class CoreMetadataSyncCharacterizationTest extends TestCase
         $this->assertSame(self::STORED_DATE, $this->dateCreation($image['id']));
     }
 
-    /** [NEG] The file's modification time is not a creation date: no EXIF date, no date. */
+    /** [ERR] [NEG] The file's modification time is not a creation date: no EXIF date, no date. */
     public function testTheFileTimeIsNeverUsed(): void
     {
         $image = $this->fixture->createTestImageAs('jpg');
@@ -96,7 +96,7 @@ final class CoreMetadataSyncCharacterizationTest extends TestCase
     }
 
     /**
-     * [ECP] PHP reads no EXIF from a PNG (exif_read_data() returns false, PHP
+     * [ERR] [ECP] PHP reads no EXIF from a PNG (exif_read_data() returns false, PHP
      * 8.4, measured 2026-10-08), so its DateTimeOriginal never reaches the row.
      */
     public function testAPngsDateTimeOriginalIsNotRead(): void

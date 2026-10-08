@@ -39,6 +39,7 @@ class FixtureBuilder
 
     private array $testImages = array();
     private array $testAlbums = array();
+    private array $physicalDirs = array();
 
     public function __construct(Db $db)
     {
@@ -196,6 +197,83 @@ class FixtureBuilder
         {
             throw new RuntimeException("the EXIF date tags were not written into $file as intended");
         }
+    }
+
+    /**
+     * Gives a fixture photo a representative file, as core's upload does for a
+     * HEIC (upload_file_heic()): a JPEG under pwg_representative/ beside it,
+     * named after it, with representative_ext set on the row.
+     *
+     * @return string the representative's absolute path
+     */
+    public function addRepresentative(array $image): string
+    {
+        $dir = dirname($image['file']) . '/pwg_representative/';
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+        $file = $dir . pathinfo($image['file'], PATHINFO_FILENAME) . '.jpg';
+        self::run('convert ' . escapeshellarg($image['file']) . ' ' . escapeshellarg($file) . ' 2>&1');
+
+        $this->db->query("UPDATE piwigo_images SET representative_ext = 'jpg' WHERE id = " . (int)$image['id']);
+        if ($this->imageRow($image['id'])['representative_ext'] !== 'jpg' or !is_file($file))
+        {
+            throw new RuntimeException("photo {$image['id']} did not get its representative");
+        }
+
+        return $file;
+    }
+
+    /**
+     * A photo of this suite's own in a physical album - a directory under
+     * galleries/ with its album row - which is what the filesystem sync
+     * (admin/site_update.php) reads. The file is a copy, never a real scan.
+     *
+     * @param string $extension 'png', or a format createTestImageAs() converts to
+     * @return array id, db_path, file, width, height, album (its id)
+     */
+    public function createPhysicalTestImage(string $extension): array
+    {
+        $image = $extension === 'png' ? $this->createTestImage() : $this->createTestImageAs($extension);
+
+        $siteId = (int)$this->db->scalar("SELECT id FROM piwigo_sites WHERE galleries_url = './galleries/'");
+        if ($siteId <= 0)
+        {
+            throw new RuntimeException('this install has no local site row to sync against');
+        }
+
+        $dirName = 'photoinfo-test-' . bin2hex(random_bytes(4));
+        $dir = PIWIGO_ROOT . 'galleries/' . $dirName . '/';
+        if (!mkdir($dir, 0755))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+        $this->physicalDirs[] = $dir;
+
+        $file = $dir . basename($image['file']);
+        if (!rename($image['file'], $file))
+        {
+            throw new RuntimeException("cannot move the fixture photo into $dir");
+        }
+
+        $albumId = $this->createTestAlbum($dirName);
+        $this->db->query("UPDATE piwigo_categories SET dir = '" . $this->db->escape($dirName) . "', site_id = $siteId WHERE id = $albumId");
+        $this->attachImage($image['id'], $albumId);
+
+        $dbPath = './galleries/' . $dirName . '/' . basename($file);
+        $this->db->query("UPDATE piwigo_images SET path = '" . $this->db->escape($dbPath) .
+            "', storage_category_id = $albumId WHERE id = " . (int)$image['id']);
+        $row = $this->imageRow($image['id']);
+        if ($row['path'] !== $dbPath or (int)$row['storage_category_id'] !== $albumId)
+        {
+            throw new RuntimeException("photo {$image['id']} was not moved into album $albumId");
+        }
+
+        array_pop($this->testImages);
+        $this->testImages[] = array_merge($image, array('db_path' => $dbPath, 'file' => $file, 'album' => $albumId));
+
+        return end($this->testImages);
     }
 
     /** Sets or clears (null) a photo's images.comment, asserting it took effect. */
@@ -484,6 +562,11 @@ class FixtureBuilder
             {
                 @unlink($leftover);
             }
+            foreach (glob(dirname($image['file']) . '/pwg_representative/' . pathinfo($image['file'], PATHINFO_FILENAME) . '.*') as $leftover)
+            {
+                @unlink($leftover);
+            }
+            @rmdir(dirname($image['file']) . '/pwg_representative');
 
             @unlink(PIWIGO_ROOT . self::PROVENANCE_LOCK_DIR . sha1($image['db_path']) . '.lock');
 
@@ -495,6 +578,12 @@ class FixtureBuilder
             }
         }
         $this->testImages = array();
+
+        foreach ($this->physicalDirs as $dir)
+        {
+            @rmdir($dir);
+        }
+        $this->physicalDirs = array();
     }
 
     /** Removes every album this fixture created. */

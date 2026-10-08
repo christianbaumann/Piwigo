@@ -94,6 +94,21 @@ final class SyncMetadataTest extends TestCase
         $this->assertSame('4. Mai 2019', $this->shown($image['id']));
     }
 
+    /**
+     * [ECP] A date photoinfo did not set - no precision stored, as core's own
+     * screens leave it - is not protected: a camera file's date replaces it.
+     */
+    public function testADateNotSetWithPhotoinfoIsReplacedByACameraDate(): void
+    {
+        $image = $this->fixture->createTestImageAs('jpg');
+        FixtureBuilder::writeExifDate($image['file'], self::CAMERA_DATE, true);
+        $this->fixture->setDate($image['id'], '2001-01-01 00:00:00', null);
+
+        $this->sync($image['id']);
+
+        $this->assertSame('2019-05-04 13:14:15', $this->fixture->imageRow($image['id'])['date_creation']);
+    }
+
     /** [NEG] Without any date in the file, the file's own time is not used either. */
     public function testTheFileTimeIsNeverUsed(): void
     {
@@ -128,6 +143,61 @@ final class SyncMetadataTest extends TestCase
         $this->sync($image['id']);
 
         $this->assertNull($this->fixture->imageRow($image['id'])['date_creation']);
+    }
+
+    /**
+     * [HAPPY] A HEIC uploaded under ImageMagick gets a JPEG representative that
+     * keeps the phone's Make, Model and date, and core reads EXIF from that
+     * representative. A photoinfo date still survives the sync.
+     */
+    public function testAPhotoinfoDateSurvivesASyncThatReadsTheRepresentative(): void
+    {
+        $image = $this->fixture->createTestImageAs('heic');
+        $representative = $this->fixture->addRepresentative($image);
+        FixtureBuilder::writeExifDate($representative, self::CAMERA_DATE, true);
+        $this->fixture->setDate($image['id'], '1965-01-01 00:00:00', 'year');
+
+        $this->sync($image['id']);
+
+        $this->assertSame('1965', $this->shown($image['id']));
+    }
+
+    public static function emptyOverrideFormats(): array
+    {
+        return array('JPEG with a camera date' => array('jpg', self::CAMERA_DATE), 'PNG' => array('png', null));
+    }
+
+    /**
+     * [HAPPY] The filesystem sync with "meta_empty_overrides" writes every value
+     * the file lacks as NULL (admin/site_update.php, mass_updates() without
+     * MASS_UPDATES_SKIP_EMPTY). A photoinfo date survives it whole - whether the
+     * file had a date of its own or PHP read nothing at all.
+     */
+    #[DataProvider('emptyOverrideFormats')]
+    public function testAPhotoinfoDateSurvivesASyncThatOverridesWithEmptyValues(string $extension, ?string $fileDate): void
+    {
+        $image = $this->fixture->createPhysicalTestImage($extension);
+        if ($fileDate !== null)
+        {
+            FixtureBuilder::writeExifDate($image['file'], $fileDate, true);
+        }
+        $this->fixture->setDate($image['id'], '1965-01-01 00:00:00', 'year');
+        $this->fixture->setQualifier($image['id'], 'between', '1970-01-01', 'year');
+        $before = $this->dateColumns($image['id']);
+        $this->assertNull($this->fixture->imageRow($image['id'])['date_metadata_update'], 'anti-vacuity: never synced');
+
+        $this->ws->postPage('/admin.php?page=site_update&site=1', array(
+            'sync' => 'metadata',
+            'cat' => $image['album'],
+            'sync_meta' => '1',
+            'meta_all' => '1',
+            'meta_empty_overrides' => '1',
+            'simulate' => '0',
+            'submit' => 'Submit',
+            ));
+
+        $this->assertNotNull($this->fixture->imageRow($image['id'])['date_metadata_update'], 'the filesystem sync did not run');
+        $this->assertSame($before, $this->dateColumns($image['id']));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────

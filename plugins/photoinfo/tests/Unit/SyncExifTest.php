@@ -13,11 +13,12 @@ final class SyncExifTest extends TestCase
 {
     private const FIELD = 'DateTimeOriginal';
     private const DATE = '2019:05:04 13:14:15';
+    private const STORED = '1965-03-01 00:00:00';
 
     /**
      * [DT] photoinfo date (yes/no) x camera metadata (Make, Model, both,
-     * neither): the file's date survives only without a photoinfo date and with
-     * camera metadata.
+     * neither): with a photoinfo date the field carries the stored date; without
+     * one, the file's date survives only with camera metadata.
      */
     public static function decisions(): array
     {
@@ -25,23 +26,25 @@ final class SyncExifTest extends TestCase
         $model = array('Model' => 'EOS 5D');
 
         return array(
-            'no photoinfo date, Make and Model' => array(false, $make + $model, true),
-            'no photoinfo date, Make only' => array(false, $make, true),
-            'no photoinfo date, Model only' => array(false, $model, true),
-            'no photoinfo date, neither' => array(false, array(), false),
-            'photoinfo date, Make and Model' => array(true, $make + $model, false),
-            'photoinfo date, neither' => array(true, array(), false),
+            'no photoinfo date, Make and Model' => array(null, $make + $model, self::DATE),
+            'no photoinfo date, Make only' => array(null, $make, self::DATE),
+            'no photoinfo date, Model only' => array(null, $model, self::DATE),
+            'no photoinfo date, neither' => array(null, array(), null),
+            'photoinfo date, Make and Model' => array(self::STORED, $make + $model, self::STORED),
+            'photoinfo date, Make only' => array(self::STORED, $make, self::STORED),
+            'photoinfo date, Model only' => array(self::STORED, $model, self::STORED),
+            'photoinfo date, neither' => array(self::STORED, array(), self::STORED),
             );
     }
 
     #[DataProvider('decisions')]
-    public function testTheFileDateIsKeptOnlyForACameraFileWithoutAPhotoinfoDate(bool $hasDate, array $camera, bool $kept): void
+    public function testTheFieldCarriesTheDateTheSyncMayWrite(?string $stored, array $camera, ?string $expected): void
     {
         $exif = $camera + array(self::FIELD => self::DATE, 'FileSize' => 1234);
 
-        $result = photoinfo_sync_exif($exif, self::FIELD, $hasDate);
+        $result = photoinfo_sync_exif($exif, self::FIELD, $stored);
 
-        $this->assertSame($kept, array_key_exists(self::FIELD, $result));
+        $this->assertSame($expected, $result[self::FIELD] ?? null);
         $this->assertSame(1234, $result['FileSize'], 'other EXIF fields are passed through');
     }
 
@@ -50,14 +53,25 @@ final class SyncExifTest extends TestCase
     {
         $exif = array('Make' => '', 'Model' => "  ", self::FIELD => self::DATE);
 
-        $this->assertArrayNotHasKey(self::FIELD, photoinfo_sync_exif($exif, self::FIELD, false));
+        $this->assertArrayNotHasKey(self::FIELD, photoinfo_sync_exif($exif, self::FIELD, null));
     }
 
-    /** [NEG] Nothing read from the file (a PNG, a HEIC) stays nothing. */
-    public function testNoExifIsPassedThrough(): void
+    /** [NEG] Nothing read from the file (a PNG, a HEIC) and no photoinfo date stays nothing. */
+    public function testNoExifAndNoPhotoinfoDateIsPassedThrough(): void
     {
-        $this->assertNull(photoinfo_sync_exif(null, self::FIELD, false));
-        $this->assertNull(photoinfo_sync_exif(null, self::FIELD, true));
+        $this->assertNull(photoinfo_sync_exif(null, self::FIELD, null));
+    }
+
+    /**
+     * [HAPPY] A photoinfo date is put into the field even when the file had none
+     * or PHP read nothing: a sync that writes missing values as NULL
+     * (site_update's "meta_empty_overrides") would otherwise clear it.
+     */
+    public function testAPhotoinfoDateIsSuppliedWhereTheFileHasNone(): void
+    {
+        $this->assertSame(array(self::FIELD => self::STORED), photoinfo_sync_exif(null, self::FIELD, self::STORED));
+        $this->assertSame(array('Make' => 'Canon', self::FIELD => self::STORED),
+            photoinfo_sync_exif(array('Make' => 'Canon'), self::FIELD, self::STORED));
     }
 
     /** [NEG] Without a date mapping there is nothing to protect. */
@@ -65,36 +79,56 @@ final class SyncExifTest extends TestCase
     {
         $exif = array(self::FIELD => self::DATE);
 
-        $this->assertSame($exif, photoinfo_sync_exif($exif, null, true));
+        $this->assertSame($exif, photoinfo_sync_exif($exif, null, self::STORED));
+        $this->assertNull(photoinfo_sync_exif(null, null, self::STORED));
     }
 
-    /** [ECP] The field mapped to date_creation is the one dropped, whatever it is named. */
-    public function testTheMappedFieldIsTheOneDropped(): void
+    /** [ECP] The field mapped to date_creation is the one set, whatever it is named. */
+    public function testTheMappedFieldIsTheOneSet(): void
     {
         $exif = array('DateTimeDigitized' => self::DATE, self::FIELD => self::DATE);
 
-        $result = photoinfo_sync_exif($exif, 'DateTimeDigitized', true);
+        $result = photoinfo_sync_exif($exif, 'DateTimeDigitized', self::STORED);
 
-        $this->assertArrayNotHasKey('DateTimeDigitized', $result);
+        $this->assertSame(self::STORED, $result['DateTimeDigitized']);
         $this->assertSame(self::DATE, $result[self::FIELD]);
     }
 
     public static function paths(): array
     {
-        // file (as the sync builds it), root => images.path
+        // file (as the sync builds it: root prefix + images.path), root prefix => images.path
         return array(
-            'root ./' => array('/var/www/html/upload/a/b.jpg', '/var/www/html', './upload/a/b.jpg'),
-            'root with slash' => array('/var/www/html/galleries/x.png', '/var/www/html/', './galleries/x.png'),
-            'outside the root' => array('/tmp/x.png', '/var/www/html', null),
-            'a sibling sharing the prefix' => array('/var/www/html2/x.png', '/var/www/html', null),
-            'no file' => array(false, '/var/www/html', null),
+            'admin and ws.php' => array('././upload/a/b.jpg', './', './upload/a/b.jpg'),
+            'path stored without ./' => array('./galleries/x.png', './', './galleries/x.png'),
+            'another root prefix' => array('../galleries/x.png', '../', './galleries/x.png'),
+            'outside the root' => array('/tmp/x.png', './', null),
+            'climbing out' => array('././upload/../../x.png', './', null),
             );
     }
 
-    /** [ECP] A file's resolved path maps to images.path relative to the gallery root. */
+    /** [ECP] A file name maps to its images.path without touching the filesystem, so a symlinked folder cannot defeat it. */
     #[DataProvider('paths')]
-    public function testAFileMapsToItsImagePath(string|false $file, string $root, ?string $expected): void
+    public function testAFileMapsToItsImagePath(string $file, string $root, ?string $expected): void
     {
         $this->assertSame($expected, photoinfo_image_path($file, $root));
+    }
+
+    public static function representatives(): array
+    {
+        // images.path of the file core read => original's path prefix and representative_ext, or null
+        return array(
+            'HEIC upload' => array('./upload/2026/10/08/x.jpg', null),
+            'its representative' => array('./upload/2026/10/08/pwg_representative/x.jpg',
+                array('./upload/2026/10/08/x.', 'jpg')),
+            'dots in the name' => array('./galleries/a/pwg_representative/v.1.png', array('./galleries/a/v.1.', 'png')),
+            'no extension' => array('./galleries/a/pwg_representative/x', null),
+            );
+    }
+
+    /** [ECP] A representative file (pwg_representative/, see original_to_representative()) points back at its original. */
+    #[DataProvider('representatives')]
+    public function testARepresentativeMapsToItsOriginal(string $path, ?array $expected): void
+    {
+        $this->assertSame($expected, photoinfo_representative_original($path));
     }
 }
