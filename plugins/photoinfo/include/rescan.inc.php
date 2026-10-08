@@ -34,28 +34,29 @@ function photoinfo_rescan_images($image_ids)
   }
 
   $query = '
-SELECT id, path
+SELECT id, path, date_creation
   FROM '.IMAGES_TABLE.'
   WHERE id IN ('.implode(',', array_map('intval', $image_ids)).')
 ;';
-  $paths = query2array($query, 'id', 'path');
+  $rows = query2array($query, 'id');
 
   foreach ($image_ids as $image_id)
   {
-    if (!isset($paths[$image_id]))
+    if (!isset($rows[$image_id]))
     {
       $failed[$image_id] = 'No such photo';
       continue;
     }
 
-    $tags = photoinfo_read_file_tags(provenance_image_file_path($paths[$image_id]));
+    $tags = photoinfo_read_file_tags(provenance_image_file_path($rows[$image_id]['path']));
     if (!is_array($tags))
     {
       $failed[$image_id] = $tags;
       continue;
     }
 
-    $outcome = photoinfo_rescan_columns($tags, $conf['allow_html_descriptions'], (int)date('Y'));
+    $outcome = photoinfo_rescan_columns($tags, $conf['allow_html_descriptions'], (int)date('Y'),
+      $rows[$image_id]['date_creation']);
     if (count($outcome['columns']) > 0)
     {
       photoinfo_update_image($image_id, $outcome['columns']);
@@ -111,6 +112,10 @@ function photoinfo_read_file_tags($file)
     $status = 1;
     exec($command.' > '.escapeshellarg($out_file).' 2>/dev/null', $lines, $status);
     $output = $status === 0 ? file_get_contents($out_file) : '';
+  }
+  catch (RuntimeException $e)
+  {
+    return $e->getMessage();
   }
   finally
   {

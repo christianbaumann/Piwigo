@@ -393,13 +393,17 @@ function photoinfo_parse_rescan_xml($xml)
  * What a rescan stores for one photo: the info text and the dating its file
  * carries. A tag the file does not carry leaves its column alone.
  *
+ * A date_creation already on the file's day stays as stored, time of day
+ * included, as on a save in core's screens (photoinfo_core_edit()).
+ *
  * @param array $tags photoinfo_parse_rescan_xml()'s answer
  * @param bool $allow_html $conf['allow_html_descriptions']
  * @param int $current_year
+ * @param string|null $stored_date the photo's date_creation
  * @return array array('columns' => column => value, 'error' => string|null);
  *   an unreadable date leaves the date columns out and says why
  */
-function photoinfo_rescan_columns($tags, $allow_html, $current_year)
+function photoinfo_rescan_columns($tags, $allow_html, $current_year, $stored_date = null)
 {
   $columns = array();
   $error = null;
@@ -418,7 +422,12 @@ function photoinfo_rescan_columns($tags, $allow_html, $current_year)
     $parsed = photoinfo_dating_from_edtf($tags['edtf'], $current_year);
     if ($parsed['error'] === null)
     {
-      $columns = array_merge($columns, photoinfo_dating_columns($parsed['dating']));
+      $dating_columns = photoinfo_dating_columns($parsed['dating']);
+      if (photoinfo_date_day($stored_date) === photoinfo_date_day($dating_columns['date_creation']))
+      {
+        unset($dating_columns['date_creation']);
+      }
+      $columns = array_merge($columns, $dating_columns);
     }
     else
     {

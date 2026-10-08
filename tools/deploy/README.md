@@ -2,9 +2,9 @@
 
 Uploads this Piwigo fork to a shared web space over FTPS — only the files the install needs,
 and only the ones that changed since the last run — then completes the remote install over
-HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of the four
-fork-local plugins, and a `site_update` scan that turns the uploaded `galleries/` tree into
-albums and photos.
+HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of four of the
+five fork-local plugins (photoedit stays inactive, see `.claude/rules/deployment.md`), and a
+`site_update` scan that turns the uploaded `galleries/` tree into albums and photos.
 
 > **The target is a sandbox instance.** This tool installs a gallery, overwrites a config file
 > and deletes remote paths. It is **never** safe to point at a production install. See

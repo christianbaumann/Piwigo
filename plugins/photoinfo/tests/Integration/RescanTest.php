@@ -12,6 +12,8 @@ use PHPUnit\Framework\TestCase;
 final class RescanTest extends TestCase
 {
     private const METHOD = 'pwg.photoinfo.rescan';
+    /** The config row provenance's runner takes the exiftool directory from. */
+    private const EXIFTOOL_PATH_PARAM = 'provenance_exiftool_path';
     private const INFO = "Hochzeit von Anna und Paul\nim Garten  \n<b>Wichtig</b>";
 
     private Db $db;
@@ -32,6 +34,7 @@ final class RescanTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->db->query("DELETE FROM piwigo_config WHERE param = '" . self::EXIFTOOL_PATH_PARAM . "'");
         $this->fixture->destroyTestImages();
     }
 
@@ -214,7 +217,51 @@ final class RescanTest extends TestCase
 
         $res = $this->ws->callGet(self::METHOD, array('image_ids' => (string)$this->image['id'], 'pwg_token' => $this->ws->token()));
 
-        $this->assertSame('fail', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame(405, $res['json']['err'] ?? null, $res['body']);
+        $this->assertNull($this->fixture->imageRow($this->image['id'])['date_creation']);
+    }
+
+    /** [ECP] A date already on the file's day keeps the time of day core or a camera stored. */
+    public function testADateOnTheSameDayKeepsItsTime(): void
+    {
+        $this->writeTags(array('DateEDTF' => '1987-06-21'));
+        $this->fixture->setDate($this->image['id'], '1987-06-21 14:30:00', null);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(1, $res['json']['result']['scanned'] ?? null, $res['body']);
+        $row = $this->fixture->imageRow($this->image['id']);
+        $this->assertSame('1987-06-21 14:30:00', $row['date_creation']);
+        $this->assertSame('day', $row['photoinfo_date_precision']);
+    }
+
+    /** [NEG] A photo whose file is gone is reported, and the next photo in the chunk is still read. */
+    public function testAMissingFileIsReportedAndTheRestRead(): void
+    {
+        $gone = $this->fixture->createTestImage();
+        unlink($gone['file']);
+        $this->writeTags(array('DateEDTF' => '1971'));
+
+        $res = $this->rescan($gone['id'] . ',' . $this->image['id']);
+
+        $this->assertSame(array('scanned' => 1, 'failed' => array($gone['id'] => 'File is missing or not readable')),
+            $res['json']['result'], $res['body']);
+        $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
+    }
+
+    /** [NEG] Without exiftool every photo of the chunk is reported, and none is changed. */
+    public function testWithoutExiftoolEveryPhotoIsReported(): void
+    {
+        $this->writeTags(array('DateEDTF' => '1971'));
+        $this->db->query("INSERT INTO piwigo_config (param, value) VALUES ('" . self::EXIFTOOL_PATH_PARAM
+            . "', '/nonexistent-photoinfo-test/')");
+        $this->assertSame('/nonexistent-photoinfo-test/', $this->db->scalar(
+            "SELECT value FROM piwigo_config WHERE param = '" . self::EXIFTOOL_PATH_PARAM . "'"), 'the config row was not written');
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(array('scanned' => 0, 'failed' => array($this->image['id'] => 'exiftool is not available on this server')),
+            $res['json']['result'], $res['body']);
         $this->assertNull($this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 

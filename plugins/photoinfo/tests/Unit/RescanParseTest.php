@@ -80,7 +80,7 @@ final class RescanParseTest extends TestCase
             . "<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>\n\n"
             . "<rdf:Description rdf:about='/tmp/t.png'\n"
             . "  xmlns:et='http://ns.exiftool.org/1.0/' et:toolkit='Image::ExifTool 13.25'\n"
-            . "  xmlns:XMP-pwginfo='http://ns.exiftool.org/XMP/XMP-pwginfo/1.0/'>\n"
+            . "  xmlns:XMP-pwginfo='" . PHOTOINFO_RDF_GROUP_URI . "'>\n"
             . $body
             . "</rdf:Description>\n</rdf:RDF>\n";
     }
@@ -187,5 +187,30 @@ final class RescanParseTest extends TestCase
         $this->assertSame(array('comment' => 'Taufe'), photoinfo_rescan_columns($tags, false, self::NOW)['columns']);
         $this->assertSame(array(), photoinfo_rescan_columns(array('info' => '<br>', 'edtf' => null), false, self::NOW)['columns'],
             'markup alone, stripped, is no text');
+    }
+
+    public static function storedDates(): array
+    {
+        // stored date_creation, EDTF in the file => whether date_creation is written
+        return array(
+            'same day, a time of day [ECP]' => array('1987-06-21 14:30:00', '1987-06-21', false),
+            'same start of a year [ECP]' => array('1965-01-01 09:00:00', '1965', false),
+            'the day after [BVA]' => array('1987-06-22 14:30:00', '1987-06-21', true),
+            'no date [ECP]' => array(null, '1987-06-21', true),
+            );
+    }
+
+    /**
+     * [ECP] A stored date on the file's day keeps its time of day: core's
+     * picker and a camera's EXIF store one, and photoinfo holds a day at most.
+     * The plugin's own columns are written either way.
+     */
+    #[DataProvider('storedDates')]
+    public function testAStoredDateOnTheSameDayKeepsItsTime(?string $stored, string $edtf, bool $written): void
+    {
+        $columns = photoinfo_rescan_columns(array('info' => null, 'edtf' => $edtf), true, self::NOW, $stored)['columns'];
+
+        $this->assertSame($written, array_key_exists('date_creation', $columns));
+        $this->assertArrayHasKey('photoinfo_date_precision', $columns);
     }
 }

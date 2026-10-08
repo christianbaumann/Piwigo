@@ -53,3 +53,19 @@ activates photoinfo, so the remote shows both fields although its database is ne
 | an unreadable date clears the date instead of reporting | `RescanParseTest::testAnUnreadableDateIsReportedAndTheInfoStillRestored` |
 | a tag read by position instead of by namespace | `RescanParseTest` XML tests (3) |
 | `trim()` on each parsed XML value | **survived**: unobservable, both consumers trim (`photoinfo_clean_info()`, `photoinfo_dating_from_edtf()`) |
+
+## Review (2026-10-08, /verify)
+
+A subagent reviewed the task's commit `4b7374f97`. These findings were fixed:
+
+* **The rescan reset the time of day** in `date_creation` to `00:00:00`, even when the day already matched (a date from core's picker or a camera's EXIF). It now leaves `date_creation` alone when the stored value falls on the file's day, the same rule as `photoinfo_core_edit()`. The test was written first and failed for that reason: `RescanParseTest::testAStoredDateOnTheSameDayKeepsItsTime`, `RescanTest::testADateOnTheSameDayKeepsItsTime`.
+* **A scratch directory that could not be created aborted the whole chunk.** `photoinfo_read_file_tags()` now catches the `RuntimeException` and reports it against that one photo. No test covers this: `_data/provenance/args/` cannot be made uncreatable without breaking provenance's other writers mid-run.
+* **Failure branches without a test** now have one: a missing file (`testAMissingFileIsReportedAndTheRestRead`) and exiftool unavailable, through a `provenance_exiftool_path` config row (`testWithoutExiftoolEveryPhotoIsReported`). Still untested: exiftool exiting non-zero on a readable file, and exiftool output that is not XML. Neither can be provoked without a fake binary.
+* The GET test asserts core's `post_only` code `405`, not just `fail`.
+* The unit fixture builds its namespace from `PHOTOINFO_RDF_GROUP_URI` instead of a second copy of the URI.
+* `exiftool/pwginfo.config`'s header no longer says the config is needed only for writing.
+* `tools/deploy/README.md`: "four of the five fork-local plugins (photoedit stays inactive)".
+
+Deferred to task 08: `.claude/rules/deployment.md` lines on rebuilding the remote name only `pwg.persons.rescan` (task 08: "deployment.md: rescan after deploy").
+
+After the fixes: unit 216, integration 119, `tools/deploy` pytest 437 passed.
