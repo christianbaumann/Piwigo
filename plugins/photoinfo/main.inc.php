@@ -41,6 +41,17 @@ add_event_handler('provenance_caption_parts', 'photoinfo_caption_parts_handler',
 add_event_handler('format_exif_data', 'photoinfo_format_exif_data',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_sync.inc.php');
 
+// A date or description saved in one of core's screens reaches the plugin's
+// columns and the file. pwg.images.setInfo is wrapped after core registers it.
+add_event_handler('picture_modify_before_update', 'photoinfo_picture_modify_before_update',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
+add_event_handler('loc_end_picture_modify', 'photoinfo_picture_modify_after_save',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
+add_event_handler('element_set_global_action', 'photoinfo_element_set_global_action',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
+add_event_handler('ws_add_methods', 'photoinfo_wrap_core_methods',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
+
 // The Datum and Info rows. Registered only on the picture page, and the file behind it is
 // pulled in only when the event actually fires.
 if (script_basename() == 'picture')

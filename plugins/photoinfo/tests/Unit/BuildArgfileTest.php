@@ -154,6 +154,43 @@ final class BuildArgfileTest extends TestCase
         $this->assertContains('-XMP-dc:Description<=' . self::PREFIX . 'caption.txt', $lines);
     }
 
+    /**
+     * [HAPPY] A save from one of core's screens writes everything: caption,
+     * the info text alone, then the three date tags.
+     */
+    public function testAFullSaveWritesCaptionInfoAndDate(): void
+    {
+        $this->assertSame(
+            array(
+                '-charset',
+                'iptc=UTF8',
+                '-EXIF:ImageDescription=14. März 1965 | Am See',
+                '-IPTC:Caption-Abstract=14. März 1965 | Am See',
+                '-XMP-dc:Description=14. März 1965 | Am See',
+                '-XMP-photoshop:Headline=14. März 1965 | Am See',
+                '-XMP-tiff:ImageDescription=14. März 1965 | Am See',
+                '-XMP-pwginfo:Info=Am See',
+                '-XMP-photoshop:DateCreated=1965-03-14',
+                '-IPTC:DateCreated=1965:03:14',
+                '-XMP-pwginfo:DateEDTF=1965-03-14',
+            ),
+            photoinfo_build_full_argfile('14. März 1965 | Am See', 'Am See',
+                self::dating(array('year' => 1965, 'month' => 3, 'day' => 14)), self::PREFIX)
+        );
+    }
+
+    /** [BVA] A full save with no date and no text deletes every tag it names. */
+    public function testAnEmptyFullSaveDeletesEveryTag(): void
+    {
+        $lines = photoinfo_build_full_argfile('', '', null, self::PREFIX);
+
+        $this->assertCount(11, $lines);
+        foreach (array_slice($lines, 2) as $line)
+        {
+            $this->assertMatchesRegularExpression('/^-[\w:-]+=$/', $line);
+        }
+    }
+
     /** [HAPPY] The config declares the EDTF tag the writer names. */
     public function testTheConfigDeclaresTheDateTag(): void
     {

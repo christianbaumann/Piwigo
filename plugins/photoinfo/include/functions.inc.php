@@ -164,16 +164,81 @@ function photoinfo_build_argfile($caption, $info, $value_prefix)
  */
 function photoinfo_build_date_argfile($caption, $dating, $value_prefix)
 {
-  $start = $dating === null ? null : $dating['start'];
-
   $lines = array('-charset', 'iptc=UTF8');
   $lines = array_merge($lines,
     provenance_caption_argfile_lines(provenance_normalize_caption($caption), $value_prefix));
-  $lines[] = '-'.PHOTOINFO_DATE_XMP_TAG.'='.photoinfo_date_xmp($start);
-  $lines[] = '-'.PHOTOINFO_DATE_IPTC_TAG.'='.photoinfo_date_iptc($start);
-  $lines[] = '-'.PHOTOINFO_DATE_EDTF_TAG.'='.photoinfo_dating_edtf($dating);
 
-  return $lines;
+  return array_merge($lines, photoinfo_date_argfile_lines($dating));
+}
+
+/**
+ * The argfile lines for a save that writes everything photoinfo keeps in a
+ * file: the composed caption, the info text alone and the date's three tags.
+ * A save in one of core's screens takes this, as it can change both fields.
+ *
+ * @param string $caption the composed caption, date and info text first
+ * @param string $info the info text alone
+ * @param array|null $dating
+ * @param string $value_prefix path prefix of the value files
+ * @return array
+ */
+function photoinfo_build_full_argfile($caption, $info, $dating, $value_prefix)
+{
+  return array_merge(photoinfo_build_argfile($caption, $info, $value_prefix),
+    photoinfo_date_argfile_lines($dating));
+}
+
+/**
+ * The date's three tags: the start in the two DateCreated slots, the whole
+ * dating as EDTF. An empty value deletes the tag.
+ *
+ * @param array|null $dating
+ * @return array
+ */
+function photoinfo_date_argfile_lines($dating)
+{
+  $start = $dating === null ? null : $dating['start'];
+
+  return array(
+    '-'.PHOTOINFO_DATE_XMP_TAG.'='.photoinfo_date_xmp($start),
+    '-'.PHOTOINFO_DATE_IPTC_TAG.'='.photoinfo_date_iptc($start),
+    '-'.PHOTOINFO_DATE_EDTF_TAG.'='.photoinfo_dating_edtf($dating),
+    );
+}
+
+/**
+ * What a save in one of core's screens - the photo properties screen, the
+ * Batch Manager - changes on photoinfo's side. A date changed there is exact to
+ * the day, so the plugin's precision, qualifier and range end are reset; a
+ * removed date clears them (design, "Core admin screens set an exact date").
+ * The file is written whenever the date or the description changed.
+ *
+ * A date posted unchanged is no change: those screens post every field on
+ * every save, and a "ca. 1965" must survive a new title.
+ *
+ * @param array|null $before date_creation and comment before the save; null
+ *   when the save set the date outright (the Batch Manager's global action)
+ * @param array $after date_creation and comment after the save
+ * @return array 'columns' => the plugin's date columns to store, or null for
+ *   no date change; 'write' => bool
+ */
+function photoinfo_core_edit($before, $after)
+{
+  $date_changed = ($before === null or $before['date_creation'] !== $after['date_creation']);
+
+  $columns = null;
+  if ($date_changed)
+  {
+    // Without a precision, a date_creation reads as an exact day.
+    $columns = photoinfo_dating_columns(photoinfo_dating_from_row(array('date_creation' => $after['date_creation'])));
+    // Core's value stays as core stored it, time of day included.
+    unset($columns['date_creation']);
+  }
+
+  return array(
+    'columns' => $columns,
+    'write' => ($date_changed or $before['comment'] !== $after['comment']),
+    );
 }
 
 /**

@@ -92,18 +92,7 @@ function ws_photoinfo_setDate($params, &$service)
   $dating = $input['dating'];
 
   $columns = photoinfo_dating_columns($dating);
-  $set = array();
-  foreach ($columns as $column => $value)
-  {
-    $set[] = $column.' = '.($value === null ? 'NULL' : '\''.pwg_db_real_escape_string($value).'\'');
-  }
-
-  $query = '
-UPDATE '.IMAGES_TABLE.'
-  SET '.implode(",\n      ", $set).'
-  WHERE id = '.(int)$image['id'].'
-;';
-  pwg_query($query);
+  photoinfo_update_image($image['id'], $columns);
 
   pwg_activity('photo', $image['id'], 'edit');
 
@@ -137,16 +126,8 @@ function photoinfo_ws_image($params)
     return new PwgError(500, PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE);
   }
 
-  $columns = array_merge(array('id', 'path'), photoinfo_written_columns(), array_keys(provenance_image_columns()));
-
-  $query = '
-SELECT '.implode(', ', $columns).'
-  FROM '.IMAGES_TABLE.'
-  WHERE id = '.(int)$params['image_id'].'
-;';
-  $image = pwg_db_fetch_assoc(pwg_query($query));
-
-  if (empty($image))
+  $image = photoinfo_image_row($params['image_id']);
+  if ($image === null)
   {
     return new PwgError(404, 'Invalid image_id');
   }
