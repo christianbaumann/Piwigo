@@ -273,6 +273,11 @@ and date tags, `--read-row=<id>` the photo's `comment` and date columns, and `--
 photoinfo and provenance for one case and reactivates both in `tearDown`; a run killed in between
 leaves them off, so reactivate them by hand. `CoreEditWithoutProvenanceTest` does the same with provenance alone,
 and `CoreEditTest` makes its own copied photos read-only for the failed-write cases.
+`RescanTest` writes a `provenance_exiftool_path` config row pointing at no binary for its
+exiftool-missing case and deletes it in `tearDown`; a killed run leaves every exiftool write in the
+install failing until that row is deleted. `SyncMetadataTest` runs core's metadata sync, but only over
+its own copied photos: `pwg.images.syncMetadata` with their ids, and `admin.php?page=site_update`
+limited to the fixture's album (`cat`), never the whole gallery.
 
 E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in a page object under `tests/e2e/support/` (`PicturePage.js`, `AlbumPropertiesPage.js`, `PhotoPropertiesPage.js`, `BatchManagerPage.js`) — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 

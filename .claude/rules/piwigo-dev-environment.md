@@ -23,8 +23,9 @@ The provenance plugin keeps its own scratch space under `_data/`, defined once i
   nothing from the second writer onwards.
 - `_data/provenance/args/<operation id>/` — the exiftool argfiles of one write-back operation, or
   of one `plugins/photoinfo` save, plus the value files a multi-line caption or info text travels
-  in (`<image id>-caption.txt`, `-caption-iptc.txt`, `-info.txt`; decision 0038)
-  (`provenance_operation_dir()`), removed whole in a `finally`, so a crashed run leaves at most
+  in (`<image id>-caption.txt`, `-caption-iptc.txt`, `-info.txt`; decision 0038), or the
+  `rescan.xml` one photo's `pwg.photoinfo.rescan` read lands in (`exec()` would drop each line's
+  trailing whitespace) (`provenance_operation_dir()`), removed whole in a `finally`, so a crashed run leaves at most
   one directory behind instead of orphan files nobody can attribute.
 
 Both are created on demand and are safe to delete when nothing is writing. They are covered by

@@ -21,8 +21,9 @@
  * rectangle a screenshot drags over cannot drift apart.
  *
  * It signs in with the persons suite's test accounts, never a human's: the
- * webmaster for the administration screens and for the photoedit button, which
- * only a webmaster gets, persons_normal for the rest of the public
+ * webmaster for the administration screens, for the photoedit button, which
+ * only a webmaster gets, and for the photoinfo editors, which only an
+ * administrator gets, persons_normal for the rest of the public
  * page, because the overlay and the tag badges are shown to any logged-in
  * non-guest and shooting them as an administrator would hide a permission
  * mistake.
@@ -214,6 +215,52 @@ async function assertNoForeignPhoto(locator, imageDir, file) {
   if (found.length > 0) {
     framesHoldingAPhoto += 1;
   }
+}
+
+/**
+ * Writes the area spanning several neighbouring elements to disk.
+ *
+ * For rows that only make sense side by side but have no element of their own
+ * around them. The clip is the rectangle around their boxes, which would also
+ * take in whatever lies between or over them, so every element it touches must
+ * be one of the rows, inside one, or a container of them; each row then passes
+ * the same foreign-photo check as shoot().
+ */
+async function shootSpan(page, locators, file, imageDir) {
+  const boxes = [];
+  for (const locator of locators) {
+    await locator.waitFor({ state: 'visible', timeout: ELEMENT_TIMEOUT });
+    await locator.scrollIntoViewIfNeeded();
+    await assertNoForeignPhoto(locator, imageDir, file);
+  }
+  for (const locator of locators) {
+    boxes.push(await locator.boundingBox());
+  }
+  const left = Math.min(...boxes.map((b) => b.x));
+  const top = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.height));
+  const clip = { x: left, y: top, width: right - left, height: bottom - top };
+  const handles = [];
+  for (const locator of locators) {
+    handles.push(await locator.elementHandle());
+  }
+  const intruders = await page.evaluate(({ clip, rows }) => {
+    const touches = (r) => r.width > 0 && r.height > 0
+      && r.left < clip.x + clip.width && r.right > clip.x
+      && r.top < clip.y + clip.height && r.bottom > clip.y;
+    const belongs = (el) => rows.some((row) => row.contains(el) || el.contains(row));
+    return Array.from(document.querySelectorAll('body *'))
+      .filter((el) => touches(el.getBoundingClientRect()) && !belongs(el))
+      .map((el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : ''));
+  }, { clip, rows: handles });
+  if (intruders.length > 0) {
+    throw new Error(`the span also takes in ${intruders.join(', ')}`);
+  }
+  await page.screenshot({
+    path: path.join(OUT_DIR, file),
+    clip,
+  });
 }
 
 /**
@@ -681,6 +728,48 @@ const SHOTS = [
       // the demo photo's file rewritten.
       await shoot(page.locator('#content'), this.file, demo.image_dir);
       await page.click('#photoedit-cancel');
+    },
+  },
+  {
+    file: '23-datum-info.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      await open(page, demo.photos.sommerfest.picture_path);
+      await page.waitForSelector('#photoinfo-date-view', { state: 'visible', timeout: ELEMENT_TIMEOUT });
+      await shootSpan(page, [page.locator('#PhotoDate'), page.locator('#PhotoInfo')], this.file, demo.image_dir);
+    },
+  },
+  {
+    file: '24-datum-zeitraum.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      // A photo with no date yet, so the editor shows only what the shot types.
+      await open(page, demo.photos.rathaus.picture_path);
+      await page.click('#photoinfo-date-view');
+      await page.fill('#photoinfo-date-form input[name=year]', '1955');
+      await page.selectOption('#photoinfo-date-form select[name=qualifier]', 'between');
+      await page.waitForSelector('#photoinfo-date-form .photoinfo-date-end', {
+        state: 'visible',
+        timeout: ELEMENT_TIMEOUT,
+      });
+      await page.fill('#photoinfo-date-form input[name=end_year]', '1960');
+      await page.mouse.move(0, 0);
+      await shoot(page.locator('#PhotoDate'), this.file, demo.image_dir);
+      // Cancelled, not saved: the handbook shows the editor, it does not need
+      // the demo photo's file rewritten.
+      await page.click('#photoinfo-date-form .photoinfo-cancel');
+    },
+  },
+  {
+    file: '25-info-bearbeiten.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      await open(page, demo.photos.sommerfest.picture_path);
+      await page.click('#photoinfo-info-view');
+      await page.waitForSelector('#photoinfo-info-form textarea', { state: 'visible', timeout: ELEMENT_TIMEOUT });
+      await page.mouse.move(0, 0);
+      await shoot(page.locator('#PhotoInfo'), this.file, demo.image_dir);
+      await page.click('#photoinfo-info-form .photoinfo-cancel');
     },
   },
 ];

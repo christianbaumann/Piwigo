@@ -37,10 +37,14 @@
   <li>
     <strong>Aufnahmedatum</strong>: wann das Foto entstanden ist, nicht wann es hochgeladen
     wurde. Ein Klick auf das Feld öffnet einen Kalender.
-    <strong>Einstellung löschen</strong> darunter leert das Datum wieder.
+    <strong>Einstellung löschen</strong> darunter leert das Datum wieder. Ein hier gesetztes
+    Datum gilt immer als genauer Tag. Wer nur das Jahr kennt oder ein ungefähres Datum
+    eintragen will, benutzt das Feld <strong>Datum</strong> auf der Fotoseite, siehe unten,
+    <strong>Datum und Info auf der Fotoseite</strong>.
   </li>
   <li>
-    <strong>Beschreibung</strong>: freier Text zum Foto.
+    <strong>Beschreibung</strong>: freier Text zum Foto. Auf der Fotoseite heißt derselbe Text
+    <strong>Info</strong>.
   </li>
 </ul>
 
@@ -133,21 +137,137 @@
   <strong>Herkunft gespeichert</strong>.
 </p>
 
+<h3>Datum und Info auf der Fotoseite</h3>
+
+<p>
+  Datum und Beschreibung lassen sich auch direkt auf der öffentlichen Fotoseite bearbeiten,
+  rechts in den Angaben unter <strong>Datum</strong> und <strong>Info</strong>. Das ist
+  Administratoren vorbehalten. Alle anderen, auch angemeldete Benutzer, können beide Angaben nur
+  lesen, und sehen sie nur dann, wenn sie ausgefüllt sind.
+</p>
+
+<figure>
+  <img src="assets/screenshots/23-datum-info.png" alt="Die Angaben Datum und Info auf der Fotoseite" />
+  <figcaption>Datum und Info auf der Fotoseite, so wie sie ohne Bearbeitung erscheinen.</figcaption>
+</figure>
+
+<p>
+  Ein Klick auf das Datum oder den Text öffnet das Bearbeitungsfeld. Fehlt eine Angabe noch,
+  steht dort <em>Klicken, um ein Datum hinzuzufügen</em> oder
+  <em>Klicken, um eine Beschreibung hinzuzufügen</em>. Jede der beiden Angaben wird für sich
+  gespeichert. <strong>Abbrechen</strong> schließt das Feld, ohne etwas zu ändern.
+</p>
+
+<h3>Ein Datum auf der Fotoseite eintragen</h3>
+
+<p>
+  Bei alten Fotos ist der genaue Tag oft unbekannt. Das Datum kann deshalb nur aus einem Jahr
+  bestehen, aus Monat und Jahr oder aus einem genauen Tag.
+</p>
+
+<ol>
+  <li>Auf das Datum klicken. Es erscheinen ein Auswahlfeld, ein Feld für das Jahr und zwei
+    Auswahlfelder für Monat und Tag.</li>
+  <li>Das Jahr vierstellig eintragen, zum Beispiel <em>1965</em>. Erlaubt sind Jahre von 1800
+    bis zum laufenden Jahr.</li>
+  <li>Ist der Monat bekannt, ihn auswählen. Erst danach lässt sich auch der Tag wählen. Bleibt
+    beim Monat oder Tag der Strich stehen, gilt er als unbekannt.</li>
+  <li>Auf <strong>Speichern</strong> klicken. Die Seite lädt neu und zeigt das Datum, je nach
+    Angabe als <em>1965</em>, <em>März 1965</em> oder <em>14. März 1965</em>.</li>
+</ol>
+
+<p>
+  Das erste Auswahlfeld vor dem Jahr gibt dem Datum einen Zusatz. Es lässt sich erst wählen,
+  wenn ein Jahr eingetragen ist:
+</p>
+
+<ul>
+  <li><strong>ca.</strong>: ungefähr, angezeigt als <em>ca. 1965</em>.</li>
+  <li><strong>vor</strong>: vor diesem Datum entstanden, angezeigt als <em>vor 1965</em>.</li>
+  <li><strong>nach</strong>: nach diesem Datum entstanden, angezeigt als
+    <em>nach März 1965</em>.</li>
+  <li><strong>zwischen</strong>: in einem Zeitraum entstanden. Darunter erscheint eine zweite
+    Zeile, die mit <strong>bis</strong> beginnt, mit Jahr, Monat und Tag für das Ende. Das Ende
+    darf nicht vor dem Anfang liegen. Angezeigt werden beide Angaben mit einem Strich
+    dazwischen.</li>
+</ul>
+
+<p>
+  Bleibt der Strich im ersten Auswahlfeld stehen, gilt das Datum als genau.
+</p>
+
+<figure>
+  <img src="assets/screenshots/24-datum-zeitraum.png" alt="Das geöffnete Datumsfeld mit dem Zusatz zwischen, Anfang 1955 und Ende 1960" />
+  <figcaption>Ein Zeitraum: zwischen 1955 und 1960, Monat und Tag unbekannt.</figcaption>
+</figure>
+
+<p>
+  Um ein Datum zu entfernen, das Jahr im Bearbeitungsfeld löschen und auf
+  <strong>Speichern</strong> klicken. Die übrigen Felder spielen dann keine Rolle.
+</p>
+
+<h3>Die Info auf der Fotoseite eintragen</h3>
+
+<ol>
+  <li>Auf den Text unter <strong>Info</strong> klicken. Er erscheint in einem Textfeld.</li>
+  <li>Den Text ändern oder neu schreiben. Zeilenumbrüche bleiben erhalten.</li>
+  <li>Auf <strong>Speichern</strong> klicken. Die Seite lädt neu und zeigt den neuen Text.</li>
+</ol>
+
+<figure>
+  <img src="assets/screenshots/25-info-bearbeiten.png" alt="Das geöffnete Textfeld unter Info mit den Schaltflächen Speichern und Abbrechen" />
+  <figcaption>Die Info im Bearbeitungsfeld.</figcaption>
+</figure>
+
+<p>
+  Um die Info zu entfernen, das Textfeld leeren und auf <strong>Speichern</strong> klicken.
+</p>
+
+<h3>Datum, Info und Bilddatei</h3>
+
+<ul>
+  <li>
+    Datum und Info werden nicht nur in der Galerie gespeichert, sondern auch in die Bilddatei
+    geschrieben. Andere Bildprogramme zeigen sie dann in der Bildbeschreibung der Datei, vor
+    dem Text zur Herkunft.
+  </li>
+  <li>
+    Datum und Info sind dieselben Angaben wie <strong>Aufnahmedatum</strong> und
+    <strong>Beschreibung</strong> in den Eigenschaften des Fotos. Was auf der einen Seite
+    gespeichert wird, steht auch auf der anderen.
+  </li>
+  <li>
+    Bei einem Datum wie <em>ca. 1965</em> steht in den Eigenschaften der erste Tag, den die
+    Angabe umfasst, hier also der 1. Januar 1965. Solange das Aufnahmedatum dort nicht
+    verändert wird, bleibt es beim Sichern der Eigenschaften bei <em>ca. 1965</em>. Wird es
+    dort oder in der Stapelverarbeitung geändert, gilt es danach als genauer Tag.
+  </li>
+</ul>
+
+<div class="hinweis">
+  <p>
+    Erscheint nach dem Speichern die Meldung
+    <em>Gespeichert, aber nicht in die Bilddatei geschrieben</em>, ist die Angabe in der
+    Galerie gespeichert, aber die Bilddatei blieb unverändert. Der Grund steht hinter der
+    Meldung. In dem Fall die Verwaltung der Galerie benachrichtigen.
+  </p>
+</div>
+
 <h3>Wo die Texte öffentlich erscheinen</h3>
 
 <figure>
   <img src="assets/screenshots/11-foto-oeffentlich.png" alt="Die Fotoseite, wie Besucher sie sehen" />
-  <figcaption>Die Fotoseite. Links das Foto mit Titel und Beschreibung, rechts die Angaben.</figcaption>
+  <figcaption>Die Fotoseite. Links das Foto mit seinem Titel, rechts die Angaben.</figcaption>
 </figure>
 
 <ul>
   <li><strong>Titel</strong>: als Überschrift über dem Foto und im Titel des Browserfensters.</li>
-  <li><strong>Beschreibung</strong>: als Text direkt unter dem Foto.</li>
   <li><strong>Autor</strong>: rechts in den Angaben unter <strong>Autor</strong>.</li>
   <li>
-    <strong>Aufnahmedatum</strong>: rechts unter <strong>Erstellt am</strong>. Daneben steht
+    <strong>Aufnahmedatum</strong>: rechts unter <strong>Datum</strong>. Weiter unten steht
     unter <strong>Veröffentlicht am</strong> das Datum des Uploads.
   </li>
+  <li><strong>Beschreibung</strong>: rechts unter <strong>Info</strong>.</li>
   <li>
     <strong>Herkunft</strong>: rechts als eigene Zeile. Die fünf Angaben stehen dort
     hintereinander, durch senkrechte Striche getrennt.
