@@ -35,6 +35,7 @@ final class SyncMetadataTest extends TestCase
     protected function tearDown(): void
     {
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
     }
 
     /** [HAPPY] A photoinfo date survives a sync of a camera file that carries a date of its own. */
