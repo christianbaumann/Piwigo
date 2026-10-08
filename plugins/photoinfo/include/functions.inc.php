@@ -33,6 +33,12 @@ define('PHOTOINFO_INFO_TAG', 'XMP-'.PHOTOINFO_XMP_PREFIX.':Info');
 /** The tag carrying the date as EDTF, qualifier and range included. */
 define('PHOTOINFO_DATE_EDTF_TAG', 'XMP-'.PHOTOINFO_XMP_PREFIX.':DateEDTF');
 
+/** The namespace exiftool's -X output puts the tags of the XMP-pwginfo group in. */
+define('PHOTOINFO_RDF_GROUP_URI', 'http://ns.exiftool.org/XMP/XMP-pwginfo/1.0/');
+
+/** Photos one rescan request reads, so none can time out. */
+define('PHOTOINFO_RESCAN_MAX_CHUNK', 10);
+
 /** The standard slots for the start date, see photoinfo_date_xmp() and photoinfo_date_iptc(). */
 define('PHOTOINFO_DATE_XMP_TAG', 'XMP-photoshop:DateCreated');
 define('PHOTOINFO_DATE_IPTC_TAG', 'IPTC:DateCreated');
@@ -350,6 +356,77 @@ function photoinfo_representative_original($path)
   }
 
   return array($m[1].$m[2], $m[3]);
+}
+
+/**
+ * The info text and the EDTF date out of what `exiftool -X` printed for a file.
+ *
+ * -X rather than -j: JSON prints a number-like value unquoted, so an info text
+ * "1.50" would come back as the float 1.5 (exiftool 13.25, measured
+ * 2026-10-08). The RDF/XML output keeps every value as text.
+ *
+ * @param string $xml
+ * @return array|null array('info' => string|null, 'edtf' => string|null), a
+ *   tag the file does not carry or carries empty being null; null when $xml is
+ *   not exiftool's output
+ */
+function photoinfo_parse_rescan_xml($xml)
+{
+  $document = new DOMDocument();
+  if (trim((string)$xml) === '' or !@$document->loadXML($xml, LIBXML_NONET))
+  {
+    return null;
+  }
+
+  $values = array();
+  foreach (array('info' => 'Info', 'edtf' => 'DateEDTF') as $key => $tag)
+  {
+    $nodes = $document->getElementsByTagNameNS(PHOTOINFO_RDF_GROUP_URI, $tag);
+    $value = $nodes->length > 0 ? $nodes->item(0)->textContent : '';
+    $values[$key] = $value === '' ? null : $value;
+  }
+
+  return $values;
+}
+
+/**
+ * What a rescan stores for one photo: the info text and the dating its file
+ * carries. A tag the file does not carry leaves its column alone.
+ *
+ * @param array $tags photoinfo_parse_rescan_xml()'s answer
+ * @param bool $allow_html $conf['allow_html_descriptions']
+ * @param int $current_year
+ * @return array array('columns' => column => value, 'error' => string|null);
+ *   an unreadable date leaves the date columns out and says why
+ */
+function photoinfo_rescan_columns($tags, $allow_html, $current_year)
+{
+  $columns = array();
+  $error = null;
+
+  if ($tags['info'] !== null)
+  {
+    $info = photoinfo_clean_info($tags['info'], $allow_html);
+    if ($info !== '')
+    {
+      $columns['comment'] = $info;
+    }
+  }
+
+  if ($tags['edtf'] !== null)
+  {
+    $parsed = photoinfo_dating_from_edtf($tags['edtf'], $current_year);
+    if ($parsed['error'] === null)
+    {
+      $columns = array_merge($columns, photoinfo_dating_columns($parsed['dating']));
+    }
+    else
+    {
+      $error = $parsed['error'].': '.$tags['edtf'];
+    }
+  }
+
+  return array('columns' => $columns, 'error' => $error);
 }
 
 /*

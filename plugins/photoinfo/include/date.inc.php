@@ -532,3 +532,43 @@ function photoinfo_dating_edtf($dating)
 
   return $start;
 }
+
+define('PHOTOINFO_DATE_ERROR_EDTF', 'Not an EDTF date this plugin writes');
+
+/**
+ * Reads a dating back from its EDTF string, the inverse of
+ * photoinfo_dating_edtf(), so a rescan can rebuild the row from the file.
+ *
+ * Only the forms photoinfo_dating_edtf() writes are read. Anything else EDTF
+ * allows - "1965/" (unknown end), "1965?" (uncertain), "../.." - names a dating
+ * the editor cannot hold, and is refused rather than guessed at. Each parsed
+ * date passes the form's own checks: year bounds, days of the month, end not
+ * before start.
+ *
+ * @param string $edtf
+ * @param int $current_year
+ * @return array array('dating' => dating|null, 'error' => string|null)
+ */
+function photoinfo_dating_from_edtf($edtf, $current_year)
+{
+  $date = '(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?';
+  $forms = array(
+    '' => '~^'.$date.'$~',
+    PHOTOINFO_QUALIFIER_CIRCA => '~^'.$date.'\~$~',
+    PHOTOINFO_QUALIFIER_BEFORE => '~^\.\./'.$date.'$~',
+    PHOTOINFO_QUALIFIER_AFTER => '~^'.$date.'/\.\.$~',
+    PHOTOINFO_QUALIFIER_BETWEEN => '~^'.$date.'/'.$date.'$~',
+    );
+
+  foreach ($forms as $qualifier => $pattern)
+  {
+    if (preg_match($pattern, trim((string)$edtf), $m))
+    {
+      $m = array_pad($m, 7, '');
+      return photoinfo_dating_from_input($qualifier,
+        array($m[1], $m[2], $m[3]), array($m[4], $m[5], $m[6]), $current_year);
+    }
+  }
+
+  return array('dating' => null, 'error' => PHOTOINFO_DATE_ERROR_EDTF);
+}

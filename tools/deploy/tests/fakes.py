@@ -131,7 +131,10 @@ class FakeGallery:
     # What this fake's gallery is running. A test that needs a *matching* local checkout
     # builds one from this attribute rather than typing the literal a second time.
     VERSION = "17.0.0beta1"
-    ALL_PLUGINS = ("typetags", "provenance", "persons")
+    ALL_PLUGINS = ("typetags", "provenance", "persons", "photoinfo")
+    # plugin -> the plugin its activate() refuses to run without, as photoinfo's
+    # maintain.class.php does.
+    REQUIRES = {"photoinfo": "provenance"}
 
     def __init__(
         self,
@@ -248,6 +251,9 @@ class FakeGallery:
                 return _fail(403, "Invalid security token")
             if fields.get("plugin") not in self.plugin_states:
                 return _fail(500, f"no such plugin {fields.get('plugin')}")
+            required = self.REQUIRES.get(fields["plugin"])
+            if required and self.plugin_states.get(required) != "active":
+                return _fail(500, f"{fields['plugin']} requires {required}")
             self.plugin_states[fields["plugin"]] = "active"
             return _ok(True)
         return _fail(501, f"unknown method {method}")

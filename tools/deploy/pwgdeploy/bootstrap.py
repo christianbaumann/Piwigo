@@ -39,7 +39,9 @@ SYNC_PATH = "admin.php?page=site_update&site=1"
 # rot the day only one of the two moved.
 CONFIG_RELATIVE_PATH = fileset.GENERATED_CONFIG_PATH
 
-PLUGINS_TO_ACTIVATE = ("typetags", "provenance", "persons")
+# photoinfo after provenance: it refuses to activate without it
+# (plugins/photoinfo/maintain.class.php, activate()).
+PLUGINS_TO_ACTIVATE = ("typetags", "provenance", "persons", "photoinfo")
 ACTIVE_STATE = "active"
 ACTIVATE_ACTION = "activate"
 

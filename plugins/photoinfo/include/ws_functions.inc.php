@@ -2,6 +2,7 @@
 defined('PHOTOINFO_PATH') or die('Hacking attempt!');
 
 include_once(PHOTOINFO_PATH.'include/writer.inc.php');
+include_once(PHOTOINFO_PATH.'include/rescan.inc.php');
 
 /**
  * Saves one photo's info text and writes it into the image file.
@@ -105,6 +106,42 @@ function ws_photoinfo_setDate($params, &$service)
     'written' => $result['ok'],
     'message' => $result['message'],
     );
+}
+
+/**
+ * Restores one chunk of photos' dates and info texts from their files. Writes
+ * the database only, never a file.
+ *
+ * One chunk per request, never a whole gallery: each photo costs one exiftool
+ * run, so the caller drives the loop and no request runs into
+ * max_execution_time.
+ *
+ * @param array $params image_ids (comma-separated), pwg_token
+ * @param object $service
+ * @return array|PwgError
+ */
+function ws_photoinfo_rescan($params, &$service)
+{
+  if (get_pwg_token() != $params['pwg_token'])
+  {
+    return new PwgError(403, 'Invalid security token');
+  }
+
+  if (!defined('PROVENANCE_PATH'))
+  {
+    return new PwgError(500, PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE);
+  }
+
+  // Refused rather than truncated: a caller that silently rescanned the first
+  // ten of twenty would report success for photos nothing read.
+  $ids = provenance_parse_id_list($params['image_ids'], PHOTOINFO_RESCAN_MAX_CHUNK);
+  if ($ids === null or count($ids) == 0)
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM,
+      'image_ids must be 1 to '.PHOTOINFO_RESCAN_MAX_CHUNK.' comma-separated photo ids');
+  }
+
+  return photoinfo_rescan_images($ids);
 }
 
 /**

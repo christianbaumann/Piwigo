@@ -32,7 +32,7 @@ RAW = {
 }
 
 # Anti-vacuity: an empty plugin tuple would satisfy every activation assertion below.
-MIN_PLUGINS = 3
+MIN_PLUGINS = 4
 # Anti-vacuity for the generated PHP: an empty string contains every substring asserted
 # of it exactly zero times, and `in` on "" would still be checked below.
 MIN_CONFIG_BYTES = 40
@@ -312,9 +312,10 @@ def test_a_wrong_password_fails_with_the_server_s_message(cfg):
     assert "Invalid username/password" in str(raised.value)
 
 
-def test_activation_installs_all_three_fork_plugins(cfg, gallery):
+def test_activation_installs_all_four_fork_plugins(cfg, gallery):
     """[HAPPY] Decision 6: activate falls through to install
-    (admin/include/plugins.class.php:187-219), which is what creates each schema."""
+    (admin/include/plugins.class.php:187-219), which is what creates each schema. From a
+    gallery where none is active, so photoinfo only passes when provenance went first."""
     assert len(bootstrap.PLUGINS_TO_ACTIVATE) >= MIN_PLUGINS
     token = bootstrap.login(gallery, cfg)
 
@@ -339,17 +340,29 @@ def test_an_inactive_plugin_is_activated_while_its_neighbour_is_not(cfg):
     """[DT] The mixed row of the table: state per plugin decides per plugin."""
     gallery = FakeGallery(
         BASE_URL,
-        plugin_states={"typetags": "active", "provenance": "inactive", "persons": "uninstalled"},
+        plugin_states={"typetags": "active", "provenance": "inactive", "persons": "uninstalled", "photoinfo": "active"},
     )
     token = bootstrap.login(gallery, cfg)
 
     outcome = bootstrap.activate_plugins(gallery, cfg.site.base_url, token)
 
-    assert outcome == {"typetags": "active", "provenance": "activated", "persons": "activated"}
+    assert outcome == {"typetags": "active", "provenance": "activated", "persons": "activated", "photoinfo": "active"}
     assert sorted(call["plugin"] for call in gallery.posts_to("ws.php") if call.get("action") == "activate") == [
         "persons",
         "provenance",
     ]
+
+
+def test_photoinfo_is_activated_after_provenance(cfg, gallery):
+    """[NEG] photoinfo refuses to activate without provenance, so the order of
+    PLUGINS_TO_ACTIVATE is load-bearing: the reverse order fails on the remote."""
+    token = bootstrap.login(gallery, cfg)
+
+    with pytest.raises(RemoteHttpError) as raised:
+        bootstrap.activate_plugins(gallery, cfg.site.base_url, token, plugins=("photoinfo", "provenance"))
+
+    assert "requires provenance" in str(raised.value)
+    assert bootstrap.PLUGINS_TO_ACTIVATE.index("provenance") < bootstrap.PLUGINS_TO_ACTIVATE.index("photoinfo")
 
 
 def test_activation_sends_the_token_with_every_action(cfg, gallery):

@@ -2,7 +2,7 @@
 
 Uploads this Piwigo fork to a shared web space over FTPS — only the files the install needs,
 and only the ones that changed since the last run — then completes the remote install over
-HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of the three
+HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of the four
 fork-local plugins, and a `site_update` scan that turns the uploaded `galleries/` tree into
 albums and photos.
 
@@ -234,7 +234,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-436 tests, measured 2026-10-05. Everything that decides *what* to do is a pure function and is
+437 tests, measured 2026-10-08. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

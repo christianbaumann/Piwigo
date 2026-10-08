@@ -102,4 +102,16 @@ function photoinfo_add_methods($arr)
     PHOTOINFO_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );
+
+  $service->addMethod(
+    'pwg.photoinfo.rescan',
+    'ws_photoinfo_rescan',
+    array(
+      'image_ids' => array('info' => 'At most ' . PHOTOINFO_RESCAN_MAX_CHUNK . ' comma-separated photo ids'),
+      'pwg_token' => array(),
+      ),
+    'Restores the date and description of one chunk of photos from what their files say. Writes no file.',
+    PHOTOINFO_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
+  );
 }
