@@ -176,6 +176,60 @@ function photoinfo_build_date_argfile($caption, $dating, $value_prefix)
   return $lines;
 }
 
+/**
+ * What a metadata sync may take from a file as the photo's date. The field
+ * mapped to date_creation is dropped when the photo has a date set with
+ * photoinfo, and when the file carries no camera metadata (Make or Model): on a
+ * scan, the file's date is the scan date.
+ *
+ * @param array|null $exif what core read from the file; null when it read nothing
+ * @param string|null $date_field the EXIF field mapped to date_creation
+ * @param bool $has_photoinfo_date
+ * @return array|null
+ */
+function photoinfo_sync_exif($exif, $date_field, $has_photoinfo_date)
+{
+  if (!is_array($exif) or $date_field === null or !array_key_exists($date_field, $exif))
+  {
+    return $exif;
+  }
+
+  $has_camera = false;
+  foreach (array('Make', 'Model') as $tag)
+  {
+    if (isset($exif[$tag]) and trim((string)$exif[$tag]) !== '')
+    {
+      $has_camera = true;
+    }
+  }
+
+  if ($has_photoinfo_date or !$has_camera)
+  {
+    unset($exif[$date_field]);
+  }
+
+  return $exif;
+}
+
+/**
+ * The images.path of a file, as core stores it: relative to the gallery root,
+ * with a leading "./".
+ *
+ * @param string|false $file the file's resolved path (realpath)
+ * @param string $root the gallery root's resolved path
+ * @return string|null null for a file outside the root
+ */
+function photoinfo_image_path($file, $root)
+{
+  $root = rtrim($root, '/').'/';
+  if ($file === false or strpos($file, $root) !== 0)
+  {
+    return null;
+  }
+
+  return './'.substr($file, strlen($root));
+}
+
 /*
  * ---------------------------------------------------------------------------
  * Template anchors the picture prefilter matches against, in

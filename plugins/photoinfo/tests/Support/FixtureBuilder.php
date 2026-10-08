@@ -140,6 +140,64 @@ class FixtureBuilder
         return end($this->testImages);
     }
 
+    /**
+     * A photo of this suite's own in another format than PNG: the copy of
+     * createTestImage(), converted with ImageMagick, its row repointed at the
+     * converted file. PHP reads EXIF from a JPEG but not from a PNG or a HEIC,
+     * so a test of a metadata sync needs one of each.
+     *
+     * @param string $extension e.g. 'jpg', 'heic'
+     * @return array id, db_path (as stored), file (absolute), width, height
+     */
+    public function createTestImageAs(string $extension): array
+    {
+        $png = $this->createTestImage();
+
+        $file = substr($png['file'], 0, -strlen('png')) . $extension;
+        self::run('convert ' . escapeshellarg($png['file']) . ' ' . escapeshellarg($file) . ' 2>&1');
+        clearstatcache(true, $file);
+        if (!is_file($file) or filesize($file) < 1)
+        {
+            throw new RuntimeException("ImageMagick convert did not produce $file");
+        }
+        @unlink($png['file']);
+
+        $dbPath = substr($png['db_path'], 0, -strlen('png')) . $extension;
+        $this->db->query("UPDATE piwigo_images SET file = '" . $this->db->escape(basename($file)) .
+            "', path = '" . $this->db->escape($dbPath) . "' WHERE id = " . (int)$png['id']);
+
+        array_pop($this->testImages);
+        $this->testImages[] = array_merge($png, array('db_path' => $dbPath, 'file' => $file));
+
+        return end($this->testImages);
+    }
+
+    /**
+     * Writes camera metadata (Make, Model) and, unless null, a DateTimeOriginal
+     * into a fixture file, or only the DateTimeOriginal when $camera is false,
+     * as a scanner would. Asserts the tags are there.
+     */
+    public static function writeExifDate(string $file, ?string $dateTimeOriginal, bool $camera): void
+    {
+        $args = $camera ? array('-EXIF:Make=PiwigoTestCam', '-EXIF:Model=T1') : array();
+        if ($dateTimeOriginal !== null)
+        {
+            $args[] = '-EXIF:DateTimeOriginal=' . $dateTimeOriginal;
+        }
+        if (count($args) === 0)
+        {
+            throw new RuntimeException('anti-vacuity: writing no tag at all leaves the fixture as it was');
+        }
+        self::run('exiftool -q -overwrite_original ' . implode(' ', array_map('escapeshellarg', $args)) . ' ' . escapeshellarg($file));
+
+        $read = json_decode(self::run('exiftool -j -EXIF:Make -EXIF:DateTimeOriginal ' . escapeshellarg($file)), true);
+        if (($read[0]['Make'] ?? null) !== ($camera ? 'PiwigoTestCam' : null)
+            or ($read[0]['DateTimeOriginal'] ?? null) !== $dateTimeOriginal)
+        {
+            throw new RuntimeException("the EXIF date tags were not written into $file as intended");
+        }
+    }
+
     /** Sets or clears (null) a photo's images.comment, asserting it took effect. */
     public function setComment(int $imageId, ?string $comment): void
     {

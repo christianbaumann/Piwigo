@@ -43,6 +43,8 @@ apart from data only exiftool knows about. `identify` in provenance's
 `WriteRegionsTest::testAnIndependentLibraryFindsTheRegionInTheStandardXmpPacket`, which extracts
 the raw XMP packet and reads the MWG region out of it as text. It comes from the DDEV web image
 itself rather than `webimage_extra_packages`; if a future image drops it, both fail loudly naming it.
+It is also a fixture tool: `createTestImageAs()` in provenance's and photoinfo's `FixtureBuilder`
+`convert`s a gallery PNG to JPEG or HEIC for the metadata-sync tests: PHP reads EXIF from JPEG, never from the gallery's PNGs.
 
 ## Agent working conventions
 

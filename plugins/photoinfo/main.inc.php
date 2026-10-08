@@ -37,6 +37,10 @@ add_event_handler('ws_add_methods', 'photoinfo_add_methods');
 add_event_handler('provenance_caption_parts', 'photoinfo_caption_parts_handler',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/writer.inc.php');
 
+// Keeps a metadata sync from replacing the photo's date with a scan date.
+add_event_handler('format_exif_data', 'photoinfo_format_exif_data',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_sync.inc.php');
+
 // The Datum and Info rows. Registered only on the picture page, and the file behind it is
 // pulled in only when the event actually fires.
 if (script_basename() == 'picture')
