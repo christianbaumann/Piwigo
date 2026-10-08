@@ -8,11 +8,22 @@ was given, and a single ordered call log — the order is the point in several t
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from pwgdeploy.errors import TransportError
 from pwgdeploy.http import Response
 from pwgdeploy.transport import RemoteEntry
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def php_value(relative_path: str, pattern: str) -> int:
+    """One integer literal out of a PHP source file; fails loudly when the line moved."""
+    match = re.search(pattern, (REPO_ROOT / relative_path).read_text(encoding="utf-8"))
+    if match is None:
+        raise AssertionError(f"{pattern!r} not found in {relative_path}")
+    return int(match.group(1))
 
 
 class FakeTransport:
@@ -122,8 +133,10 @@ class FakeGallery:
 
     Each endpoint mirrors one real one: the marker install.php:156-165 dies with, the
     JSON envelope include/ws_protocols/json_encoder.php builds, the token and webmaster
-    checks of include/ws_functions/pwg.extensions.php:53-88, and the summary markup of
-    admin/themes/default/template/site_update.tpl:19-24.
+    checks of include/ws_functions/pwg.extensions.php:53-88, the summary markup of
+    admin/themes/default/template/site_update.tpl:19-24, the paging of
+    pwg.categories.getImages (include/ws_functions/pwg.categories.php:19-232) and the
+    chunk limit and answer of pwg.photoinfo.rescan (plugins/photoinfo/include/).
     """
 
     LOGIN_PAGE = "identification.php"
@@ -135,6 +148,15 @@ class FakeGallery:
     # plugin -> the plugin its activate() refuses to run without, as photoinfo's
     # maintain.class.php does.
     REQUIRES = {"photoinfo": "provenance"}
+    # Read from the PHP that enforces them, so a change there reaches these tests. ws.php
+    # clamps per_page to the first; pwg.photoinfo.rescan refuses a longer id list.
+    MAX_PER_PAGE = php_value(
+        "include/config_default.inc.php", r"\$conf\['ws_max_images_per_page'\]\s*=\s*(\d+);"
+    )
+    MAX_RESCAN_CHUNK = php_value(
+        "plugins/photoinfo/include/functions.inc.php",
+        r"define\('PHOTOINFO_RESCAN_MAX_CHUNK',\s*(\d+)\);",
+    )
 
     def __init__(
         self,
@@ -150,6 +172,8 @@ class FakeGallery:
         photos_deleted=0,
         sync_errors=0,
         admin=("webmaster", "p"),
+        photo_ids=None,
+        rescan_failures=None,
     ):
         self.base_url = base_url
         self.installed = installed
@@ -167,6 +191,13 @@ class FakeGallery:
         self.photos_deleted = photos_deleted
         self.sync_errors = sync_errors
         self.admin = admin
+        # The photos the sync registered, as getImages lists them.
+        self.photo_ids = list(
+            range(1, photos_added + 1) if photo_ids is None else photo_ids
+        )
+        # photo id -> the reason pwg.photoinfo.rescan gives for it.
+        self.rescan_failures = dict(rescan_failures or {})
+        self.rescanned: list[int] = []
         self.logged_in = False
         self.calls: list[tuple] = []
 
@@ -256,7 +287,48 @@ class FakeGallery:
                 return _fail(500, f"{fields['plugin']} requires {required}")
             self.plugin_states[fields["plugin"]] = "active"
             return _ok(True)
+        if method == "pwg.categories.getImages":
+            return self._images_page(fields)
+        if method == "pwg.photoinfo.rescan":
+            return self._rescan(fields)
         return _fail(501, f"unknown method {method}")
+
+    def _images_page(self, fields) -> str:
+        per_page = int(fields.get("per_page", 100))
+        page = int(fields.get("page", 0))
+        per_page = min(per_page, self.MAX_PER_PAGE)
+        ordered = sorted(self.photo_ids) if fields.get("order") == "id" else self.photo_ids
+        listed = ordered[page * per_page : (page + 1) * per_page]
+        return _ok(
+            {
+                "paging": {
+                    "page": page,
+                    "per_page": per_page,
+                    "count": len(listed),
+                    "total_count": len(self.photo_ids),
+                },
+                "images": [{"id": photo_id, "file": f"{photo_id}.png"} for photo_id in listed],
+            }
+        )
+
+    def _rescan(self, fields) -> str:
+        if self.plugin_states.get("photoinfo") != "active":
+            return _fail(501, "unknown method pwg.photoinfo.rescan")
+        if fields.get("pwg_token") != self.TOKEN:
+            return _fail(403, "Invalid security token")
+        ids = [int(part) for part in fields.get("image_ids", "").split(",") if part]
+        if not 0 < len(ids) <= self.MAX_RESCAN_CHUNK:
+            return _fail(1003, f"image_ids must be 1 to {self.MAX_RESCAN_CHUNK} photo ids")
+        self.rescanned.extend(ids)
+        failed = {i: self.rescan_failures[i] for i in ids if i in self.rescan_failures}
+        # PHP's json_encode: an empty array is a list, an id-keyed one an object with
+        # string keys.
+        return _ok(
+            {
+                "scanned": len(ids) - len(failed),
+                "failed": {str(i): reason for i, reason in failed.items()} or [],
+            }
+        )
 
     def _sync_page(self) -> str:
         """The six summary lines site_update.tpl:19-24 emits, in that order."""

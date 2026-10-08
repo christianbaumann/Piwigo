@@ -513,6 +513,166 @@ def test_parse_sync_counts_needs_both_added_lines():
         bootstrap.parse_sync_counts('<li class="update_summary_new">4 Alben</li>')
 
 
+# --- photoinfo rescan ---------------------------------------------------------------
+
+
+def active_gallery(**kwargs):
+    """Logged in, every fork plugin active: the state the sync leaves behind."""
+    gallery = FakeGallery(
+        BASE_URL,
+        installed=True,
+        plugin_states={name: "active" for name in FakeGallery.ALL_PLUGINS},
+        **kwargs,
+    )
+    bootstrap.login(gallery, config())
+    return gallery
+
+
+def test_image_ids_lists_every_photo_the_gallery_holds(cfg):
+    """[HAPPY] Every id, each once, whatever album it sits in."""
+    gallery = active_gallery(photo_ids=[5, 3, 9])
+
+    assert bootstrap.image_ids(gallery, cfg.site.base_url) == [3, 5, 9]
+
+
+def test_image_ids_asks_for_the_whole_tree_in_a_stable_order(cfg):
+    """[DT] No cat_id is every album; order=id keeps the pages from overlapping, which
+    the configured default order does not promise."""
+    gallery = active_gallery(photo_ids=[1])
+
+    bootstrap.image_ids(gallery, cfg.site.base_url)
+
+    asked = gallery.posts_to("ws.php")[-1]
+    assert asked["method"] == "pwg.categories.getImages"
+    assert asked["order"] == "id"
+    assert "cat_id" not in asked
+
+
+@pytest.mark.parametrize(
+    ("photos", "pages"),
+    [(0, 1), (1, 1), (bootstrap.IMAGE_PAGE_SIZE, 1), (bootstrap.IMAGE_PAGE_SIZE + 1, 2)],
+)
+def test_image_ids_asks_for_as_many_pages_as_the_total_needs(cfg, photos, pages):
+    """[BVA] A full last page must not cost an empty extra request, one photo over must
+    not be dropped."""
+    gallery = active_gallery(photo_ids=list(range(1, photos + 1)))
+
+    ids = bootstrap.image_ids(gallery, cfg.site.base_url)
+
+    assert ids == list(range(1, photos + 1))
+    assert gallery.methods_called().count("pwg.categories.getImages") == pages
+
+
+def test_the_page_size_is_one_the_server_accepts():
+    """[BVA] Within what ws.php serves; it clamps a larger per_page."""
+    assert 0 < bootstrap.IMAGE_PAGE_SIZE <= FakeGallery.MAX_PER_PAGE
+
+
+def test_parse_image_page_reads_the_ids_and_the_total():
+    """[HAPPY]"""
+    result = {"paging": {"total_count": 7}, "images": [{"id": 4}, {"id": 6}]}
+
+    assert bootstrap.parse_image_page(result) == ([4, 6], 7)
+
+
+@pytest.mark.parametrize(
+    "result",
+    [None, [], {"images": []}, {"paging": {}, "images": []}, {"paging": {"total_count": 1}}],
+    ids=["none", "list", "no paging", "no total", "no images"],
+)
+def test_parse_image_page_refuses_a_shape_it_does_not_know(result):
+    """[NEG] Read as "no photos", any of these would report a rescan of nothing as done."""
+    with pytest.raises(RemoteHttpError):
+        bootstrap.parse_image_page(result)
+
+
+@pytest.mark.parametrize(
+    ("count", "sizes"),
+    [
+        (0, []),
+        (1, [1]),
+        (bootstrap.RESCAN_CHUNK, [bootstrap.RESCAN_CHUNK]),
+        (bootstrap.RESCAN_CHUNK + 1, [bootstrap.RESCAN_CHUNK, 1]),
+    ],
+)
+def test_chunks_never_exceed_what_the_method_accepts(count, sizes):
+    """[BVA] pwg.photoinfo.rescan refuses more than its chunk rather than truncating."""
+    ids = list(range(1, count + 1))
+
+    chunks = bootstrap.chunks(ids, bootstrap.RESCAN_CHUNK)
+
+    assert [len(chunk) for chunk in chunks] == sizes
+    assert [i for chunk in chunks for i in chunk] == ids
+
+
+def test_the_chunk_is_the_one_the_server_accepts():
+    """[BVA] Larger and every request is refused; the server is the authority."""
+    assert bootstrap.RESCAN_CHUNK == FakeGallery.MAX_RESCAN_CHUNK
+
+
+def test_parse_rescan_reads_failures_by_photo_id():
+    """[HAPPY] json_encode turns the PHP id-keyed array into an object with string keys."""
+    result = bootstrap.parse_rescan({"scanned": 8, "failed": {"3": "gone", "12": "bad"}})
+
+    assert result == bootstrap.RescanResult(scanned=8, failed={3: "gone", 12: "bad"})
+
+
+def test_parse_rescan_reads_an_empty_failure_list_as_no_failures():
+    """[ECP] An empty PHP array encodes as a JSON list, not an object."""
+    assert bootstrap.parse_rescan({"scanned": 10, "failed": []}).failed == {}
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        None,
+        {"failed": []},
+        {"scanned": "10", "failed": []},
+        {"scanned": 1},
+        {"scanned": 1, "failed": [1]},
+    ],
+    ids=["none", "no count", "count as text", "no failed", "non-empty list"],
+)
+def test_parse_rescan_refuses_a_shape_it_does_not_know(result):
+    """[NEG] A misread answer would report photos as read that nothing read."""
+    with pytest.raises(RemoteHttpError):
+        bootstrap.parse_rescan(result)
+
+
+def test_rescan_sends_every_photo_once_with_the_token(cfg):
+    """[HAPPY] 23 photos is two full chunks and a partial one."""
+    gallery = active_gallery(photo_ids=list(range(1, 24)))
+
+    result = bootstrap.rescan_photoinfo(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    assert sorted(gallery.rescanned) == list(range(1, 24))
+    assert len(gallery.rescanned) == 23
+    assert result == bootstrap.RescanResult(scanned=23, failed={})
+
+
+def test_a_failed_photo_is_reported_and_the_others_still_read(cfg):
+    """[ECP] One unreadable file must not cost the gallery its rescan."""
+    gallery = active_gallery(
+        photo_ids=list(range(1, 24)), rescan_failures={4: "gone", 17: "bad"}
+    )
+
+    result = bootstrap.rescan_photoinfo(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    assert result.scanned == 21
+    assert result.failed == {4: "gone", 17: "bad"}
+    assert len(gallery.rescanned) == 23
+
+
+def test_an_empty_gallery_sends_no_rescan_request(cfg):
+    """[BVA] The method refuses an empty id list."""
+    gallery = active_gallery(photo_ids=[])
+
+    result = bootstrap.rescan_photoinfo(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    assert result == bootstrap.RescanResult(scanned=0, failed={})
+    assert "pwg.photoinfo.rescan" not in gallery.methods_called()
+
+
 # --- the whole bootstrap ------------------------------------------------------------
 
 
@@ -559,8 +719,39 @@ def test_the_config_is_uploaded_after_the_install(cfg, gallery, tmp_path):
     assert transport.paths("put") == []
 
 
-def test_the_sync_runs_last(cfg, gallery, tmp_path):
-    """[ST] It scans the galleries/ tree the upload placed, so nothing may follow it."""
+def test_the_rescan_follows_the_sync(cfg, gallery, tmp_path):
+    """[ST] The sync registers the photos the rescan reads, and the rescan is the only
+    request allowed after it."""
     bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
 
-    assert "site_update" in gallery.urls()[-1]
+    urls = gallery.urls()
+    last_sync = max(i for i, url in enumerate(urls) if "site_update" in url)
+    after = gallery.calls[last_sync + 1 :]
+    assert after  # anti-vacuity: something follows the sync at all
+    assert {call[2]["method"] for call in after} == {
+        "pwg.categories.getImages",
+        "pwg.photoinfo.rescan",
+    }
+
+
+def test_a_run_rescans_every_photo_the_sync_registered(cfg, gallery, tmp_path):
+    """[HAPPY] The remote's dates and info texts come from the files, never the database."""
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert len(gallery.rescanned) == gallery.photos_added
+    assert result.rescan == bootstrap.RescanResult(scanned=gallery.photos_added, failed={})
+
+
+def test_a_run_without_photoinfo_does_not_rescan(cfg, gallery, tmp_path, monkeypatch):
+    """[DT] The method exists only while photoinfo is active."""
+    monkeypatch.setattr(
+        bootstrap,
+        "PLUGINS_TO_ACTIVATE",
+        tuple(name for name in bootstrap.PLUGINS_TO_ACTIVATE if name != "photoinfo"),
+    )
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert result.rescan is None
+    assert "pwg.photoinfo.rescan" not in gallery.methods_called()
+    assert gallery.plugin_states["provenance"] == "active"  # anti-vacuity: the run ran

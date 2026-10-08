@@ -35,6 +35,8 @@ MAX_REPORTED_GALLERY_DELETIONS = 10
 # Same idea for the audit, which can legitimately find hundreds. Larger because its whole
 # output is the list, where the deploy's is one line of a longer report.
 MAX_REPORTED_ORPHANS = 20
+# Same idea for the photoinfo rescan: a host without exiftool fails every photo alike.
+MAX_REPORTED_RESCAN_FAILURES = 10
 # The audit's closing claim, and the one thing an operator has to be able to trust about
 # it. Stated once here so the test that asserts it reads it rather than retyping it.
 AUDIT_READ_ONLY_NOTICE = "This is a read-only report. Nothing was deleted."
@@ -63,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-bootstrap",
         action="store_true",
-        help="upload only; skip install, config, plugins and sync",
+        help="upload only; skip install, config, plugins, sync and rescan",
     )
     parser.add_argument(
         "--no-prune",
@@ -376,6 +378,26 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory):
         f"{result.sync.errors} errors (deleted: {result.sync.photos_deleted} photos, "
         f"{result.sync.albums_deleted} albums)",
     )
+    if result.rescan is not None:
+        _report_rescan(out, result.rescan)
+
+
+def _report_rescan(out, rescan: bootstrap.RescanResult) -> None:
+    """Failed photos are named with their reasons but never fail the deploy: the upload
+    and install are done and correct, and a photo whose file cannot be read keeps its
+    date and info text empty until the next run. Every photo failing — a host without
+    exiftool — is flagged a warning, like a missing SITE CHMOD."""
+    summary = f"{rescan.scanned} of {rescan.total} photos read"
+    if rescan.failed:
+        warning = " (warning)" if rescan.scanned == 0 else ""
+        summary += f", {len(rescan.failed)} failed{warning}:"
+    _line(out, "rescan", summary)
+    failed = sorted(rescan.failed.items())
+    for photo_id, reason in failed[:MAX_REPORTED_RESCAN_FAILURES]:
+        _continuation(out, f"{photo_id}: {reason}")
+    unnamed = len(failed) - MAX_REPORTED_RESCAN_FAILURES
+    if unnamed > 0:
+        _continuation(out, f"… and {unnamed} more")
 
 
 def _progress(out):

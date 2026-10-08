@@ -1,8 +1,8 @@
 """Turning an uploaded tree into an installed gallery.
 
-Five steps — install, config, session, plugins, sync — each of which asks the server what
-state it is in before changing it, so running the whole thing twice is safe by
-construction rather than by the operator remembering.
+Six steps — install, config, session, plugins, sync, photoinfo rescan — each of which asks
+the server what state it is in before changing it, so running the whole thing twice is
+safe by construction rather than by the operator remembering.
 
 Every step is port-typed: the HTTP side arrives as an `HttpClient`, the one file this
 module uploads goes through the same `Transport` and the same manifest as the rest of the
@@ -72,6 +72,15 @@ MIN_SUMMARY_ADDED_LINES = 2
 MIN_SUMMARY_DELETED_LINES = 2
 MAX_REPORTED_ERRORS = 10
 
+PHOTOINFO_PLUGIN = "photoinfo"
+IMAGES_METHOD = "pwg.categories.getImages"
+RESCAN_METHOD = "pwg.photoinfo.rescan"
+# $conf['ws_max_images_per_page'] in include/config_default.inc.php; ws.php clamps to it.
+IMAGE_PAGE_SIZE = 500
+# PHOTOINFO_RESCAN_MAX_CHUNK in plugins/photoinfo/include/functions.inc.php; the method
+# refuses a longer id list rather than truncating it.
+RESCAN_CHUNK = 10
+
 
 @dataclass(frozen=True)
 class SyncCounts:
@@ -83,6 +92,17 @@ class SyncCounts:
 
 
 @dataclass(frozen=True)
+class RescanResult:
+    scanned: int
+    failed: dict[int, str]
+    """Photo id -> the reason pwg.photoinfo.rescan gave for not reading it."""
+
+    @property
+    def total(self) -> int:
+        return self.scanned + len(self.failed)
+
+
+@dataclass(frozen=True)
 class BootstrapResult:
     installed: bool
     """True when *this* run installed; False when it found the gallery already installed."""
@@ -90,6 +110,8 @@ class BootstrapResult:
     config_uploaded: bool
     plugins: dict[str, str]
     sync: SyncCounts
+    rescan: RescanResult | None = None
+    """None when photoinfo was not among the plugins this run activated."""
 
 
 # --- install --------------------------------------------------------------------------
@@ -360,11 +382,96 @@ def parse_sync_counts(body: str) -> SyncCounts:
     )
 
 
+# --- photoinfo rescan -----------------------------------------------------------------
+
+
+def rescan_photoinfo(client, base_url: str, token: str) -> RescanResult:
+    """Rebuild every photo's date and info text from its file (decision 0023: the
+    database never travels, the files do). One chunk per request, as the method demands."""
+    results = [
+        parse_rescan(
+            ws_call(
+                client,
+                base_url,
+                RESCAN_METHOD,
+                {"image_ids": ",".join(map(str, chunk)), "pwg_token": token},
+            )
+        )
+        for chunk in chunks(image_ids(client, base_url), RESCAN_CHUNK)
+    ]
+    return merge_rescans(results)
+
+
+def image_ids(client, base_url: str) -> list[int]:
+    """Every photo the gallery lists to this login, page by page. No cat_id is every
+    album; order=id keeps the pages from overlapping."""
+    ids: list[int] = []
+    page = 0
+    while True:
+        listed, total = parse_image_page(
+            ws_call(
+                client,
+                base_url,
+                IMAGES_METHOD,
+                {
+                    "order": "id",
+                    "per_page": str(IMAGE_PAGE_SIZE),
+                    "page": str(page),
+                },
+            )
+        )
+        ids.extend(listed)
+        if not listed or len(ids) >= total:
+            return ids
+        page += 1
+
+
+def parse_image_page(result: Any) -> tuple[list[int], int]:
+    """The ids of one getImages page, and the total the paging block claims."""
+    try:
+        total = result["paging"]["total_count"]
+        ids = [image["id"] for image in result["images"]]
+    except (KeyError, TypeError) as error:
+        raise RemoteHttpError(
+            f"{IMAGES_METHOD} returned an unexpected result: {result!r:.200}"
+        ) from error
+    return [int(i) for i in ids], int(total)
+
+
+def chunks(ids: list[int], size: int) -> list[list[int]]:
+    return [ids[start : start + size] for start in range(0, len(ids), size)]
+
+
+def parse_rescan(result: Any) -> RescanResult:
+    """One chunk's answer. json_encode writes an empty PHP array as `[]` and an id-keyed
+    one as an object with string keys."""
+    scanned = result.get("scanned") if isinstance(result, Mapping) else None
+    failed = result.get("failed") if isinstance(result, Mapping) else None
+    if failed == []:
+        failed = {}
+    if not isinstance(scanned, int) or not isinstance(failed, Mapping):
+        raise RemoteHttpError(
+            f"{RESCAN_METHOD} returned an unexpected result: {result!r:.200}"
+        )
+    return RescanResult(
+        scanned=scanned, failed={int(key): str(reason) for key, reason in failed.items()}
+    )
+
+
+def merge_rescans(results: Iterable[RescanResult]) -> RescanResult:
+    scanned = 0
+    failed: dict[int, str] = {}
+    for result in results:
+        scanned += result.scanned
+        failed.update(result.failed)
+    return RescanResult(scanned=scanned, failed=failed)
+
+
 # --- the whole bootstrap --------------------------------------------------------------
 
 
 def run(config: DeployConfig, state_dir: Path, transport, client) -> BootstrapResult:
-    """Install if needed, publish the config, log in, activate, then scan."""
+    """Install if needed, publish the config, log in, activate, scan, then rescan."""
     installed_now = False
     if not is_installed(client, config.site.base_url):
         install(client, config)
@@ -373,12 +480,18 @@ def run(config: DeployConfig, state_dir: Path, transport, client) -> BootstrapRe
     config_uploaded = upload_config(config, state_dir, transport)
 
     token = login(client, config)
-    plugins = activate_plugins(client, config.site.base_url, token)
+    plugins = activate_plugins(client, config.site.base_url, token, PLUGINS_TO_ACTIVATE)
     counts = sync(client, config.site.base_url)
+    rescan = (
+        rescan_photoinfo(client, config.site.base_url, token)
+        if PHOTOINFO_PLUGIN in plugins
+        else None
+    )
 
     return BootstrapResult(
         installed=installed_now,
         config_uploaded=config_uploaded,
         plugins=plugins,
         sync=counts,
+        rescan=rescan,
     )

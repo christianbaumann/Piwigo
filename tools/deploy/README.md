@@ -3,8 +3,9 @@
 Uploads this Piwigo fork to a shared web space over FTPS — only the files the install needs,
 and only the ones that changed since the last run — then completes the remote install over
 HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of four of the
-five fork-local plugins (photoedit stays inactive, see `.claude/rules/deployment.md`), and a
-`site_update` scan that turns the uploaded `galleries/` tree into albums and photos.
+five fork-local plugins (photoedit stays inactive, see `.claude/rules/deployment.md`), a
+`site_update` scan that turns the uploaded `galleries/` tree into albums and photos, and a
+photoinfo rescan that reads each photo's date and info text back out of its file.
 
 > **The target is a sandbox instance.** This tool installs a gallery, overwrites a config file
 > and deletes remote paths. It is **never** safe to point at a production install. See
@@ -76,7 +77,7 @@ reports the plugins already active.
 | `--dry-run` | enumerate, hash and diff; open no socket. Reports what *would* be sent **and deleted** |
 | `--list-files` | print the published file set and exit |
 | `--audit` | list the remote and report what the manifest does not cover; delete nothing |
-| `--no-bootstrap` | upload only; skip install, config, plugins and sync |
+| `--no-bootstrap` | upload only; skip install, config, plugins, sync and rescan |
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
 | `--allow-version-change` | upload even when the remote runs a different core version |
@@ -115,6 +116,32 @@ into them and the prune never touches them.
 No database content is transferred, in either direction; the remote's albums and photos are
 re-created from the uploaded files by the `site_update` scan. See
 [decision 0023](../../docs/agents/decisions/0023-no-database-transfer-to-the-remote.md).
+
+## The photoinfo rescan
+
+A photo's date and info text live in the database, which never travels — but photoinfo also
+writes both into the image file. So after the sync, every run lists every photo
+(`pwg.categories.getImages`, every album the deploy login may see) and asks `pwg.photoinfo.rescan` to read them back,
+ten photos per request. It runs only when photoinfo is among the activated plugins, and it
+writes no file.
+
+```
+  sync        106 photos, 4 albums, 0 errors (deleted: 0 photos, 0 albums)
+  rescan      105 of 106 photos read, 1 failed:
+              57: File is missing or not readable
+```
+
+A photo that fails keeps whatever date and info text it had (none, on a first deploy); for
+a date the rescan cannot read, the info text is still restored. Each failed photo is named with the
+server's reason (at most 10 names, then `… and N more`), and the run still exits `0`. When
+**every** photo fails, the line says `(warning)` — that is a host without a working exiftool,
+or a wrong `exiftool_path`. Fix that and re-run; the upload has nothing left to send and the
+rescan runs again. A request that fails outright (not a single photo, the whole call) aborts
+with exit `7`, like any other remote HTTP failure.
+
+A photo only in an album made private on the remote is not listed, so it is neither read nor
+counted: the line can say `N of N` with it missing. A sync creates public albums, so this needs
+someone to have changed an album's permission on the remote by hand.
 
 ## The manifest is the only record of remote state
 
@@ -234,7 +261,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-437 tests, measured 2026-10-08. Everything that decides *what* to do is a pure function and is
+472 tests, measured 2026-10-08. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

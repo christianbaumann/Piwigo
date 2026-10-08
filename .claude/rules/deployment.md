@@ -13,7 +13,7 @@ uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
-uv run pytest                                    # 437 tests, measured 2026-10-08
+uv run pytest                                    # 472 tests, measured 2026-10-08
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -131,7 +131,8 @@ their answers are in the plan's Phase 6 section.
    URL — the link there carries `&pwg_token=`.
 
 The host answered `exec()` enabled and exiftool 12.76 present, so the provenance and persons
-write-back works there. Note the version gap: local is 13.25, and no suite has run against 12.76.
+write-back works there. Local is 13.25; the integration suites of provenance, persons, photoedit and photoinfo and
+photoinfo's E2E also pass against 12.76 (2026-10-08, the ledger in `docs/agents/TESTING.md` says how).
 
 ## No database is transferred
 
@@ -144,9 +145,25 @@ the preflight compares `include/constants.php`'s `PHPWG_VERSION` against the rem
 Exact string equality, never an ordering; `--allow-version-change` overrides. **The tool never
 posts to `upgrade.php`** — run it in a browser yourself, then re-run the deploy. Albums
 and photos are re-created by the `site_update` scan; person regions by `pwg.persons.rescan` out
-of the image files. **Provenance columns have no path to the remote at all** — they live in the
+of the image files; photoinfo's date and info text by `pwg.photoinfo.rescan`, which the deploy runs
+itself (below). **Provenance columns have no path to the remote at all** — they live in the
 database and the file is only an export target — so a photo whose provenance was not written back
 before upload has none on the remote.
+
+## The deploy rescans photoinfo's values
+
+After the sync, `bootstrap.run()` rebuilds the remote's dates and info texts from the files through
+`pwg.photoinfo.rescan`
+([decision 0043](../../docs/agents/decisions/0043-photoinfo-requires-provenance-and-rebuilds-from-the-file.md)).
+The report line, its `(warning)` and the exit codes are in the
+[README](../../tools/deploy/README.md#the-photoinfo-rescan). What an agent needs beside it:
+
+- `RESCAN_CHUNK` and `IMAGE_PAGE_SIZE` in `bootstrap.py` mirror `PHOTOINFO_RESCAN_MAX_CHUNK` and
+  `$conf['ws_max_images_per_page']`; the tests read both PHP values, so a change there goes red here.
+- A rescan where every photo failed exits 0 on purpose: upload and install are already done, and a
+  re-run repeats the rescan. Every run reads the whole gallery, one exiftool run per photo.
+- The photo list is `pwg.categories.getImages` as the deploy login, which honours album
+  permissions: a photo only in an album made private on the remote is skipped and not reported.
 
 ## The remote's compiled templates are never purged
 

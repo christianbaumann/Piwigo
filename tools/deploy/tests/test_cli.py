@@ -125,7 +125,7 @@ def test_the_report_names_every_step(run):
     """[HAPPY] The operator reads this instead of the log; each step says what it did."""
     run()
 
-    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "sync"):
+    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "sync", "rescan"):
         assert label in run.text, f"{label} missing from:\n{run.text}"
 
 
@@ -332,6 +332,85 @@ def test_the_report_names_what_the_sync_deleted(config_file, repo, tmp_path):
     assert run() == 0
 
     assert "deleted: 7 photos, 2 albums" in run.text
+
+
+def _rescan_lines(text: str) -> list[str]:
+    """The `rescan` line and the continuation lines under it."""
+    label = f"  {'rescan':{cli.LABEL_WIDTH}}"
+    continuation = f"  {'':{cli.LABEL_WIDTH}}"
+    lines = text.splitlines()
+    starts = [i for i, line in enumerate(lines) if line.startswith(label)]
+    assert len(starts) == 1, f"expected one rescan line, got {starts}"
+    block = [lines[starts[0]]]
+    for line in lines[starts[0] + 1 :]:
+        if not line.startswith(continuation):
+            break
+        block.append(line)
+    return block
+
+
+def test_the_report_says_how_many_photos_the_rescan_read(run):
+    """[HAPPY] The remote's dates and info texts exist only after this step."""
+    assert run() == 0
+
+    assert _rescan_lines(run.text) == [f"  {'rescan':{cli.LABEL_WIDTH}}106 of 106 photos read"]
+
+
+def test_failed_photos_are_named_with_their_reasons_and_the_run_succeeds(
+    config_file, repo, tmp_path
+):
+    """[ECP] One unreadable file is the photo's problem, not the deploy's."""
+    gallery = FakeGallery(BASE_URL, rescan_failures={7: "File is missing or not readable"})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner() == 0
+
+    lines = _rescan_lines(runner.text)
+    assert "105 of 106 photos read, 1 failed:" in lines[0]
+    assert lines[1].strip() == "7: File is missing or not readable"
+
+
+def test_a_rescan_where_every_photo_failed_warns_and_the_run_succeeds(
+    config_file, repo, tmp_path
+):
+    """[BVA] The whole gallery failing is what a host without exiftool looks like. The
+    upload and install are done and correct, so it is a warning like a missing SITE
+    CHMOD, not an exit code."""
+    reason = "exiftool is not available on this server"
+    gallery = FakeGallery(
+        BASE_URL, photos_added=3, rescan_failures={i: reason for i in (1, 2, 3)}
+    )
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner() == 0
+
+    lines = _rescan_lines(runner.text)
+    assert "0 of 3 photos read, 3 failed (warning):" in lines[0]
+    assert len(lines) == 4
+
+
+def test_the_failure_list_is_capped(config_file, repo, tmp_path):
+    """[BVA] A gallery-wide failure must not turn the report into the failure list."""
+    over = cli.MAX_REPORTED_RESCAN_FAILURES + 5
+    gallery = FakeGallery(
+        BASE_URL, photos_added=over, rescan_failures={i: "bad" for i in range(1, over + 1)}
+    )
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner() == 0
+
+    lines = _rescan_lines(runner.text)
+    assert len(lines) == 1 + cli.MAX_REPORTED_RESCAN_FAILURES + 1
+    assert lines[-1].strip() == "… and 5 more"
+
+
+def test_an_empty_gallery_reports_a_rescan_of_nothing(config_file, repo, tmp_path):
+    """[BVA] Zero photos read of zero is not a failure."""
+    runner = Run(config_file, repo, tmp_path, gallery=FakeGallery(BASE_URL, photos_added=0))
+
+    assert runner() == 0
+
+    assert _rescan_lines(runner.text) == [f"  {'rescan':{cli.LABEL_WIDTH}}0 of 0 photos read"]
 
 
 def _preflight_line(text: str) -> str:
