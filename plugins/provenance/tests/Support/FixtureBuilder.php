@@ -370,6 +370,39 @@ class FixtureBuilder
     }
 
     /**
+     * A photo of this suite's own in another format than PNG: the PNG copy of
+     * createTestImage(), converted with ImageMagick, its row repointed at the
+     * converted file. PHP reads EXIF from a JPEG but not from a PNG, so a test
+     * of core's metadata sync needs one.
+     *
+     * @param string $extension e.g. 'jpg'
+     * @return array id, db_path (as stored) and file (absolute)
+     */
+    public function createTestImageAs(string $extension): array
+    {
+        $png = $this->createTestImage();
+
+        $file = substr($png['file'], 0, -strlen('png')) . $extension;
+        $output = array();
+        $status = 1;
+        exec('convert ' . escapeshellarg($png['file']) . ' ' . escapeshellarg($file) . ' 2>&1', $output, $status);
+        if ($status !== 0 or !is_file($file) or filesize($file) < 1)
+        {
+            throw new RuntimeException("ImageMagick convert did not produce $file: " . implode("\n", $output));
+        }
+        @unlink($png['file']);
+
+        $dbPath = substr($png['db_path'], 0, -strlen('png')) . $extension;
+        $this->db->query("UPDATE piwigo_images SET file = '" . $this->db->escape(basename($file)) .
+            "', path = '" . $this->db->escape($dbPath) . "' WHERE id = " . (int)$png['id']);
+
+        array_pop($this->testImages);
+        $this->testImages[] = array('id' => $png['id'], 'db_path' => $dbPath, 'file' => $file);
+
+        return end($this->testImages);
+    }
+
+    /**
      * Takes ownership of a photo somebody else created, so teardown removes it.
      *
      * An upload driven through ws.php produces a real image row and a real file
