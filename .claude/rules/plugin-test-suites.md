@@ -262,8 +262,9 @@ provenance: both suites need photoinfo **and** provenance active (`FixtureBuilde
 `FixtureBuilder::createTestImage()` copies the first gallery PNG into `upload/photoinfo-test/`, never
 a real scan in place, and `FixtureBuilder::readFileTags()` reads the three caption slots and
 `XMP-pwginfo:Info` back with a plain exiftool call, `readDateTags()` the date tags -
-`XMP-photoshop:DateCreated` out of the raw XMP packet, because exiftool prints an XMP date with
-colons. The E2E specs run as the webmaster;
+`XMP-photoshop:DateCreated` and `XMP-pwginfo:DateEDTF` out of the raw XMP packet, because exiftool
+prints an XMP date with colons and, without photoinfo's config, reads the EDTF range `1965/1970` as
+the fraction `0.997…`. The E2E specs run as the webmaster;
 `auth.setup.js` saves all three sessions. `tests/e2e/support/seed.php --scenario=photo` creates a
 public album with one copied photo, `--read-file=<id>` and `--read-date=<id>` print the file's caption
 and date tags, `--read-row=<id>` the photo's `comment` and date columns, and `--restore` removes the album, the row, the file and exiftool's

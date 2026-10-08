@@ -55,11 +55,11 @@ UPDATE '.IMAGES_TABLE.'
 /**
  * Saves one photo's date and writes it into the image file.
  *
- * date_creation takes the start of the date, the precision column how much of
- * it is known. Empty fields clear the date. Like the info text, the database
- * stays written when the file write fails.
+ * date_creation takes the start of the date, the plugin's columns its
+ * precision, qualifier and range end. Empty fields clear the date. Like the
+ * info text, the database stays written when the file write fails.
  *
- * @param array $params image_id, year, month, day, pwg_token
+ * @param array $params image_id, qualifier, year, month, day, end_year, end_month, end_day, pwg_token
  * @param object $service
  * @return array|PwgError
  */
@@ -71,7 +71,7 @@ function ws_photoinfo_setDate($params, &$service)
     return $image;
   }
 
-  foreach (array('year', 'month', 'day') as $name)
+  foreach (array('qualifier', 'year', 'month', 'day', 'end_year', 'end_month', 'end_day') as $name)
   {
     if (!is_string($params[$name]))
     {
@@ -79,31 +79,40 @@ function ws_photoinfo_setDate($params, &$service)
     }
   }
 
-  $input = photoinfo_date_from_input($params['year'], $params['month'], $params['day'], (int)date('Y'));
+  $input = photoinfo_dating_from_input(
+    $params['qualifier'],
+    array($params['year'], $params['month'], $params['day']),
+    array($params['end_year'], $params['end_month'], $params['end_day']),
+    (int)date('Y')
+    );
   if ($input['error'] !== null)
   {
     return new PwgError(WS_ERR_INVALID_PARAM, $input['error']);
   }
-  $date = $input['date'];
+  $dating = $input['dating'];
+
+  $columns = photoinfo_dating_columns($dating);
+  $set = array();
+  foreach ($columns as $column => $value)
+  {
+    $set[] = $column.' = '.($value === null ? 'NULL' : '\''.pwg_db_real_escape_string($value).'\'');
+  }
 
   $query = '
 UPDATE '.IMAGES_TABLE.'
-  SET date_creation = '.($date === null ? 'NULL' : '\''.photoinfo_date_start($date).'\'').',
-      photoinfo_date_precision = '.($date === null ? 'NULL' : '\''.photoinfo_date_precision($date).'\'').'
+  SET '.implode(",\n      ", $set).'
   WHERE id = '.(int)$image['id'].'
 ;';
   pwg_query($query);
 
   pwg_activity('photo', $image['id'], 'edit');
 
-  $image['date_creation'] = $date === null ? null : photoinfo_date_start($date);
-  $image['photoinfo_date_precision'] = $date === null ? null : photoinfo_date_precision($date);
-  $result = photoinfo_write_file($image, PHOTOINFO_WRITE_DATE);
+  $result = photoinfo_write_file(array_merge($image, $columns), PHOTOINFO_WRITE_DATE);
 
   return array(
     'image_id' => (int)$image['id'],
-    'date' => photoinfo_date_display($date),
-    'edtf' => photoinfo_date_edtf($date),
+    'date' => photoinfo_dating_display($dating),
+    'edtf' => photoinfo_dating_edtf($dating),
     'written' => $result['ok'],
     'message' => $result['message'],
     );

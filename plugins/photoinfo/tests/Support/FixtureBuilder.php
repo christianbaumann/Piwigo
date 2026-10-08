@@ -200,6 +200,25 @@ class FixtureBuilder
         }
     }
 
+    /**
+     * Sets a photo's qualifier and range end beside the date setDate() set,
+     * and asserts they took.
+     */
+    public function setQualifier(int $imageId, string $qualifier, ?string $end = null, ?string $endPrecision = null): void
+    {
+        $quote = fn(?string $v) => $v === null ? 'NULL' : "'" . $this->db->escape($v) . "'";
+        $this->db->query('UPDATE piwigo_images SET photoinfo_date_qualifier = ' . $quote($qualifier) .
+            ', photoinfo_date_end = ' . $quote($end) . ', photoinfo_date_end_precision = ' . $quote($endPrecision) .
+            " WHERE id = $imageId");
+
+        $row = $this->imageRow($imageId);
+        if ($row['photoinfo_date_qualifier'] !== $qualifier or $row['photoinfo_date_end'] !== $end
+            or $row['photoinfo_date_end_precision'] !== $endPrecision)
+        {
+            throw new RuntimeException("qualifier of photo $imageId was not set");
+        }
+    }
+
     /** One image row's columns, as stored. */
     public function imageRow(int $id): array
     {
@@ -247,8 +266,8 @@ class FixtureBuilder
 
     /**
      * Reads the date tags back with a plain exiftool call, as the file holds
-     * them: XMP-photoshop:DateCreated out of the raw XMP packet, since exiftool
-     * prints an XMP date with colons; the others as exiftool reads them.
+     * them: the two XMP tags out of the raw XMP packet, the others as exiftool
+     * reads them.
      *
      * @return array tag => value as a string, or null when absent
      */
@@ -259,7 +278,7 @@ class FixtureBuilder
             throw new RuntimeException("no file to read tags from: $file");
         }
 
-        $decoded = json_decode(self::run('exiftool -j -G1 -IPTC:DateCreated -XMP-pwginfo:DateEDTF -EXIF:DateTimeOriginal ' .
+        $decoded = json_decode(self::run('exiftool -j -G1 -IPTC:DateCreated -EXIF:DateTimeOriginal ' .
             escapeshellarg($file)), true);
         if (!is_array($decoded) or !isset($decoded[0]) or !is_array($decoded[0]))
         {
@@ -267,18 +286,33 @@ class FixtureBuilder
         }
 
         $packet = self::run('exiftool -b -XMP ' . escapeshellarg($file));
-        $xmp = preg_match('~<photoshop:DateCreated>([^<]*)</photoshop:DateCreated>|photoshop:DateCreated=[\'"]([^\'"]*)~', $packet, $m)
-            ? ($m[1] !== '' ? $m[1] : ($m[2] ?? ''))
-            : null;
-
         $value = fn(string $key) => isset($decoded[0][$key]) ? (string)$decoded[0][$key] : null;
 
+        // Both XMP values come out of the raw packet: exiftool prints an XMP
+        // date with colons, and without photoinfo's config it guesses the
+        // unknown DateEDTF's type and reads "1965/1970" as a fraction
+        // (exiftool 13.25, measured 2026-10-08).
         return array(
-            'XMP-photoshop:DateCreated' => $xmp,
+            'XMP-photoshop:DateCreated' => self::packetValue($packet, 'photoshop:DateCreated'),
             'IPTC:DateCreated' => $value('IPTC:DateCreated'),
-            'XMP-pwginfo:DateEDTF' => $value('XMP-pwginfo:DateEDTF'),
+            'XMP-pwginfo:DateEDTF' => self::packetValue($packet, 'pwginfo:DateEDTF'),
             'EXIF:DateTimeOriginal' => $value('ExifIFD:DateTimeOriginal'),
             );
+    }
+
+    /**
+     * One simple XMP property out of a raw packet, written as an element or
+     * as an attribute; null when absent.
+     */
+    private static function packetValue(string $packet, string $property): ?string
+    {
+        $name = preg_quote($property, '~');
+        if (!preg_match('~<' . $name . '>([^<]*)</' . $name . '>|' . $name . '=[\'"]([^\'"]*)~', $packet, $m))
+        {
+            return null;
+        }
+
+        return html_entity_decode($m[1] !== '' ? $m[1] : ($m[2] ?? ''), ENT_QUOTES | ENT_XML1);
     }
 
     /** Puts a DateTimeOriginal into a fixture file, as a camera or a scanner would, and asserts it is there. */

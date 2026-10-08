@@ -45,7 +45,8 @@ function readDate(imageId) {
  * The photo's comment and date columns as stored.
  *
  * @param {number} imageId
- * @returns {{comment: string|null, date_creation: string|null, photoinfo_date_precision: string|null}}
+ * @returns {{comment: string|null, date_creation: string|null, photoinfo_date_precision: string|null,
+ *   photoinfo_date_qualifier: string|null, photoinfo_date_end: string|null, photoinfo_date_end_precision: string|null}}
  */
 function readRow(imageId) {
   return run(`--read-row=${imageId}`);

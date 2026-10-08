@@ -34,9 +34,7 @@ SELECT '.implode(', ', $columns).'
     $image = array_merge(empty($row) ? array_fill_keys($columns, null) : $row, $image);
   }
 
-  $date = photoinfo_date_from_row($image['date_creation'], $image['photoinfo_date_precision']);
-
-  return photoinfo_caption_blocks($blocks, $image['comment'], photoinfo_date_display($date));
+  return photoinfo_caption_blocks($blocks, $image['comment'], photoinfo_dating_display(photoinfo_dating_from_row($image)));
 }
 
 /** What a file write sets beside the caption: the info text, or the date. */
@@ -80,8 +78,7 @@ function photoinfo_write_file($image, $field)
 
   if ($field == PHOTOINFO_WRITE_DATE)
   {
-    $date = photoinfo_date_from_row($image['date_creation'], $image['photoinfo_date_precision']);
-    $lines = photoinfo_build_date_argfile($caption, $date, $value_prefix);
+    $lines = photoinfo_build_date_argfile($caption, photoinfo_dating_from_row($image), $value_prefix);
     $values = provenance_caption_values(provenance_normalize_caption($caption));
   }
   else

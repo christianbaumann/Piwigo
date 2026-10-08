@@ -23,10 +23,15 @@ class PicturePage {
     this.dateView = page.locator('#photoinfo-date-view');
     this.datePlaceholder = page.locator('#photoinfo-date-view .photoinfo-placeholder');
     this.dateForm = page.locator('#photoinfo-date-form');
+    this.dateQualifier = page.locator('#photoinfo-date-form select[name=qualifier]');
     this.dateYear = page.locator('#photoinfo-date-form input[name=year]');
     this.dateMonth = page.locator('#photoinfo-date-form select[name=month]');
     this.dateDay = page.locator('#photoinfo-date-form select[name=day]');
     this.dateDayOptions = page.locator('#photoinfo-date-form select[name=day] option:not([value=""])');
+    this.dateEnd = page.locator('#photoinfo-date-form .photoinfo-date-end');
+    this.dateEndYear = page.locator('#photoinfo-date-form input[name=end_year]');
+    this.dateEndMonth = page.locator('#photoinfo-date-form select[name=end_month]');
+    this.dateEndDay = page.locator('#photoinfo-date-form select[name=end_day]');
     this.dateSaveButton = page.locator('#photoinfo-date-form input[type=submit]');
     this.dateCancelButton = page.locator('#photoinfo-date-form .photoinfo-cancel');
     this.dateMessage = page.locator('#photoinfo-date-form .photoinfo-message');
@@ -52,6 +57,25 @@ class PicturePage {
     }
     if (day !== '') {
       await this.dateDay.selectOption(day);
+    }
+  }
+
+  /**
+   * Chooses a qualifier and fills the range end, leaving a part out when it is ''.
+   *
+   * @param {string} qualifier circa, before, after, between, or '' for exact
+   * @param {{year: string, month: string, day: string}} [end] only with between
+   */
+  async qualifyDate(qualifier, end) {
+    await this.dateQualifier.selectOption(qualifier);
+    if (end) {
+      await this.dateEndYear.fill(end.year);
+      if (end.month !== '') {
+        await this.dateEndMonth.selectOption(end.month);
+      }
+      if (end.day !== '') {
+        await this.dateEndDay.selectOption(end.day);
+      }
     }
   }
 

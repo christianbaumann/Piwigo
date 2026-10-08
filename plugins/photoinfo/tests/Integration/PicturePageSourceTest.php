@@ -190,6 +190,33 @@ final class PicturePageSourceTest extends TestCase
         $this->assertStringContainsString('data-day="14"', $row);
     }
 
+    /** [HAPPY] A reader sees a range in German, linked to the calendar at its start. */
+    public function testARangeShowsToAReader(): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
+        $this->fixture->setQualifier($this->image['id'], 'between', '1970-01-01', 'year');
+
+        $row = $this->dateRowOf($this->pageAs(null));
+
+        $this->assertStringContainsString("März 1965\u{2013}1970</a>", $row);
+        $this->assertMatchesRegularExpression('~href="[^"]*created-monthly-list-1965-03"~', $row);
+    }
+
+    /** [HAPPY] The editor starts from a saved range: qualifier, start and end. */
+    public function testTheEditorStartsFromASavedRange(): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
+        $this->fixture->setQualifier($this->image['id'], 'between', '1970-05-02', 'day');
+
+        $row = $this->dateRowOf($this->pageAs(TestUsers::ADMIN));
+
+        $this->assertStringContainsString('<option value="between" selected>zwischen</option>', $row);
+        $this->assertMatchesRegularExpression('~<input type="text" name="year"[^>]* value="1965">~', $row);
+        $this->assertMatchesRegularExpression('~<input type="text" name="end_year"[^>]* value="1970">~', $row);
+        $this->assertMatchesRegularExpression('~<select name="end_month"[^>]*>.*<option value="5" selected>Mai</option>~s', $row);
+        $this->assertStringContainsString('data-day="2"', $row);
+    }
+
     private function pageAs(?string $role): string
     {
         $client = new WsClient();

@@ -31,6 +31,7 @@ is still taken, as an exact day.
 ## Verification
 
 * [ ] After a metadata sync, a photo with photoinfo date `ca. 1965` still shows `ca. 1965`
+* [ ] After a metadata sync, a photo with the range `1965–1970` keeps start, qualifier and end together: a sync that rewrote only `date_creation` would show an end before its start (found in task 04's review)
 * [ ] A file with `DateTimeOriginal` but no `Make`/`Model` gets no date from a sync
 * [ ] A file with `Make`, `Model` and `DateTimeOriginal` gets that day as an exact date
 * [ ] The filesystem date is never used

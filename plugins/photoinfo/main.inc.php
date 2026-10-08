@@ -74,12 +74,16 @@ function photoinfo_add_methods($arr)
     'ws_photoinfo_setDate',
     array(
       'image_id' => array('type' => WS_TYPE_ID),
-      'year' => array('default' => '', 'info' => 'Four digits, 1800 to the current year; all three empty to clear the date'),
+      'qualifier' => array('default' => '', 'info' => 'circa, before, after or between; empty for an exact date'),
+      'year' => array('default' => '', 'info' => 'Four digits, 1800 to the current year; every field empty to clear the date'),
       'month' => array('default' => '', 'info' => '1 to 12, or empty when unknown'),
       'day' => array('default' => '', 'info' => 'Day of the month, or empty when unknown; needs a month'),
+      'end_year' => array('default' => '', 'info' => 'The range end, only with between; not before the start'),
+      'end_month' => array('default' => '', 'info' => 'The range end\'s month, or empty when unknown'),
+      'end_day' => array('default' => '', 'info' => 'The range end\'s day, or empty when unknown; needs a month'),
       'pwg_token' => array(),
       ),
-    'Saves a photo\'s date - a year, a month or a day - and writes it into the image file.',
+    'Saves a photo\'s date - a year, a month or a day, optionally circa, before, after, or a range - and writes it into the image file.',
     PHOTOINFO_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );

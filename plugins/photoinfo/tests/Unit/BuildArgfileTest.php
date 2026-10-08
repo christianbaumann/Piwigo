@@ -88,7 +88,7 @@ final class BuildArgfileTest extends TestCase
      */
     public function testADateSaveWritesTheCaptionAndTheThreeDateTags(): void
     {
-        $lines = photoinfo_build_date_argfile('März 1965 | P', array('year' => 1965, 'month' => 3, 'day' => null), self::PREFIX);
+        $lines = photoinfo_build_date_argfile('März 1965 | P', self::dating(array('year' => 1965, 'month' => 3, 'day' => null)), self::PREFIX);
 
         $this->assertSame(
             array(
@@ -108,6 +108,29 @@ final class BuildArgfileTest extends TestCase
         $this->assertSame(array(), preg_grep('/DateTimeOriginal/i', $lines));
     }
 
+    /**
+     * [HAPPY] A range puts its start into both DateCreated slots and the
+     * whole range into the EDTF tag.
+     */
+    public function testARangeWritesItsStartAsDateCreated(): void
+    {
+        $dating = array(
+            'qualifier' => 'between',
+            'start' => array('year' => 1965, 'month' => 3, 'day' => null),
+            'end' => array('year' => 1970, 'month' => null, 'day' => null),
+        );
+
+        $this->assertSame(
+            array('-XMP-photoshop:DateCreated=1965-03', '-IPTC:DateCreated=1965:03:00', '-XMP-pwginfo:DateEDTF=1965-03/1970'),
+            array_slice(photoinfo_build_date_argfile('1965–1970', $dating, self::PREFIX), -3)
+        );
+    }
+
+    private static function dating(array $start): array
+    {
+        return array('qualifier' => null, 'start' => $start, 'end' => null);
+    }
+
     /** [BVA] No date deletes all three date tags. */
     public function testNoDateDeletesTheDateTags(): void
     {
@@ -122,7 +145,7 @@ final class BuildArgfileTest extends TestCase
     /** [NEG] A multi-line caption names its value file, never a line break on a line. */
     public function testAMultiLineCaptionInADateSaveTravelsInAValueFile(): void
     {
-        $lines = photoinfo_build_date_argfile("1965\nInfo\n\nP", array('year' => 1965, 'month' => null, 'day' => null), self::PREFIX);
+        $lines = photoinfo_build_date_argfile("1965\nInfo\n\nP", self::dating(array('year' => 1965, 'month' => null, 'day' => null)), self::PREFIX);
 
         foreach ($lines as $line)
         {

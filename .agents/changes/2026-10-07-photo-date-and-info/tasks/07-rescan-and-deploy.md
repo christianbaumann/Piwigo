@@ -30,6 +30,7 @@ activates photoinfo, so the remote shows both fields although its database is ne
 ## Verification
 
 * [ ] Every EDTF form from the design's table parses back to the values that produced it
+* [ ] The rescan reads `XMP-pwginfo:DateEDTF` with `plugins/photoinfo/exiftool/pwginfo.config`: without it exiftool reads `1965/1970` as a fraction (task 04's notes). An EDTF `1965/` (open end) is not a range the editor can save; decide and record what the rescan makes of it. Note that `../1965` is inclusive in EDTF while `vor` means strictly before; the design's table fixes `../1965`
 * [ ] After clearing a photo's date and info in the database, a rescan restores both
 * [ ] A rescan changes no image file (checksum before and after)
 * [ ] `uv run pwg-deploy --dry-run` lists photoinfo for activation; `uv run pytest` in `tools/deploy` passes

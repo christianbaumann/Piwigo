@@ -71,6 +71,9 @@ try
             'comment' => $row['comment'],
             'date_creation' => $row['date_creation'],
             'photoinfo_date_precision' => $row['photoinfo_date_precision'],
+            'photoinfo_date_qualifier' => $row['photoinfo_date_qualifier'],
+            'photoinfo_date_end' => $row['photoinfo_date_end'],
+            'photoinfo_date_end_precision' => $row['photoinfo_date_end_precision'],
             )), "\n";
         exit(0);
     }

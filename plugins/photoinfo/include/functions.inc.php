@@ -34,8 +34,7 @@ define('PHOTOINFO_DATE_IPTC_TAG', 'IPTC:DateCreated');
 /**
  * The photo columns this plugin adds to images, as column name => SQL
  * definition. date_creation (core) holds the start of the date; these carry
- * what a DATETIME cannot. The qualifier and the range end are unused until
- * qualifiers and ranges are edited.
+ * what a DATETIME cannot.
  *
  * @return array
  */
@@ -44,7 +43,7 @@ function photoinfo_image_columns()
   $precisions = "ENUM('".implode("','", photoinfo_date_precisions())."')";
 
   return array(
-    'photoinfo_date_qualifier' => "ENUM('circa','before','after','between') DEFAULT NULL",
+    'photoinfo_date_qualifier' => "ENUM('".implode("','", array_keys(photoinfo_qualifier_labels()))."') DEFAULT NULL",
     'photoinfo_date_precision' => $precisions.' DEFAULT NULL',
     'photoinfo_date_end' => 'DATE DEFAULT NULL',
     'photoinfo_date_end_precision' => $precisions.' DEFAULT NULL',
@@ -59,7 +58,7 @@ function photoinfo_image_columns()
  */
 function photoinfo_written_columns()
 {
-  return array('comment', 'date_creation', 'photoinfo_date_precision');
+  return array_merge(array('comment'), array_keys(photoinfo_dating_columns(null)));
 }
 
 /** This plugin's block in the provenance_caption_parts filter. */
@@ -74,7 +73,7 @@ define('PHOTOINFO_CAPTION_BLOCK', 'photoinfo');
  *
  * @param array $blocks name => text, as the provenance_caption_parts filter passes them
  * @param string|null $info the photo's description
- * @param string $date the date as photoinfo_date_display() gives it
+ * @param string $date the date as photoinfo_dating_display() gives it
  * @return array
  */
 function photoinfo_caption_blocks($blocks, $info, $date = '')
@@ -151,25 +150,28 @@ function photoinfo_build_argfile($caption, $info, $value_prefix)
 
 /**
  * The argfile lines for one date save: the composed caption in provenance's
- * five slots and the date in its three tags. Never EXIF DateTimeOriginal: on a
- * scan that is the scan date, and it cannot say "1965".
+ * five slots and the date in its three tags: the start in the two DateCreated
+ * slots, the whole dating as EDTF. Never EXIF DateTimeOriginal: on a scan that
+ * is the scan date, and it cannot say "1965".
  *
  * Every line is emitted even when its value is empty: clearing the date must
  * delete it from the file too.
  *
  * @param string $caption the composed caption, date and info text first
- * @param array|null $date
+ * @param array|null $dating
  * @param string $value_prefix path prefix of the caption's value files
  * @return array
  */
-function photoinfo_build_date_argfile($caption, $date, $value_prefix)
+function photoinfo_build_date_argfile($caption, $dating, $value_prefix)
 {
+  $start = $dating === null ? null : $dating['start'];
+
   $lines = array('-charset', 'iptc=UTF8');
   $lines = array_merge($lines,
     provenance_caption_argfile_lines(provenance_normalize_caption($caption), $value_prefix));
-  $lines[] = '-'.PHOTOINFO_DATE_XMP_TAG.'='.photoinfo_date_xmp($date);
-  $lines[] = '-'.PHOTOINFO_DATE_IPTC_TAG.'='.photoinfo_date_iptc($date);
-  $lines[] = '-'.PHOTOINFO_DATE_EDTF_TAG.'='.photoinfo_date_edtf($date);
+  $lines[] = '-'.PHOTOINFO_DATE_XMP_TAG.'='.photoinfo_date_xmp($start);
+  $lines[] = '-'.PHOTOINFO_DATE_IPTC_TAG.'='.photoinfo_date_iptc($start);
+  $lines[] = '-'.PHOTOINFO_DATE_EDTF_TAG.'='.photoinfo_dating_edtf($dating);
 
   return $lines;
 }

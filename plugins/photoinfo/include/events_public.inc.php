@@ -44,21 +44,18 @@ function photoinfo_picture_rows()
   // The test picture.php uses for COMMENT_IMG, so the row and core agree.
   $rows['INFO'] = (!empty($raw) or $editable);
 
-  $date = photoinfo_date_from_row(
-    isset($current['date_creation']) ? $current['date_creation'] : null,
-    isset($current['photoinfo_date_precision']) ? $current['photoinfo_date_precision'] : null
-    );
-  $rows['DATE'] = ($date !== null or $editable);
+  $dating = photoinfo_dating_from_row($current);
+  $rows['DATE'] = ($dating !== null or $editable);
 
-  if ($date !== null)
+  if ($dating !== null)
   {
-    $rows['DATE_TEXT'] = photoinfo_date_display($date);
+    $rows['DATE_TEXT'] = photoinfo_dating_display($dating);
     $rows['DATE_URL'] = make_index_url(
       array(
         'chronology_field' => 'created',
         'chronology_style' => 'monthly',
         'chronology_view' => 'list',
-        'chronology_date' => photoinfo_date_chronology($date),
+        'chronology_date' => photoinfo_date_chronology($dating['start']),
         )
       );
   }
@@ -66,9 +63,12 @@ function photoinfo_picture_rows()
   if ($editable)
   {
     $rows['RAW'] = $raw;
-    $rows['YEAR'] = $date === null ? '' : $date['year'];
-    $rows['MONTH'] = ($date === null or $date['month'] === null) ? '' : $date['month'];
-    $rows['DAY'] = ($date === null or $date['day'] === null) ? '' : $date['day'];
+    $start = $dating === null ? null : $dating['start'];
+    $end = $dating === null ? null : $dating['end'];
+    $rows['QUALIFIER'] = ($dating === null or $dating['qualifier'] === null) ? '' : $dating['qualifier'];
+    $rows['QUALIFIERS'] = photoinfo_qualifier_labels();
+    $rows['START'] = photoinfo_date_fields($start);
+    $rows['END'] = photoinfo_date_fields($end);
     $rows['MONTHS'] = photoinfo_month_names();
     $rows['MIN_YEAR'] = PHOTOINFO_DATE_MIN_YEAR;
     $rows['MAX_YEAR'] = date('Y');
@@ -108,4 +108,24 @@ function photoinfo_picture_prefilter($content)
       .PHOTOINFO_TPL_ROW_ANCHOR,
     $content
     );
+}
+
+/**
+ * One date as the editor's three fields hold it.
+ *
+ * @param array|null $date
+ * @return array year, month, day; '' where unknown
+ */
+function photoinfo_date_fields($date)
+{
+  $fields = array('year' => '', 'month' => '', 'day' => '');
+  if ($date !== null)
+  {
+    foreach ($fields as $part => $empty)
+    {
+      $fields[$part] = $date[$part] === null ? '' : $date[$part];
+    }
+  }
+
+  return $fields;
 }

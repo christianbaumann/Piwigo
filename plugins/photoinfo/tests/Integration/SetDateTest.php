@@ -127,6 +127,8 @@ final class SetDateTest extends TestCase
         $row = $this->fixture->imageRow($this->image['id']);
         $this->assertNull($row['date_creation']);
         $this->assertNull($row['photoinfo_date_precision']);
+        $this->assertNull($row['photoinfo_date_qualifier']);
+        $this->assertNull($row['photoinfo_date_end']);
         $this->assertSame(array(
             'XMP-photoshop:DateCreated' => null,
             'IPTC:DateCreated' => null,
@@ -134,6 +136,100 @@ final class SetDateTest extends TestCase
             'EXIF:DateTimeOriginal' => self::SCAN_DATE,
             ), FixtureBuilder::readDateTags($this->image['file']));
         $this->assertNull(FixtureBuilder::readFileTags($this->image['file'])['XMP-dc:Description']);
+    }
+
+    public static function qualified(): array
+    {
+        // qualifier, start, end => date_creation, qualifier, end, end precision, shown, XMP, IPTC, EDTF
+        return array(
+            'ca.' => array('circa', array('1965', '', ''), array('', '', ''),
+                '1965-01-01 00:00:00', 'circa', null, null, 'ca. 1965', '1965', '1965:00:00', '1965~'),
+            'vor' => array('before', array('1965', '', ''), array('', '', ''),
+                '1965-01-01 00:00:00', 'before', null, null, 'vor 1965', '1965', '1965:00:00', '../1965'),
+            'nach' => array('after', array('1965', '3', ''), array('', '', ''),
+                '1965-03-01 00:00:00', 'after', null, null, 'nach März 1965', '1965-03', '1965:03:00', '1965-03/..'),
+            'zwischen' => array('between', array('1965', '', ''), array('1970', '', ''),
+                '1965-01-01 00:00:00', 'between', '1970-01-01', 'year', "1965\u{2013}1970", '1965', '1965:00:00', '1965/1970'),
+            'zwischen, end with a day' => array('between', array('1965', '3', ''), array('1966', '5', '2'),
+                '1965-03-01 00:00:00', 'between', '1966-05-02', 'day', "März 1965\u{2013}2. Mai 1966", '1965-03', '1965:03:00', '1965-03/1966-05-02'),
+            );
+    }
+
+    /**
+     * [DT] Each row of the design's combination table: the columns, the start
+     * in both DateCreated slots, the EDTF string and the caption's text.
+     */
+    #[DataProvider('qualified')]
+    public function testEachQualifierGoesIntoRowAndFile(string $qualifier, array $start, array $end,
+        string $dateCreation, string $storedQualifier, ?string $storedEnd, ?string $endPrecision,
+        string $shown, string $xmp, string $iptc, string $edtf): void
+    {
+        FixtureBuilder::writeDateTimeOriginal($this->image['file'], self::SCAN_DATE);
+
+        $res = $this->setDate($this->ws, $start[0], $start[1], $start[2], $qualifier, $end);
+
+        $this->assertTrue($res['json']['result']['written'], $res['body']);
+        $this->assertSame($shown, $res['json']['result']['date']);
+        $this->assertSame($edtf, $res['json']['result']['edtf']);
+
+        $row = $this->fixture->imageRow($this->image['id']);
+        $this->assertSame($dateCreation, $row['date_creation']);
+        $this->assertSame($storedQualifier, $row['photoinfo_date_qualifier']);
+        $this->assertSame($storedEnd, $row['photoinfo_date_end']);
+        $this->assertSame($endPrecision, $row['photoinfo_date_end_precision']);
+
+        $this->assertSame(array(
+            'XMP-photoshop:DateCreated' => $xmp,
+            'IPTC:DateCreated' => $iptc,
+            'XMP-pwginfo:DateEDTF' => $edtf,
+            'EXIF:DateTimeOriginal' => self::SCAN_DATE,
+            ), FixtureBuilder::readDateTags($this->image['file']));
+        $this->assertSame($shown, FixtureBuilder::readFileTags($this->image['file'])['XMP-dc:Description']);
+    }
+
+    /** [ST] Going from a range back to an exact date clears the qualifier and the end. */
+    public function testAnExactDateClearsAFormerRange(): void
+    {
+        $this->setDate($this->ws, '1965', '', '', 'between', array('1970', '', ''));
+
+        $res = $this->setDate($this->ws, '1965', '3', '');
+
+        $this->assertSame('März 1965', $res['json']['result']['date']);
+        $row = $this->fixture->imageRow($this->image['id']);
+        $this->assertNull($row['photoinfo_date_qualifier']);
+        $this->assertNull($row['photoinfo_date_end']);
+        $this->assertNull($row['photoinfo_date_end_precision']);
+        $this->assertSame('1965-03', FixtureBuilder::readDateTags($this->image['file'])['XMP-pwginfo:DateEDTF']);
+    }
+
+    public static function refusedRanges(): array
+    {
+        return array(
+            'end before start [BVA]' => array('between', array('1965', '', ''), array('1964', '', '')),
+            'end one day before start [BVA]' => array('between', array('1965', '3', '14'), array('1965', '3', '13')),
+            'between with no end [NEG]' => array('between', array('1965', '', ''), array('', '', '')),
+            'circa with an end [NEG]' => array('circa', array('1965', '', ''), array('1970', '', '')),
+            'qualifier with no date [NEG]' => array('circa', array('', '', ''), array('', '', '')),
+            'unknown qualifier [NEG]' => array('exact', array('1965', '', ''), array('', '', '')),
+            'end in the next year [BVA]' => array('between', array('1965', '', ''), array((string)((int)date('Y') + 1), '', '')),
+            );
+    }
+
+    /** [NEG] A range or qualifier the date model does not allow is refused, and nothing changes. */
+    #[DataProvider('refusedRanges')]
+    public function testAnImpossibleRangeIsRefused(string $qualifier, array $start, array $end): void
+    {
+        $this->fixture->setDate($this->image['id'], '1950-05-06 00:00:00', 'day');
+        $before = md5_file($this->image['file']);
+
+        $res = $this->call($this->ws, $start[0], $start[1], $start[2], $qualifier, $end);
+
+        $this->assertSame(WS_ERR_INVALID_PARAM, $res['json']['err'] ?? null, $res['body']);
+        $row = $this->fixture->imageRow($this->image['id']);
+        $this->assertSame('1950-05-06 00:00:00', $row['date_creation']);
+        $this->assertNull($row['photoinfo_date_qualifier']);
+        clearstatcache();
+        $this->assertSame($before, md5_file($this->image['file']), 'the file was rewritten');
     }
 
     /** [HAPPY] The calendar lists the photo under its start date. */
@@ -258,20 +354,26 @@ final class SetDateTest extends TestCase
         return $client;
     }
 
-    private function call(WsClient $client, string $year, string $month, string $day): array
+    private function call(WsClient $client, string $year, string $month, string $day,
+        string $qualifier = '', array $end = array('', '', '')): array
     {
         return $client->call(self::METHOD, array(
             'image_id' => $this->image['id'],
+            'qualifier' => $qualifier,
             'year' => $year,
             'month' => $month,
             'day' => $day,
+            'end_year' => $end[0],
+            'end_month' => $end[1],
+            'end_day' => $end[2],
             'pwg_token' => $client->token(),
         ));
     }
 
-    private function setDate(WsClient $client, string $year, string $month, string $day): array
+    private function setDate(WsClient $client, string $year, string $month, string $day,
+        string $qualifier = '', array $end = array('', '', '')): array
     {
-        $res = $this->call($client, $year, $month, $day);
+        $res = $this->call($client, $year, $month, $day, $qualifier, $end);
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
 
         return $res;
