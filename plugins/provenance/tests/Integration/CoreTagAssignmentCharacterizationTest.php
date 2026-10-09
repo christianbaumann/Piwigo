@@ -13,8 +13,8 @@ use PHPUnit\Framework\TestCase;
  * promises that add_tags appends or that a typed name becomes a tag; these
  * record that it does today. They report a change; they prove nothing right.
  *
- * They pass on their first run, so each was watched go red by breaking the
- * fact it pins (docs/agents/TESTING.md).
+ * They pass on their first run, so each was watched go red by inverting the
+ * expectation it pins (docs/agents/TESTING.md); core itself was not mutated.
  */
 final class CoreTagAssignmentCharacterizationTest extends TestCase
 {
@@ -110,12 +110,17 @@ final class CoreTagAssignmentCharacterizationTest extends TestCase
 
     // ── pwg.images.setInfo ────────────────────────────────────────────────
 
-    /** [ERR] tag_list (the Batch Manager's unit mode) creates a typed name and links it. */
+    /**
+     * [ERR] tag_list (the Batch Manager's unit mode) creates a typed name and
+     * links it, replacing the photo's other tags (set_tags(), not add_tags()).
+     */
     public function testSetInfoTagListCreatesANewTag(): void
     {
         $name = $this->uniqueName('setinfo-typed');
         $this->testTagNames[] = $name;
+        $old = $this->addTag($this->uniqueName('setinfo-old'));
         $image = $this->fixture->createTestImage()['id'];
+        $this->linkTag($image, $old);
         $this->assertSame(0, $this->tagIdByName($name), 'anti-vacuity: the tag must not exist yet');
 
         $res = $this->ws->call('pwg.images.setInfo', array(
@@ -127,7 +132,7 @@ final class CoreTagAssignmentCharacterizationTest extends TestCase
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
         $id = $this->tagIdByName($name);
         $this->assertGreaterThan(0, $id, 'the typed name became a tag');
-        $this->assertSame(array($id), $this->tagsOfPhoto($image));
+        $this->assertSame(array($id), $this->tagsOfPhoto($image), 'the earlier tag was replaced, not kept');
     }
 
     /** [ERR] tag_ids with multiple_value_mode=append keeps the photo's existing tags. */
@@ -203,6 +208,7 @@ final class CoreTagAssignmentCharacterizationTest extends TestCase
         $name = $this->uniqueName('props-group');
         $this->testTagNames[] = $name;
         $image = $this->photoOnTheProperties();
+        $this->assertSame(0, $this->tagIdByName($name), 'anti-vacuity: the tag must not exist yet');
 
         $this->postProperties($image, array($name));
 
