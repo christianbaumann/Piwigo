@@ -84,6 +84,36 @@ class FixtureBuilder
     }
 
     /**
+     * Removes what a copied gallery photo brings along of persons and of
+     * photoinfo's tag writes - regions, PersonInImage, keywords and the pwginfo
+     * namespace - and asserts none is left: a copy carrying a real face makes
+     * the suite act on that real person and the real photos tagged with them.
+     * The pwginfo group is deleted as a whole, which needs no -config.
+     */
+    private static function stripCopiedMetadata(string $file): void
+    {
+        $fields = array('XMP-mwg-rs:RegionInfo', 'XMP-iptcExt:PersonInImage', 'XMP-dc:Subject', 'IPTC:Keywords',
+            'XMP-lr:HierarchicalSubject', 'XMP-pwginfo:all');
+        $deletes = array_map(fn ($field) => escapeshellarg('-' . $field . '='), $fields);
+        $reads = array_map(fn ($field) => escapeshellarg('-' . $field), $fields);
+
+        $output = array();
+        $status = 1;
+        exec('exiftool -q -overwrite_original ' . implode(' ', $deletes) . ' ' . escapeshellarg($file) . ' 2>&1', $output, $status);
+        if ($status !== 0)
+        {
+            throw new RuntimeException("cannot strip the copied metadata of $file: " . implode("\n", $output));
+        }
+
+        $left = array();
+        exec('exiftool -s3 ' . implode(' ', $reads) . ' ' . escapeshellarg($file) . ' 2>&1', $left);
+        if (trim(implode("\n", $left)) !== '')
+        {
+            throw new RuntimeException("regions or keywords left in $file: " . implode("\n", $left));
+        }
+    }
+
+    /**
      * A photo of this suite's own: a copy of the first PNG of the gallery under
      * upload/photoedit-test/, registered as an image row. Never a real scan:
      * the edits this suite drives rewrite the file in place.
@@ -112,6 +142,7 @@ class FixtureBuilder
         {
             throw new RuntimeException("cannot copy $sourceFile to $dir$name");
         }
+        self::stripCopiedMetadata($dir . $name);
 
         $dimensions = @getimagesize($dir . $name);
         if ($dimensions === false)

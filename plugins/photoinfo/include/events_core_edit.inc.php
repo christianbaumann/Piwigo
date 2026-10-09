@@ -12,6 +12,9 @@ include_once(PHOTOINFO_PATH.'include/writer.inc.php');
  * - the Batch Manager's global "Set creation date": element_set_global_action
  * - pwg.images.setInfo, which the Batch Manager's unit mode calls: no event
  *   after the save, so the method is registered again around core's
+ *
+ * The same screens' tag changes are in events_tags.inc.php, beside the other
+ * paths that change tags.
  */
 
 /**
@@ -87,27 +90,82 @@ function photoinfo_element_set_global_action($action, $collection)
  */
 function photoinfo_wrap_core_methods($arr)
 {
-  $service = &$arr[0];
-  $method = 'pwg.images.setInfo';
+  photoinfo_wrap_method($arr[0], 'pwg.images.setInfo', 'ws_photoinfo_images_setInfo',
+    PHOTOINFO_PATH.'include/events_core_edit.inc.php');
+}
 
+/**
+ * The callbacks photoinfo_wrap_method() replaced, by method name.
+ *
+ * @return array method => array('callback', 'include')
+ */
+function &photoinfo_wrapped_methods()
+{
+  static $methods = array();
+  return $methods;
+}
+
+/**
+ * Registers a web-service method again around its current callback, keeping
+ * its parameters, description and options. The wrapper calls the original
+ * through photoinfo_call_wrapped(). Does nothing for a method that does not
+ * exist, as when the plugin providing it is off, or that is wrapped already.
+ *
+ * @param object $service
+ * @param string $method
+ * @param string $callback
+ * @param string $include the file defining $callback
+ */
+function photoinfo_wrap_method($service, $method, $callback, $include)
+{
   if (!$service->hasMethod($method))
   {
     return;
   }
 
+  $wrapped = &photoinfo_wrapped_methods();
+  if (isset($wrapped[$method]))
+  {
+    return;
+  }
+  $wrapped[$method] = array(
+    'callback' => $service->_methods[$method]['callback'],
+    'include' => $service->_methods[$method]['include'],
+    );
+
   $service->addMethod(
     $method,
-    'ws_photoinfo_images_setInfo',
+    $callback,
     $service->getMethodSignature($method),
     $service->getMethodDescription($method),
-    PHOTOINFO_PATH.'include/events_core_edit.inc.php',
+    $include,
     $service->getMethodOptions($method)
     );
 }
 
 /**
- * pwg.images.setInfo, then photoinfo's side of what it changed. Core's answer
- * is kept; when a file was written, the answer says whether that worked.
+ * Calls the callback photoinfo_wrap_method() replaced.
+ *
+ * @param string $method
+ * @param array $params
+ * @param object $service
+ * @return mixed its answer
+ */
+function photoinfo_call_wrapped($method, $params, &$service)
+{
+  $wrapped = photoinfo_wrapped_methods();
+  if (!empty($wrapped[$method]['include']))
+  {
+    include_once($wrapped[$method]['include']);
+  }
+
+  return call_user_func_array($wrapped[$method]['callback'], array($params, &$service));
+}
+
+/**
+ * pwg.images.setInfo, then photoinfo's side of what it changed: the date and
+ * description, and the tags. Core's answer is kept; when a file was written,
+ * the answer says whether that worked.
  *
  * @param array $params
  * @param object $service
@@ -115,11 +173,10 @@ function photoinfo_wrap_core_methods($arr)
  */
 function ws_photoinfo_images_setInfo($params, &$service)
 {
-  include_once(PHPWG_ROOT_PATH.'include/ws_functions/pwg.images.php');
-
   $before = photoinfo_core_edit_snapshot($params['image_id']);
+  $tags_before = photoinfo_tag_ids_of($params['image_id']);
 
-  $result = ws_images_setInfo($params, $service);
+  $result = photoinfo_call_wrapped('pwg.images.setInfo', $params, $service);
   if ($before === null)
   {
     return $result;
@@ -127,16 +184,51 @@ function ws_photoinfo_images_setInfo($params, &$service)
 
   // Core can answer an error after it saved the row; what it saved is still synced.
   $written = photoinfo_apply_core_edit($before['id'], $before);
-  if ($written === null or $result instanceof PwgError)
+  $tags_written = array();
+  if (photoinfo_tag_ids_of($before['id']) !== $tags_before)
+  {
+    $tags_written = photoinfo_write_tags(array($before['id']));
+  }
+
+  if ($result instanceof PwgError or ($written === null and count($tags_written) == 0))
   {
     return $result;
   }
 
-  return array(
-    'image_id' => (int)$before['id'],
-    'written' => $written['ok'],
-    'message' => $written['message'],
-    );
+  $answer = array('image_id' => (int)$before['id']);
+  if ($written !== null)
+  {
+    $answer['written'] = $written['ok'];
+    $answer['message'] = $written['message'];
+  }
+
+  return array_merge($answer, photoinfo_tag_write_answer($tags_written));
+}
+
+/**
+ * What a web-service answer says about the tag writes it caused.
+ *
+ * @param array $results photoinfo_write_tags()'s answer
+ * @return array 'tags_written' => whether every write worked, 'tags_message'
+ *   => the first failure's message; empty when nothing was written
+ */
+function photoinfo_tag_write_answer($results)
+{
+  if (count($results) == 0)
+  {
+    return array();
+  }
+
+  $answer = array('tags_written' => true, 'tags_message' => '');
+  foreach ($results as $result)
+  {
+    if (!$result['ok'])
+    {
+      return array('tags_written' => false, 'tags_message' => $result['message']);
+    }
+  }
+
+  return $answer;
 }
 
 /**

@@ -52,6 +52,26 @@ add_event_handler('element_set_global_action', 'photoinfo_element_set_global_act
 add_event_handler('ws_add_methods', 'photoinfo_wrap_core_methods',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 10, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
 
+// A photo's tags reach its file whenever they change, on every path that changes them.
+$photoinfo_tags_file = PHOTOINFO_PATH . 'include/events_tags.inc.php';
+add_event_handler('picture_modify_before_update', 'photoinfo_tags_picture_modify_before_update',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $photoinfo_tags_file);
+add_event_handler('loc_end_picture_modify', 'photoinfo_tags_picture_modify_after_save',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $photoinfo_tags_file);
+add_event_handler('element_set_global_action', 'photoinfo_tags_element_set_global_action',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $photoinfo_tags_file);
+add_event_handler('ws_add_methods', 'photoinfo_wrap_tag_methods',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $photoinfo_tags_file);
+add_event_handler('typetags_tags_regrouped', 'photoinfo_tags_regrouped',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $photoinfo_tags_file);
+add_event_handler('persons_tags_changed', 'photoinfo_persons_tags_changed',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $photoinfo_tags_file);
+add_event_handler('photoedit_begin', 'photoinfo_photoedit_begin',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $photoinfo_tags_file);
+// After provenance and persons, whose handlers give back the locks the edit held.
+add_event_handler('photoedit_end', 'photoinfo_photoedit_end',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $photoinfo_tags_file);
+
 // The Datum and Info rows. Registered only on the picture page, and the file behind it is
 // pulled in only when the event actually fires.
 if (script_basename() == 'picture')

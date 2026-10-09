@@ -210,6 +210,30 @@ function photoedit_record_version($image_id, $file)
 }
 
 /**
+ * Stores the file's size, checksum and version again once photoedit_end has
+ * run: its listeners (persons' regions, photoinfo's keywords) may have
+ * written the file after photoedit_write() stored them. Runs under the edit's
+ * lock, so no other edit can come between.
+ *
+ * @param array $image the row as read before the edit: id, md5sum
+ * @param string $file
+ * @return void
+ */
+function photoedit_refresh_file_facts($image, $file)
+{
+  clearstatcache();
+
+  $updates = array('filesize' => floor(filesize($file) / 1024));
+  if (!empty($image['md5sum']))
+  {
+    $updates['md5sum'] = md5_file($file);
+  }
+  single_update(IMAGES_TABLE, $updates, array('id' => $image['id']));
+
+  photoedit_record_version($image['id'], $file);
+}
+
+/**
  * @param array $versions
  * @return void
  */
@@ -334,9 +358,19 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
   }
   finally
   {
-    trigger_notify('photoedit_end', $image, $transform, $ok);
-    photoedit_remove_dir($work_dir);
-    photoedit_lock_release($lock);
+    try
+    {
+      trigger_notify('photoedit_end', $image, $transform, $ok);
+      if ($ok)
+      {
+        photoedit_refresh_file_facts($image, $file);
+      }
+    }
+    finally
+    {
+      photoedit_remove_dir($work_dir);
+      photoedit_lock_release($lock);
+    }
   }
 
   if (!$ok)

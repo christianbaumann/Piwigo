@@ -37,8 +37,19 @@ class FixtureBuilder
         'XMP-pwginfo:Info' => 'Info',
         );
 
+    /** The tags readKeywords() asks for, mapped to the key exiftool's JSON names each one with. */
+    public const KEYWORD_TAGS = array(
+        'XMP-dc:Subject' => 'Subject',
+        'IPTC:Keywords' => 'Keywords',
+        'XMP-lr:HierarchicalSubject' => 'HierarchicalSubject',
+        'XMP-pwginfo:TagsWritten' => 'TagsWritten',
+        );
+
     private array $testImages = array();
     private array $testAlbums = array();
+    private array $testTags = array();
+    private array $testGroups = array();
+    private array $testPersons = array();
     private array $physicalDirs = array();
 
     public function __construct(Db $db)
@@ -528,6 +539,180 @@ class FixtureBuilder
         $this->db->query("UPDATE `piwigo_user_cache` SET need_update = 'true'");
     }
 
+    /** A typetags group of this suite's own. */
+    public function createGroup(string $name): int
+    {
+        $this->db->query(
+            "INSERT INTO piwigo_typetags (name, color) VALUES ('" . $this->db->escape($name) . "', '#123456')"
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException("group $name was not inserted");
+        }
+        $this->testGroups[] = $id;
+        return $id;
+    }
+
+    /** A tag of this suite's own, in a group or none. */
+    public function createTag(string $name, ?int $groupId = null): int
+    {
+        $this->db->query(
+            "INSERT INTO piwigo_tags (name, url_name, id_typetags) VALUES ('" . $this->db->escape($name) . "', '" .
+            $this->db->escape(bin2hex(random_bytes(8))) . "', " . ($groupId === null ? 'NULL' : $groupId) . ')'
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException("tag $name was not inserted");
+        }
+        $this->testTags[] = $id;
+        return $id;
+    }
+
+    /** A tag the server created while a test ran (a copy, a typed name), so teardown removes it. */
+    public function tagIdNamed(string $name): int
+    {
+        $id = (int)$this->db->scalar("SELECT id FROM piwigo_tags WHERE name = '" . $this->db->escape($name) . "'");
+        if ($id <= 0)
+        {
+            throw new RuntimeException("no tag named $name");
+        }
+        $this->testTags[] = $id;
+        return $id;
+    }
+
+    /** Links one tag to one photo directly, asserting it took effect. */
+    public function linkTag(int $imageId, int $tagId): void
+    {
+        $this->db->query("INSERT IGNORE INTO piwigo_image_tag (image_id, tag_id) VALUES ($imageId, $tagId)");
+        if (!in_array($tagId, $this->tagIdsOf($imageId), true))
+        {
+            throw new RuntimeException("tag $tagId was not linked to photo $imageId");
+        }
+    }
+
+    /** @return int[] the photo's tag ids, ascending */
+    public function tagIdsOf(int $imageId): array
+    {
+        $ids = array();
+        $result = $this->db->query("SELECT tag_id FROM piwigo_image_tag WHERE image_id = $imageId ORDER BY tag_id");
+        while ($row = $result->fetch_assoc())
+        {
+            $ids[] = (int)$row['tag_id'];
+        }
+        return $ids;
+    }
+
+    /** A person a test created through plugins/persons, so teardown removes its rows and tag. */
+    public function trackPerson(string $name): void
+    {
+        $this->testPersons[] = $name;
+    }
+
+    /**
+     * Reads the keyword fields and the marker back with a plain exiftool call in
+     * its own process, not through photoinfo.
+     *
+     * @return array the three keyword fields as lists of strings (empty when
+     *   absent), and the marker as a string or null
+     */
+    public static function readKeywords(string $file): array
+    {
+        if (!is_file($file))
+        {
+            throw new RuntimeException("no file to read keywords from: $file");
+        }
+
+        $command = 'exiftool -j -charset iptc=UTF8';
+        foreach (array_keys(self::KEYWORD_TAGS) as $tag)
+        {
+            $command .= ' ' . escapeshellarg('-' . $tag);
+        }
+        $decoded = json_decode(self::run($command . ' ' . escapeshellarg($file)), true);
+        if (!is_array($decoded) or !isset($decoded[0]) or !is_array($decoded[0]))
+        {
+            throw new RuntimeException("exiftool returned no JSON object for $file");
+        }
+
+        $tags = array();
+        foreach (self::KEYWORD_TAGS as $tag => $key)
+        {
+            $value = $decoded[0][$key] ?? null;
+            if ($tag == 'XMP-pwginfo:TagsWritten')
+            {
+                $tags[$tag] = $value === null ? null : (string)$value;
+                continue;
+            }
+            $list = $value === null ? array() : array_map('strval', (array)$value);
+            sort($list, SORT_STRING);
+            $tags[$tag] = $list;
+        }
+        return $tags;
+    }
+
+    /**
+     * Removes what a copied gallery photo brings along of persons and of tag
+     * writes - its regions, keywords and marker - so a case sees only what it
+     * put there itself.
+     */
+    public static function stripRegionsAndKeywords(string $file): void
+    {
+        $fields = array('XMP-mwg-rs:RegionInfo', 'XMP-iptcExt:PersonInImage', 'XMP-dc:Subject', 'IPTC:Keywords',
+            'XMP-lr:HierarchicalSubject', 'XMP-pwginfo:TagsWritten');
+        // -config is honoured only as the first argument.
+        $command = 'exiftool -config ' . escapeshellarg(PHOTOINFO_PATH . 'exiftool/pwginfo.config') . ' -q -overwrite_original';
+        foreach ($fields as $field)
+        {
+            $command .= ' ' . escapeshellarg('-' . $field . '=');
+        }
+        self::run($command . ' ' . escapeshellarg($file) . ' 2>&1');
+
+        $left = self::run('exiftool -s3 ' . implode(' ', array_map(fn ($field) => escapeshellarg('-' . $field), $fields)) .
+            ' ' . escapeshellarg($file));
+        if (trim($left) !== '')
+        {
+            throw new RuntimeException("regions or keywords left in $file: $left");
+        }
+    }
+
+    /** Removes the tags, groups and persons this fixture created or tracked, and their links. */
+    public function destroyTestTags(): void
+    {
+        foreach ($this->testPersons as $name)
+        {
+            $escaped = $this->db->escape($name);
+            $person = $this->db->query("SELECT id, tag_id FROM piwigo_persons WHERE name = '$escaped'")->fetch_assoc();
+            if ($person === null)
+            {
+                continue;
+            }
+            $this->db->query('DELETE FROM piwigo_person_region WHERE person_id = ' . (int)$person['id']);
+            $this->db->query('DELETE FROM piwigo_persons WHERE id = ' . (int)$person['id']);
+            if ($person['tag_id'] !== null)
+            {
+                $this->testTags[] = (int)$person['tag_id'];
+            }
+        }
+        $this->testPersons = array();
+
+        foreach (array_unique($this->testTags) as $id)
+        {
+            $this->db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$id);
+            $this->db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$id);
+        }
+        $this->testTags = array();
+
+        foreach ($this->testGroups as $id)
+        {
+            $this->db->query('UPDATE piwigo_tags SET id_typetags = NULL WHERE id_typetags = ' . (int)$id);
+            $this->db->query('DELETE FROM piwigo_typetags WHERE id = ' . (int)$id);
+        }
+        $this->testGroups = array();
+
+        $this->db->query("UPDATE piwigo_user_cache SET nb_available_tags = NULL");
+    }
+
     /** What this fixture created, for the E2E seed's separate restore process. */
     public function exportTestObjects(): array
     {
@@ -569,6 +754,15 @@ class FixtureBuilder
             @rmdir(dirname($image['file']) . '/pwg_representative');
 
             @unlink(PIWIGO_ROOT . self::PROVENANCE_LOCK_DIR . sha1($image['db_path']) . '.lock');
+            if ($this->db->scalar("SHOW TABLES LIKE 'piwigo_person_region'") !== null)
+            {
+                $this->db->query('DELETE FROM piwigo_person_region WHERE image_id = ' . $id);
+            }
+            // The backups a photoedit edit made before it wrote the file.
+            foreach (glob(PIWIGO_ROOT . '_data/photoedit/originals/' . $id . '-*') as $backup)
+            {
+                @unlink($backup);
+            }
 
             // The derivatives i.php generated while a spec looked at the photo.
             $derivatives = PIWIGO_ROOT . '_data/i/' . substr(ltrim($image['db_path'], './'), 0, -strlen('.' . pathinfo($image['db_path'], PATHINFO_EXTENSION)));
@@ -577,6 +771,7 @@ class FixtureBuilder
                 @unlink($derivative);
             }
         }
+        $this->forgetPhotoeditVersions(array_map(fn ($image) => (int)$image['id'], $this->testImages));
         $this->testImages = array();
 
         foreach ($this->physicalDirs as $dir)
@@ -584,6 +779,27 @@ class FixtureBuilder
             @rmdir($dir);
         }
         $this->physicalDirs = array();
+    }
+
+    /** Drops these photos from the photoedit_versions row an edit writes; the rows were deleted directly. */
+    private function forgetPhotoeditVersions(array $ids): void
+    {
+        $versions = json_decode((string)$this->db->scalar(
+            "SELECT value FROM piwigo_config WHERE param = 'photoedit_versions'"
+        ), true);
+        if (!is_array($versions))
+        {
+            return;
+        }
+
+        $kept = array_diff_key($versions, array_flip($ids));
+        if (count($kept) != count($versions))
+        {
+            $this->db->query(
+                "UPDATE piwigo_config SET value = '" . $this->db->escape(json_encode((object)$kept)) .
+                "' WHERE param = 'photoedit_versions'"
+            );
+        }
     }
 
     /** Removes every album this fixture created. */

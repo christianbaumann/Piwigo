@@ -91,6 +91,23 @@ function persons_check_writer($params)
 }
 
 /**
+ * An answer, with what the file writes its change caused said beside it.
+ *
+ * @param array|PwgError $answer
+ * @param array $tag_writes persons_notify_tags_changed()'s answer
+ * @return array|PwgError
+ */
+function persons_with_tag_writes($answer, $tag_writes)
+{
+  if (!is_array($answer))
+  {
+    return $answer;
+  }
+
+  return array_merge($answer, persons_tag_write_answer($tag_writes));
+}
+
+/**
  * One image's regions in the shape the picture page renders from.
  *
  * Coordinates are handed over exactly as stored - normalized, centre origin,
@@ -325,7 +342,7 @@ function ws_persons_addRegion($params, &$service)
     return new PwgError(500, $outcome['message']);
   }
 
-  return persons_regions_payload($params['image_id']);
+  return persons_with_tag_writes(persons_regions_payload($params['image_id']), $outcome['tag_writes']);
 }
 
 /**
@@ -376,7 +393,7 @@ SELECT r.image_id, r.area_x, r.area_y, r.area_w, r.area_h, p.name
     return new PwgError(500, $outcome['message']);
   }
 
-  return persons_regions_payload($region['image_id']);
+  return persons_with_tag_writes(persons_regions_payload($region['image_id']), $outcome['tag_writes']);
 }
 
 /**
@@ -405,14 +422,14 @@ function ws_persons_rename($params, &$service)
 
   $person = persons_person_row($params['person_id']);
 
-  return array(
+  return persons_with_tag_writes(array(
     'id'       => (int)$params['person_id'],
     'name'     => $person === null ? null : $person['name'],
     'url_name' => $person === null ? null : $person['url_name'],
     'tag_id'   => ($person === null or $person['tag_id'] === null) ? null : (int)$person['tag_id'],
     'photos'   => $outcome['photos'],
     'failed'   => $outcome['failed'],
-    );
+    ), $outcome['tag_writes']);
 }
 
 /**
@@ -438,7 +455,8 @@ function ws_persons_delete($params, &$service)
     return new PwgError(WS_ERR_INVALID_PARAM, $outcome['message']);
   }
 
-  return array('photos' => $outcome['photos'], 'failed' => $outcome['failed']);
+  return persons_with_tag_writes(array('photos' => $outcome['photos'], 'failed' => $outcome['failed']),
+    $outcome['tag_writes']);
 }
 
 /**

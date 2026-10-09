@@ -154,6 +154,26 @@ final class ApplyRegionsTest extends TestCase
         $this->assertSame(array(self::INSIDE['name'], self::PARTLY['name']), $this->tagNames());
     }
 
+    /**
+     * [ST] persons rewrites the file in photoedit_end, after the edit stored
+     * the file's checksum and version; both still match the file afterwards.
+     */
+    public function testACropThatMovesRegionsLeavesTheChecksumAndVersionCurrent(): void
+    {
+        $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
+        $this->assertNotEmpty($this->db->scalar('SELECT md5sum FROM piwigo_images WHERE id = ' . (int)$this->image['id']),
+            'anti-vacuity: the row has no md5sum to keep current');
+
+        $this->apply(array('turns' => 0, 'crop' => self::LEFT_HALF));
+
+        $this->assertSame(array(self::INSIDE['name']), $this->indexedNames(), 'anti-vacuity: the crop moved no region');
+        clearstatcache();
+        $md5 = md5_file($this->image['file']);
+        $this->assertSame($md5, $this->db->scalar('SELECT md5sum FROM piwigo_images WHERE id = ' . (int)$this->image['id']));
+        $versions = json_decode((string)$this->db->scalar("SELECT value FROM piwigo_config WHERE param = 'photoedit_versions'"), true);
+        $this->assertSame(substr($md5, 0, 12), $versions[$this->image['id']] ?? null);
+    }
+
     private function sortedKeys(array $map): array
     {
         $keys = array_keys($map);

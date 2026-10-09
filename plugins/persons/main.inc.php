@@ -54,7 +54,9 @@ add_event_handler('delete_elements', 'persons_delete_elements',
 // Registered everywhere: photoedit fires these from ws.php.
 $persons_photoedit_file = PERSONS_PATH . 'include/events_photoedit.inc.php';
 add_event_handler('photoedit_preview', 'persons_photoedit_preview', EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_photoedit_file);
-add_event_handler('photoedit_begin', 'persons_photoedit_begin', EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_photoedit_file);
+// Before provenance's: every writer holding both locks takes persons' first (photoinfo does too),
+// so two of them never wait for each other.
+add_event_handler('photoedit_begin', 'persons_photoedit_begin', EVENT_HANDLER_PRIORITY_NEUTRAL - 1, $persons_photoedit_file);
 add_event_handler('photoedit_end', 'persons_photoedit_end', EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_photoedit_file);
 
 // The public overlay and person row. Registered only on the picture page, and

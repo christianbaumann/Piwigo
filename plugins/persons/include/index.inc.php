@@ -125,9 +125,9 @@ SELECT id, person_id, region_type, area_x, area_y, area_w, area_h
     mass_inserts(PERSONS_REGION_TABLE, array_keys($rows[0]), $rows);
   }
 
-  persons_sync_image_tags($image_id);
+  $tags_changed = persons_sync_image_tags($image_id);
 
-  return array('ok' => true, 'regions' => count($rows), 'message' => '');
+  return array('ok' => true, 'regions' => count($rows), 'message' => '', 'tags_changed' => $tags_changed);
 }
 
 /**
@@ -364,7 +364,7 @@ function persons_person_id_from_name($name)
  * never becomes a tag at all.
  *
  * @param int $image_id
- * @return void
+ * @return bool whether a tag was added or removed
  */
 function persons_sync_image_tags($image_id)
 {
@@ -420,7 +420,10 @@ DELETE FROM '.IMAGE_TAG_TABLE.'
   if (count($obsolete) or count($missing))
   {
     persons_invalidate_tag_cache();
+    return true;
   }
+
+  return false;
 }
 
 /**
@@ -555,12 +558,41 @@ function persons_image_rotation($image_id)
  * so a write exiftool accepted but stored differently shows up as an index that
  * disagrees, instead of staying invisible until the next rescan.
  *
+ * A change that added or removed a person tag fires persons_tags_changed once
+ * the lock is given back, so another plugin can act on the photo's new tags.
+ * A rescan or reindex fires nothing: the deploy rescans the whole gallery.
+ *
  * @param int $image_id
  * @param array $add list of array(name, x, y, w, h, type) to add
  * @param array $remove list of matchers, per persons_merge_regions()
- * @return array array('ok' => bool, 'regions' => int, 'message' => string)
+ * @param bool $notify false when the caller fires the event itself, once for
+ *   all the photos it changes
+ * @return array array('ok' => bool, 'regions' => int, 'message' => string,
+ *   'tag_writes' => persons_notify_tags_changed()'s answer, and
+ *   'tags_changed' => bool when ok)
  */
-function persons_apply_change($image_id, $add, $remove)
+function persons_apply_change($image_id, $add, $remove, $notify = true)
+{
+  $outcome = persons_apply_change_quietly($image_id, $add, $remove);
+
+  $outcome['tag_writes'] = array();
+  if ($notify and $outcome['ok'] and $outcome['tags_changed'])
+  {
+    $outcome['tag_writes'] = persons_notify_tags_changed(array((int)$image_id));
+  }
+
+  return $outcome;
+}
+
+/**
+ * persons_apply_change() without the event.
+ *
+ * @param int $image_id
+ * @param array $add
+ * @param array $remove
+ * @return array as persons_apply_change()
+ */
+function persons_apply_change_quietly($image_id, $add, $remove)
 {
   $image_id = (int)$image_id;
 
@@ -680,7 +712,8 @@ function persons_rename_person($person_id, $new_name)
   $person_id = (int)$person_id;
   $failure = function ($message)
   {
-    return array('ok' => false, 'message' => $message, 'photos' => 0, 'failed' => array());
+    return array('ok' => false, 'message' => $message, 'photos' => 0, 'failed' => array(),
+      'tag_writes' => array());
   };
 
   $new_name = persons_clean_name($new_name);
@@ -697,7 +730,8 @@ function persons_rename_person($person_id, $new_name)
 
   if ($person['name'] === $new_name)
   {
-    return array('ok' => true, 'message' => '', 'photos' => 0, 'failed' => array());
+    return array('ok' => true, 'message' => '', 'photos' => 0, 'failed' => array(),
+      'tag_writes' => array());
   }
 
   $taken = pwg_db_fetch_assoc(pwg_query(
@@ -736,7 +770,8 @@ function persons_rename_person($person_id, $new_name)
   $failed = array();
   $photos = 0;
 
-  foreach (persons_person_images($person_id) as $image_id)
+  $images = persons_person_images($person_id);
+  foreach ($images as $image_id)
   {
     $add = array();
     $result = pwg_query('
@@ -756,7 +791,7 @@ SELECT area_x, area_y, area_w, area_h, region_type
         );
     }
 
-    $outcome = persons_apply_change($image_id, $add, array(array('name' => $person['name'])));
+    $outcome = persons_apply_change($image_id, $add, array(array('name' => $person['name'])), false);
 
     if ($outcome['ok'])
     {
@@ -768,7 +803,11 @@ SELECT area_x, area_y, area_w, area_h, region_type
     }
   }
 
-  return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed);
+  // The tag's name changed on every photo carrying it, also where it was applied by hand.
+  $tag_writes = persons_notify_tags_changed(array_merge($images, persons_tag_images($person['tag_id'])));
+
+  return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed,
+    'tag_writes' => $tag_writes);
 }
 
 /**
@@ -796,10 +835,12 @@ function persons_delete_person($person_id)
 
   $failed = array();
   $photos = 0;
+  $images = persons_person_images($person_id);
+  $tagged = persons_tag_images($person['tag_id']);
 
-  foreach (persons_person_images($person_id) as $image_id)
+  foreach ($images as $image_id)
   {
-    $outcome = persons_apply_change($image_id, array(), array(array('name' => $person['name'])));
+    $outcome = persons_apply_change($image_id, array(), array(array('name' => $person['name'])), false);
 
     if ($outcome['ok'])
     {
@@ -826,6 +867,70 @@ function persons_delete_person($person_id)
   }
 
   persons_invalidate_tag_cache();
+  $tag_writes = persons_notify_tags_changed(array_merge($images, $tagged));
 
-  return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed);
+  return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed,
+    'tag_writes' => $tag_writes);
+}
+
+/**
+ * @param int|null $tag_id a person's mirrored tag
+ * @return int[] the photos carrying it
+ */
+function persons_tag_images($tag_id)
+{
+  if ($tag_id === null)
+  {
+    return array();
+  }
+
+  return array_map('intval', query2array(
+    'SELECT image_id FROM '.IMAGE_TAG_TABLE.' WHERE tag_id = '.(int)$tag_id.';', null, 'image_id'
+    ));
+}
+
+/**
+ * Fires persons_tags_changed once for the photos, when there are any. A
+ * filter rather than a notification: a listener that writes files hands back
+ * how each write went, which the web-service answers pass on.
+ *
+ * @param int[] $image_ids
+ * @return array image id => array('ok' => bool, 'message' => string), empty
+ *   when no listener wrote anything
+ */
+function persons_notify_tags_changed($image_ids)
+{
+  $image_ids = array_values(array_unique(array_map('intval', $image_ids)));
+  if (count($image_ids) == 0)
+  {
+    return array();
+  }
+
+  return (array)trigger_change('persons_tags_changed', array(), $image_ids);
+}
+
+/**
+ * What a web-service answer says about the file writes a listener of
+ * persons_tags_changed made.
+ *
+ * @param array $tag_writes persons_notify_tags_changed()'s answer
+ * @return array 'tags_written' => whether every write worked, 'tags_message'
+ *   => the first failure's message; empty when nothing was written
+ */
+function persons_tag_write_answer($tag_writes)
+{
+  if (count($tag_writes) == 0)
+  {
+    return array();
+  }
+
+  foreach ($tag_writes as $write)
+  {
+    if (!$write['ok'])
+    {
+      return array('tags_written' => false, 'tags_message' => $write['message']);
+    }
+  }
+
+  return array('tags_written' => true, 'tags_message' => '');
 }

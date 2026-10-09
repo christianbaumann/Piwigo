@@ -440,6 +440,124 @@ function photoinfo_rescan_columns($tags, $allow_html, $current_year, $stored_dat
 
 /*
  * ---------------------------------------------------------------------------
+ * A photo's tags in its file.
+ * ---------------------------------------------------------------------------
+ */
+
+/** The fields a photo's tags are written to; the rescan reads the two XMP ones. */
+define('PHOTOINFO_SUBJECT_TAG', 'XMP-dc:Subject');
+define('PHOTOINFO_KEYWORDS_TAG', 'IPTC:Keywords');
+define('PHOTOINFO_HIERARCHY_TAG', 'XMP-lr:HierarchicalSubject');
+
+/** Set on every tag write, so a rescan can tell "no tags" from "never written". */
+define('PHOTOINFO_TAGS_MARKER_TAG', 'XMP-'.PHOTOINFO_XMP_PREFIX.':TagsWritten');
+
+/** Between a group and its tag in a hierarchy entry. */
+define('PHOTOINFO_HIERARCHY_SEPARATOR', '|');
+
+/** Tags that stay in the database and never reach a file, beside every name with a '?'. */
+define('PHOTOINFO_LOCAL_ONLY_TAGS', array('Ausstellung'));
+
+/** The typetags group a tag typed in while tagging is put into. */
+define('PHOTOINFO_FREITEXT_GROUP', 'Freitext');
+
+/**
+ * @param string $name a tag's or a group's name
+ * @return bool whether a tag of that name stays out of the file
+ */
+function photoinfo_tag_is_local_only($name)
+{
+  return in_array($name, PHOTOINFO_LOCAL_ONLY_TAGS, true) or strpos($name, '?') !== false;
+}
+
+/**
+ * What a photo's tags become in its file: a flat keyword list, and
+ * "Group|Tag" for every tag in a group. Local-only tags are left out, and a
+ * group whose name holds the separator gives no hierarchy entry, as it would
+ * split in the wrong place when read back.
+ *
+ * Control characters in a tag's or a group's name become spaces: a line
+ * break would start a new exiftool option in the argfile.
+ *
+ * @param array $tags rows: name, group (null for none)
+ * @return array array('subject' => names, 'hierarchy' => entries), each sorted
+ *   and without duplicates
+ */
+function photoinfo_file_keywords($tags)
+{
+  $subject = array();
+  $hierarchy = array();
+
+  foreach ($tags as $tag)
+  {
+    $name = trim(preg_replace('/[[:cntrl:]]+/', ' ', (string)$tag['name']));
+    if ($name === '' or photoinfo_tag_is_local_only($name))
+    {
+      continue;
+    }
+
+    $subject[] = $name;
+
+    $group = trim(preg_replace('/[[:cntrl:]]+/', ' ', (string)$tag['group']));
+    if ($group !== '' and strpos($group, PHOTOINFO_HIERARCHY_SEPARATOR) === false)
+    {
+      $hierarchy[] = $group.PHOTOINFO_HIERARCHY_SEPARATOR.$name;
+    }
+  }
+
+  return array(
+    'subject' => photoinfo_sorted_unique($subject),
+    'hierarchy' => photoinfo_sorted_unique($hierarchy),
+    );
+}
+
+/**
+ * @param array $values strings
+ * @return array sorted byte-wise, without duplicates, reindexed
+ */
+function photoinfo_sorted_unique($values)
+{
+  $values = array_unique($values);
+  sort($values, SORT_STRING);
+
+  return $values;
+}
+
+/**
+ * The argfile lines of one tag write. exiftool replaces a list field with the
+ * first value the run assigns it and adds the rest, so each field is replaced
+ * as a whole; an empty list deletes it. The marker is set every time.
+ *
+ * @param array $keywords photoinfo_file_keywords()'s answer
+ * @return array
+ */
+function photoinfo_build_tags_argfile($keywords)
+{
+  $fields = array(
+    PHOTOINFO_SUBJECT_TAG => $keywords['subject'],
+    PHOTOINFO_KEYWORDS_TAG => $keywords['subject'],
+    PHOTOINFO_HIERARCHY_TAG => $keywords['hierarchy'],
+    );
+
+  $lines = array('-charset', 'iptc=UTF8');
+  foreach ($fields as $field => $values)
+  {
+    if (count($values) == 0)
+    {
+      $lines[] = '-'.$field.'=';
+    }
+    foreach ($values as $value)
+    {
+      $lines[] = '-'.$field.'='.$value;
+    }
+  }
+  $lines[] = '-'.PHOTOINFO_TAGS_MARKER_TAG.'=1';
+
+  return $lines;
+}
+
+/*
+ * ---------------------------------------------------------------------------
  * Template anchors the picture prefilter matches against, in
  * themes/default/template/picture.tpl.
  * ---------------------------------------------------------------------------

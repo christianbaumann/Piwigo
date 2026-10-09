@@ -410,7 +410,7 @@ hook on every path that changes tags.
 
 ### Changes Required
 
-#### [ ] 1. Pure layer
+#### [x] 1. Pure layer
 **File**: `plugins/photoinfo/include/functions.inc.php`, `exiftool/pwginfo.config`
 
 ```php
@@ -432,7 +432,7 @@ function photoinfo_build_tags_argfile($keywords) {}
 - A group name containing `|` contributes no hierarchy entry for its tags (flat only).
 - `pwginfo.config` declares `TagsWritten`; the existing config/URI unit test is extended.
 
-#### [ ] 2. Writer under both locks
+#### [x] 2. Writer under both locks
 **File**: `plugins/photoinfo/include/writer.inc.php`
 
 ```php
@@ -441,13 +441,13 @@ function photoinfo_write_tags($image_ids) {}         // returns array(id => arra
 function photoinfo_with_persons_lock($db_path, $fn) {}  // persons_lock_acquire() when persons is active
 ```
 
-- [ ] `photoinfo_write_tags()` builds the argfile and calls `provenance_exiftool_run()` inside
+- [x] `photoinfo_write_tags()` builds the argfile and calls `provenance_exiftool_run()` inside
   `photoinfo_with_persons_lock()` (persons lock first, re-entrant, then provenance's)
-- [ ] `photoinfo_write_file()` (date and info) runs inside the same wrapper (Q7a)
-- [ ] Skips a photo whose provenance lock is held by photoedit in this request
+- [x] `photoinfo_write_file()` (date and info) runs inside the same wrapper (Q7a)
+- [x] Skips a photo whose provenance lock is held by photoedit in this request
   (`provenance_photoedit_held_locks()`); `photoedit_end` handles it (below)
 
-#### [ ] 3. Hooks
+#### [x] 3. Hooks
 **Files**: `plugins/photoinfo/main.inc.php`, new `plugins/photoinfo/include/events_tags.inc.php`
 
 | Path | Hook | Photos to write |
@@ -462,20 +462,26 @@ function photoinfo_with_persons_lock($db_path, $fn) {}  // persons_lock_acquire(
 | persons region add/remove, rename, delete | new `persons_tags_changed($image_ids)` (below) | those photos |
 | photoedit save | `photoedit_end` at NEUTRAL+10 (after provenance and persons release), when `$ok` | that photo |
 
-- [ ] Failures are reported like date writes: `photoinfo_report_core_edit()` on admin pages;
+- [x] Failures are reported like date writes: `photoinfo_report_core_edit()` on admin pages;
   the ws wrappers add `tags_written`/`tags_message` to the answer
-- [ ] The re-registering of ws methods goes through one helper,
+- [x] The re-registering of ws methods goes through one helper,
   `photoinfo_wrap_method($service, $method, $callback)`, shared with the setInfo wrapper
 
-#### [ ] 4. Persons event
+#### [x] 4. Persons event
 **File**: `plugins/persons/include/index.inc.php`
 **Changes**: `persons_sync_image_tags()` returns whether it changed anything, and
 `persons_reindex_image_locked()` passes it through. `persons_apply_change()` fires
 `trigger_notify('persons_tags_changed', array($image_id))` when it did; `persons_rename_person()`
 and `persons_delete_person()` fire it once with every affected photo. Rescans and reindexes
 fire nothing (see Key Discoveries).
+**As built (owner, 2026-10-09, Q6b):** `trigger_change('persons_tags_changed', array(), $image_ids)`
+rather than a notification - listeners return `image id => array('ok', 'message')`, and
+addRegion, deleteRegion, rename and delete answer `tags_written`/`tags_message` from it, so persons
+stays unaware of photoinfo. A photoedit edit writes keywords in `photoedit_end` only when the tags
+changed; photoedit stores the file's size, checksum and version again after `photoedit_end`
+(Phase 8).
 
-#### [ ] 5. Gate
+#### [x] 5. Gate
 **File**: `.githooks/lib.sh`, `tools/test-hooks.sh`
 **Changes**: add photoinfo's unit suite to `UNIT_SUITES` (Boy Scout: the plugin now carries
 more pure logic than the gated ones); the self-test's runner check covers it.
@@ -483,14 +489,23 @@ more pure logic than the gated ones); the self-test's runner check covers it.
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `ddev exec plugins/photoinfo/vendor/bin/phpunit --testsuite unit --configuration plugins/photoinfo/phpunit.xml`
-- [ ] `ddev exec bash -c 'set -a; . local/config/photoinfo-test.env; set +a; plugins/photoinfo/vendor/bin/phpunit --testsuite integration --configuration plugins/photoinfo/phpunit.xml'`
-- [ ] Persons unit + integration suites (regression: event added, return value changed)
-- [ ] photoedit integration suite (regression: `photoedit_end` ordering, `ExclusionTest`)
-- [ ] `bash tools/test-hooks.sh`
+- [x] `ddev exec plugins/photoinfo/vendor/bin/phpunit --testsuite unit --configuration plugins/photoinfo/phpunit.xml`
+- [x] `ddev exec bash -c 'set -a; . local/config/photoinfo-test.env; set +a; plugins/photoinfo/vendor/bin/phpunit --testsuite integration --configuration plugins/photoinfo/phpunit.xml'`
+- [x] Persons unit + integration suites (regression: event added, return value changed) - green
+  after Phase 8 (the 20 red ones were the fixtures copying a real face)
+- [x] photoedit integration suite (regression: `photoedit_end` ordering, `ExclusionTest`)
+- [x] `bash tools/test-hooks.sh`
 
 #### Manual Verification:
-- [ ] Tag a photo in the photo properties screen; `exiftool` shows the keywords and marker
+- [x] Tag a photo in the photo properties screen; `exiftool` shows the keywords and marker
+  (automated: `TagWriteTest::testAPropertiesSaveWritesTheTags` posts the screen's form and reads the
+  file with a plain exiftool call; green 2026-10-09)
+
+**Verified 2026-10-09** (`/verify`, two independent reviews): Phase 4 approved. The reviews found
+an unescaped group name in the argfile, an exception escaping photoedit's `finally`, a stale
+checksum after an edit and a crash on a same-name person rename; each fixed test-first. Running the
+suites showed that the fixtures of persons, photoedit and typetags acted on real photo 1, which the
+new hooks then rewrote; see Phase 8.
 
 ---
 
@@ -633,6 +648,14 @@ deploy calling both.
 
 ---
 
+## Phase 8: Fix the failing baseline tests
+
+- [x] [2026-10-09-fix-failing-baseline-tests.md](2026-10-09-fix-failing-baseline-tests.md) - 20
+  persons integration tests fail on the current gallery (a real region in the photo the fixtures
+  copy). Owner, 2026-10-09: done **now**, before Phase 5; Phase 4 is committed only once it is green
+
+---
+
 ## Testing Strategy
 
 Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
@@ -648,26 +671,26 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [x] `EmojiRenderTest` — html and css forms of one and two code points; `''` renders nothing `[HAPPY]`/`[BVA]`
 
 **photoinfo** (`plugins/photoinfo/tests/Unit/`)
-- [ ] `TagKeywordsTest::testGroupedTagsGetAHierarchyEntry` `[HAPPY]`
-- [ ] `…::testAnUngroupedTagIsFlatOnly` (person names) `[ECP]`
-- [ ] `…::testAusstellungIsNeverWritten` `[NEG]`
-- [ ] `…::testANameWithAQuestionMarkIsNeverWritten` — `Name ?`, `Kategorie ?`, `Wer?` `[ECP]`
-- [ ] `…::testAGroupNameWithThePipeGivesNoHierarchyEntry` `[ERR]`
-- [ ] `…::testOutputIsSortedAndDeduplicated` `[ECP]`
-- [ ] `…::testNoTagsGivesEmptyLists` `[BVA]`
-- [ ] `BuildTagsArgfileTest::testAnEmptyListDeletesEachField` — `-XMP-dc:Subject=` etc. `[BVA]`
-- [ ] `…::testEveryKeywordIsOneLinePerField` `[HAPPY]`
-- [ ] `…::testTheMarkerIsAlwaysSet` — also for an empty list `[DT]`
-- [ ] `…::testACommaInANameStaysOneKeyword` — `Feste, Bräuche, Jahreskreis` `[ERR]`
-- [ ] `…::testTheConfigDeclaresTheMarker` (extends the existing URI test) `[HAPPY]`
+- [x] `TagKeywordsTest::testGroupedTagsGetAHierarchyEntry` `[HAPPY]`
+- [x] `…::testAnUngroupedTagIsFlatOnly` (person names) `[ECP]`
+- [x] `…::testAusstellungIsNeverWritten` `[NEG]`
+- [x] `…::testANameWithAQuestionMarkIsNeverWritten` — `Name ?`, `Kategorie ?`, `Wer?` `[ECP]`
+- [x] `…::testAGroupNameWithThePipeGivesNoHierarchyEntry` `[ERR]`
+- [x] `…::testOutputIsSortedAndDeduplicated` `[ECP]`
+- [x] `…::testNoTagsGivesEmptyLists` `[BVA]`
+- [x] `BuildTagsArgfileTest::testAnEmptyListDeletesEachField` — `-XMP-dc:Subject=` etc. `[BVA]`
+- [x] `…::testEveryKeywordIsOneLinePerField` `[HAPPY]`
+- [x] `…::testTheMarkerIsAlwaysSet` — also for an empty list `[DT]`
+- [x] `…::testACommaInANameStaysOneKeyword` — `Feste, Bräuche, Jahreskreis` `[ERR]`
+- [x] `…::testTheConfigDeclaresTheMarker` (extends the existing URI test) `[HAPPY]`
 - [ ] `RescanParseTest` additions — lists of 0, 1, n entries `[BVA]`; marker absent/present `[ECP]`; another namespace's `Subject` ignored `[NEG]`
 - [ ] `RescanTagsTest` (decision table: marker × in file × in DB × local-only × has group) `[DT]`; no marker → nothing at all `[NEG]`; hierarchy entry without matching Subject still links `[ERR]`; `Group|Tag|More` splits at the first separator `[BVA]`
 - [ ] `FreitextTest` — id == max not new, max+1 new `[BVA]`; grouped new tag skipped `[ECP]`; person tag skipped `[NEG]`; no new tags → empty `[BVA]`
-- [ ] `LocalOnlyRuleTest` reads `tag-groups.json` and asserts every group whose tags are local-only is named in `PHOTOINFO_LOCAL_ONLY_TAGS` or has `?` (no transcribed copy) `[ECP]`
+- [x] `LocalOnlyRuleTest` reads `tag-groups.json` and asserts every group whose tags are local-only is named in `PHOTOINFO_LOCAL_ONLY_TAGS` or has `?` (no transcribed copy) `[ECP]`
 
 **deploy** (`tools/deploy/tests/`)
 - [x] `test_seed.py` — load: duplicate group `[NEG]`, tag in unknown group `[NEG]`, bad colour `[NEG]`, bad emoji `[NEG]`; plan: empty install adds all `[HAPPY]`, seeded install plans nothing `[ST]`, changed colour updates `[ECP]`, a group that exists only remotely is left alone `[NEG]`; verify step raises on a mismatch `[NEG]`
-- [ ] `test_seed.py::test_the_freitext_group_exists_in_the_file` — reads `PHOTOINFO_FREITEXT_GROUP` with `php_value`-style regex `[HAPPY]` (moved to Phase 4: the constant is defined there)
+- [x] `test_seed.py::test_the_freitext_group_exists_in_the_file` — reads `PHOTOINFO_FREITEXT_GROUP` with `php_value`-style regex `[HAPPY]` (moved to Phase 4: the constant is defined there)
 - [ ] `test_bootstrap.py` — seed runs after activation and before the sync `[ST]`; a run without typetags skips the seed `[NEG]`; `parse_rescan` new fields, `[]` for empty `not_in_file` `[BVA]`, unknown shape raises `[NEG]`; `--prune-tags` absent → no prune call `[DT]`, present → only photos with `not_in_file` `[DT]`; prune failure does not fail the run `[NEG]` (the two seed cases done in Phase 3)
 - [x] `test_cli.py` — `--seed-tags-only` opens no FTP connection and uploads nothing `[NEG]`
 
@@ -687,19 +710,19 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [x] `SchemaUpgradeTest` — `install()` twice keeps rows and adds the columns once `[ST]`
 
 **photoinfo** (`tests/Integration/`)
-- [ ] `TagWriteTest` — one row per hooked path in the Phase 4 table: the file's Subject/Hierarchy/Keywords/marker match the DB afterwards `[HAPPY]`
-- [ ] `…::testRemovingTheLastTagLeavesTheMarkerAndNoKeywords` `[BVA]`
-- [ ] `…::testAusstellungStaysOutOfTheFile` `[NEG]`
-- [ ] `…::testAnIptcKeywordOver64BytesDoesNotFailTheWrite` (XMP keeps it whole) `[BVA]`
-- [ ] `…::testUmlautsSurviveInIptcAndXmp` `[ERR]`
-- [ ] `…::testRenameRewritesEveryPhotoWithTheTag` `[HAPPY]`
-- [ ] `…::testDeleteRewritesThePhotosThatHadTheTag` `[HAPPY]`
-- [ ] `…::testRegroupingRewritesTheHierarchy` `[HAPPY]`
-- [ ] `…::testAReadOnlyFileReportsTheFailureAndKeepsTheDatabase` `[NEG]`
-- [ ] `…::testAPersonsRescanWritesNoFile` — mtime unchanged `[NEG]`
-- [ ] `…::testAPersonsRegionAddWritesTheName` (persons active) `[HAPPY]`
-- [ ] `…::testAPhotoeditCropThatCutsAFaceRewritesTheKeywords` (persons, photoedit active) `[ST]`
-- [ ] `…::testATagWriteWaitsForAHeldPersonsLock` — child process holds the persons lock, write waits (ExclusionTest shape) `[ERR]`
+- [x] `TagWriteTest` — one row per hooked path in the Phase 4 table: the file's Subject/Hierarchy/Keywords/marker match the DB afterwards `[HAPPY]`
+- [x] `…::testRemovingTheLastTagLeavesTheMarkerAndNoKeywords` `[BVA]`
+- [x] `…::testAusstellungStaysOutOfTheFile` `[NEG]`
+- [x] `…::testAnIptcKeywordOver64BytesDoesNotFailTheWrite` (XMP keeps it whole) `[BVA]`
+- [x] `…::testUmlautsSurviveInIptcAndXmp` `[ERR]`
+- [x] `…::testRenameRewritesEveryPhotoWithTheTag` `[HAPPY]`
+- [x] `…::testDeleteRewritesThePhotosThatHadTheTag` `[HAPPY]`
+- [x] `…::testRegroupingRewritesTheHierarchy` `[HAPPY]`
+- [x] `…::testAReadOnlyFileReportsTheFailureAndKeepsTheDatabase` `[NEG]`
+- [x] `…::testAPersonsRescanWritesNoFile` — mtime unchanged `[NEG]`
+- [x] `…::testAPersonsRegionAddWritesTheName` (persons active) `[HAPPY]`
+- [x] `…::testAPhotoeditCropThatCutsAFaceRewritesTheKeywords` (persons, photoedit active) `[ST]`
+- [x] `…::testATagWriteWaitsForAHeldPersonsLock` — child process holds the persons lock, write waits (ExclusionTest shape) `[ERR]`
 - [ ] `FreitextAssignTest` — photo properties, Batch Manager, setInfo `tag_list`, `typetags.image.addNewTag`: new tag in Freitext and in the file as `Freitext|Name` `[HAPPY]`; `pwg.tags.add` leaves it ungrouped `[NEG]`; Freitext group missing → ungrouped, write still succeeds `[NEG]`; `addNewTag` with an existing grouped name keeps its group `[ECP]`
 
 **typetags** (`tests/Integration/`, Phase 5)

@@ -4,7 +4,8 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
 /*
  * The file side: what photoinfo puts into an image file, through provenance's
  * exiftool runner and under provenance's lock - one lock file per image, which
- * plugins/photoedit's edits respect as well.
+ * plugins/photoedit's edits respect as well. When plugins/persons is active,
+ * its lock is taken first: persons writes its regions under that lock alone.
  */
 
 /**
@@ -105,7 +106,207 @@ function photoinfo_write_file($image, $field)
     $argfile = $operation_dir.(int)$image['id'].'.args';
     file_put_contents($argfile, implode("\n", $lines)."\n");
 
-    return provenance_exiftool_run($argfile, $file, $image['path'], PHOTOINFO_XMP_CONFIG);
+    return photoinfo_with_persons_lock($image['path'], function () use ($argfile, $file, $image)
+    {
+      return provenance_exiftool_run($argfile, $file, $image['path'], PHOTOINFO_XMP_CONFIG);
+    });
+  }
+  finally
+  {
+    provenance_remove_dir($operation_dir);
+  }
+}
+
+/**
+ * Runs a file write under plugins/persons' lock on the photo, when persons is
+ * active. Its lock is re-entrant within one request, so a write started from
+ * inside a persons change does not wait for itself.
+ *
+ * @param string $db_path images.path
+ * @param callable $fn returns array('ok' => bool, 'message' => string)
+ * @return array what $fn returned, or the persons lock's timeout
+ */
+function photoinfo_with_persons_lock($db_path, $fn)
+{
+  // PERSONS_PATH alone is also defined while persons is being (de)activated.
+  if (!defined('PERSONS_LOCK_DIR'))
+  {
+    return $fn();
+  }
+
+  include_once(PERSONS_PATH.'include/exiftool.inc.php');
+  $lock = persons_lock_acquire($db_path);
+  if ($lock === null)
+  {
+    return array('ok' => false, 'message' => PERSONS_LOCK_TIMEOUT_MESSAGE);
+  }
+
+  try
+  {
+    return $fn();
+  }
+  finally
+  {
+    persons_lock_release($lock);
+  }
+}
+
+/**
+ * Whether plugins/photoedit holds provenance's lock on the photo in this
+ * request: a write now would wait for itself. photoedit_end writes the tags
+ * once the edit is over.
+ *
+ * @param string $db_path images.path
+ * @return bool
+ */
+function photoinfo_photoedit_holds($db_path)
+{
+  if (!function_exists('provenance_photoedit_held_locks'))
+  {
+    return false;
+  }
+
+  $held = &provenance_photoedit_held_locks();
+  return isset($held[$db_path]);
+}
+
+/**
+ * @param int $image_id
+ * @return int[] the photo's tag ids, ascending
+ */
+function photoinfo_tag_ids_of($image_id)
+{
+  $query = '
+SELECT tag_id
+  FROM '.IMAGE_TAG_TABLE.'
+  WHERE image_id = '.(int)$image_id.'
+  ORDER BY tag_id
+;';
+
+  return array_map('intval', query2array($query, null, 'tag_id'));
+}
+
+/**
+ * @param int[] $tag_ids
+ * @return int[] the photos carrying any of the tags
+ */
+function photoinfo_images_with_tags($tag_ids)
+{
+  $tag_ids = array_map('intval', $tag_ids);
+  if (count($tag_ids) == 0)
+  {
+    return array();
+  }
+
+  $query = '
+SELECT DISTINCT image_id
+  FROM '.IMAGE_TAG_TABLE.'
+  WHERE tag_id IN ('.implode(',', $tag_ids).')
+;';
+
+  return array_map('intval', query2array($query, null, 'image_id'));
+}
+
+/**
+ * One photo's tags with the name of each one's typetags group.
+ *
+ * @param int $image_id
+ * @return array rows: name, group (null for none, or without typetags)
+ */
+function photoinfo_image_tags($image_id)
+{
+  $grouped = defined('TYPETAGS_TABLE');
+
+  $query = '
+SELECT t.name, '.($grouped ? 'g.name' : 'NULL').' AS group_name
+  FROM '.IMAGE_TAG_TABLE.' AS it
+    JOIN '.TAGS_TABLE.' AS t ON t.id = it.tag_id'.($grouped ? '
+    LEFT JOIN '.TYPETAGS_TABLE.' AS g ON g.id = t.id_typetags' : '').'
+  WHERE it.image_id = '.(int)$image_id.'
+;';
+
+  $tags = array();
+  foreach (query2array($query) as $row)
+  {
+    $tags[] = array('name' => $row['name'], 'group' => $row['group_name']);
+  }
+
+  return $tags;
+}
+
+/**
+ * Writes the photos' tags into their files. A photo plugins/photoedit is
+ * editing in this request is left out; photoedit_end writes it.
+ *
+ * @param int[] $image_ids
+ * @return array image id => array('ok' => bool, 'message' => string)
+ */
+function photoinfo_write_tags($image_ids)
+{
+  $image_ids = array_unique(array_map('intval', $image_ids));
+  if (count($image_ids) == 0)
+  {
+    return array();
+  }
+
+  if (!defined('PROVENANCE_PATH'))
+  {
+    return array_fill_keys($image_ids,
+      array('ok' => false, 'message' => PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE));
+  }
+
+  $query = '
+SELECT id, path
+  FROM '.IMAGES_TABLE.'
+  WHERE id IN ('.implode(',', $image_ids).')
+;';
+
+  $results = array();
+  foreach (query2array($query) as $image)
+  {
+    if (!photoinfo_photoedit_holds($image['path']))
+    {
+      $results[(int)$image['id']] = photoinfo_write_tags_file($image);
+    }
+  }
+
+  return $results;
+}
+
+/**
+ * Writes one photo's tags into its file. The tags are read under the locks,
+ * so two changes racing each other leave the later state in the file.
+ *
+ * @param array $image id, path
+ * @return array array('ok' => bool, 'message' => string)
+ */
+function photoinfo_write_tags_file($image)
+{
+  if (!provenance_exiftool_available())
+  {
+    return array('ok' => false, 'message' => 'exiftool is not available on this server');
+  }
+
+  $file = provenance_image_file_path($image['path']);
+  if (!is_file($file) or !is_writable($file))
+  {
+    return array('ok' => false, 'message' => PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE);
+  }
+
+  $operation_dir = provenance_operation_dir(provenance_operation_id());
+  $argfile = $operation_dir.(int)$image['id'].'-tags.args';
+
+  try
+  {
+    provenance_make_dir($operation_dir);
+
+    return photoinfo_with_persons_lock($image['path'], function () use ($argfile, $file, $image)
+    {
+      $lines = photoinfo_build_tags_argfile(photoinfo_file_keywords(photoinfo_image_tags($image['id'])));
+      file_put_contents($argfile, implode("\n", $lines)."\n");
+
+      return provenance_exiftool_run($argfile, $file, $image['path'], PHOTOINFO_XMP_CONFIG);
+    });
   }
   finally
   {

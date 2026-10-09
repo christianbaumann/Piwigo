@@ -71,6 +71,24 @@ final class PersonAdminApiTest extends TestCase
         $this->assertSame(array(self::NEW_NAME), $this->namesInFile());
     }
 
+    /** [BVA] A rename to the name the person already has, once trimmed, changes nothing and answers ok. */
+    public function testRenamingToTheSameNameChangesNothing(): void
+    {
+        $this->add(self::OLD_NAME);
+        $personId = $this->personId(self::OLD_NAME);
+        $this->assertNotNull($personId, 'anti-vacuity: nothing was created to rename');
+
+        $res = $this->admin->call('pwg.persons.rename', array(
+            'person_id' => $personId,
+            'name' => self::OLD_NAME . ' ',
+            'pwg_token' => $this->admin->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame(0, (int)$res['json']['result']['photos']);
+        $this->assertSame($personId, $this->personId(self::OLD_NAME));
+    }
+
     /** [NEG] A rename onto a name another person already holds is refused. */
     public function testRenamingOntoAnExistingPersonIsRefused(): void
     {

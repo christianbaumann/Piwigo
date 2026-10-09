@@ -8,12 +8,13 @@ The seed runs against `FakeGallery`, which keeps the groups and tags it was give
 """
 
 import json
+import re
 
 import pytest
 
 from pwgdeploy import seed
 from pwgdeploy.errors import ConfigError, RemoteHttpError
-from tests.fakes import FakeGallery, php_value
+from tests.fakes import REPO_ROOT, FakeGallery, php_value
 
 BASE_URL = "https://g.example.test"
 
@@ -90,6 +91,15 @@ def test_the_emoji_limit_is_the_one_typetags_enforces():
         "plugins/typetags/include/functions.inc.php",
         r"define\('TYPETAGS_EMOJI_MAX_CODEPOINTS',\s*(\d+)\);",
     )
+
+
+def test_the_freitext_group_exists_in_the_file():
+    """[HAPPY] photoinfo puts a tag typed in while tagging into this group; read from the PHP."""
+    source = (REPO_ROOT / "plugins/photoinfo/include/functions.inc.php").read_text(encoding="utf-8")
+    match = re.search(r"define\('PHOTOINFO_FREITEXT_GROUP',\s*'([^']+)'\);", source)
+    assert match is not None, "PHOTOINFO_FREITEXT_GROUP not found in photoinfo's functions.inc.php"
+    loaded = seed.load_tag_groups(seed.TAG_GROUPS_PATH)
+    assert match.group(1) in [group.name for group in loaded.groups]
 
 
 # --- loading -------------------------------------------------------------------------
