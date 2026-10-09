@@ -314,7 +314,7 @@ value passes through `typetags_emoji_codepoints()`; an invalid value is refused 
   - The four new groups and three tags of Phase 3 were created locally through the ws methods
     for this look, ahead of the seed.
   - Confirmed by the owner 2026-10-09; recorded in the hand-check ledger in Phase 7.
-- [x] Owner pushes `plugins/typetags` to `Piwigo-Colored-Tags` (Q9b) - pushed 2026-10-09, 0 ahead
+- [ ] Owner pushes `plugins/typetags` to `Piwigo-Colored-Tags` (Q9b) - not on GitHub as of 2026-10-09: origin/master at 78e53c8, local master 7 ahead
 
 **Implementation Note**: pause for the owner's look before Phase 3.
 
