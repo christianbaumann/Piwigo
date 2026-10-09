@@ -308,6 +308,11 @@ value passes through `typetags_emoji_codepoints()`; an invalid value is refused 
 #### Manual Verification:
 - [ ] The S5 badge and emoji look as in the drafts on the picture page, the photo properties
   chips and the admin tags page (hand-check ledger entry: legibility has no oracle)
+  - Automated 2026-10-09 (`admin-striped.spec.js`, `rendering.spec.js`): every measurable
+    part — tab, border and text colour by computed style on all three screens, the emoji in
+    each, and the text starting after the border and tab. What stays manual is the look itself.
+  - The four new groups and three tags of Phase 3 were created locally through the ws methods
+    for this look, ahead of the seed.
 - [ ] Owner pushes `plugins/typetags` to `Piwigo-Colored-Tags` (Q9b)
 
 **Implementation Note**: pause for the owner's look before Phase 3.
