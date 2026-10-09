@@ -231,13 +231,13 @@ an update method for the seed. All commits inside the submodule.
 
 ### Changes Required
 
-#### [ ] 1. Schema
+#### [x] 1. Schema
 **File**: `plugins/typetags/maintain.class.php`
 **Changes**: in `install()`, guarded by `SHOW COLUMNS … LIKE` like `id_typetags`:
 `striped TINYINT(1) NOT NULL DEFAULT 0`, `emoji VARCHAR(64) NOT NULL DEFAULT ''`.
 `uninstall()` already drops the table.
 
-#### [ ] 2. Pure functions
+#### [x] 2. Pure functions
 **File**: `plugins/typetags/include/functions.inc.php`
 
 ```php
@@ -260,50 +260,50 @@ color:#000; padding:2px 8px 2px 24px; border:1px solid C; border-radius:12px; di
 Non-striped returns exactly today's string (`events_public.inc.php:76-77`), so nothing else
 moves.
 
-#### [ ] 3. Renderers (every place a colour is applied)
+#### [x] 3. Renderers (every place a colour is applied)
 **Files**: `include/events_public.inc.php`, `include/events_admin.inc.php`, `admin.php`,
 `template/admin.tpl`, `template/tags.tpl`, `template/tags.js`, `main.inc.php`
 
-- [ ] (a) `typetags_render()` (`render_tag_name`): style from `typetags_badge_style()`, name
+- [x] (a) `typetags_render()` (`render_tag_name`): style from `typetags_badge_style()`, name
   prefixed by `typetags_emoji_html()`; cache gains `striped`, `emoji`
-- [ ] (b) picture-page `+` badges: server side as (a); each badge carries `data-tag-style` and
+- [x] (b) picture-page `+` badges: server side as (a); each badge carries `data-tag-style` and
   `data-tag-emoji`
-- [ ] (c, d) badge JS after add/remove: build from `data-tag-style`/`data-tag-emoji` instead of
+- [x] (c, d) badge JS after add/remove: build from `data-tag-style`/`data-tag-emoji` instead of
   the `background-color` regex (`events_public.inc.php:231, 302-328`)
-- [ ] (g) admin photo/Batch Manager chips: the `TYPETAGS_CSS` rule gets the S5 background and a
+- [x] (g) admin photo/Batch Manager chips: the `TYPETAGS_CSS` rule gets the S5 background and a
   `::before { content: "<emoji>" }`
-- [ ] (h) plugin page list and edit preview
-- [ ] (i) admin tags page swatches and popin (`tags.tpl`, `tags.js` `.css('background', …)`)
-- [ ] Every SELECT that reads `color` also reads `striped, emoji`
+- [x] (h) plugin page list and edit preview
+- [x] (i) admin tags page swatches and popin (`tags.tpl`, `tags.js` `.css('background', …)`)
+- [x] Every SELECT that reads `color` also reads `striped, emoji`
   (`events_public.inc.php:26-29, 40-47, 151-156, 388-396`; `events_admin.inc.php:21, 30-38, 80-88`;
   `admin.php:164, 186-190`)
-- [ ] Not changed: (e, f) public tags page text-only and cumulus modes
+- [x] Not changed: (e, f) public tags page text-only and cumulus modes
 
-#### [ ] 4. Admin form
+#### [x] 4. Admin form
 **Files**: `admin.php`, `template/admin.tpl`, `language/{de_DE,en_UK}/plugin.lang.php`
 **Changes**: `Striped`/`Gestreift` checkbox and `Emoji` text field in add and edit forms; the
 value passes through `typetags_emoji_codepoints()`; an invalid value is refused with
 `Invalid emoji`/`Ungültiges Emoji`, like an invalid colour.
 
-#### [ ] 5. Web-service methods
+#### [x] 5. Web-service methods
 **File**: `plugins/typetags/main.inc.php`
 
-- [ ] `typetags.type.list` — admin_only; returns `[{id, name, color, striped, emoji}]`
-- [ ] `typetags.type.update` — admin_only, post_only, pwg_token; `typetag_id`, optional
+- [x] `typetags.type.list` — admin_only; returns `[{id, name, color, striped, emoji}]`
+- [x] `typetags.type.update` — admin_only, post_only, pwg_token; `typetag_id`, optional
   `typetag_color`, `striped`, `emoji`; refuses an unknown id and invalid values
-- [ ] `typetags.type.add` — accepts optional `striped`, `emoji`; returns them
-- [ ] An event `trigger_notify('typetags_tags_regrouped', $tag_ids)` fired after
+- [x] `typetags.type.add` — accepts optional `striped`, `emoji`; returns them
+- [x] An event `trigger_notify('typetags_tags_regrouped', $tag_ids)` fired after
   `typetags.tags.setType`, a group edit (all its tags) and a group delete (all its former tags),
   so photoinfo can rewrite the `HierarchicalSubject` of affected photos
 
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml`
-- [ ] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'`
-- [ ] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; cd plugins/typetags && npx playwright test'`
-- [ ] `rm -rf _data/templates_c/*` before the integration and E2E runs (prefilter code changed)
-- [ ] `ddev exec php -l` on every changed PHP file
+- [x] `ddev exec plugins/typetags/vendor/bin/phpunit --testsuite unit --configuration plugins/typetags/phpunit.xml`
+- [x] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; plugins/typetags/vendor/bin/phpunit --testsuite integration --configuration plugins/typetags/phpunit.xml'`
+- [x] `ddev exec bash -c 'set -a; . local/config/typetags-test.env; set +a; cd plugins/typetags && npx playwright test'`
+- [x] `rm -rf _data/templates_c/*` before the integration and E2E runs (prefilter code changed)
+- [x] `ddev exec php -l` on every changed PHP file
 
 #### Manual Verification:
 - [ ] The S5 badge and emoji look as in the drafts on the picture page, the photo properties
@@ -603,11 +603,11 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 ### Unit Tests
 
 **typetags** (`plugins/typetags/tests/Unit/`)
-- [ ] `BadgeStyleTest::testANonStripedGroupKeepsTodaysStyle` — byte-equal to the old string `[HAPPY]`
-- [ ] `BadgeStyleTest::testAStripedGroupGetsTheTabAndBorderInItsColour` `[HAPPY]`
-- [ ] `BadgeStyleTest::testStripedTextIsAlwaysBlack` — for a dark and a light colour `[ECP]`
-- [ ] `EmojiCodepointsTest` — pasted 🖼️ → `1F5BC FE0F`; typed `1f5bc fe0f` normalised; `U+1F5BC` accepted `[ECP]`; empty → `''` `[BVA]`; `110000` → false, `10FFFF` → valid `[BVA]`; 8 code points valid, 9 → false `[BVA]`; letters/garbage → false `[NEG]`; ZWJ sequence kept intact `[ERR]`
-- [ ] `EmojiRenderTest` — html and css forms of one and two code points; `''` renders nothing `[HAPPY]`/`[BVA]`
+- [x] `BadgeStyleTest::testANonStripedGroupKeepsTodaysStyle` — byte-equal to the old string `[HAPPY]`
+- [x] `BadgeStyleTest::testAStripedGroupGetsTheTabAndBorderInItsColour` `[HAPPY]`
+- [x] `BadgeStyleTest::testStripedTextIsAlwaysBlack` — for a dark and a light colour `[ECP]`
+- [x] `EmojiCodepointsTest` — pasted 🖼️ → `1F5BC FE0F`; typed `1f5bc fe0f` normalised; `U+1F5BC` accepted `[ECP]`; empty → `''` `[BVA]`; `110000` → false, `10FFFF` → valid `[BVA]`; 8 code points valid, 9 → false `[BVA]`; letters/garbage → false `[NEG]`; ZWJ sequence kept intact `[ERR]`
+- [x] `EmojiRenderTest` — html and css forms of one and two code points; `''` renders nothing `[HAPPY]`/`[BVA]`
 
 **photoinfo** (`plugins/photoinfo/tests/Unit/`)
 - [ ] `TagKeywordsTest::testGroupedTagsGetAHierarchyEntry` `[HAPPY]`
@@ -634,7 +634,7 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [ ] `test_cli.py` — `--seed-tags-only` opens no FTP connection and uploads nothing `[NEG]`
 
 #### Regression — affected existing tests
-- [ ] typetags: all unit, integration (`PicturePageSourceTest`, `PluginActivationTest`, `MalformedColorRenderingTest`) and E2E (`rendering.spec.js`, `assign.spec.js`, `remove.spec.js`)
+- [x] typetags: all unit, integration (`PicturePageSourceTest`, `PluginActivationTest`, `MalformedColorRenderingTest`) and E2E (`rendering.spec.js`, `assign.spec.js`, `remove.spec.js`)
 - [ ] photoinfo: `BuildArgfileTest`, `CoreEditTest`, `RescanTest`, `SyncMetadataTest`
 - [ ] persons: `ReindexTest`, `WriteRegionsTest`, `AddRegionTest`, `DeleteRegionTest`, `PersonAdminApiTest`, `IndexRebuildTest`
 - [ ] photoedit: `ApplyRegionsTest`, `ExclusionTest`, `ApplyTurnTest`
@@ -643,10 +643,10 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 ### Integration Tests
 
 **typetags** (`tests/Integration/`)
-- [ ] `GroupStyleTest::testAStripedGroupRendersTheTabOnThePicturePage` `[HAPPY]`
-- [ ] `…::testAnEmojiRendersBeforeTheName` `[HAPPY]`
-- [ ] `TypeListUpdateTest` — list as admin `[HAPPY]`; normal user and guest refused `[NEG]`; update unknown id `[NEG]`; update without token `[NEG]`; GET refused `[NEG]`; invalid emoji `[NEG]`
-- [ ] `SchemaUpgradeTest` — `install()` twice keeps rows and adds the columns once `[ST]`
+- [x] `GroupStyleTest::testAStripedGroupRendersTheTabOnThePicturePage` `[HAPPY]`
+- [x] `…::testAnEmojiRendersBeforeTheName` `[HAPPY]`
+- [x] `TypeListUpdateTest` — list as admin `[HAPPY]`; normal user and guest refused `[NEG]`; update unknown id `[NEG]`; update without token `[NEG]`; GET refused `[NEG]`; invalid emoji `[NEG]`
+- [x] `SchemaUpgradeTest` — `install()` twice keeps rows and adds the columns once `[ST]`
 
 **photoinfo** (`tests/Integration/`)
 - [ ] `TagWriteTest` — one row per hooked path in the Phase 4 table: the file's Subject/Hierarchy/Keywords/marker match the DB afterwards `[HAPPY]`
@@ -668,8 +668,8 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 
 ### End-to-End Tests
 
-- [ ] typetags `rendering.spec.js::a striped group paints the tab and border at real size` — computed `background-image` and `border-color` `[HAPPY]`
-- [ ] typetags `assign.spec.js::a striped badge keeps its stripes after add and remove` (JS rebuild path) `[ST]`
+- [x] typetags `rendering.spec.js::a striped group paints the tab and border at real size` — computed `background-image` and `border-color` `[HAPPY]`
+- [x] typetags `assign.spec.js::a striped badge keeps its stripes after add and remove` (JS rebuild path) `[ST]`
 - [ ] photoinfo `tags-freitext.spec.js::a name typed in the photo properties tag field shows the ✍️ badge on the picture page` `[HAPPY]`
 
 ### Manual Testing Steps
