@@ -15,8 +15,9 @@ web_environment:
     - PLAYWRIGHT_BROWSERS_PATH=/var/www/html/plugins/typetags/.playwright-browsers
 corepack_enable: false
 # exiftool, for the provenance plugin's metadata write-back. Hand-installing it
-# into the container does not survive a `ddev restart`; this does.
-webimage_extra_packages: ["libimage-exiftool-perl"]
+# into the container does not survive a `ddev restart`; this does. exiv2 is
+# dev-only: an independent reader in photoinfo's TagWriteTest.
+webimage_extra_packages: ["libimage-exiftool-perl", "exiv2"]
 
 # Key features of DDEV's config.yaml:
 

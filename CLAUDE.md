@@ -34,15 +34,17 @@ ddev logs -f
 No build step for the application itself — PHP is served directly from the repo root. The only dependency managers are the per-plugin `composer.json` / `package.json` files in `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit` and `plugins/photoinfo`, all dev-only (test runners; see [plugin-test-suites.md](.claude/rules/plugin-test-suites.md)).
 
 `exiftool` is available in the web container via `webimage_extra_packages` in `.ddev/config.yaml`
-(the provenance plugin's write-back needs it); production has it preinstalled.
+(the provenance plugin's write-back needs it); production has it preinstalled. `exiv2` comes the
+same way, dev-only: an independent keyword reader in photoinfo's `TagWriteTest`.
 
-ImageMagick is also used, but only by two integration suites, as an **independent** reader of what
+ImageMagick is also used, but only by three integration suites, as an **independent** reader of what
 a write-back produced — reading back with exiftool cannot tell data written to the standard slots
 apart from data only exiftool knows about. `identify` in provenance's
 `WriteBackTest::testAnIndependentReaderFindsTheCaption`; `convert <file> xmp:-` in persons'
 `WriteRegionsTest::testAnIndependentLibraryFindsTheRegionInTheStandardXmpPacket`, which extracts
-the raw XMP packet and reads the MWG region out of it as text. It comes from the DDEV web image
-itself rather than `webimage_extra_packages`; if a future image drops it, both fail loudly naming it.
+the raw XMP packet and reads the MWG region out of it as text, and the same in photoinfo's
+`TagWriteTest::testAnIndependentReaderFindsTheKeywordsInTheStandardXmpSlots` for the keywords. It comes from the DDEV web image
+itself rather than `webimage_extra_packages`; if a future image drops it, all three fail loudly naming it.
 It is also a fixture tool: `createTestImageAs()` in provenance's and photoinfo's `FixtureBuilder`
 `convert`s a gallery PNG to JPEG or HEIC for the metadata-sync tests: PHP reads EXIF from JPEG, never from the gallery's PNGs.
 

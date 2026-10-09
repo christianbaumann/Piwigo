@@ -21,6 +21,14 @@ final class TagWriteTest extends TestCase
     private const HOLD_POLLS = 50;
     /** flock(1)'s exit status for "held by someone else" when asked with -E. */
     private const HELD = 9;
+    /** An XMP packet shorter than this cannot hold the keywords. */
+    private const MIN_XMP_BYTES = 500;
+    /** exiv2's answer for the three keyword fields of a two-tag write is longer than this. */
+    private const MIN_EXIV2_BYTES = 150;
+    /** The keys exiv2 names the three keyword fields by. */
+    private const EXIV2_SUBJECT = 'Xmp.dc.subject';
+    private const EXIV2_HIERARCHY = 'Xmp.lr.hierarchicalSubject';
+    private const EXIV2_KEYWORDS = 'Iptc.Application2.Keywords';
 
     private Db $db;
     private FixtureBuilder $fixture;
@@ -262,6 +270,33 @@ final class TagWriteTest extends TestCase
         $this->assertFileTags($this->image, array($this->tagName('Kirmes')), array());
     }
 
+    /** [ECP] A tag in the Ausstellung group stays in the database, whatever its name (decision 0051). */
+    public function testATagInTheAusstellungGroupStaysOutOfTheFile(): void
+    {
+        $vernissage = $this->tag('Vernissage', $this->ausstellungGroup());
+        $kirmes = $this->tag('Kirmes');
+
+        $this->setInfo(array('tag_ids' => $vernissage . ',' . $kirmes, 'multiple_value_mode' => 'replace'));
+
+        $this->assertSame(array($vernissage, $kirmes), $this->fixture->tagIdsOf($this->image['id']));
+        $this->assertFileTags($this->image, array($this->tagName('Kirmes')), array());
+    }
+
+    /** [ST] Moving a tag into the Ausstellung group takes it out of the file (decision 0051). */
+    public function testRegroupingIntoAusstellungTakesTheTagOutOfTheFile(): void
+    {
+        $vernissage = $this->tag('Vernissage', $this->group);
+        $this->setInfo(array('tag_ids' => (string)$vernissage, 'multiple_value_mode' => 'replace'));
+        $this->assertSame(array($this->tagName('Vernissage')), FixtureBuilder::readKeywords($this->image['file'])['XMP-dc:Subject'],
+            'anti-vacuity: the tag never reached the file');
+
+        $this->assertOk($this->ws->call('typetags.tags.setType', array(
+            'tag_id' => array($vernissage), 'typetag_id' => $this->ausstellungGroup(), 'pwg_token' => $this->ws->token(),
+            )));
+
+        $this->assertFileTags($this->image, array(), array());
+    }
+
     /** [BVA] IPTC keeps 64 bytes of a keyword; the write still succeeds and XMP keeps it whole. */
     public function testAnIptcKeywordOver64BytesDoesNotFailTheWrite(): void
     {
@@ -285,6 +320,56 @@ final class TagWriteTest extends TestCase
         $this->setInfo(array('tag_ids' => (string)$id, 'multiple_value_mode' => 'replace'));
 
         $this->assertFileTags($this->image, array($name), array($this->groupName() . '|' . $name));
+    }
+
+    /**
+     * [HAPPY] A reader that is not exiftool finds the keywords in the standard XMP slots.
+     *
+     * Reading back with exiftool cannot tell the standard slots apart from data only
+     * exiftool knows about. ImageMagick extracts the raw XMP packet, and the slots
+     * digiKam and Lightroom read are asserted on it as text.
+     */
+    public function testAnIndependentReaderFindsTheKeywordsInTheStandardXmpSlots(): void
+    {
+        $kirmes = $this->tag('Kirmes', $this->group);
+        $anna = $this->tag('Anna');
+
+        $this->postProperties($this->image['id'], array('tags' => array('~~' . $kirmes . '~~', '~~' . $anna . '~~')));
+
+        $xmp = $this->xmpPacketViaImageMagick($this->image['file']);
+
+        $this->assertStringContainsString('xmlns:dc=\'http://purl.org/dc/elements/1.1/\'', $xmp,
+            'the Dublin Core namespace is not declared in the XMP packet');
+        $this->assertStringContainsString('xmlns:lr=\'http://ns.adobe.com/lightroom/1.0/\'', $xmp,
+            'the Lightroom namespace is not declared in the XMP packet');
+        $this->assertSame(1, preg_match('~<dc:subject>\s*<rdf:Bag>(.*?)</rdf:Bag>\s*</dc:subject>~s', $xmp, $subject),
+            'dc:subject holds no rdf:Bag');
+        $this->assertStringContainsString('<rdf:li>' . $this->tagName('Anna') . '</rdf:li>', $subject[1]);
+        $this->assertStringContainsString('<rdf:li>' . $this->tagName('Kirmes') . '</rdf:li>', $subject[1]);
+        $this->assertSame(1, preg_match('~<lr:hierarchicalSubject>\s*<rdf:Bag>(.*?)</rdf:Bag>\s*</lr:hierarchicalSubject>~s', $xmp, $hierarchy),
+            'lr:hierarchicalSubject holds no rdf:Bag');
+        $this->assertStringContainsString('<rdf:li>' . $this->groupName() . '|' . $this->tagName('Kirmes') . '</rdf:li>', $hierarchy[1]);
+    }
+
+    /**
+     * [HAPPY] A second reader that shares no code with exiftool or ImageMagick
+     * finds all three fields, and is the only independent read of
+     * IPTC:Keywords. exiv2 joins an XMP bag's items with ", ", which no tag
+     * name here contains.
+     */
+    public function testExiv2ReadsTheKeywordsFromAllThreeFields(): void
+    {
+        $kirmes = $this->tag('Kirmes', $this->group);
+        $anna = $this->tag('Anna');
+
+        $this->postProperties($this->image['id'], array('tags' => array('~~' . $kirmes . '~~', '~~' . $anna . '~~')));
+
+        $fields = $this->keywordFieldsViaExiv2($this->image['file']);
+
+        $flat = array($this->tagName('Anna'), $this->tagName('Kirmes'));
+        $this->assertSame(array(implode(', ', $flat)), $fields[self::EXIV2_SUBJECT] ?? null, 'dc:subject');
+        $this->assertSame(array($this->groupName() . '|' . $this->tagName('Kirmes')), $fields[self::EXIV2_HIERARCHY] ?? null, 'lr:hierarchicalSubject');
+        $this->assertSame($flat, $fields[self::EXIV2_KEYWORDS] ?? null, 'IPTC:Keywords');
     }
 
     /** [NEG] A read-only file: the answer says so and the tags stay saved. */
@@ -481,6 +566,13 @@ final class TagWriteTest extends TestCase
         return $this->fixture->createTag($this->tagName($base), $group);
     }
 
+    /** The install's Ausstellung group, or one of this suite's own when the seed has not run. */
+    private function ausstellungGroup(): int
+    {
+        $id = (int)$this->db->scalar("SELECT id FROM piwigo_typetags WHERE name = 'Ausstellung'");
+        return $id > 0 ? $id : $this->fixture->createGroup('Ausstellung');
+    }
+
     /** The install's Ausstellung tag, or one of this suite's own when the seed has not run. */
     private function ausstellungTag(): int
     {
@@ -524,6 +616,59 @@ final class TagWriteTest extends TestCase
         $this->assertSame($subject, $tags['XMP-dc:Subject'], 'XMP-dc:Subject');
         $this->assertSame($subject, $tags['IPTC:Keywords'], 'IPTC:Keywords');
         $this->assertSame($hierarchy, $tags['XMP-lr:HierarchicalSubject'], 'XMP-lr:HierarchicalSubject');
+    }
+
+    /** The raw XMP packet as ImageMagick extracts it, not as exiftool reads it. */
+    private function xmpPacketViaImageMagick(string $file): string
+    {
+        $packet = shell_exec('convert ' . escapeshellarg($file) . ' xmp:- 2>/dev/null');
+
+        if (!is_string($packet) || $packet === '')
+        {
+            throw new RuntimeException(
+                'ImageMagick returned no XMP packet. Either the write left none, or `convert` is '
+                . 'missing from the DDEV web image - it comes from the image itself, not from '
+                . 'webimage_extra_packages in .ddev/config.yaml.'
+            );
+        }
+
+        // Anti-vacuity: the assertions are substring searches, which pass trivially
+        // against a packet that is really an error message.
+        $this->assertGreaterThan(self::MIN_XMP_BYTES, strlen($packet), 'the XMP packet is too small to hold keywords');
+
+        return $packet;
+    }
+
+    /**
+     * The three keyword fields as exiv2 prints them, one value per line.
+     *
+     * @return array<string, string[]> key => values in file order
+     */
+    private function keywordFieldsViaExiv2(string $file): array
+    {
+        if (trim((string)shell_exec('command -v exiv2')) === '')
+        {
+            throw new RuntimeException(
+                'exiv2 is missing from the DDEV web image. It comes from webimage_extra_packages in '
+                . '.ddev/config.yaml; run `ddev restart` after adding it there.'
+            );
+        }
+
+        $out = (string)shell_exec('exiv2 -Pkv -g ' . self::EXIV2_SUBJECT . ' -g ' . self::EXIV2_HIERARCHY
+            . ' -g ' . self::EXIV2_KEYWORDS . ' ' . escapeshellarg($file) . ' 2>&1');
+
+        // Anti-vacuity: an empty answer or an error line would give empty fields,
+        // and the assertions would then only report a missing key.
+        $this->assertGreaterThan(self::MIN_EXIV2_BYTES, strlen($out), 'exiv2 printed too little: ' . $out);
+
+        $fields = array();
+        foreach (preg_split('/\R/', trim($out)) as $line)
+        {
+            $parts = preg_split('/\s+/', $line, 2);
+            $fields[$parts[0]][] = $parts[1] ?? '';
+        }
+
+        return $fields;
     }
 
     private function assertOk(array $res): void
