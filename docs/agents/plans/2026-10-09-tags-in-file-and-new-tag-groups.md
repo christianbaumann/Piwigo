@@ -328,7 +328,7 @@ One data file, one deploy step, idempotent, applied over ws.php locally and on t
 
 ### Changes Required
 
-#### [ ] 1. Data file
+#### [x] 1. Data file
 **File**: `tools/deploy/tag-groups.json`
 
 ```json
@@ -359,7 +359,7 @@ One data file, one deploy step, idempotent, applied over ws.php locally and on t
 
 `tools/` is never published (decision 0022); the deploy reads the file locally.
 
-#### [ ] 2. Seed step
+#### [x] 2. Seed step
 **File**: `tools/deploy/pwgdeploy/seed.py` (new), `bootstrap.py`, `cli.py`
 
 ```python
@@ -372,24 +372,26 @@ def plan_seed(wanted: TagGroups, groups: list, tags: list) -> SeedPlan: ...   # 
 def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResult: ...
 ```
 
-- [ ] Reads `typetags.type.list` and `pwg.tags.getAdminList`, matches by name, then
+- [x] Reads `typetags.type.list` and `pwg.tags.getAdminList`, matches by name, then
   `typetags.type.add`/`type.update`, `pwg.tags.add`, `typetags.tags.setType`; never deletes
-- [ ] Re-reads both lists afterwards and raises if anything differs from the file
-- [ ] `bootstrap.run()`: after `activate_plugins`, before `sync`; report line `tags …`
-- [ ] `cli.py`: `--seed-tags-only` runs login + seed only (no upload, no FTP connection), so the
+- [x] Re-reads both lists afterwards and raises if anything differs from the file
+- [x] `bootstrap.run()`: after `activate_plugins`, before `sync`; report line `tags …`
+- [x] `cli.py`: `--seed-tags-only` runs login + seed only (no upload, no FTP connection), so the
   same command seeds the local install from a credential file whose `site.url` is
   `http://piwigo.ddev.site` (README documents it; plain http avoids Python not trusting mkcert)
 
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `cd tools/deploy && uv run pytest`
-- [ ] Local seed applied: `uv run pwg-deploy --seed-tags-only deploy.ddev.json`, run twice; second
-  run reports 0 added, 0 changed
-- [ ] `ddev mysql -e "select name, color, striped, emoji from piwigo_typetags"` shows 12 rows
+- [x] `cd tools/deploy && uv run pytest` (532 passed, twice in random order and once in file order, 2026-10-09)
+- [x] Local seed applied: `uv run pwg-deploy --seed-tags-only deploy.ddev.json`, run twice; second
+  run reports 0 added, 0 changed (local was hand-seeded in Phase 2, so both reported 0; with one
+  group's colour and emoji and one tag's group broken by hand, a run reported `2 changed` and the
+  next `0`)
+- [x] `ddev mysql -e "select name, color, striped, emoji from piwigo_typetags"` shows 12 rows
 
 #### Manual Verification:
-- [ ] None beyond the above
+- [x] None beyond the above
 
 ---
 
@@ -658,10 +660,10 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [ ] `LocalOnlyRuleTest` reads `tag-groups.json` and asserts every group whose tags are local-only is named in `PHOTOINFO_LOCAL_ONLY_TAGS` or has `?` (no transcribed copy) `[ECP]`
 
 **deploy** (`tools/deploy/tests/`)
-- [ ] `test_seed.py` — load: duplicate group `[NEG]`, tag in unknown group `[NEG]`, bad colour `[NEG]`, bad emoji `[NEG]`; plan: empty install adds all `[HAPPY]`, seeded install plans nothing `[ST]`, changed colour updates `[ECP]`, a group that exists only remotely is left alone `[NEG]`; verify step raises on a mismatch `[NEG]`
-- [ ] `test_seed.py::test_the_freitext_group_exists_in_the_file` — reads `PHOTOINFO_FREITEXT_GROUP` with `php_value`-style regex `[HAPPY]`
-- [ ] `test_bootstrap.py` — seed runs after activation and before the sync `[ST]`; a run without typetags skips the seed `[NEG]`; `parse_rescan` new fields, `[]` for empty `not_in_file` `[BVA]`, unknown shape raises `[NEG]`; `--prune-tags` absent → no prune call `[DT]`, present → only photos with `not_in_file` `[DT]`; prune failure does not fail the run `[NEG]`
-- [ ] `test_cli.py` — `--seed-tags-only` opens no FTP connection and uploads nothing `[NEG]`
+- [x] `test_seed.py` — load: duplicate group `[NEG]`, tag in unknown group `[NEG]`, bad colour `[NEG]`, bad emoji `[NEG]`; plan: empty install adds all `[HAPPY]`, seeded install plans nothing `[ST]`, changed colour updates `[ECP]`, a group that exists only remotely is left alone `[NEG]`; verify step raises on a mismatch `[NEG]`
+- [ ] `test_seed.py::test_the_freitext_group_exists_in_the_file` — reads `PHOTOINFO_FREITEXT_GROUP` with `php_value`-style regex `[HAPPY]` (moved to Phase 4: the constant is defined there)
+- [ ] `test_bootstrap.py` — seed runs after activation and before the sync `[ST]`; a run without typetags skips the seed `[NEG]`; `parse_rescan` new fields, `[]` for empty `not_in_file` `[BVA]`, unknown shape raises `[NEG]`; `--prune-tags` absent → no prune call `[DT]`, present → only photos with `not_in_file` `[DT]`; prune failure does not fail the run `[NEG]` (the two seed cases done in Phase 3)
+- [x] `test_cli.py` — `--seed-tags-only` opens no FTP connection and uploads nothing `[NEG]`
 
 #### Regression — affected existing tests
 - [x] typetags: all unit, integration (`PicturePageSourceTest`, `PluginActivationTest`, `MalformedColorRenderingTest`) and E2E (`rendering.spec.js`, `assign.spec.js`, `remove.spec.js`)

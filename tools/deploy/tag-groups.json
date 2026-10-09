@@ -1,0 +1,29 @@
+{
+  "groups": [
+    {"name": "Personen", "color": "#FFFFB6"},
+    {"name": "Feste, Bräuche, Jahreskreis", "color": "#D8D900"},
+    {"name": "Arbeiten", "color": "#FFCA4F"},
+    {"name": "Gewerbe", "color": "#BE6CB7"},
+    {"name": "Vereine, Gruppierungen", "color": "#007DAD"},
+    {"name": "Friedhof, Kirche, Kapelle", "color": "#77A600"},
+    {"name": "Stationen durch das Leben", "color": "#FF759A"},
+    {"name": "Häuser, Ortsansichten", "color": "#938953"},
+    {"name": "Kategorie ?", "color": "#D00000", "striped": true},
+    {"name": "Name ?", "color": "#D00000", "striped": true},
+    {"name": "Ausstellung", "color": "#E4E6E3", "emoji": "1F5BC FE0F"},
+    {"name": "Freitext", "color": "#E4E6E3", "emoji": "270D FE0F"}
+  ],
+  "tags": [
+    {"name": "Personen", "group": "Personen"},
+    {"name": "Feste, Bräuche, Jahreskreis", "group": "Feste, Bräuche, Jahreskreis"},
+    {"name": "Arbeiten", "group": "Arbeiten"},
+    {"name": "Gewerbe", "group": "Gewerbe"},
+    {"name": "Vereine, Gruppierungen", "group": "Vereine, Gruppierungen"},
+    {"name": "Friedhof, Kirche, Kapelle", "group": "Friedhof, Kirche, Kapelle"},
+    {"name": "Stationen durch das Leben", "group": "Stationen durch das Leben"},
+    {"name": "Häuser, Ortsansichten", "group": "Häuser, Ortsansichten"},
+    {"name": "Kategorie ?", "group": "Kategorie ?"},
+    {"name": "Name ?", "group": "Name ?"},
+    {"name": "Ausstellung", "group": "Ausstellung"}
+  ]
+}

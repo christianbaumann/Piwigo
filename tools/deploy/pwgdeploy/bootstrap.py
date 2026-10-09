@@ -1,6 +1,6 @@
 """Turning an uploaded tree into an installed gallery.
 
-Six steps — install, config, session, plugins, sync, photoinfo rescan — each of which asks
+Seven steps — install, config, session, plugins, tag groups, sync, photoinfo rescan — each of which asks
 the server what state it is in before changing it, so running the whole thing twice is
 safe by construction rather than by the operator remembering.
 
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from pwgdeploy import fileset, manifest
+from pwgdeploy import fileset, manifest, seed
 from pwgdeploy.config import DeployConfig, MailConfig, SiteConfig
 from pwgdeploy.errors import InstallError, RemoteHttpError
 from pwgdeploy.http import SYNC_TIMEOUT_SECONDS
@@ -72,6 +72,7 @@ MIN_SUMMARY_ADDED_LINES = 2
 MIN_SUMMARY_DELETED_LINES = 2
 MAX_REPORTED_ERRORS = 10
 
+TYPETAGS_PLUGIN = "typetags"
 PHOTOINFO_PLUGIN = "photoinfo"
 IMAGES_METHOD = "pwg.categories.getImages"
 RESCAN_METHOD = "pwg.photoinfo.rescan"
@@ -110,6 +111,8 @@ class BootstrapResult:
     config_uploaded: bool
     plugins: dict[str, str]
     sync: SyncCounts
+    seed: seed.SeedResult | None = None
+    """None when typetags was not among the plugins this run activated."""
     rescan: RescanResult | None = None
     """None when photoinfo was not among the plugins this run activated."""
 
@@ -470,8 +473,16 @@ def merge_rescans(results: Iterable[RescanResult]) -> RescanResult:
 # --- the whole bootstrap --------------------------------------------------------------
 
 
-def run(config: DeployConfig, state_dir: Path, transport, client) -> BootstrapResult:
-    """Install if needed, publish the config, log in, activate, scan, then rescan."""
+def run(
+    config: DeployConfig,
+    state_dir: Path,
+    transport,
+    client,
+    tag_groups_path: Path | None = None,
+) -> BootstrapResult:
+    """Install if needed, publish the config, log in, activate, seed the tag groups, scan,
+    then rescan."""
+    wanted = seed.load_tag_groups(tag_groups_path or seed.TAG_GROUPS_PATH)
     installed_now = False
     if not is_installed(client, config.site.base_url):
         install(client, config)
@@ -481,6 +492,11 @@ def run(config: DeployConfig, state_dir: Path, transport, client) -> BootstrapRe
 
     token = login(client, config)
     plugins = activate_plugins(client, config.site.base_url, token, PLUGINS_TO_ACTIVATE)
+    seeded = (
+        seed.seed_tags(client, config.site.base_url, token, wanted)
+        if TYPETAGS_PLUGIN in plugins
+        else None
+    )
     counts = sync(client, config.site.base_url)
     rescan = (
         rescan_photoinfo(client, config.site.base_url, token)
@@ -493,5 +509,6 @@ def run(config: DeployConfig, state_dir: Path, transport, client) -> BootstrapRe
         config_uploaded=config_uploaded,
         plugins=plugins,
         sync=counts,
+        seed=seeded,
         rescan=rescan,
     )

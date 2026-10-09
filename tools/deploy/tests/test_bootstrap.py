@@ -11,7 +11,7 @@ a real `install.php` — that is Phase 6's manual step and the hand-check ledger
 
 import pytest
 
-from pwgdeploy import bootstrap, manifest
+from pwgdeploy import bootstrap, manifest, seed
 from pwgdeploy.config import load
 from pwgdeploy.errors import InstallError, RemoteHttpError
 from tests.fakes import FakeGallery, FakeTransport
@@ -754,4 +754,59 @@ def test_a_run_without_photoinfo_does_not_rescan(cfg, gallery, tmp_path, monkeyp
 
     assert result.rescan is None
     assert "pwg.photoinfo.rescan" not in gallery.methods_called()
+    assert gallery.plugin_states["provenance"] == "active"  # anti-vacuity: the run ran
+
+
+# --- tag groups ---------------------------------------------------------------------
+
+SEED_METHODS = {"typetags.type.list", "typetags.type.add", "pwg.tags.getAdminList"}
+
+
+def test_the_seed_runs_after_activation_and_before_the_sync(cfg, gallery, tmp_path):
+    """[ST] typetags' methods exist only once it is active, and the photos the sync
+    registers should find their groups already there."""
+    bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    methods = [call[2].get("method") for call in gallery.calls]
+    urls = gallery.urls()
+    first_seed = min(i for i, m in enumerate(methods) if m in SEED_METHODS)
+    last_activation = max(i for i, m in enumerate(methods) if m == "pwg.plugins.performAction")
+    first_sync = min(i for i, url in enumerate(urls) if "site_update" in url)
+    assert last_activation < first_seed < first_sync
+
+
+def test_a_run_seeds_the_committed_tag_groups(cfg, gallery, tmp_path):
+    """[HAPPY] An empty remote gets every group and tag the file names."""
+    wanted = seed.load_tag_groups()
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert result.seed.groups_added == len(wanted.groups) >= 1
+    assert result.seed.tags_added == len(wanted.tags) >= 1
+    assert {g["name"] for g in gallery.tag_groups} == {g.name for g in wanted.groups}
+
+
+def test_a_second_run_seeds_nothing(cfg, gallery, tmp_path):
+    """[ST]"""
+    bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert result.seed.groups_checked >= 1  # anti-vacuity: the seed ran
+    assert (result.seed.groups_added, result.seed.groups_changed) == (0, 0)
+    assert (result.seed.tags_added, result.seed.tags_regrouped) == (0, 0)
+
+
+def test_a_run_without_typetags_does_not_seed(cfg, gallery, tmp_path, monkeypatch):
+    """[NEG] The group methods exist only while typetags is active."""
+    monkeypatch.setattr(
+        bootstrap,
+        "PLUGINS_TO_ACTIVATE",
+        tuple(name for name in bootstrap.PLUGINS_TO_ACTIVATE if name != "typetags"),
+    )
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert result.seed is None
+    assert not SEED_METHODS & set(gallery.methods_called())
     assert gallery.plugin_states["provenance"] == "active"  # anti-vacuity: the run ran

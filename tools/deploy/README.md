@@ -4,8 +4,8 @@ Uploads this Piwigo fork to a shared web space over FTPS — only the files the 
 and only the ones that changed since the last run — then completes the remote install over
 HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of four of the
 five fork-local plugins (photoedit stays inactive, see `.claude/rules/deployment.md`), a
-`site_update` scan that turns the uploaded `galleries/` tree into albums and photos, and a
-photoinfo rescan that reads each photo's date and info text back out of its file.
+seed of the tag groups and tags `tag-groups.json` names, a `site_update` scan that turns the
+uploaded `galleries/` tree into albums and photos, and a photoinfo rescan that reads each photo's date and info text back out of its file.
 
 > **The target is a sandbox instance.** This tool installs a gallery, overwrites a config file
 > and deletes remote paths. It is **never** safe to point at a production install. See
@@ -77,7 +77,8 @@ reports the plugins already active.
 | `--dry-run` | enumerate, hash and diff; open no socket. Reports what *would* be sent **and deleted** |
 | `--list-files` | print the published file set and exit |
 | `--audit` | list the remote and report what the manifest does not cover; delete nothing |
-| `--no-bootstrap` | upload only; skip install, config, plugins, sync and rescan |
+| `--no-bootstrap` | upload only; skip install, config, plugins, tag groups, sync and rescan |
+| `--seed-tags-only` | log in and apply `tag-groups.json`, nothing else: no upload, no FTP connection (see below) |
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
 | `--allow-version-change` | upload even when the remote runs a different core version |
@@ -116,6 +117,31 @@ into them and the prune never touches them.
 No database content is transferred, in either direction; the remote's albums and photos are
 re-created from the uploaded files by the `site_update` scan. See
 [decision 0023](../../docs/agents/decisions/0023-no-database-transfer-to-the-remote.md).
+
+## The tag groups
+
+The colour groups of the Colored Tags plugin, and the tags that belong in them, live in the
+database, which never travels. `tag-groups.json` (next to this README, never published) is
+their single record: each group's name, colour, `striped` flag and `emoji` (code points,
+`"1F5BC FE0F"`), and each tag's group. After activating the plugins, every run matches them by
+name against the remote, adds what is missing, corrects a colour, stripe, emoji or a tag's
+group that differs, then reads both lists back and fails with exit `7` if they still differ.
+It never deletes: a group or tag the file does not name is left alone.
+
+```
+  plugins     typetags active, provenance active, persons active, photoinfo active
+  tags        12 groups, 11 tags checked: 0 groups added, 0 tags added, 0 changed
+```
+
+`--seed-tags-only` applies the file to any install without deploying to it, which is how the
+local DDEV install is seeded. It activates nothing, so typetags has to be active. Give it a
+credential file whose `site.base_url` is `http://piwigo.ddev.site` (plain http: Python does not
+trust DDEV's mkcert certificate) and whose `admin` is a local webmaster login; the `ftp` and
+`mysql` sections are validated but not used:
+
+```bash
+uv run pwg-deploy --seed-tags-only deploy.ddev.json
+```
 
 ## The photoinfo rescan
 
@@ -261,7 +287,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-472 tests, measured 2026-10-08. Everything that decides *what* to do is a pure function and is
+532 tests, measured 2026-10-09. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

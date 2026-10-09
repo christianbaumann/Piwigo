@@ -135,8 +135,10 @@ class FakeGallery:
     JSON envelope include/ws_protocols/json_encoder.php builds, the token and webmaster
     checks of include/ws_functions/pwg.extensions.php:53-88, the summary markup of
     admin/themes/default/template/site_update.tpl:19-24, the paging of
-    pwg.categories.getImages (include/ws_functions/pwg.categories.php:19-232) and the
-    chunk limit and answer of pwg.photoinfo.rescan (plugins/photoinfo/include/).
+    pwg.categories.getImages (include/ws_functions/pwg.categories.php:19-232), the
+    chunk limit and answer of pwg.photoinfo.rescan (plugins/photoinfo/include/), the tag
+    rows of pwg.tags.getAdminList/add (include/ws_functions/pwg.tags.php) and typetags'
+    group methods (plugins/typetags/main.inc.php).
     """
 
     LOGIN_PAGE = "identification.php"
@@ -174,6 +176,9 @@ class FakeGallery:
         admin=("webmaster", "p"),
         photo_ids=None,
         rescan_failures=None,
+        tag_groups=None,
+        tags=None,
+        inert_methods=(),
     ):
         self.base_url = base_url
         self.installed = installed
@@ -198,6 +203,12 @@ class FakeGallery:
         # photo id -> the reason pwg.photoinfo.rescan gives for it.
         self.rescan_failures = dict(rescan_failures or {})
         self.rescanned: list[int] = []
+        # typetags' groups as typetags.type.list answers them, and core's tag rows as
+        # pwg.tags.getAdminList does: ids as strings, id_typetags a string or None.
+        self.tag_groups = [dict(group) for group in tag_groups or []]
+        self.tags = [dict(tag) for tag in tags or []]
+        # Methods that answer ok and change nothing: a server that lost a write.
+        self.inert_methods = set(inert_methods)
         self.logged_in = False
         self.calls: list[tuple] = []
 
@@ -291,6 +302,64 @@ class FakeGallery:
             return self._images_page(fields)
         if method == "pwg.photoinfo.rescan":
             return self._rescan(fields)
+        if method == "pwg.tags.getAdminList":
+            return _ok({"tags": [dict(tag, name_raw=tag["name"]) for tag in self.tags]})
+        if method == "pwg.tags.add":
+            return self._tags_add(fields)
+        if method.startswith("typetags."):
+            return self._typetags(method, fields)
+        return _fail(501, f"unknown method {method}")
+
+    def _tags_add(self, fields) -> str:
+        name = fields.get("name", "")
+        if any(tag["name"] == name for tag in self.tags):
+            return _fail(1003, f'Tag "{name}" already exists')
+        tag_id = str(1 + max((int(tag["id"]) for tag in self.tags), default=0))
+        if "pwg.tags.add" not in self.inert_methods:
+            self.tags.append({"id": tag_id, "name": name, "id_typetags": None})
+        return _ok({"id": int(tag_id), "name": name})
+
+    def _typetags(self, method, fields) -> str:
+        if self.plugin_states.get("typetags") != "active":
+            return _fail(501, f"unknown method {method}")
+        inert = method in self.inert_methods
+        if method == "typetags.type.list":
+            return _ok([dict(group) for group in self.tag_groups])
+        if method == "typetags.type.add":
+            if any(g["name"] == fields["typetag_name"] for g in self.tag_groups):
+                return _fail(1003, "This name is already used")
+            group = {
+                "id": 1 + max((g["id"] for g in self.tag_groups), default=0),
+                "name": fields["typetag_name"],
+                "color": "#" + fields["typetag_color"],
+                "striped": fields.get("striped") == "1",
+                "emoji": fields.get("emoji", ""),
+            }
+            if not inert:
+                self.tag_groups.append(group)
+            return _ok(dict(group))
+        if method == "typetags.type.update":
+            if fields.get("pwg_token") != self.TOKEN:
+                return _fail(403, "Invalid security token")
+            group = next(
+                (g for g in self.tag_groups if g["id"] == int(fields["typetag_id"])), None
+            )
+            if group is None:
+                return _fail(404, "Tag color not found")
+            answer = dict(
+                group,
+                color="#" + fields["typetag_color"].lstrip("#"),
+                striped=fields["striped"] == "1",
+                emoji=fields["emoji"],
+            )
+            if not inert:
+                group.update(answer)
+            return _ok(answer)
+        if method == "typetags.tags.setType":
+            for tag in [] if inert else self.tags:
+                if tag["id"] == fields["tag_id"]:
+                    tag["id_typetags"] = fields["typetag_id"]
+            return _ok(None)
         return _fail(501, f"unknown method {method}")
 
     def _images_page(self, fields) -> str:

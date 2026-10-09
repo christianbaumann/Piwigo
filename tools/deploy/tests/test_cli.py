@@ -14,12 +14,14 @@ import re
 import pytest
 
 from pwgdeploy import cli
+from pwgdeploy import seed
 from pwgdeploy import fileset
 from pwgdeploy import preflight
 from pwgdeploy import version as pwgversion
 from pwgdeploy.errors import (
     ConfigError,
     InsecureTransportError,
+    RemoteHttpError,
     StateMismatchError,
     TransportError,
     VersionError,
@@ -125,7 +127,7 @@ def test_the_report_names_every_step(run):
     """[HAPPY] The operator reads this instead of the log; each step says what it did."""
     run()
 
-    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "sync", "rescan"):
+    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "tags", "sync", "rescan"):
         assert label in run.text, f"{label} missing from:\n{run.text}"
 
 
@@ -402,6 +404,77 @@ def test_the_failure_list_is_capped(config_file, repo, tmp_path):
     lines = _rescan_lines(runner.text)
     assert len(lines) == 1 + cli.MAX_REPORTED_RESCAN_FAILURES + 1
     assert lines[-1].strip() == "… and 5 more"
+
+
+def _tags_line(text: str) -> str:
+    label = f"  {'tags':{cli.LABEL_WIDTH}}"
+    lines = [line for line in text.splitlines() if line.startswith(label)]
+    assert len(lines) == 1, f"expected one tags line, got {lines}"
+    return lines[0][len(label) :]
+
+
+def test_the_report_says_what_the_seed_added(run):
+    """[HAPPY] The mockup's line: what was checked, then what changed."""
+    wanted = seed.load_tag_groups()
+    run()
+
+    assert _tags_line(run.text) == (
+        f"{len(wanted.groups)} groups, {len(wanted.tags)} tags checked: "
+        f"{len(wanted.groups)} groups added, {len(wanted.tags)} tags added, 0 changed"
+    )
+
+
+def test_the_report_counts_updated_groups_and_regrouped_tags_as_changed(
+    config_file, repo, tmp_path
+):
+    """[ECP] An install whose groups were all seeded but one tag sits elsewhere."""
+    first = Run(config_file, repo, tmp_path)
+    first()
+    first.gallery.tags[0]["id_typetags"] = None
+    first.gallery.tag_groups[0]["color"] = "#000000"
+
+    again = Run(config_file, repo, tmp_path, gallery=first.gallery)
+    again()
+
+    assert _tags_line(again.text).endswith(": 0 groups added, 0 tags added, 2 changed")
+
+
+def test_seed_tags_only_seeds_without_touching_the_web_space(config_file, repo, tmp_path):
+    """[NEG] The local install is seeded with the same command, and has no FTP server."""
+    gallery = FakeGallery(BASE_URL, installed=True, plugin_states={"typetags": "active"})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    def no_transport(config):
+        raise AssertionError("--seed-tags-only built a transport")
+
+    def no_tracked(root):
+        raise AssertionError("--seed-tags-only enumerated the file set")
+
+    code = cli.main(
+        ["--seed-tags-only", str(config_file)],
+        stdout=runner.out,
+        stderr=runner.err,
+        repo_root=repo,
+        state_dir=tmp_path / "state",
+        transport_factory=no_transport,
+        client_factory=lambda config: gallery,
+        tracked=no_tracked,
+    )
+
+    assert code == 0, runner.err.getvalue()
+    assert len(gallery.tag_groups) == len(seed.load_tag_groups().groups) >= 1
+    assert "site_update" not in " ".join(gallery.urls())
+    assert "pwg.plugins.performAction" not in gallery.methods_called()
+    _tags_line(runner.text)
+
+
+def test_seed_tags_only_fails_when_typetags_is_not_active(config_file, repo, tmp_path):
+    """[NEG] It activates nothing; the server's refusal is the message."""
+    gallery = FakeGallery(BASE_URL, installed=True, plugin_states={"typetags": "inactive"})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner("--seed-tags-only") == RemoteHttpError.exit_code
+    assert "typetags.type.list" in runner.err.getvalue()
 
 
 def test_an_empty_gallery_reports_a_rescan_of_nothing(config_file, repo, tmp_path):

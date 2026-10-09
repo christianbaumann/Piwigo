@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from pwgdeploy import audit, bootstrap, fileset, manifest, preflight, upload, version
+from pwgdeploy import audit, bootstrap, fileset, manifest, preflight, seed, upload, version
 from pwgdeploy.config import DeployConfig, load_file
 from pwgdeploy.errors import DeployError
 from pwgdeploy.http import UrllibClient
@@ -61,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--audit",
         action="store_true",
         help="list the remote and report what the manifest does not cover; delete nothing",
+    )
+    parser.add_argument(
+        "--seed-tags-only",
+        action="store_true",
+        help="log in and apply tag-groups.json; no upload, no FTP connection",
     )
     parser.add_argument(
         "--no-bootstrap",
@@ -121,6 +126,11 @@ def main(
         if args.audit:
             _report_target(out, config)
             _audit(out, config, state_dir, transport_factory)
+            return 0
+
+        if args.seed_tags_only:
+            print(f"Piwigo tag groups -> {config.site.base_url}", file=out)
+            _seed_tags_only(out, config, client_factory)
             return 0
 
         tracked_paths = tracked(repo_root)
@@ -371,6 +381,8 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory):
         "plugins",
         ", ".join(f"{name} {state}" for name, state in result.plugins.items()),
     )
+    if result.seed is not None:
+        _report_seed(out, result.seed)
     _line(
         out,
         "sync",
@@ -380,6 +392,26 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory):
     )
     if result.rescan is not None:
         _report_rescan(out, result.rescan)
+
+
+def _seed_tags_only(out, config, client_factory) -> None:
+    """The seed step on its own, for an install this tool does not deploy to: the local
+    one has no FTP server. Activates nothing; typetags has to be active already."""
+    wanted = seed.load_tag_groups()
+    client = client_factory(config)
+    token = bootstrap.login(client, config)
+    _report_seed(out, seed.seed_tags(client, config.site.base_url, token, wanted))
+
+
+def _report_seed(out, result: seed.SeedResult) -> None:
+    changed = result.groups_changed + result.tags_regrouped
+    _line(
+        out,
+        "tags",
+        f"{result.groups_checked} groups, {result.tags_checked} tags checked: "
+        f"{result.groups_added} groups added, {result.tags_added} tags added, "
+        f"{changed} changed",
+    )
 
 
 def _report_rescan(out, rescan: bootstrap.RescanResult) -> None:
