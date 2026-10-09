@@ -688,7 +688,7 @@ Each fixed test-first, the new cases proven by mutants.
   `use_iptc`, public tags page modes)
 - [x] `docs/backlog.md`: close "save labels/tags in the image meta data" and "eight colored
   tags have no seeding script"; update the typetags "ahead of origin" count
-- [-] `handbuch/`: the tags page explains `Kategorie ?`, `Name ?`, `Ausstellung` (stays local)
+- [x] `handbuch/`: the tags page explains `Kategorie ?`, `Name ?`, `Ausstellung` (stays local)
   and Freitext; re-shoot only the shots whose screen changed (`.claude/rules/handbook.md`),
   then `ddev exec php handbuch/tools/check.php`
 - [x] Mutation table for `photoinfo_file_keywords()`, `photoinfo_build_tags_argfile()`,
@@ -699,23 +699,40 @@ Each fixed test-first, the new cases proven by mutants.
     person ids; the ids arrive as strings from `query2array()`), E7 (surrogate upper edge `DFFF`
     untested), E14 (pasted characters separated by a blank untested). Open with the owner
 
+**Verified 2026-10-09** (`/verify`, independent review): Phase 7 approved. The review found the
+handbook and deploy docs still describing the name-only rule, a rescan comparing the raw group while
+the write compared a trimmed one (a group `Ausstellung ` would have been pruned), and core's
+`pwg.tags.rename` answering badge HTML like `getAdminList` did. Each fixed test-first. Suites after
+the follow-ups: typetags unit 82, integration 114, E2E 45; photoinfo unit 268, integration 178,
+E2E 32; persons, photoedit and provenance as above; `tools/test-hooks.sh`. Open with the owner:
+the Phase 6 real deploy, digiKam/Lightroom display (ledger), pushing `plugins/typetags`.
+
 ### Follow-ups decided by the owner after Phase 7 (2026-10-09)
 
 - [x] **Q19 = a**: the handbook explains `Kategorie ?` as "not yet clear which coloured tag the
   photo belongs to" and `Name ?` as "not everyone on the photo identified yet"; the tag is removed
   once resolved
-- [ ] **Q20 = a**: local-only is decided by the **group** as well: every tag in `Ausstellung`,
+- [x] **Q20 = a**: local-only is decided by the **group** as well: every tag in `Ausstellung`,
   `Kategorie ?` or `Name ?` stays out of the file, rescan and prune; the `?`-in-name rule stays.
   Test-first; a new decision supersedes 0046's name-only sentence; the mutant rows for
   `photoinfo_tag_is_local_only()` are re-run
-- [-] **Q21 = a**: `pwg.tags.getAdminList` returns badge HTML as `name`, so the admin tag field
+- [x] **Q21 = a**: `pwg.tags.getAdminList` returns badge HTML as `name`, so the admin tag field
   (photo properties, Batch Manager) shows the emoji and stripes twice. Fix test-first (integration
   `name === name_raw`, chip-content assertion in `admin-striped.spec.js`), exempt the method in
   `typetags_render()`, bump the coloured tags' `lastmodified` in `update()` so browser tag caches
   refresh; then re-shoot handbook 09 and 13 and commit the handbook. Owner pushes the submodule
 - [x] **Q22 = a**: tests for the three weak-test survivors F6, E7, E14, each watched red against its
   mutant; the mutant table updated
-- [ ] **Q23 = a**: persons and photoedit suites re-run and the regression lines ticked with the date
+- [x] **Q23 = a**: persons and photoedit suites re-run and the regression lines ticked with the date
+- [x] **Q24 = c**: a second independent command-line reader (`exiv2`) in the DDEV web image reads
+  the keywords back; whether digiKam/Lightroom display them stays open in the ledger
+- [x] **Q25 = a**: the local-only rule compares case-insensitively, as the database does; test-first,
+  one sentence in decision 0051
+- [x] **Q26 = a**: one superproject commit per topic
+- [x] **Q27 = a**: the owner pushes `plugins/typetags`; the backlog records count and hashes
+- [ ] **Q28 = a + b**: the real deploy check stays with the owner; `--dry-run` is run now as a partial check
+  - `--dry-run deploy.local.json` 2026-10-09: 3423 files, 70 new, 46 changed, 0 removed; opens no
+    connection, so the seed, rescan and prune are not exercised
 
 ---
 
@@ -768,8 +785,10 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 #### Regression — affected existing tests
 - [x] typetags: all unit, integration (`PicturePageSourceTest`, `PluginActivationTest`, `MalformedColorRenderingTest`) and E2E (`rendering.spec.js`, `assign.spec.js`, `remove.spec.js`)
 - [x] photoinfo: `BuildArgfileTest`, `CoreEditTest`, `RescanTest`, `SyncMetadataTest`
-- [ ] persons: `ReindexTest`, `WriteRegionsTest`, `AddRegionTest`, `DeleteRegionTest`, `PersonAdminApiTest`, `IndexRebuildTest`
-- [ ] photoedit: `ApplyRegionsTest`, `ExclusionTest`, `ApplyTurnTest`
+- [x] persons: `ReindexTest`, `WriteRegionsTest`, `AddRegionTest`, `DeleteRegionTest`, `PersonAdminApiTest`, `IndexRebuildTest`
+- [x] photoedit: `ApplyRegionsTest`, `ExclusionTest`, `ApplyTurnTest`
+  - Re-run 2026-10-09 after the Phase 7 follow-ups: persons unit 153, integration 113; photoedit
+    integration 82; provenance unit 221, integration 209; photoinfo E2E 32 - all green
 - [x] provenance: `CoreTagCrudCharacterizationTest`, Phase 1's new test
 
 ### Integration Tests
