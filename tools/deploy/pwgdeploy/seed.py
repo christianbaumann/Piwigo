@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -32,7 +33,8 @@ _SURROGATES = range(0xD800, 0xE000)
 _COLOR = re.compile(r"#[0-9A-Fa-f]{6}")
 # The form typetags_emoji_codepoints() stores: upper-case hex, one space apart. Anything
 # else would compare unequal to the stored value and be re-sent on every run.
-_EMOJI = re.compile(r"[0-9A-F]{1,6}( [0-9A-F]{1,6})*")
+# No leading zero: it stores sprintf('%X').
+_EMOJI = re.compile(r"[1-9A-F][0-9A-F]{0,5}( [1-9A-F][0-9A-F]{0,5})*")
 
 
 @dataclass(frozen=True)
@@ -181,27 +183,37 @@ def parse_tag_list(result: Any) -> list[Mapping]:
     return tags
 
 
+def collated(name: str) -> str:
+    """A name as utf8mb3_general_ci compares it: no case, no accents, no trailing spaces.
+    typetags.type.add and core's create_tag look a name up that way, so two names equal
+    here are one name to the server, and adding the second is refused."""
+    stripped = "".join(
+        c for c in unicodedata.normalize("NFKD", name) if not unicodedata.combining(c)
+    )
+    return stripped.casefold().rstrip(" ")
+
+
 def plan_seed(wanted: TagGroups, groups: list[Mapping], tags: list[Mapping]) -> SeedPlan:
-    remote_groups = {g["name"]: g for g in groups}
+    remote_groups = {collated(g["name"]): g for g in groups}
     group_ids = {name: int(g["id"]) for name, g in remote_groups.items()}
 
     add_groups = []
     update_groups = []
     for group in wanted.groups:
-        found = remote_groups.get(group.name)
+        found = remote_groups.get(collated(group.name))
         if found is None:
             add_groups.append(group)
         elif not _same_group(group, found):
             update_groups.append((int(found["id"]), group))
 
-    remote_tags = {t["name_raw"]: t for t in tags}
+    remote_tags = {collated(t["name_raw"]): t for t in tags}
     add_tags = []
     regroup_tags = []
     for name, group in wanted.tags:
-        found = remote_tags.get(name)
+        found = remote_tags.get(collated(name))
         if found is None:
             add_tags.append((name, group))
-        elif found["id_typetags"] is None or int(found["id_typetags"]) != group_ids.get(group):
+        elif found["id_typetags"] is None or int(found["id_typetags"]) != group_ids.get(collated(group)):
             regroup_tags.append((int(found["id"]), group))
 
     return SeedPlan(
@@ -226,7 +238,7 @@ def _same_group(group: Group, found: Mapping) -> bool:
 def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResult:
     groups, tags = read_remote(client, base_url)
     plan = plan_seed(wanted, groups, tags)
-    group_ids = {g["name"]: int(g["id"]) for g in groups}
+    group_ids = {collated(g["name"]): int(g["id"]) for g in groups}
 
     for group in plan.add_groups:
         added = bootstrap.ws_call(
@@ -235,7 +247,7 @@ def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResul
             "typetags.type.add",
             {"typetag_name": group.name, **_group_fields(group)},
         )
-        group_ids[group.name] = _answer_id(added, "typetags.type.add")
+        group_ids[collated(group.name)] = _answer_id(added, "typetags.type.add")
     for group_id, group in plan.update_groups:
         bootstrap.ws_call(
             client,
@@ -253,7 +265,7 @@ def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResul
             client,
             base_url,
             "typetags.tags.setType",
-            {"tag_id": str(tag_id), "typetag_id": str(group_ids[group])},
+            {"tag_id": str(tag_id), "typetag_id": str(group_ids[collated(group)])},
         )
 
     left = plan_seed(wanted, *read_remote(client, base_url))

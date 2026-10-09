@@ -468,6 +468,26 @@ def test_seed_tags_only_seeds_without_touching_the_web_space(config_file, repo, 
     _tags_line(runner.text)
 
 
+@pytest.mark.parametrize("other", ["--dry-run", "--audit", "--list-files", "--no-bootstrap"])
+def test_seed_tags_only_refuses_another_mode(run, other):
+    """[NEG] --dry-run promises no socket; a seed beside it would write to the gallery."""
+    with pytest.raises(SystemExit) as raised:
+        run("--seed-tags-only", other)
+    assert raised.value.code == 2
+    assert run.gallery.calls == []
+
+
+def test_a_broken_tag_groups_file_fails_before_any_upload(run, monkeypatch, tmp_path):
+    """[NEG] Like the credential file: a typo costs milliseconds, not an upload."""
+    broken = tmp_path / "tag-groups.json"
+    broken.write_text("{", encoding="utf-8")
+    monkeypatch.setattr(seed, "TAG_GROUPS_PATH", broken)
+
+    assert run() == ConfigError.exit_code
+    assert run.transport.calls == []
+    assert run.gallery.calls == []
+
+
 def test_seed_tags_only_fails_when_typetags_is_not_active(config_file, repo, tmp_path):
     """[NEG] It activates nothing; the server's refusal is the message."""
     gallery = FakeGallery(BASE_URL, installed=True, plugin_states={"typetags": "inactive"})

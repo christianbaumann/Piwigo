@@ -137,7 +137,9 @@ It never deletes: a group or tag the file does not name is left alone.
 local DDEV install is seeded. It activates nothing, so typetags has to be active. Give it a
 credential file whose `site.base_url` is `http://piwigo.ddev.site` (plain http: Python does not
 trust DDEV's mkcert certificate) and whose `admin` is a local webmaster login; the `ftp` and
-`mysql` sections are validated but not used:
+`mysql` sections are validated but not used. It cannot be combined with `--dry-run`, `--audit`,
+`--list-files` or `--no-bootstrap`. Every run reads `tag-groups.json` before it connects to
+anything, so a mistake in it stops the deploy with exit `3` before the upload:
 
 ```bash
 uv run pwg-deploy --seed-tags-only deploy.ddev.json
@@ -287,7 +289,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-532 tests, measured 2026-10-09. Everything that decides *what* to do is a pure function and is
+542 tests, measured 2026-10-09. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

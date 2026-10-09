@@ -46,6 +46,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
 
 
+# Each a mode of its own; beside --seed-tags-only one of them would be silently dropped,
+# and --dry-run's promise of no socket broken.
+SEED_ONLY_CONFLICTS = ("dry_run", "audit", "list_files", "no_bootstrap")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=PROGRAM, description=DESCRIPTION)
     parser.add_argument("config_json", metavar="CONFIG_JSON", help="the credential file")
@@ -113,7 +118,12 @@ def main(
     tracked=fileset.verified_tracked_paths,
     clock=time.monotonic,
 ) -> int:
-    args = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
+    parser = build_parser()
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    if args.seed_tags_only:
+        clash = [f"--{n.replace('_', '-')}" for n in SEED_ONLY_CONFLICTS if getattr(args, n)]
+        if clash:
+            parser.error(f"--seed-tags-only cannot be combined with {', '.join(clash)}")
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     repo_root = Path(repo_root or REPO_ROOT)
@@ -128,9 +138,13 @@ def main(
             _audit(out, config, state_dir, transport_factory)
             return 0
 
+        # Read before anything connects, like the credential file: a typo in it should
+        # cost milliseconds, not an upload.
+        wanted = seed.load_tag_groups(seed.TAG_GROUPS_PATH)
+
         if args.seed_tags_only:
             print(f"Piwigo tag groups -> {config.site.base_url}", file=out)
-            _seed_tags_only(out, config, client_factory)
+            _seed_tags_only(out, config, client_factory, wanted)
             return 0
 
         tracked_paths = tracked(repo_root)
@@ -156,7 +170,7 @@ def main(
         )
 
         if not args.dry_run and not args.no_bootstrap:
-            _bootstrap(out, config, state_dir, transport_factory, client_factory)
+            _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted)
         elif args.no_bootstrap:
             _line(out, "bootstrap", "skipped (--no-bootstrap)")
     except DeployError as error:
@@ -365,9 +379,9 @@ def _report_paths(out, label: str, paths: list[str], what: str) -> None:
         _continuation(out, f"… and {unnamed} more")
 
 
-def _bootstrap(out, config, state_dir, transport_factory, client_factory):
+def _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted):
     client = client_factory(config)
-    result = bootstrap.run(config, state_dir, transport_factory(config), client)
+    result = bootstrap.run(config, state_dir, transport_factory(config), client, wanted)
 
     _line(out, "install", "installed" if result.installed else "already installed - skipped")
     _line(
@@ -394,10 +408,9 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory):
         _report_rescan(out, result.rescan)
 
 
-def _seed_tags_only(out, config, client_factory) -> None:
+def _seed_tags_only(out, config, client_factory, wanted) -> None:
     """The seed step on its own, for an install this tool does not deploy to: the local
     one has no FTP server. Activates nothing; typetags has to be active already."""
-    wanted = seed.load_tag_groups()
     client = client_factory(config)
     token = bootstrap.login(client, config)
     _report_seed(out, seed.seed_tags(client, config.site.base_url, token, wanted))

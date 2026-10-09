@@ -137,6 +137,7 @@ def test_a_bad_colour_is_refused(color):
     [
         "1f5bc fe0f",  # not the form typetags stores, so it would be re-sent on every run
         "1F5BC  FE0F",
+        "0270D FE0F",  # typetags stores sprintf('%X'): no leading zero, so never equal
         "🖼️",
         "U+1F5BC",
         "110000",  # one past the last code point
@@ -321,3 +322,27 @@ def test_an_unexpected_tag_list_is_refused(answer, monkeypatch):
     """[NEG] Read as "no tags", it would plan every tag as new."""
     with pytest.raises(RemoteHttpError, match="getAdminList"):
         seed.parse_tag_list(answer)
+
+
+@pytest.mark.parametrize("remote", ["name ?", "NAME ?", "Name ? "])
+def test_a_tag_the_collation_calls_equal_is_the_same_tag(remote):
+    """[ECP] utf8mb3_general_ci ignores case and trailing spaces: pwg.tags.add would
+    refuse the name as taken, on every run."""
+    gallery = seeded_gallery()
+    gallery.tags[1]["name"] = remote
+    gallery.tags[1]["id_typetags"] = None
+
+    result = seed.seed_tags(gallery, BASE_URL, FakeGallery.TOKEN, wanted())
+
+    assert (result.tags_added, result.tags_regrouped) == (0, 1)
+
+
+def test_a_group_the_collation_calls_equal_is_the_same_group():
+    """[ECP] It also ignores accents: "Häuser" and "Hauser" are one name to it."""
+    raw = with_groups({"name": "Häuser", "color": "#000000"}, tags=[])
+    gallery = seeded_gallery()
+    gallery.tag_groups.append(
+        {"id": 9, "name": "hauser", "color": "#000000", "striped": False, "emoji": ""}
+    )
+
+    assert plan_against(gallery, raw).is_empty

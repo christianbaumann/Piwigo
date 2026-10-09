@@ -478,11 +478,11 @@ def run(
     state_dir: Path,
     transport,
     client,
-    tag_groups_path: Path | None = None,
+    tag_groups: seed.TagGroups | None = None,
 ) -> BootstrapResult:
     """Install if needed, publish the config, log in, activate, seed the tag groups, scan,
     then rescan."""
-    wanted = seed.load_tag_groups(tag_groups_path or seed.TAG_GROUPS_PATH)
+    wanted = tag_groups or seed.load_tag_groups(seed.TAG_GROUPS_PATH)
     installed_now = False
     if not is_installed(client, config.site.base_url):
         install(client, config)

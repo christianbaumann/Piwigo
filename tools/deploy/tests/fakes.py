@@ -312,7 +312,7 @@ class FakeGallery:
 
     def _tags_add(self, fields) -> str:
         name = fields.get("name", "")
-        if any(tag["name"] == name for tag in self.tags):
+        if any(_collated(tag["name"]) == _collated(name) for tag in self.tags):
             return _fail(1003, f'Tag "{name}" already exists')
         tag_id = str(1 + max((int(tag["id"]) for tag in self.tags), default=0))
         if "pwg.tags.add" not in self.inert_methods:
@@ -326,7 +326,10 @@ class FakeGallery:
         if method == "typetags.type.list":
             return _ok([dict(group) for group in self.tag_groups])
         if method == "typetags.type.add":
-            if any(g["name"] == fields["typetag_name"] for g in self.tag_groups):
+            if any(
+                _collated(g["name"]) == _collated(fields["typetag_name"])
+                for g in self.tag_groups
+            ):
                 return _fail(1003, "This name is already used")
             group = {
                 "id": 1 + max((g["id"] for g in self.tag_groups), default=0),
@@ -411,6 +414,18 @@ class FakeGallery:
             f'<li class="update_summary_err">{self.sync_errors} Fehler</li>'
             "</ul>"
         )
+
+
+def _collated(name: str) -> str:
+    """How utf8mb3_general_ci compares two names: no case, no accents, no trailing spaces.
+    Written independently of seed.py's own folding, so a test is not the code agreeing
+    with itself."""
+    import unicodedata
+
+    stripped = "".join(
+        c for c in unicodedata.normalize("NFKD", name) if not unicodedata.combining(c)
+    )
+    return stripped.lower().rstrip(" ")
 
 
 def _ok(result) -> str:

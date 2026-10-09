@@ -393,6 +393,12 @@ def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResul
 #### Manual Verification:
 - [x] None beyond the above
 
+**Verified 2026-10-09** (`/verify`, independent review): three fixes followed, each test-first -
+`--seed-tags-only` refuses `--dry-run`/`--audit`/`--list-files`/`--no-bootstrap`;
+`tag-groups.json` is read before anything connects; names are matched as
+`utf8mb3_general_ci` compares them (case, accents, trailing spaces), since the server refuses a
+second name it calls equal; an emoji code point with a leading zero is refused. 542 tests.
+
 ---
 
 ## Phase 4: photoinfo writes the tags into the file
