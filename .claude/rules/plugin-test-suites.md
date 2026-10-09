@@ -65,10 +65,10 @@ That script writes the git-ignored `local/config/provenance-test.env` and create
 against a production database.
 
 **`plugins/provenance` is also where Piwigo *core* is characterized.** Core carries no suite of
-its own and this repository deliberately does not stand one up, so eight
+its own and this repository deliberately does not stand one up, so nine
 `Core*CharacterizationTest.php` files in `plugins/provenance/tests/Integration/` cover core
 behaviour the fork depends on: `CoreAlbumCharacterizationTest`, `CorePhotoTextCharacterizationTest`,
-`CoreTagCrudCharacterizationTest`, `CoreUploadCharacterizationTest`,
+`CoreTagCrudCharacterizationTest`, `CoreTagAssignmentCharacterizationTest`, `CoreUploadCharacterizationTest`,
 `CoreAssociationCharacterizationTest`, `CoreDeleteCategoriesCharacterizationTest`,
 `CoreMetadataSyncCharacterizationTest` and `CoreDateAndCommentSaveCharacterizationTest`. Every case is
 `[ERR]`: the oracle is the current implementation, so they report a *change* and prove nothing

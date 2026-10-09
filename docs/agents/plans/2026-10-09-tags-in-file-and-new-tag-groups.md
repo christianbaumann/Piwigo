@@ -192,31 +192,31 @@ Pin today's behaviour of every core path Phase 4 hooks, before any hook exists. 
 
 ### Changes Required
 
-#### [ ] 1. New characterization test
+#### [x] 1. New characterization test
 **File**: `plugins/provenance/tests/Integration/CoreTagAssignmentCharacterizationTest.php`
 **Changes**: over ws.php and the admin forms, like `CoreTagCrudCharacterizationTest`
 (reuse its `linkTag` helper shape; teardown removes the tags it created).
 
-- [ ] `testBatchManagerAddTagsAppendsAndKeepsExisting` — `add_tags` on two photos, one already
+- [x] `testBatchManagerAddTagsAppendsAndKeepsExisting` — `add_tags` on two photos, one already
   tagged: both carry the new tag, the old one stays `[ERR]`
-- [ ] `testBatchManagerAddTagsCreatesATypedName` — a non-`~~id~~` value creates the tag `[ERR]`
-- [ ] `testBatchManagerDelTagsRemovesOnlyTheSelectedTag` `[ERR]`
-- [ ] `testSetInfoTagListCreatesANewTag` — `tag_list[]=NewName` creates and links it `[ERR]`
-- [ ] `testSetInfoTagIdsAppendModeKeepsExisting` (`multiple_value_mode=append`) `[ERR]`
-- [ ] `testDuplicateCopiesEveryImageLink` — `pwg.tags.duplicate` `[ERR]`
-- [ ] `testPhotoPropertiesTypedNameCreatesTheTag` — `tags[]=NewName` on the form `[ERR]`
-- [ ] `testATagCreatedOnTheFlyHasNoGroup` — `id_typetags` is `NULL` `[ERR]`
+- [x] `testBatchManagerAddTagsCreatesATypedName` — a non-`~~id~~` value creates the tag `[ERR]`
+- [x] `testBatchManagerDelTagsRemovesOnlyTheSelectedTag` `[ERR]`
+- [x] `testSetInfoTagListCreatesANewTag` — `tag_list[]=NewName` creates and links it `[ERR]`
+- [x] `testSetInfoTagIdsAppendModeKeepsExisting` (`multiple_value_mode=append`) `[ERR]`
+- [x] `testDuplicateCopiesEveryImageLink` — `pwg.tags.duplicate` `[ERR]`
+- [x] `testPhotoPropertiesTypedNameCreatesTheTag` — `tags[]=NewName` on the form `[ERR]`
+- [x] `testATagCreatedOnTheFlyHasNoGroup` — `id_typetags` is `NULL` `[ERR]`
 
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] Green twice and in reverse order:
+- [x] Green twice and in reverse order:
   `ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; plugins/provenance/vendor/bin/phpunit --testsuite integration --configuration plugins/provenance/phpunit.xml --filter CoreTagAssignment'`
-- [ ] Each case watched red once (break the pinned fact in the test's expectation, run, revert);
+- [x] Each case watched red once (break the pinned fact in the test's expectation, run, revert);
   results listed in `docs/agents/TESTING.md` beside the existing core characterization rows
 
 #### Manual Verification:
-- [ ] None
+- [x] None
 
 **Implementation Note**: commit on its own before Phase 2.
 

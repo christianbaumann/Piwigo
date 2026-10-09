@@ -610,6 +610,27 @@ were left behind across the run and removed by hand afterwards; the install was 
 5 albums, 105 photos, 8 tags and 8 colours. This is a property of the mutants, not of teardown:
 a real regression produces no warning output, and the adopt-then-destroy path runs normally.
 
+### `CoreTagAssignmentCharacterizationTest` — watched red (2026-10-09)
+
+Phase 1 of the tags-in-file plan (`docs/agents/plans/2026-10-09-tags-in-file-and-new-tag-groups.md`)
+pins the core paths photoinfo's tag write-back hooks, before any hook exists. Eight `[ERR]` cases,
+green twice and with `--order-by=reverse`. Unlike the table above, each was watched red by
+inverting the **expectation** it pins, not by mutating core, as the plan specifies: a temporary
+copy of the class with one assertion flipped per case, run once, then deleted. **8 of 8 went red**,
+each at the flipped assertion. This proves each case can fail and asserts what it claims; it does
+not prove a core mutation would reach it.
+
+| Case | Flipped expectation |
+|---|---|
+| `testBatchManagerAddTagsAppendsAndKeepsExisting` | the tagged photo holds only the new tag |
+| `testBatchManagerAddTagsCreatesATypedName` | no tag of the typed name exists afterwards |
+| `testBatchManagerDelTagsRemovesOnlyTheSelectedTag` | the selected photo still holds both tags |
+| `testSetInfoTagListCreatesANewTag` | no tag of the typed name exists afterwards |
+| `testSetInfoTagIdsAppendModeKeepsExisting` | the photo holds only the appended tag |
+| `testDuplicateCopiesEveryImageLink` | the copy carries no photo |
+| `testPhotoPropertiesTypedNameCreatesTheTag` | no tag of the typed name exists afterwards |
+| `testATagCreatedOnTheFlyHasNoGroup` | `id_typetags` is not NULL |
+
 ## Mutant table — `GermanOverrideKeyTest` (2026-08-31)
 
 Run against the provenance unit suite at 183 tests / 516 assertions, by hand, one mutant at a
