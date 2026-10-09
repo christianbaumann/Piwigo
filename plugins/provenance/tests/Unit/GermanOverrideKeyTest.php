@@ -121,6 +121,11 @@ final class GermanOverrideKeyTest extends TestCase
                 "{\'The tag was not saved\'|@translate|escape:javascript}",
                 2,
             ),
+            'You have typed in too many new tags today' => array(
+                'plugins/typetags/main.inc.php',
+                "l10n('You have typed in too many new tags today')",
+                1,
+            ),
             'Invalid tag name' => array(
                 'plugins/typetags/main.inc.php',
                 "l10n('Invalid tag name')",

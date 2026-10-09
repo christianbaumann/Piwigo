@@ -583,11 +583,12 @@ that the account can see the photo.
 
 Done before Phase 6, each test-first and in its own commit:
 
-- [ ] **Q16 = a, N = 255**: an account may create at most `TYPETAGS_NEW_TAGS_PER_DAY` = 255 tags
+- [x] **Q16 = a, N = 255**: an account may create at most `TYPETAGS_NEW_TAGS_PER_DAY` = 255 tags
   through `typetags.image.addNewTag` in 24 hours, counted from core's activity log
   (`pwg_activity('tag', id, 'add')`, which the method now writes). `piwigo_tags.id` is
   `smallint unsigned`, so unlimited creation by any account could exhaust it install-wide.
-  Tests: 255th accepted, 256th refused; a row older than 24 h does not count. Decision recorded.
+  Tests: 255th accepted, 256th refused; a row older than 24 h does not count;
+  [decision 0045](../decisions/0045-typed-tags-are-capped-per-account-and-day.md).
 - [x] **Q17 = a**: `typetags.image.addTag`, `removeTag` and `addNewTag` refuse a photo the account
   cannot see (one shared check, core's album permissions), answering 404 as for a missing photo.
   Test with a private album; [decision 0044](../decisions/0044-picture-page-tag-methods-respect-album-permissions.md).

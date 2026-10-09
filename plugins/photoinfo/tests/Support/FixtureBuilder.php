@@ -767,6 +767,8 @@ class FixtureBuilder
         {
             $this->db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$id);
             $this->db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$id);
+            // a tag typed in on the picture page counts against its account's daily allowance
+            $this->db->query("DELETE FROM piwigo_activity WHERE object = 'tag' AND object_id = " . (int)$id);
         }
         $this->testTags = array();
 
