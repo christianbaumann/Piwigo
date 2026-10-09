@@ -172,11 +172,13 @@ const DEMO_PHOTO_TEXTS = array(
  * Colored tags per photo, by name.
  *
  * Existing tags of this install rather than new ones: 04-schlagworte.html
- * documents the eight German colored tags that are really there, and a
- * screenshot showing invented ones would document a gallery nobody has.
+ * documents the German colored tags that are really there, and a screenshot
+ * showing invented ones would document a gallery nobody has. The sommerfest
+ * photo also carries a striped tag and one with an emoji, so the badge shots
+ * show both looks the page explains.
  */
 const DEMO_PHOTO_TAGS = array(
-    'sommerfest'   => array('Feste, Bräuche, Jahreskreis', 'Personen'),
+    'sommerfest'   => array('Feste, Bräuche, Jahreskreis', 'Personen', 'Name ?', 'Ausstellung'),
     'rathaus'      => array('Häuser, Ortsansichten'),
     'musikkapelle' => array('Vereine, Gruppierungen', 'Feste, Bräuche, Jahreskreis'),
     'werkstatt'    => array('Gewerbe', 'Arbeiten'),

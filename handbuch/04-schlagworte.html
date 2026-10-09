@@ -15,7 +15,9 @@
   der Verwaltung unter <span class="pwgScreen">Schlagworte</span>
   (<code>admin.php?page=tags</code>) angelegt und dort oder an einem einzelnen Foto zugeordnet.
   Ein Teil der Schlagworte trägt eine Farbe. Farbige Schlagworte können angemeldete Benutzer
-  auch direkt auf der Fotoseite setzen, ohne Zugang zur Verwaltung.
+  auch direkt auf der Fotoseite setzen, ohne Zugang zur Verwaltung, und dort auch ein neues
+  Schlagwort eintippen. Die Schlagworte eines Fotos werden außerdem in seine Bilddatei
+  geschrieben, siehe <a href="#bilddatei">Schlagworte in der Bilddatei</a>.
 </p>
 
 <h3>Schlagworte anlegen, umbenennen und löschen</h3>
@@ -125,6 +127,12 @@
   <figcaption>Die Schlagworte eines Fotos. Farbige Schlagworte tragen ihre Farbe, die übrigen die Standardfarbe des Feldes.</figcaption>
 </figure>
 
+<p>
+  Ein Name, den es noch nicht gibt, wird beim Sichern als neues Schlagwort angelegt und kommt
+  in die Gruppe <strong>Freitext</strong>, siehe
+  <a href="#besondere">Die vier besonderen Gruppen</a>.
+</p>
+
 <div class="hinweis">
   <p>
     Beim Sichern ersetzt die Liste im Feld die bisherigen Schlagworte des Fotos vollständig.
@@ -138,7 +146,8 @@
 <p>
   Ein Schlagwort kann eine Farbe bekommen. Farbige Schlagworte werden überall als farbige
   Plakette dargestellt und sind dadurch auf einen Blick von den übrigen zu unterscheiden. In
-  dieser Galerie sind acht Schlagworte farbig:
+  dieser Galerie gibt es zwölf Farben (im Folgenden auch Gruppen genannt). Elf davon tragen je
+  ein gleichnamiges Schlagwort; diese acht sind die Themen:
 </p>
 
 <ul>
@@ -151,6 +160,10 @@
   <li>Stationen durch das Leben</li>
   <li>Vereine, Gruppierungen</li>
 </ul>
+
+<p>
+  Die übrigen vier sind besondere Gruppen mit eigener Bedeutung, siehe den nächsten Abschnitt.
+</p>
 
 <p>Eine Farbe wird in der Schlagwortverwaltung vergeben:</p>
 
@@ -173,6 +186,48 @@
   </li>
 </ol>
 
+<h3 id="besondere">Die vier besonderen Gruppen</h3>
+
+<p>
+  Vier Farben sehen anders aus als die übrigen: zwei tragen am linken Rand einen rot-weiß
+  gestreiften Rand, zwei ein kleines Bild vor dem Namen.
+</p>
+
+<ul>
+  <li>
+    <strong>Kategorie ?</strong> (rot-weiß gestreift): ein Merkzeichen für ein Foto, bei dem
+    noch offen ist, zu welchem der farbigen Schlagworte es gehört. Ist das geklärt, das
+    passende Schlagwort setzen und <strong>Kategorie ?</strong> wieder entfernen.
+  </li>
+  <li>
+    <strong>Name ?</strong> (rot-weiß gestreift): ein Merkzeichen für ein Foto, auf dem noch
+    nicht alle Personen erkannt sind. Ist der Name bekannt, die Person markieren (siehe
+    <a href="05-personen.html">Personen auf Fotos markieren</a>) und
+    <strong>Name ?</strong> wieder entfernen.
+  </li>
+  <li>
+    <strong>Ausstellung</strong> (mit einem gerahmten Bild davor): kennzeichnet Fotos für eine
+    Ausstellung.
+  </li>
+  <li>
+    <strong>Freitext</strong> (mit einer schreibenden Hand davor): sammelt die Schlagworte, die
+    beim Zuordnen neu eingetippt wurden, auf der Fotoseite ebenso wie in den Eigenschaften
+    eines Fotos oder in der Stapelverarbeitung. Jedes davon trägt die schreibende Hand. Ein
+    Schlagwort, das in der Schlagwortverwaltung mit <strong>Schlagwort hinzufügen</strong>
+    angelegt wird, kommt nicht hierher.
+  </li>
+</ul>
+
+<div class="hinweis">
+  <p>
+    Schlagworte mit der Farbe <strong>Ausstellung</strong>, <strong>Kategorie ?</strong> oder
+    <strong>Name ?</strong>, gleich wie sie heißen, sowie jedes Schlagwort und jede Farbe mit
+    einem Fragezeichen im Namen bleiben in dieser Galerie. Sie
+    werden nicht in die Bilddatei geschrieben und erscheinen deshalb auch nicht in der
+    Online-Galerie, die aus den Bilddateien aufgebaut wird.
+  </p>
+</div>
+
 <h3>Farbige Schlagworte auf der Fotoseite setzen</h3>
 
 <p>
@@ -185,12 +240,12 @@
 
 <figure>
   <img src="assets/screenshots/14-schlagwort-badges.png" alt="Die vergebenen Schlagworte eines Fotos" />
-  <figcaption>Vergebene Schlagworte. Farbige tragen ein x zum Entfernen.</figcaption>
+  <figcaption>Vergebene Schlagworte. Farbige tragen ein x zum Entfernen; Name ? ist gestreift, Ausstellung trägt sein Bild.</figcaption>
 </figure>
 
 <figure>
-  <img src="assets/screenshots/15-schlagwort-hinzufuegen.png" alt="Noch nicht vergebene farbige Schlagworte" />
-  <figcaption>Die noch nicht vergebenen farbigen Schlagworte, jeweils mit einem Pluszeichen.</figcaption>
+  <img src="assets/screenshots/15-schlagwort-hinzufuegen.png" alt="Noch nicht vergebene farbige Schlagworte und das Feld für ein neues Schlagwort" />
+  <figcaption>Die noch nicht vergebenen farbigen Schlagworte, jeweils mit einem Pluszeichen, darunter das Feld für ein neues Schlagwort.</figcaption>
 </figure>
 
 <ul>
@@ -203,14 +258,46 @@
     <strong>Entfernen</strong>: auf das <strong>x</strong> einer vergebenen farbigen Plakette
     klicken. Der Kurzhinweis lautet <em>Schlagwort entfernen</em>.
   </li>
+  <li>
+    <strong>Eintippen</strong>: den Namen in das Feld <strong>Neues Schlagwort
+    eingeben</strong> schreiben und <strong>Hinzufügen</strong> klicken oder die Eingabetaste
+    drücken. Ein neuer Name wird als Schlagwort angelegt und kommt in die Gruppe
+    <strong>Freitext</strong>. Gibt es den Namen schon, wird das vorhandene Schlagwort
+    zugeordnet und behält seine Farbe. Schlägt das fehl, steht der Grund neben dem Feld und
+    der eingetippte Text bleibt stehen.
+  </li>
 </ul>
 
 <p>
-  Beides wirkt sofort, ohne Speichern. Vergebene Schlagworte stehen in einer Zeile, durch
-  Kommas getrennt; farbige als Plakette, farblose als schlichter Text. Schlagworte ohne Farbe
-  lassen sich hier nicht ändern und werden in der Verwaltung gepflegt. Nicht angemeldete
-  Besucher sehen weder das <strong>+</strong> noch das <strong>x</strong>.
+  Alles wirkt sofort, ohne Speichern. Vergebene Schlagworte stehen in einer Zeile, durch
+  Kommas getrennt; farbige als Plakette, farblose als schlichter Text. Ein Schlagwort ohne
+  Farbe lässt sich hier nur durch Eintippen seines Namens zuordnen; entfernt wird es in der
+  Verwaltung. Nicht angemeldete Besucher sehen weder das <strong>+</strong> noch das
+  <strong>x</strong> noch das Feld.
 </p>
+
+<h3 id="bilddatei">Schlagworte in der Bilddatei</h3>
+
+<p>
+  Ändern sich die Schlagworte eines Fotos, auf welchem Weg auch immer, werden sie auch in die
+  Bilddatei geschrieben, zusammen mit dem Namen ihrer Farbe. Andere Bildprogramme zeigen sie
+  dann als Stichwörter der Datei. Ausgenommen sind die Schlagworte, die nur in dieser Galerie
+  bleiben (siehe <a href="#besondere">Die vier besonderen Gruppen</a>).
+</p>
+
+<ul>
+  <li>
+    Geschrieben wird nur, wenn sich an den Schlagworten eines Fotos etwas ändert. Ein Foto,
+    dessen Schlagworte seit Einführung dieser Funktion nicht bearbeitet wurden, trägt sie
+    noch nicht in seiner Datei.
+  </li>
+  <li>
+    Kann die Datei nicht geschrieben werden, zeigt die Verwaltung nach dem Sichern oben eine
+    Fehlermeldung, die mit <em>Photo Info:</em> beginnt. Die Schlagworte sind dann in der
+    Galerie gespeichert, die Datei blieb unverändert. In dem Fall die Verwaltung der Galerie
+    benachrichtigen.
+  </li>
+</ul>
 
 <nav class="zurueck">
   <a href="index.html">Zurück zum Inhalt</a> ·

@@ -591,7 +591,12 @@ const SHOTS = [
     async take(page, demo) {
       await open(page, demo.photos.sommerfest.picture_path);
       await page.waitForSelector('#typetags-unassigned .typetag-add', { timeout: ELEMENT_TIMEOUT });
-      await shoot(page.locator('#typetags-unassigned'), this.file, demo.image_dir);
+      await shootSpan(
+        page,
+        [page.locator('#typetags-unassigned'), page.locator('#typetags-new-tag')],
+        this.file,
+        demo.image_dir
+      );
     },
   },
   {
