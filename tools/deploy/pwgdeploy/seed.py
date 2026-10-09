@@ -170,8 +170,8 @@ def read_remote(client, base_url: str) -> tuple[list[Mapping], list[Mapping]]:
 
 
 def parse_tag_list(result: Any) -> list[Mapping]:
-    """getAdminList's rows. `name` is rendered through render_tag_name; `name_raw` is
-    what is stored, and the only one a name from the file can be compared with."""
+    """getAdminList's rows. `name_raw` is what is stored, and the only one a name from the
+    file can be compared with."""
     tags = result.get("tags") if isinstance(result, Mapping) else None
     if not isinstance(tags, list) or not all(
         isinstance(t, Mapping) and "id" in t and "name_raw" in t and "id_typetags" in t

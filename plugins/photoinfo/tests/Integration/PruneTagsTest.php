@@ -110,6 +110,21 @@ final class PruneTagsTest extends TestCase
         $this->assertSame(array($tag), $this->fixture->tagIdsOf($this->image['id']));
     }
 
+    /** [NEG] A tag in a local-only group is never in a file, so it is never pruned (decision 0051). */
+    public function testATagInALocalOnlyGroupIsNeverRemoved(): void
+    {
+        $this->fixture->assertPluginActive('typetags');
+        $group = $this->fixture->createGroup('Kategorie ? ' . $this->suffix);
+        $tag = $this->fixture->createTag($this->tagName('Vernissage'), $group);
+        $this->fixture->linkTag($this->image['id'], $tag);
+        FixtureBuilder::writeKeywords($this->image['file'], array(), array(), true);
+
+        $res = $this->prune((string)$this->image['id']);
+
+        $this->assertSame(array('removed' => array(), 'failed' => array()), $res['json']['result'] ?? null, $res['body']);
+        $this->assertSame(array($tag), $this->fixture->tagIdsOf($this->image['id']));
+    }
+
     /** [BVA] A full chunk is accepted; unknown photos are reported, the known one pruned. */
     public function testAFullChunkIsAccepted(): void
     {

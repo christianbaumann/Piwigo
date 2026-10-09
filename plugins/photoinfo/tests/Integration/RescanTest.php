@@ -405,6 +405,38 @@ final class RescanTest extends TestCase
             $res['json']['result']['not_in_file'] ?? null, $res['body']);
     }
 
+    /** [ECP] A file entry in a local-only group is not linked, though the tag exists (decision 0051). */
+    public function testATagInALocalOnlyGroupIsNotLinked(): void
+    {
+        $this->fixture->assertPluginActive('typetags');
+        $suffix = bin2hex(random_bytes(4));
+        $group = $this->fixture->createGroup('Kategorie ? ' . $suffix);
+        $this->fixture->createTag('Vernissage ' . $suffix, $group);
+        FixtureBuilder::writeKeywords($this->image['file'], array('Vernissage ' . $suffix),
+            array('Kategorie ? ' . $suffix . '|Vernissage ' . $suffix), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(0, $res['json']['result']['tags_added'] ?? null, $res['body']);
+        $this->assertSame(array(), $this->fixture->tagIdsOf($this->image['id']));
+    }
+
+    /** [ECP] A tag in a local-only group the file does not name is not reported (decision 0051). */
+    public function testATagInALocalOnlyGroupIsNotReported(): void
+    {
+        $this->fixture->assertPluginActive('typetags');
+        $suffix = bin2hex(random_bytes(4));
+        $group = $this->fixture->createGroup('Kategorie ? ' . $suffix);
+        $this->fixture->linkTag($this->image['id'], $this->fixture->createTag('Vernissage ' . $suffix, $group));
+        $this->fixture->linkTag($this->image['id'], $this->fixture->createTag('Zug ' . $suffix));
+        FixtureBuilder::writeKeywords($this->image['file'], array(), array(), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(array((string)$this->image['id'] => array('Zug ' . $suffix)),
+            $res['json']['result']['not_in_file'] ?? null, $res['body']);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function groupExists(string $name): bool

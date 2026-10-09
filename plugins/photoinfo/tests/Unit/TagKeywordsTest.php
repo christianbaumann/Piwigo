@@ -54,6 +54,28 @@ final class TagKeywordsTest extends TestCase
         );
     }
 
+    /** [ECP] A tag in a local-only group stays out, whatever its own name (decision 0051). */
+    public function testATagInALocalOnlyGroupIsNeverWritten(): void
+    {
+        $this->assertSame(
+            array('subject' => array('Kirmes'), 'hierarchy' => array()),
+            photoinfo_file_keywords(array(
+                array('name' => 'Vernissage 1987', 'group' => 'Ausstellung'),
+                array('name' => 'Hans', 'group' => 'Name ?'),
+                array('name' => 'Kirmes', 'group' => null),
+            ))
+        );
+    }
+
+    /** [BVA] A group named only like a listed one is written with its tag. */
+    public function testATagInAGroupNamedLikeALocalOneIsWritten(): void
+    {
+        $this->assertSame(
+            array('subject' => array('Vernissage 1987'), 'hierarchy' => array('Ausstellungen|Vernissage 1987')),
+            photoinfo_file_keywords(array(array('name' => 'Vernissage 1987', 'group' => 'Ausstellungen')))
+        );
+    }
+
     /**
      * [ERR] A group name holding the separator would split in the wrong place
      * when read back, so its tags are written flat. No requirement beyond the

@@ -186,8 +186,8 @@ the file does not name:
 ```
 
 `--prune-tags` removes those, through `pwg.photoinfo.pruneTags`, ten photos per request and only
-for the photos the rescan named. `Ausstellung` and every tag with a `?` in its name never reach a
-file, so they are never removed either.
+for the photos the rescan named. `Ausstellung` and every tag with a `?` in its name, and every tag
+in a group so named, never reach a file, so they are never removed either.
 
 ```
   rescan      105 of 105 photos read

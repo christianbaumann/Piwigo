@@ -538,15 +538,33 @@ and `git -C plugins/typetags diff --stat` were both empty and both suites green 
 | F6 `array_map('intval', $person_tag_ids)` dropped | `testIdsReadAsStringsAreComparedAsNumbers` | **survived**, then killed (2026-10-09): `testAPersonTagIdReadAsAStringIsLeftAlone` alone. The first run's string-id case passed person id `'7'`, which matches no row, so the strict `in_array` against a string id was never exercised. Reachable: the caller (`writer.inc.php`) passes `query2array()` output, i.e. strings, so without the cast a person's tag typed in a save would be put into Freitext. The new `[ECP]` case passes a new, linked person tag's id as a string |
 | F7 `array_map('intval', $linked_tag_ids)` dropped | the same string-id case | killed: that alone |
 
-`photoinfo_tag_is_local_only()`:
+`photoinfo_tag_is_local_only()`, re-run 2026-10-09 after decision 0051 gave it the group as a
+second argument (`foreach (array($name, $group) as $value)`, each non-null value checked against
+the list and for `?`). L1-L5 are the first pass's mutants on the new body; L6-L11 are new. Same
+procedure as above (exactly-once substitution, file asserted changed, `md5sum` polled after apply
+and revert, `cp` backup restored); photoinfo unit 264 tests / 492 assertions before and after.
+L8, L9 and L12-L14 were run again on 2026-10-09 after the function began normalising both values
+the way `photoinfo_file_keywords()` cleans them (a group stored as `Ausstellung ` was kept out of
+the write but reported by the rescan); photoinfo unit 266 tests / 500 assertions before and after.
+The kill counts of the other rows are from the first run and predate the whitespace cases.
 
 | Mutant | Expected killer | Result |
 |---|---|---|
-| L1 `or` → `and` | `LocalOnlyRuleTest` | killed: 2 `LocalOnlyRuleTest`, 2 `RescanTagsTest` `[DT]` rows, 2 `TagKeywordsTest` cases |
-| L2 the `?` clause dropped | the question-mark cases | killed: 4 cases across the three files |
-| L3 the list clause dropped | the `Ausstellung` cases | killed: 4 cases across the three files |
-| L4 `in_array(..., true)` → `false` | none | **survived**: equivalent. Every caller passes a string and the list holds only the non-numeric `Ausstellung`, so loose and strict comparison cannot differ |
-| L5 `strpos(...) !== false` → `=== false` | everything | killed: 17 cases |
+| L1 `or` between the list and `?` clauses → `and` | `LocalOnlyRuleTest` | killed: 3 `LocalOnlyRuleTest`, 4 `RescanTagsTest` `[DT]` rows, 3 `TagKeywordsTest` cases |
+| L2 the `?` clause dropped | the question-mark cases | killed: 8 cases across the three files |
+| L3 the list clause dropped | the `Ausstellung` cases | killed: 9 cases across the three files |
+| L4 `in_array(..., true)` → `false` | none | **survived**: equivalent. Every caller passes a string or null, null never reaches `in_array`, and the list holds only the non-numeric `Ausstellung`, so loose and strict comparison cannot differ |
+| L5 `strpos(...) !== false` → `=== false` | everything | killed: 22 cases |
+| L6 the group not checked (`array($name)`) | the local-only-group cases | killed: `testATagInALocalOnlyGroupIsLocalOnly`, the two "in a local-only group" `[DT]` rows, `testATagInALocalOnlyGroupIsNeverWritten` |
+| L7 the name not checked (`array($group)`) | the name-rule cases | killed: 5 cases, among them `testTheNameRuleHoldsWithAndWithoutAGroup` |
+| L8 the null guard dropped (`if ($value === null) { continue; }`) | none | **survived**: equivalent. Re-run 2026-10-09 after the normalisation fix: the value is now cast with `(string)` before anything reads it, so null becomes `''`, which is neither listed nor holds `?`, and the PHP 8.4 deprecation the first run saw is gone too. Kept as the statement that null means "no group" |
+| L9 the null guard inverted (`=== null` → `!== null`), re-run 2026-10-09 | every local-only case | killed: 12 cases across the three files |
+| L10 the final `return false` → `true` | everything not local | killed: 20 cases |
+| L11 a second name added to `PHOTOINFO_LOCAL_ONLY_TAGS` that is no seeded group | `testEveryListedNameIsASeededGroup` | killed: that alone |
+| L12 the normalisation dropped (`trim(preg_replace(...))` → `(string)$value`), 2026-10-09 | the whitespace cases | killed: `testWhitespaceAroundANameOrGroupDoesNotChangeTheAnswer` and the "stored with a trailing space" `RescanTagsTest` row |
+| L13 the `trim()` dropped, 2026-10-09 | the whitespace cases | killed: the same two |
+| L14 the control-character replacement dropped (`trim((string)$value)`), 2026-10-09 | the `\x1F` case | **survived** at first: `trim()` already strips `\t` and `\n`, so every control character the test used was removed either way. Killed after the `[BVA]` case `"Ausstellung\x1F"` (a control character `trim()` leaves) was added: `testWhitespaceAroundANameOrGroupDoesNotChangeTheAnswer` alone |
+| L15 the case folding dropped (both `mb_strtolower` calls removed, the exact comparison restored), 2026-10-09, owner decision Q25 | the lower/upper/mixed-case cases | killed: `testALowerUpperOrMixedCaseListedNameIsLocalOnly` alone. `testALowerCaseNameThatOnlyStartsLikeAListedOneIsNot` stays green under it by design: it guards that folding does not widen the match. Photoinfo unit 268 tests / 509 assertions before and after |
 
 `photoinfo_file_keywords()` (with its helper `photoinfo_sorted_unique()`):
 
@@ -562,6 +580,7 @@ and `git -C plugins/typetags diff --stat` were both empty and both suites green 
 | K8 `sort` dropped | the same | killed: that alone |
 | K9 the name's `trim` dropped | the name control-character case | killed: that alone |
 | K10 hierarchy written `Name|Group` | the grouped case | killed: 4 `TagKeywordsTest` cases |
+| K11 the group not passed to the local-only check (2026-10-09, decision 0051) | the local-only-group case | killed: `testATagInALocalOnlyGroupIsNeverWritten` alone |
 
 `photoinfo_rescan_tags()` (with its helper `photoinfo_file_tag_names()`):
 
@@ -579,6 +598,8 @@ and `git -C plugins/typetags diff --stat` were both empty and both suites green 
 | R11 only the empty-group check dropped | the same | killed: that alone |
 | R12 only the empty-name check dropped | the same | killed: that alone |
 | R10 `explode(..., 2)` limit dropped | `testAnEntrySplitsAtTheFirstSeparator` | killed: that alone |
+| R13 the file loop's check without the group (2026-10-09, decision 0051) | the "in a local-only group, in the file" `[DT]` row | killed: that alone |
+| R14 the database loop's check without the group (2026-10-09, decision 0051) | the "in a local-only group, in the database only" `[DT]` row | killed: that alone |
 
 `photoinfo_build_tags_argfile()`:
 
@@ -629,6 +650,11 @@ of the three mutants (exactly-once substitution, `md5sum` polled after apply and
 backup restored): each died to its new case alone, so 60 of 62 are killed and only the two
 equivalent mutants survive. Suites after the revert: photoinfo unit 256 tests / 480 assertions,
 typetags unit 82 tests / 33075 assertions.
+
+Decision 0051 (2026-10-09) added nine mutants (L6-L11, K11, R13, R14) and re-ran L1-L5 on the
+changed body: 71 mutants, 68 killed. The normalisation fix added L12-L14 and the case-insensitive
+comparison (owner decision Q25) L15: 75 mutants, 72 killed. The three survivors are equivalent:
+L4, L8 and E5.
 
 ## The two tooltips only a browser can witness (2026-08-31)
 
@@ -1122,7 +1148,7 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-10-08 | Whether the new German handbook text reads naturally: read by an agent against the existing pages' tone. | **Open for the owner**: a native reader's judgment. |
 | 2026-10-08 | The exiftool-writing suites against **exiftool 12.76**, the remote's version: the CPAN `Image-ExifTool-12.76` tarball unpacked under `.agent-tests/`, linked as `/usr/local/bin/exiftool` in the web container (php-fpm keeps the container's PATH, `clear_env = no`, where `/usr/local/bin` precedes `/usr/bin`), removed afterwards. Integration: photoinfo 119, provenance 201 (4 skipped), persons 112 (1 skipped), photoedit 81, all OK; photoinfo E2E 30 passed. A logging wrapper over one `SetInfoTest` run recorded 25 of 36 calls with `php-fpm` as grandparent, so the HTTP path used 12.76. The suites' own read-backs ran on 12.76 too; ImageMagick stayed the independent reader. | Not replaced: a one-off. Pinning a second exiftool into the suites would vendor a binary for one host; repeat this before a deploy after an exiftool-facing change. |
 | 2026-10-09 | The striped tab (`Kategorie ?`, `Name ?`) and the emoji (`Ausstellung`, `Freitext`) on the picture page, the photo properties chips and the admin tags page look as in the brainstorm drafts (S5, A1, F5 on C5) and read legibly: confirmed by the owner (tags-in-file plan, Phase 2 manual box). The plan's testing steps ask for modus light and dark; which skins the owner looked at is not recorded. | **Mostly replaced 2026-10-09** by `rendering.spec.js` and `admin-striped.spec.js`: tab, border and text colour by computed style on all three screens, the emoji in each badge, and the text starting after the border and tab. Whether the result reads comfortably stays a judgment, like the badge-contrast row in the open table below. |
-| 2026-10-09 | Whether digiKam or Lightroom read the keywords photoinfo writes (`XMP-dc:Subject`, `IPTC:Keywords`) and show `XMP-lr:HierarchicalSubject` as a `Group > Tag` tree. | **Open: not checked.** Neither program is installed here. `TagWriteTest` reads the fields back with a plain exiftool call; no independent reader (as ImageMagick is for the caption and the regions) checks them yet. See the open table below. |
+| 2026-10-09 | Whether digiKam or Lightroom read the keywords photoinfo writes (`XMP-dc:Subject`, `IPTC:Keywords`) and show `XMP-lr:HierarchicalSubject` as a `Group > Tag` tree. | **Partly replaced 2026-10-09** by `plugins/photoinfo/tests/Integration/TagWriteTest.php` → `testAnIndependentReaderFindsTheKeywordsInTheStandardXmpSlots`: ImageMagick (`convert <file> xmp:-`) extracts the raw XMP packet, and `dc:subject` as an `rdf:Bag` holding both names and `lr:hierarchicalSubject` holding `Group|Tag` are asserted as text in it, so the standard slots are witnessed by a reader that is not exiftool. Watched red against `photoinfo_build_tags_argfile()` with the subject list emptied and, separately, with the hierarchy list emptied. Since 2026-10-09 also by `testExiv2ReadsTheKeywordsFromAllThreeFields`: exiv2 (from `webimage_extra_packages` in `.ddev/config.yaml`) reads `Xmp.dc.subject`, `Xmp.lr.hierarchicalSubject` and `Iptc.Application2.Keywords`, the first read of `IPTC:Keywords` not done by exiftool; watched red against each of the three field lines dropped from `photoinfo_build_tags_argfile()`, each failing on its own field. **Still open:** whether digiKam or Lightroom actually display the keywords and build the `Group > Tag` tree — neither program is installed here. See the open table below. |
 
 ### Open — no oracle, so no test
 
@@ -1142,4 +1168,4 @@ than accumulating. Nothing is marked done on prose alone.
 | Whether a screenshot still shows the screen the text beside it describes | Subjective. `assertOutput()` in `shoot.js` proves every declared shot exists and that no undeclared file sits beside them, and `assertNoForeignPhoto()` proves no frame held a photo outside the demo album. That a shot is *framed on the right thing* has no oracle. |
 | Whether digiKam, Lightroom or a phone's gallery show photoinfo's caption and `DateCreated` the way the suites read them | The suites read the standard slots back with exiftool and, for the caption, ImageMagick; what a given release of a given program displays is not a fact a fixture settles, same limit as the MWG region row above. |
 | A date taken from `IPTC:DateCreated` with `$conf['use_iptc']` enabled | Not a missing oracle but an unhandled path (decision 0041): core maps IPTC after the `format_exif_data` hook, so photoinfo cannot protect a month-precision date there without a core change. `use_iptc` is `false` in this install. |
-| Whether digiKam, Lightroom or another tool show a photo's tags and their group hierarchy the way photoinfo writes them | No such program runs in the DDEV web image. The suites read the three keyword fields and the marker back with exiftool; which field a given release of a given program shows, and whether it builds the tree from `HierarchicalSubject`, is not a fact a fixture settles. Same limit as the caption and region rows above. |
+| Whether digiKam, Lightroom or another tool show a photo's tags and their group hierarchy the way photoinfo writes them | No such program runs in the DDEV web image. The suites read the three keyword fields and the marker back with exiftool, and the three fields also with exiv2 and the XMP ones with ImageMagick; which field a given release of a given program shows, and whether it builds the tree from `HierarchicalSubject`, is not a fact a fixture settles. Same limit as the caption and region rows above. |

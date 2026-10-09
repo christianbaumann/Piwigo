@@ -57,6 +57,18 @@ final class RescanTagsTest extends TestCase
             'local-only in the file [DT]' => array(
                 self::file(array('Ausstellung', 'Wer?')), array(), array(),
                 array(), array()),
+            'in a local-only group, in the database only [DT]' => array(
+                self::file(array()), array(self::db(9, 'Vernissage 1987', 'Ausstellung'), self::db(10, 'Hans', 'Kategorie ?')), array(),
+                array(), array()),
+            'in a local-only group stored with a trailing space, in the database only [BVA]' => array(
+                self::file(array()), array(self::db(9, 'Vernissage 1987', 'Ausstellung '), self::db(10, 'Ausstellung ')), array(),
+                array(), array()),
+            'in a local-only group, in the file [DT]' => array(
+                self::file(array('Vernissage 1987'), array('Ausstellung|Vernissage 1987')), array(), array(),
+                array(), array()),
+            'in a group named like a local-only one, in the file [DT]' => array(
+                self::file(array('Vernissage 1987'), array('Ausstellungen|Vernissage 1987')), array(), array(),
+                array('Vernissage 1987' => 'Ausstellungen'), array()),
             );
     }
 

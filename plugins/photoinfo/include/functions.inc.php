@@ -496,7 +496,10 @@ define('PHOTOINFO_TAGS_MARKER_TAG', 'XMP-'.PHOTOINFO_XMP_PREFIX.':TagsWritten');
 /** Between a group and its tag in a hierarchy entry. */
 define('PHOTOINFO_HIERARCHY_SEPARATOR', '|');
 
-/** Tags that stay in the database and never reach a file, beside every name with a '?'. */
+/**
+ * Names that keep a tag in the database and out of its file, as the tag's own
+ * name or its group's; so does any such name holding a '?' (decision 0051).
+ */
 define('PHOTOINFO_LOCAL_ONLY_TAGS', array('Ausstellung'));
 
 /** The typetags group a tag typed in while tagging is put into. */
@@ -533,12 +536,33 @@ function photoinfo_new_freitext_tags($rows, $max_before, $person_tag_ids, $linke
 }
 
 /**
- * @param string $name a tag's or a group's name
- * @return bool whether a tag of that name stays out of the file
+ * Both names are judged as photoinfo_file_keywords() writes them, control
+ * characters as spaces and trimmed, so a raw database row gets the same
+ * answer as the write: MariaDB stores "Ausstellung " as a distinct name but
+ * compares it equal to "Ausstellung". The list is matched regardless of
+ * letter case, as utf8mb3_general_ci compares names; its accent folding is
+ * not reproduced.
+ *
+ * @param string $name the tag's name
+ * @param string|null $group its typetags group's name, null for none
+ * @return bool whether the tag stays out of the file
  */
-function photoinfo_tag_is_local_only($name)
+function photoinfo_tag_is_local_only($name, $group = null)
 {
-  return in_array($name, PHOTOINFO_LOCAL_ONLY_TAGS, true) or strpos($name, '?') !== false;
+  foreach (array($name, $group) as $value)
+  {
+    if ($value === null)
+    {
+      continue;
+    }
+    $value = mb_strtolower(trim(preg_replace('/[[:cntrl:]]+/', ' ', (string)$value)), 'UTF-8');
+    if (in_array($value, array_map('mb_strtolower', PHOTOINFO_LOCAL_ONLY_TAGS), true) or strpos($value, '?') !== false)
+    {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -562,14 +586,14 @@ function photoinfo_file_keywords($tags)
   foreach ($tags as $tag)
   {
     $name = trim(preg_replace('/[[:cntrl:]]+/', ' ', (string)$tag['name']));
-    if ($name === '' or photoinfo_tag_is_local_only($name))
+    $group = trim(preg_replace('/[[:cntrl:]]+/', ' ', (string)$tag['group']));
+    if ($name === '' or photoinfo_tag_is_local_only($name, $group))
     {
       continue;
     }
 
     $subject[] = $name;
 
-    $group = trim(preg_replace('/[[:cntrl:]]+/', ' ', (string)$tag['group']));
     if ($group !== '' and strpos($group, PHOTOINFO_HIERARCHY_SEPARATOR) === false)
     {
       $hierarchy[] = $group.PHOTOINFO_HIERARCHY_SEPARATOR.$name;
@@ -623,8 +647,8 @@ function photoinfo_file_tag_names($file_tags)
 
 /**
  * What a rescan does with the tags a file names. Only a file carrying the
- * marker says anything about tags; local-only names are never linked or
- * reported. Never removes: pwg.photoinfo.pruneTags does that.
+ * marker says anything about tags; local-only tags, by name or by group, are
+ * never linked or reported. Never removes: pwg.photoinfo.pruneTags does that.
  *
  * Tags are compared by id, never by name: the database finds a tag by a name
  * that differs in case or accents, and by its URL name, so a byte comparison
@@ -656,7 +680,7 @@ function photoinfo_rescan_tags($file_tags, $db_tags, $existing_ids)
   foreach (photoinfo_file_tag_names($file_tags) as $name => $group)
   {
     $name = (string)$name;
-    if (photoinfo_tag_is_local_only($name))
+    if (photoinfo_tag_is_local_only($name, $group))
     {
       continue;
     }
@@ -673,7 +697,7 @@ function photoinfo_rescan_tags($file_tags, $db_tags, $existing_ids)
   $not_in_file = array();
   foreach ($db_tags as $tag)
   {
-    if (!isset($named[(int)$tag['id']]) and !photoinfo_tag_is_local_only((string)$tag['name']))
+    if (!isset($named[(int)$tag['id']]) and !photoinfo_tag_is_local_only((string)$tag['name'], $tag['group']))
     {
       $not_in_file[(int)$tag['id']] = (string)$tag['name'];
     }

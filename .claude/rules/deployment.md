@@ -170,8 +170,8 @@ line. Report, exit codes and the local DDEV credential file are in the
   `--dry-run`, `--audit`, `--list-files` and `--no-bootstrap` (`SEED_ONLY_CONFLICTS` in `cli.py`).
 - Two PHP facts are tied to the file by tests rather than copied: `test_seed.py` reads
   `PHOTOINFO_FREITEXT_GROUP` and asserts the file has that group, and photoinfo's
-  `LocalOnlyRuleTest` reads the file and asserts every local-only group matches
-  `photoinfo_tag_is_local_only()`.
+  `LocalOnlyRuleTest` reads the file and asserts every name in `PHOTOINFO_LOCAL_ONLY_TAGS` is a
+  group there, so renaming that group cannot switch the rule off unnoticed (decision 0051).
 
 ## The deploy rescans photoinfo's values
 
