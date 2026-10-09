@@ -699,6 +699,24 @@ Each fixed test-first, the new cases proven by mutants.
     person ids; the ids arrive as strings from `query2array()`), E7 (surrogate upper edge `DFFF`
     untested), E14 (pasted characters separated by a blank untested). Open with the owner
 
+### Follow-ups decided by the owner after Phase 7 (2026-10-09)
+
+- [x] **Q19 = a**: the handbook explains `Kategorie ?` as "not yet clear which coloured tag the
+  photo belongs to" and `Name ?` as "not everyone on the photo identified yet"; the tag is removed
+  once resolved
+- [ ] **Q20 = a**: local-only is decided by the **group** as well: every tag in `Ausstellung`,
+  `Kategorie ?` or `Name ?` stays out of the file, rescan and prune; the `?`-in-name rule stays.
+  Test-first; a new decision supersedes 0046's name-only sentence; the mutant rows for
+  `photoinfo_tag_is_local_only()` are re-run
+- [-] **Q21 = a**: `pwg.tags.getAdminList` returns badge HTML as `name`, so the admin tag field
+  (photo properties, Batch Manager) shows the emoji and stripes twice. Fix test-first (integration
+  `name === name_raw`, chip-content assertion in `admin-striped.spec.js`), exempt the method in
+  `typetags_render()`, bump the coloured tags' `lastmodified` in `update()` so browser tag caches
+  refresh; then re-shoot handbook 09 and 13 and commit the handbook. Owner pushes the submodule
+- [x] **Q22 = a**: tests for the three weak-test survivors F6, E7, E14, each watched red against its
+  mutant; the mutant table updated
+- [ ] **Q23 = a**: persons and photoedit suites re-run and the regression lines ticked with the date
+
 ---
 
 ## Phase 8: Fix the failing baseline tests

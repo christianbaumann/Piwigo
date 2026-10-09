@@ -535,7 +535,7 @@ and `git -C plugins/typetags diff --stat` were both empty and both suites green 
 | F3 `!in_array(person)` → `in_array` | the person-tag case | killed: 5 `FreitextTest` cases |
 | F4 the linked-tag clause dropped | the not-linked case | killed: `testANewTagNotLinkedToTheSavedPhotosIsLeftAlone` alone |
 | F5 `and in_array(linked)` → `or` | the not-linked case | killed: 6 `FreitextTest` cases |
-| F6 `array_map('intval', $person_tag_ids)` dropped | `testIdsReadAsStringsAreComparedAsNumbers` | **survived**: weak test. The string-id case passes person id `'7'`, which matches no row, so the strict `in_array` against a string id is never exercised. Reachable: the caller (`writer.inc.php`) passes `query2array()` output, i.e. strings, so without the cast a person's tag typed in a save would be put into Freitext |
+| F6 `array_map('intval', $person_tag_ids)` dropped | `testIdsReadAsStringsAreComparedAsNumbers` | **survived**, then killed (2026-10-09): `testAPersonTagIdReadAsAStringIsLeftAlone` alone. The first run's string-id case passed person id `'7'`, which matches no row, so the strict `in_array` against a string id was never exercised. Reachable: the caller (`writer.inc.php`) passes `query2array()` output, i.e. strings, so without the cast a person's tag typed in a save would be put into Freitext. The new `[ECP]` case passes a new, linked person tag's id as a string |
 | F7 `array_map('intval', $linked_tag_ids)` dropped | the same string-id case | killed: that alone |
 
 `photoinfo_tag_is_local_only()`:
@@ -601,14 +601,14 @@ and `git -C plugins/typetags diff --stat` were both empty and both suites green 
 | E4 `> 0x10FFFF + 1` | the same | killed: that alone |
 | E5 `< 1` → `< 0` | `testGarbageIsRefused` (`'0'`) | **survived**: equivalent. Code point 0 is below `0x80` and NUL is not in `TYPETAGS_EMOJI_ASCII`, so the ASCII check refuses it on the next line; the `< 1` clause is redundant for every input |
 | E6 surrogate `>= 0xD800` → `>` | `testGarbageIsRefused` (`'D800'`) | killed: that alone |
-| E7 surrogate `<= 0xDFFF` → `<` | none | **survived**: weak test. Only the lower surrogate boundary `D800` is tested; typed `DFFF` is reachable and the mutant stores it. (A pasted surrogate cannot arrive: it is not valid UTF-8, and `preg_split('//u')` fails first) |
+| E7 surrogate `<= 0xDFFF` → `<` | `testTheSurrogateRangeIsRefusedAtBothEdges` `[BVA]` | **survived**, then killed (2026-10-09): `testTheSurrogateRangeIsRefusedAtBothEdges` alone. The first run tested only the lower surrogate boundary `D800`; the new case refuses `D800` and `DFFF` and accepts `D7FF` and `E000`. (A pasted surrogate cannot arrive: it is not valid UTF-8, and `preg_split('//u')` fails first) |
 | E8 surrogate `and` → `or` | every valid case | killed: 7 cases |
 | E9 the ASCII check removed | `testAsciiTextIsNoPartOfAnEmoji` | killed: that alone |
 | E10 `< 0x80` → `< 0x7F` | the same | killed: that alone (DEL, `0x7F`, is in its input) |
 | E11 hex `{1,6}` → `{1,5}` | `testTheUnicodeRangeIsTheBound` | killed: that alone |
 | E12 the `U+` prefix not accepted | `testTheUPlusNotationIsAccepted` | killed: that alone |
 | E13 `%X` → `%x` | every valid case | killed: 7 cases |
-| E14 blanks not stripped on the pasted path | none | **survived**: weak test. No case pastes characters with blanks between them; the docblock promises "separated by blanks", and with the mutant a pasted `🖼 ️` becomes `1F5BC 20 FE0F`, which the ASCII check then refuses |
+| E14 blanks not stripped on the pasted path | `testPastedCharactersSeparatedByBlanksAreNormalised` `[ECP]` | **survived**, then killed (2026-10-09): `testPastedCharactersSeparatedByBlanksAreNormalised` alone. No case pasted characters with blanks between them; the docblock promises "separated by blanks", and with the mutant a pasted `🖼 ️` becomes `1F5BC 20 FE0F`, which the ASCII check then refuses |
 | E15 empty input → `false` instead of `''` | `testEmptyMeansNone` | killed: that alone |
 | E16 `trim` dropped | the same | killed: that and `testTypedCodePointsAreNormalised` |
 | E17 the non-ASCII detector negated | everything | killed: 9 cases |
@@ -623,8 +623,12 @@ and `git -C plugins/typetags diff --stat` were both empty and both suites green 
 | B4 `border-radius`/`display` dropped | the non-striped case | killed: that alone |
 | B5 the colour part dropped | all three | killed: 3 cases |
 
-Three weak tests (F6, E7, E14) and two equivalent mutants (L4, E5); the tests were not changed in
-this pass.
+62 mutants. The first pass killed 57 and left three weak tests (F6, E7, E14) and two equivalent
+mutants (L4, E5). A second pass on 2026-10-09 added one unit case per weak test and re-applied each
+of the three mutants (exactly-once substitution, `md5sum` polled after apply and revert, `cp`
+backup restored): each died to its new case alone, so 60 of 62 are killed and only the two
+equivalent mutants survive. Suites after the revert: photoinfo unit 256 tests / 480 assertions,
+typetags unit 82 tests / 33075 assertions.
 
 ## The two tooltips only a browser can witness (2026-08-31)
 

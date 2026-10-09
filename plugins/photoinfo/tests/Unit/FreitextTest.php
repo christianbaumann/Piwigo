@@ -70,4 +70,15 @@ final class FreitextTest extends TestCase
 
         $this->assertSame(array(100), photoinfo_new_freitext_tags($rows, '99', array('7'), array('100', '41')));
     }
+
+    /**
+     * [ECP] A person's tag id read as a string, as query2array() delivers it,
+     * still keeps that tag out of Freitext.
+     */
+    public function testAPersonTagIdReadAsAStringIsLeftAlone(): void
+    {
+        $rows = array(self::row(41), self::row(42));
+
+        $this->assertSame(array(42), photoinfo_new_freitext_tags($rows, self::MAX_BEFORE, array('41'), self::linked($rows)));
+    }
 }
