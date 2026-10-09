@@ -579,6 +579,24 @@ could be moved into Freitext; each fixed test-first. Open for the owner: any log
 now create tags (ids are `smallint unsigned`), and the field, like the `+` badges, does not check
 that the account can see the photo.
 
+### Follow-ups decided by the owner after Phase 5 (2026-10-09)
+
+Done before Phase 6, each test-first and in its own commit:
+
+- [ ] **Q16 = a, N = 255**: an account may create at most `TYPETAGS_NEW_TAGS_PER_DAY` = 255 tags
+  through `typetags.image.addNewTag` in 24 hours, counted from core's activity log
+  (`pwg_activity('tag', id, 'add')`, which the method now writes). `piwigo_tags.id` is
+  `smallint unsigned`, so unlimited creation by any account could exhaust it install-wide.
+  Tests: 255th accepted, 256th refused; a row older than 24 h does not count. Decision recorded.
+- [x] **Q17 = a**: `typetags.image.addTag`, `removeTag` and `addNewTag` refuse a photo the account
+  cannot see (one shared check, core's album permissions), answering 404 as for a missing photo.
+  Test with a private album; [decision 0044](../decisions/0044-picture-page-tag-methods-respect-album-permissions.md).
+  Core's rule holds for administrators too: a private album needs a grant.
+- [x] **Q18 = a**, withdrawn: the question rested on a wrong diagnosis. A person's rename renames
+  the tag in place; the tag one run left behind came from `testAPersonsDeleteRemovesTheName`, since
+  persons leaves a deleted person's tag to core's orphan cleanup on purpose. Test fixed
+  (`67d24f239`); nothing to change in persons.
+
 ---
 
 ## Phase 6: Rescan, prune, deploy
@@ -638,11 +656,11 @@ deploy calling both.
 ### Changes Required
 
 - [ ] Decisions (`docs/agents/decisions/`):
-  - `0044-a-photos-tags-travel-in-its-file.md` — fields, marker, local-only rule, merge-only rescan, prune by flag
-  - `0045-new-tags-typed-while-tagging-go-to-freitext.md`
-  - `0046-typetags-emoji-are-stored-as-code-points.md` — utf8mb3, no charset migration
-  - `0047-tag-writes-take-the-persons-lock-first.md` — and provenance's write-back does not
-  - `0048-uploads-and-iptc-import-do-not-write-tags.md`
+  - `0046-a-photos-tags-travel-in-its-file.md` — fields, marker, local-only rule, merge-only rescan, prune by flag
+  - `0047-new-tags-typed-while-tagging-go-to-freitext.md`
+  - `0048-typetags-emoji-are-stored-as-code-points.md` — utf8mb3, no charset migration
+  - `0049-tag-writes-take-the-persons-lock-first.md` — and provenance's write-back does not
+  - `0050-uploads-and-iptc-import-do-not-write-tags.md`
 - [ ] `CLAUDE.md`: photoinfo bullet mentions tags; persons bullet mentions its one new event
   (still no core change); typetags bullet mentions the striped/emoji columns
 - [ ] `.claude/rules/plugin-test-suites.md`: new FixtureBuilder helpers and seed scenarios
