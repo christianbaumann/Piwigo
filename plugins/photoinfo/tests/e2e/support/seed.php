@@ -13,6 +13,7 @@
  *   php tests/e2e/support/seed.php --read-row=<id>     the photo's comment and date columns
  *   php tests/e2e/support/seed.php --read-date=<id>    the photo's date tags
  *   php tests/e2e/support/seed.php --read-only=<id>    makes the photo's file unwritable, so a save's file write fails
+ *   php tests/e2e/support/seed.php --track-tag=<name> records a tag the browser created, for --restore
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -29,7 +30,7 @@ function fail(string $message): void
     exit(1);
 }
 
-$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:'));
+$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:', 'track-tag:'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -83,6 +84,34 @@ catch (RuntimeException $e)
     fail($e->getMessage());
 }
 
+// A tag the browser created is unknown to the snapshot; recording it there
+// makes --restore delete it. Prints its id and the name of its group.
+if (isset($args['track-tag']))
+{
+    $snapshot = is_file(SNAPSHOT_FILE) ? json_decode((string)file_get_contents(SNAPSHOT_FILE), true) : null;
+    if (!is_array($snapshot))
+    {
+        fail('--track-tag needs a seeded scenario');
+    }
+    $builder->importTestObjects($snapshot);
+    try
+    {
+        $id = $builder->tagIdNamed((string)$args['track-tag']);
+    }
+    catch (RuntimeException $e)
+    {
+        fail($e->getMessage());
+    }
+    file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+
+    $group = $builder->groupOf($id);
+    echo json_encode(array(
+        'tag_id' => $id,
+        'group' => $group === null ? null : $db->scalar("SELECT name FROM piwigo_typetags WHERE id = $group"),
+        )), "\n";
+    exit(0);
+}
+
 if (isset($args['restore']))
 {
     if (!is_file(SNAPSHOT_FILE))
@@ -98,6 +127,7 @@ if (isset($args['restore']))
     }
 
     $builder->importTestObjects($snapshot);
+    $builder->destroyTestTags();
     $builder->destroyTestImages();
     $builder->destroyTestAlbums();
     unlink(SNAPSHOT_FILE);
@@ -121,6 +151,7 @@ $image = $builder->createTestImage();
 $catId = $builder->createTestAlbum('Photoinfo E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
+$freitext = $builder->freitextGroup();
 
 $dir = dirname(SNAPSHOT_FILE);
 if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir))
@@ -134,4 +165,10 @@ echo json_encode(array(
     'album_id' => $catId,
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
     'album_path' => '/index.php?/category/' . $catId,
+    // the Freitext group's colour as getComputedStyle reports it
+    'freitext_rgb' => vsprintf('rgb(%d, %d, %d)', sscanf($freitext['color'], '#%2x%2x%2x')),
+    // the Freitext group's emoji as the characters a browser shows
+    'freitext_emoji' => html_entity_decode(implode('', array_map(
+        fn ($cp) => '&#x' . $cp . ';', preg_split('/\s+/', trim($freitext['emoji']), -1, PREG_SPLIT_NO_EMPTY)
+        )), ENT_HTML5, 'UTF-8'),
     )), "\n";

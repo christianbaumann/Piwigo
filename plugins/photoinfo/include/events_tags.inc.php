@@ -20,6 +20,10 @@ include_once(PHOTOINFO_PATH.'include/events_core_edit.inc.php');
  *   provenance and persons have given their locks back, and only when the
  *   tags changed - the edit copied the old keywords into the new file, and
  *   recorded that file's checksum and version, which a write would make stale
+ *
+ * A tag typed in on the first four paths, and on typetags' field for a new
+ * tag, is put into the Freitext group before the file is written. The admin
+ * tags page creates tags deliberately and groups them there.
  */
 
 /**
@@ -32,7 +36,11 @@ function photoinfo_tags_picture_modify_before_update($data)
 {
   global $photoinfo_tags_before;
 
-  $photoinfo_tags_before = array('id' => (int)$data['id'], 'tags' => photoinfo_tag_ids_of($data['id']));
+  $photoinfo_tags_before = array(
+    'id' => (int)$data['id'],
+    'tags' => photoinfo_tag_ids_of($data['id']),
+    'max_tag_id' => photoinfo_max_tag_id(),
+    );
 
   return $data;
 }
@@ -55,8 +63,20 @@ function photoinfo_tags_picture_modify_after_save()
 
   if (photoinfo_tag_ids_of($before['id']) !== $before['tags'])
   {
+    photoinfo_assign_freitext($before['max_tag_id'], array($before['id']));
     photoinfo_report_tag_writes(photoinfo_write_tags(array($before['id'])));
   }
+}
+
+/**
+ * loc_begin_element_set_global: before the Batch Manager runs an action,
+ * which may create the tags typed into its field.
+ */
+function photoinfo_tags_begin_element_set_global()
+{
+  global $photoinfo_max_tag_id_before;
+
+  $photoinfo_max_tag_id_before = photoinfo_max_tag_id();
 }
 
 /**
@@ -69,8 +89,14 @@ function photoinfo_tags_picture_modify_after_save()
 function photoinfo_tags_element_set_global_action($action, $collection)
 {
   // Core refuses either action without a tag, and then changes nothing.
+  global $photoinfo_max_tag_id_before;
+
   if (in_array($action, array('add_tags', 'del_tags')) and !empty($_POST[$action]))
   {
+    if ($action == 'add_tags' and isset($photoinfo_max_tag_id_before))
+    {
+      photoinfo_assign_freitext($photoinfo_max_tag_id_before, $collection);
+    }
     photoinfo_report_tag_writes(photoinfo_write_tags($collection));
   }
 }
@@ -182,6 +208,7 @@ function photoinfo_wrap_tag_methods($arr)
   $methods = array(
     'typetags.image.addTag' => 'ws_photoinfo_typetags_addTag',
     'typetags.image.removeTag' => 'ws_photoinfo_typetags_removeTag',
+    'typetags.image.addNewTag' => 'ws_photoinfo_typetags_addNewTag',
     'pwg.tags.rename' => 'ws_photoinfo_tags_rename',
     'pwg.tags.duplicate' => 'ws_photoinfo_tags_duplicate',
     'pwg.tags.merge' => 'ws_photoinfo_tags_merge',
@@ -204,6 +231,29 @@ function ws_photoinfo_typetags_addTag($params, &$service)
 function ws_photoinfo_typetags_removeTag($params, &$service)
 {
   return photoinfo_call_and_write('typetags.image.removeTag', $params, $service, null, array($params['image_id']));
+}
+
+/**
+ * typetags' field for a new tag on the picture page: a new name goes to
+ * Freitext, and the answer's badge is the tag's after that.
+ */
+function ws_photoinfo_typetags_addNewTag($params, &$service)
+{
+  $max_tag_id = photoinfo_max_tag_id();
+
+  $result = photoinfo_call_wrapped('typetags.image.addNewTag', $params, $service);
+  if ($result instanceof PwgError)
+  {
+    return $result;
+  }
+
+  photoinfo_assign_freitext($max_tag_id, array($params['image_id']));
+
+  return array_merge(
+    $result,
+    typetags_tag_badge($result['tag_id']),
+    photoinfo_tag_write_answer(photoinfo_write_tags(array($params['image_id'])))
+    );
 }
 
 /** The admin tags page's rename. */

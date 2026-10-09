@@ -19,6 +19,9 @@ class FixtureBuilder
 
     /** The provenance plugin's per-image lock, held while it writes a file. */
     private const PROVENANCE_LOCK_DIR = '_data/provenance/locks/';
+    /** The seeded Freitext group's look, for an install the seed has not reached. */
+    private const FREITEXT_COLOR = '#e4e6e3';
+    private const FREITEXT_EMOJI = '270D FE0F';
 
     /** The photo columns setProvenance() may write. */
     public const PROVENANCE_COLUMNS = array(
@@ -50,6 +53,7 @@ class FixtureBuilder
     private array $testTags = array();
     private array $testGroups = array();
     private array $testPersons = array();
+    private ?array $hiddenFreitext = null;
     private array $physicalDirs = array();
 
     public function __construct(Db $db)
@@ -554,6 +558,69 @@ class FixtureBuilder
         return $id;
     }
 
+    /**
+     * The install's Freitext group, or one of this suite's own, shaped like
+     * the seeded one, when the seed has not run.
+     *
+     * @return array id, color, emoji
+     */
+    public function freitextGroup(): array
+    {
+        $hidden = $this->db->scalar(
+            "SELECT name FROM piwigo_typetags WHERE name LIKE '" . $this->db->escape(PHOTOINFO_FREITEXT_GROUP) . " hidden %'"
+        );
+        if ($hidden !== null)
+        {
+            throw new RuntimeException("a killed run left the Freitext group renamed to '$hidden'; rename it back to '"
+                . PHOTOINFO_FREITEXT_GROUP . "' by hand");
+        }
+
+        $row = $this->db->query(
+            "SELECT id, color, emoji FROM piwigo_typetags WHERE name = '" . $this->db->escape(PHOTOINFO_FREITEXT_GROUP) . "'"
+        )->fetch_assoc();
+        if ($row !== null)
+        {
+            return array('id' => (int)$row['id'], 'color' => $row['color'], 'emoji' => $row['emoji']);
+        }
+
+        $this->db->query(
+            "INSERT INTO piwigo_typetags (name, color, emoji) VALUES ('" . $this->db->escape(PHOTOINFO_FREITEXT_GROUP) .
+            "', '" . self::FREITEXT_COLOR . "', '" . self::FREITEXT_EMOJI . "')"
+        );
+        $id = $this->db->insertId();
+        if ($id <= 0)
+        {
+            throw new RuntimeException('the Freitext group was not inserted');
+        }
+        $this->testGroups[] = $id;
+        return array('id' => $id, 'color' => self::FREITEXT_COLOR, 'emoji' => self::FREITEXT_EMOJI);
+    }
+
+    /** Renames the install's Freitext group away until destroyTestTags() puts it back. */
+    public function hideFreitextGroup(): void
+    {
+        $group = $this->freitextGroup();
+        $this->hiddenFreitext = $group;
+        $this->db->query(
+            "UPDATE piwigo_typetags SET name = '" . $this->db->escape(PHOTOINFO_FREITEXT_GROUP . ' hidden ' . bin2hex(random_bytes(4))) .
+            "' WHERE id = " . $group['id']
+        );
+        $left = (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM piwigo_typetags WHERE name = '" . $this->db->escape(PHOTOINFO_FREITEXT_GROUP) . "'"
+        );
+        if ($left !== 0)
+        {
+            throw new RuntimeException('the Freitext group is still there');
+        }
+    }
+
+    /** The group a tag is in, null for none. */
+    public function groupOf(int $tagId): ?int
+    {
+        $group = $this->db->scalar("SELECT id_typetags FROM piwigo_tags WHERE id = $tagId");
+        return $group === null ? null : (int)$group;
+    }
+
     /** A tag of this suite's own, in a group or none. */
     public function createTag(string $name, ?int $groupId = null): int
     {
@@ -710,19 +777,35 @@ class FixtureBuilder
         }
         $this->testGroups = array();
 
+        if ($this->hiddenFreitext !== null)
+        {
+            $this->db->query(
+                "UPDATE piwigo_typetags SET name = '" . $this->db->escape(PHOTOINFO_FREITEXT_GROUP) .
+                "' WHERE id = " . $this->hiddenFreitext['id']
+            );
+            $this->hiddenFreitext = null;
+        }
+
         $this->db->query("UPDATE piwigo_user_cache SET nb_available_tags = NULL");
     }
 
     /** What this fixture created, for the E2E seed's separate restore process. */
     public function exportTestObjects(): array
     {
-        return array('images' => $this->testImages, 'albums' => $this->testAlbums);
+        return array(
+            'images' => $this->testImages,
+            'albums' => $this->testAlbums,
+            'tags' => $this->testTags,
+            'groups' => $this->testGroups,
+            );
     }
 
     public function importTestObjects(array $objects): void
     {
         $this->testImages = $objects['images'] ?? array();
         $this->testAlbums = $objects['albums'] ?? array();
+        $this->testTags = $objects['tags'] ?? array();
+        $this->testGroups = $objects['groups'] ?? array();
     }
 
     /**

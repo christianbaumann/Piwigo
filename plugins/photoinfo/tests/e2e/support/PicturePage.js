@@ -36,6 +36,52 @@ class PicturePage {
     this.dateCancelButton = page.locator('#photoinfo-date-form .photoinfo-cancel');
     this.dateMessage = page.locator('#photoinfo-date-form .photoinfo-message');
     this.coreDateRow = page.locator('#datecreate');
+
+    // typetags' field for a new tag, and the Tags row its answer lands in
+    this.newTagField = page.locator('#typetags-new-tag input[name="tag_name"]');
+    this.newTagButton = page.locator('#typetags-new-tag button[type="submit"]');
+  }
+
+  /** @param {number} tagId */
+  tagLink(tagId) {
+    return this.page.locator(`#Tags dd a[data-tag-id="${tagId}"]`);
+  }
+
+  /**
+   * The emoji in front of a tag's name in the Tags row. Core links a tag by its
+   * URL there, typetags' script by data-tag-id, so the name finds both.
+   *
+   * @param {string} name
+   */
+  tagEmojiNamed(name) {
+    return this.page.locator('#Tags dd a', { hasText: name }).locator('.typetag-emoji');
+  }
+
+  /**
+   * The background colour the browser paints a tag's badge in.
+   *
+   * @param {string} name
+   */
+  async tagBadgeColorNamed(name) {
+    return this.page
+      .locator('#Tags dd a', { hasText: name })
+      .locator('span[style]')
+      .first()
+      .evaluate((span) => window.getComputedStyle(span).backgroundColor);
+  }
+
+  /**
+   * Types a name into typetags' field and waits for the server's answer.
+   *
+   * @param {string} name
+   */
+  async addNewTag(name) {
+    await this.newTagField.fill(name);
+    const answer = this.page.waitForResponse(
+      (r) => r.url().includes('ws.php') && (r.request().postData() || '').includes('typetags.image.addNewTag')
+    );
+    await this.newTagButton.click();
+    await answer;
   }
 
   /** @param {string} picturePath as seed.php prints it */

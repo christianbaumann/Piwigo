@@ -208,6 +208,80 @@ SELECT DISTINCT image_id
 }
 
 /**
+ * @return int the highest tag id, 0 for none: taken before a save, it tells
+ *   the tags the save created
+ */
+function photoinfo_max_tag_id()
+{
+  list($max) = pwg_db_fetch_row(pwg_query('SELECT MAX(id) FROM '.TAGS_TABLE.';'));
+
+  return (int)$max;
+}
+
+/**
+ * Puts the tags typed in on the photos since photoinfo_max_tag_id() into the
+ * Freitext group. Does nothing without typetags or without that group.
+ *
+ * @param int $max_before
+ * @param int[] $image_ids the photos the save changed
+ */
+function photoinfo_assign_freitext($max_before, $image_ids)
+{
+  if (!defined('TYPETAGS_TABLE'))
+  {
+    return;
+  }
+
+  $query = '
+SELECT id
+  FROM '.TYPETAGS_TABLE.'
+  WHERE name = \''.pwg_db_real_escape_string(PHOTOINFO_FREITEXT_GROUP).'\'
+;';
+  $group = query2array($query, null, 'id');
+  if (count($group) == 0)
+  {
+    return;
+  }
+
+  $query = '
+SELECT id, id_typetags AS `group`
+  FROM '.TAGS_TABLE.'
+  WHERE id > '.(int)$max_before.'
+;';
+  $person_tag_ids = array();
+  if (defined('PERSONS_TABLE'))
+  {
+    $person_tag_ids = query2array('SELECT tag_id FROM '.PERSONS_TABLE.' WHERE tag_id IS NOT NULL;', null, 'tag_id');
+  }
+
+  $image_ids = array_map('intval', $image_ids);
+  if (count($image_ids) == 0)
+  {
+    return;
+  }
+  $linked_tag_ids = query2array('
+SELECT DISTINCT tag_id
+  FROM '.IMAGE_TAG_TABLE.'
+  WHERE image_id IN ('.implode(',', $image_ids).')
+    AND tag_id > '.(int)$max_before.'
+;', null, 'tag_id');
+
+  $tag_ids = photoinfo_new_freitext_tags(query2array($query), $max_before, $person_tag_ids, $linked_tag_ids);
+  if (count($tag_ids) == 0)
+  {
+    return;
+  }
+
+  $query = '
+UPDATE '.TAGS_TABLE.'
+  SET id_typetags = '.(int)$group[0].'
+  WHERE id IN ('.implode(',', $tag_ids).')
+    AND id_typetags IS NULL
+;';
+  pwg_query($query);
+}
+
+/**
  * One photo's tags with the name of each one's typetags group.
  *
  * @param int $image_id

@@ -359,6 +359,12 @@ final class TagWriteTest extends TestCase
             'pwg_token' => $this->ws->token(),
             ));
 
+        // persons leaves the old name's tag behind, unlinked; teardown removes it
+        if ((int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_tags WHERE name = '" . $this->db->escape($this->tagName('Anna')) . "'") > 0)
+        {
+            $this->fixture->tagIdNamed($this->tagName('Anna'));
+        }
+
         $this->assertTagsWritten($res);
 
         foreach (array($this->image, $other) as $photo)

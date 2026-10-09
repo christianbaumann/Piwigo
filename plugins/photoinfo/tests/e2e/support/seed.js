@@ -13,7 +13,7 @@ function run(arg) {
  * Creates a throwaway public album with one copied photo and returns what was made.
  *
  * @param {'photo'} scenario
- * @returns {{image_id: number, album_id: number, picture_path: string, album_path: string}}
+ * @returns {{image_id: number, album_id: number, picture_path: string, album_path: string, freitext_emoji: string, freitext_rgb: string}}
  */
 function seed(scenario) {
   return run(`--scenario=${scenario}`);
@@ -66,4 +66,14 @@ function restore() {
   run('--restore');
 }
 
-module.exports = { seed, readFile, readDate, readRow, makeReadOnly, restore };
+/**
+ * Records a tag the browser created, so restore() deletes it.
+ *
+ * @param {string} name
+ * @returns {{tag_id: number, group: string|null}}
+ */
+function trackTag(name) {
+  return run(`--track-tag=${name}`);
+}
+
+module.exports = { seed, readFile, readDate, readRow, makeReadOnly, restore, trackTag };

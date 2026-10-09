@@ -175,6 +175,7 @@ function ws_photoinfo_images_setInfo($params, &$service)
 {
   $before = photoinfo_core_edit_snapshot($params['image_id']);
   $tags_before = photoinfo_tag_ids_of($params['image_id']);
+  $max_tag_id = photoinfo_max_tag_id();
 
   $result = photoinfo_call_wrapped('pwg.images.setInfo', $params, $service);
   if ($before === null)
@@ -187,6 +188,7 @@ function ws_photoinfo_images_setInfo($params, &$service)
   $tags_written = array();
   if (photoinfo_tag_ids_of($before['id']) !== $tags_before)
   {
+    photoinfo_assign_freitext($max_tag_id, array($before['id']));
     $tags_written = photoinfo_write_tags(array($before['id']));
   }
 

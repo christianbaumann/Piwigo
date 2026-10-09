@@ -462,6 +462,36 @@ define('PHOTOINFO_LOCAL_ONLY_TAGS', array('Ausstellung'));
 define('PHOTOINFO_FREITEXT_GROUP', 'Freitext');
 
 /**
+ * The tags a save typed in: created by it and linked to the photos it saved,
+ * in no group, and not a person's. The link keeps out a tag another request
+ * created meanwhile.
+ *
+ * @param array $rows tags: id, group (null for none)
+ * @param int $max_before the highest tag id before the save
+ * @param int[] $person_tag_ids
+ * @param int[] $linked_tag_ids the tags of the photos the save changed
+ * @return int[]
+ */
+function photoinfo_new_freitext_tags($rows, $max_before, $person_tag_ids, $linked_tag_ids)
+{
+  $person_tag_ids = array_map('intval', $person_tag_ids);
+  $linked_tag_ids = array_map('intval', $linked_tag_ids);
+
+  $ids = array();
+  foreach ($rows as $row)
+  {
+    $id = (int)$row['id'];
+    if ($id > (int)$max_before and $row['group'] === null and !in_array($id, $person_tag_ids, true)
+      and in_array($id, $linked_tag_ids, true))
+    {
+      $ids[] = $id;
+    }
+  }
+
+  return $ids;
+}
+
+/**
  * @param string $name a tag's or a group's name
  * @return bool whether a tag of that name stays out of the file
  */

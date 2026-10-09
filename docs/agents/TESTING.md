@@ -631,6 +631,12 @@ not prove a core mutation would reach it.
 | `testPhotoPropertiesTypedNameCreatesTheTag` | no tag of the typed name exists afterwards |
 | `testATagCreatedOnTheFlyHasNoGroup` | `id_typetags` is not NULL |
 
+Phase 5 (2026-10-09) replaced the last row's recorded behaviour on purpose: with photoinfo active
+and a `Freitext` group, a typed tag now lands in that group. The case is now
+`testATagCreatedOnTheFlyHasNoGroupUnlessPhotoinfoMovesItToFreitext` and expects the Freitext
+group's id when photoinfo is active, NULL otherwise; photoinfo's `FreitextAssignTest` pins the
+assignment itself.
+
 ## Mutant table — `GermanOverrideKeyTest` (2026-08-31)
 
 Run against the provenance unit suite at 183 tests / 516 assertions, by hand, one mutant at a

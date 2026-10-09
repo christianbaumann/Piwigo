@@ -198,8 +198,13 @@ final class CoreTagAssignmentCharacterizationTest extends TestCase
         $this->assertSame(array($id), $this->tagsOfPhoto($image));
     }
 
-    /** [ERR] A tag created on the fly carries no Colored Tags group. */
-    public function testATagCreatedOnTheFlyHasNoGroup(): void
+    /**
+     * [ERR] Core gives a tag created on the fly no Colored Tags group. Since
+     * plan 2026-10-09 Phase 5, plugins/photoinfo puts such a tag into its
+     * Freitext group when it is active and the group exists (photoinfo's
+     * FreitextAssignTest pins that); only without it does core's NULL remain.
+     */
+    public function testATagCreatedOnTheFlyHasNoGroupUnlessPhotoinfoMovesItToFreitext(): void
     {
         if (!$this->fixture->columnExists('piwigo_tags', 'id_typetags'))
         {
@@ -214,9 +219,16 @@ final class CoreTagAssignmentCharacterizationTest extends TestCase
 
         $id = $this->tagIdByName($name);
         $this->assertGreaterThan(0, $id, 'anti-vacuity: the typed name must have become a tag');
-        $this->assertNull(
+        $freitext = $this->db->scalar(
+            "SELECT g.id FROM `piwigo_typetags` AS g" .
+            " JOIN `piwigo_plugins` AS p ON p.id = 'photoinfo' AND p.state = 'active'" .
+            " JOIN `piwigo_plugins` AS t ON t.id = 'typetags' AND t.state = 'active'" .
+            " WHERE g.name = 'Freitext'"
+        );
+        $this->assertSame(
+            $freitext,
             $this->db->scalar("SELECT id_typetags FROM `piwigo_tags` WHERE id = $id"),
-            'core knows nothing of groups, so a new tag has none'
+            'core knows nothing of groups; only photoinfo moves a typed tag into Freitext'
         );
     }
 

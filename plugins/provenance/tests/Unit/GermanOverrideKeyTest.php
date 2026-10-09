@@ -104,6 +104,26 @@ final class GermanOverrideKeyTest extends TestCase
             'Remove tag' => array(
                 'plugins/typetags/include/events_public.inc.php',
                 "{\'Remove tag\'|@translate}",
+                1,
+            ),
+            'Type a new tag' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Type a new tag\'|@translate}",
+                2,
+            ),
+            'Add the tag' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Add the tag\'|@translate}",
+                1,
+            ),
+            'The tag was not saved' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'The tag was not saved\'|@translate|escape:javascript}",
+                2,
+            ),
+            'Invalid tag name' => array(
+                'plugins/typetags/main.inc.php',
+                "l10n('Invalid tag name')",
                 2,
             ),
             'Create' => array(
