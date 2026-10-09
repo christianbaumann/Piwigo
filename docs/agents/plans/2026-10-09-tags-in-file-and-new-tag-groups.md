@@ -509,14 +509,38 @@ function photoinfo_assign_freitext($tag_ids) {}              // UPDATE tags SET 
 - [ ] `pwg.tags.add` and `pwg.tags.duplicate` (tags admin page) do **not** assign Freitext: a
   tag created on the admin tags page is deliberate and gets its group there
 
+#### [ ] 2. Typing a new tag on the picture page (added 2026-10-09, **Q15**)
+**Files**: `plugins/typetags/main.inc.php`, `include/events_public.inc.php`,
+`language/{de_DE,en_UK}/plugin.lang.php` (submodule); `plugins/photoinfo/include/events_tags.inc.php`
+
+Q15 answers: any logged-in user (the same rule as the `+` badges); built here, after Phase 4,
+so the typed tag reaches the file on the same path as every other change; a name that already
+exists is assigned and keeps its group, only a new name is created.
+
+- [ ] typetags: a text field after the `+` badges (`#typetags-unassigned`), shown to every
+  non-guest; Enter or a button sends `typetags.image.addNewTag`
+- [ ] `typetags.image.addNewTag`: non-guest, POST only, `pwg_token`; `image_id`, `tag_name`
+  (trimmed, 1..255 characters, refused otherwise); `tag_id_from_tag_name()` then the link
+  (`INSERT IGNORE`), user cache invalidated like `addTag`; answers `tag_id`, `name`, `style`,
+  `emoji_html` and `created` (bool) - the style read *after* any listener grouped the tag
+- [ ] The script appends the answer's badge to the Tags row like a `+` click does (shared
+  builder, name inserted as text, never as HTML: the name is typed by any user) and clears the
+  field; a refusal shows the message and keeps the text
+- [ ] photoinfo re-registers `typetags.image.addNewTag` (`photoinfo_wrap_method()`): snapshot
+  `photoinfo_max_tag_id()`, call through, `photoinfo_assign_freitext()`, then
+  `photoinfo_write_tags()`; refreshes `style`/`emoji_html` in the answer from the tag's group
+- [ ] Without photoinfo the tag stays ungrouped and plain (no Freitext, no file write)
+
 ### Success Criteria
 
 #### Automated Verification:
 - [ ] photoinfo unit and integration suites as in Phase 4
+- [ ] typetags unit, integration and E2E suites (Phase 2 commands)
 - [ ] photoinfo E2E: `ddev exec bash -c 'set -a; . local/config/photoinfo-test.env; set +a; cd plugins/photoinfo && npx playwright test'`
 
 #### Manual Verification:
 - [ ] Type a new name into the photo properties tag field; the badge shows ✍️ on grey
+- [ ] Type a new name into the picture page's field; the badge shows ✍️ on grey
 
 ---
 
@@ -667,7 +691,10 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [ ] `…::testAPersonsRegionAddWritesTheName` (persons active) `[HAPPY]`
 - [ ] `…::testAPhotoeditCropThatCutsAFaceRewritesTheKeywords` (persons, photoedit active) `[ST]`
 - [ ] `…::testATagWriteWaitsForAHeldPersonsLock` — child process holds the persons lock, write waits (ExclusionTest shape) `[ERR]`
-- [ ] `FreitextAssignTest` — photo properties, Batch Manager, setInfo `tag_list`: new tag in Freitext and in the file as `Freitext|Name` `[HAPPY]`; `pwg.tags.add` leaves it ungrouped `[NEG]`; Freitext group missing → ungrouped, write still succeeds `[NEG]`
+- [ ] `FreitextAssignTest` — photo properties, Batch Manager, setInfo `tag_list`, `typetags.image.addNewTag`: new tag in Freitext and in the file as `Freitext|Name` `[HAPPY]`; `pwg.tags.add` leaves it ungrouped `[NEG]`; Freitext group missing → ungrouped, write still succeeds `[NEG]`; `addNewTag` with an existing grouped name keeps its group `[ECP]`
+
+**typetags** (`tests/Integration/`, Phase 5)
+- [ ] `AddNewTagTest` — normal account creates and links a new name, `created` true `[HAPPY]`; an existing name is linked, `created` false, group unchanged `[ECP]`; guest, wrong token, GET refused `[NEG]`; empty / blank name refused `[BVA]`; 255 characters accepted, 256 refused `[BVA]`; unknown image refused, no tag row left behind `[NEG]`; a name with markup is stored as core stores it and rendered escaped `[ERR]`
 - [ ] `RescanTest` additions — adds tags of a marked file `[HAPPY]`; unmarked file adds nothing `[NEG]`; never removes `[ST]`; creates a missing tag and group `[HAPPY]`; reports `not_in_file`, excluding local-only `[DT]`; rescan writes no file (mtime) `[NEG]`
 - [ ] `PruneTagsTest` — removes only `not_in_file` of a marked file `[HAPPY]`; unmarked file untouched `[NEG]`; local-only never removed `[NEG]`; chunk 10 ok, 11 refused `[BVA]`; auth/token/GET refused `[NEG]`
 
@@ -676,6 +703,8 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [x] typetags `rendering.spec.js::a striped group paints the tab and border at real size` — computed `background-image` and `border-color` `[HAPPY]`
 - [x] typetags `assign.spec.js::a striped badge keeps its stripes after add and remove` (JS rebuild path) `[ST]`
 - [ ] photoinfo `tags-freitext.spec.js::a name typed in the photo properties tag field shows the ✍️ badge on the picture page` `[HAPPY]`
+- [ ] photoinfo `tags-freitext.spec.js::a name typed into the picture page's field appears as a ✍️ badge without a reload, and after one` `[HAPPY]`
+- [ ] typetags `add-new-tag.spec.js` — the field is shown to a normal account, not to a guest `[NEG]`; a typed name with `<b>` shows as text `[NEG]`; a refusal keeps the text and shows the message `[NEG]`
 
 ### Manual Testing Steps
 1. Look at S5 and the emoji on the picture page in modus, light and dark (legibility; ledger).
