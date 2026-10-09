@@ -16,7 +16,7 @@ import json
 import re
 import tempfile
 import urllib.parse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -76,6 +76,7 @@ TYPETAGS_PLUGIN = "typetags"
 PHOTOINFO_PLUGIN = "photoinfo"
 IMAGES_METHOD = "pwg.categories.getImages"
 RESCAN_METHOD = "pwg.photoinfo.rescan"
+PRUNE_METHOD = "pwg.photoinfo.pruneTags"
 # $conf['ws_max_images_per_page'] in include/config_default.inc.php; ws.php clamps to it.
 IMAGE_PAGE_SIZE = 500
 # PHOTOINFO_RESCAN_MAX_CHUNK in plugins/photoinfo/include/functions.inc.php; the method
@@ -97,10 +98,24 @@ class RescanResult:
     scanned: int
     failed: dict[int, str]
     """Photo id -> the reason pwg.photoinfo.rescan gave for not reading it."""
+    tags_added: int = 0
+    """Tags linked to photos because their files name them."""
+    not_in_file: dict[int, list[str]] = field(default_factory=dict)
+    """Photo id -> the tags it has that its file, written with tags, does not name."""
 
     @property
     def total(self) -> int:
         return self.scanned + len(self.failed)
+
+
+@dataclass(frozen=True)
+class PruneResult:
+    removed: dict[int, list[str]]
+    """Photo id -> the tags pwg.photoinfo.pruneTags removed from it."""
+    failed: dict[int, str]
+    """Photo id -> why its file could not be read."""
+    error: str | None = None
+    """Why the prune stopped; a prune never fails the deploy."""
 
 
 @dataclass(frozen=True)
@@ -115,6 +130,8 @@ class BootstrapResult:
     """None when typetags was not among the plugins this run activated."""
     rescan: RescanResult | None = None
     """None when photoinfo was not among the plugins this run activated."""
+    prune: PruneResult | None = None
+    """None unless the run was asked to prune and photoinfo was active."""
 
 
 # --- install --------------------------------------------------------------------------
@@ -448,26 +465,94 @@ def chunks(ids: list[int], size: int) -> list[list[int]]:
 def parse_rescan(result: Any) -> RescanResult:
     """One chunk's answer. json_encode writes an empty PHP array as `[]` and an id-keyed
     one as an object with string keys."""
-    scanned = result.get("scanned") if isinstance(result, Mapping) else None
-    failed = result.get("failed") if isinstance(result, Mapping) else None
-    if failed == []:
-        failed = {}
-    if not isinstance(scanned, int) or not isinstance(failed, Mapping):
+    fields = result if isinstance(result, Mapping) else {}
+    scanned = fields.get("scanned")
+    tags_added = fields.get("tags_added")
+    failed = _id_keyed(fields.get("failed"))
+    not_in_file = _id_keyed(fields.get("not_in_file"))
+    if (
+        not isinstance(scanned, int)
+        or not isinstance(tags_added, int)
+        or failed is None
+        or not _names_by_photo(not_in_file)
+    ):
         raise RemoteHttpError(
             f"{RESCAN_METHOD} returned an unexpected result: {result!r:.200}"
         )
     return RescanResult(
-        scanned=scanned, failed={int(key): str(reason) for key, reason in failed.items()}
+        scanned=scanned,
+        failed={int(key): str(reason) for key, reason in failed.items()},
+        tags_added=tags_added,
+        not_in_file={int(key): list(names) for key, names in not_in_file.items()},
     )
 
 
 def merge_rescans(results: Iterable[RescanResult]) -> RescanResult:
     scanned = 0
+    tags_added = 0
     failed: dict[int, str] = {}
+    not_in_file: dict[int, list[str]] = {}
     for result in results:
         scanned += result.scanned
+        tags_added += result.tags_added
         failed.update(result.failed)
-    return RescanResult(scanned=scanned, failed=failed)
+        not_in_file.update(result.not_in_file)
+    return RescanResult(
+        scanned=scanned, failed=failed, tags_added=tags_added, not_in_file=not_in_file
+    )
+
+
+def _id_keyed(value: Any) -> Mapping | None:
+    """An id-keyed PHP array as json_encode writes it: an object, or `[]` when empty."""
+    if value == []:
+        return {}
+    return value if isinstance(value, Mapping) else None
+
+
+def _names_by_photo(value: Mapping | None) -> bool:
+    return value is not None and all(
+        isinstance(names, list) and all(isinstance(n, str) for n in names)
+        for names in value.values()
+    )
+
+
+# --- pruning tags the files do not name ------------------------------------------------
+
+
+def prune_photo_tags(client, base_url: str, token: str, photo_ids: Iterable[int]) -> PruneResult:
+    """Remove from these photos the tags their files do not name, one chunk per request.
+    Never raises: the upload, install and rescan are done, and the next run repeats it."""
+    removed: dict[int, list[str]] = {}
+    failed: dict[int, str] = {}
+    try:
+        for chunk in chunks(sorted(photo_ids), RESCAN_CHUNK):
+            result = parse_prune(
+                ws_call(
+                    client,
+                    base_url,
+                    PRUNE_METHOD,
+                    {"image_ids": ",".join(map(str, chunk)), "pwg_token": token},
+                )
+            )
+            removed.update(result.removed)
+            failed.update(result.failed)
+    except (RemoteHttpError, OSError) as error:
+        # OSError: a read timeout or a dropped connection, which the HTTP client passes on
+        return PruneResult(removed=removed, failed=failed, error=str(error) or type(error).__name__)
+    return PruneResult(removed=removed, failed=failed)
+
+
+def parse_prune(result: Any) -> PruneResult:
+    """One chunk's answer, keyed as parse_rescan's."""
+    fields = result if isinstance(result, Mapping) else {}
+    removed = _id_keyed(fields.get("removed"))
+    failed = _id_keyed(fields.get("failed"))
+    if failed is None or not _names_by_photo(removed):
+        raise RemoteHttpError(f"{PRUNE_METHOD} returned an unexpected result: {result!r:.200}")
+    return PruneResult(
+        removed={int(key): list(names) for key, names in removed.items()},
+        failed={int(key): str(reason) for key, reason in failed.items()},
+    )
 
 
 # --- the whole bootstrap --------------------------------------------------------------
@@ -479,9 +564,10 @@ def run(
     transport,
     client,
     tag_groups: seed.TagGroups | None = None,
+    prune_tags: bool = False,
 ) -> BootstrapResult:
     """Install if needed, publish the config, log in, activate, seed the tag groups, scan,
-    then rescan."""
+    rescan, then - only when asked - prune the tags the files do not name."""
     wanted = tag_groups or seed.load_tag_groups(seed.TAG_GROUPS_PATH)
     installed_now = False
     if not is_installed(client, config.site.base_url):
@@ -503,6 +589,11 @@ def run(
         if PHOTOINFO_PLUGIN in plugins
         else None
     )
+    pruned = (
+        prune_photo_tags(client, config.site.base_url, token, rescan.not_in_file)
+        if prune_tags and rescan is not None
+        else None
+    )
 
     return BootstrapResult(
         installed=installed_now,
@@ -511,4 +602,5 @@ def run(
         sync=counts,
         seed=seeded,
         rescan=rescan,
+        prune=pruned,
     )

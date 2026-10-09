@@ -82,6 +82,7 @@ reports the plugins already active.
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
 | `--allow-version-change` | upload even when the remote runs a different core version |
+| `--prune-tags` | after the rescan, remove the tags each photo's file does not name (see below) |
 | `--verbose` | name each uploaded path as it goes |
 
 Exit codes are one per failure mode — `3` bad credential file, `4` git, `5` transport, `6` no
@@ -170,6 +171,33 @@ with exit `7`, like any other remote HTTP failure.
 A photo only in an album made private on the remote is not listed, so it is neither read nor
 counted: the line can say `N of N` with it missing. A sync creates public albums, so this needs
 someone to have changed an album's permission on the remote by hand.
+
+### Tags
+
+The rescan also adds the tags a file names (photoinfo writes them as keywords whenever a photo's
+tags change), creating a missing tag, and a missing group the keyword hierarchy names. It only
+reads files that carry photoinfo's marker, so a photo whose tags were never written loses
+nothing, and it never removes a tag. Instead it counts, per photo, the tags the remote has that
+the file does not name:
+
+```
+  rescan      105 of 105 photos read
+              tags: 14 added; 3 photos have tags their file does not name (prune with --prune-tags)
+```
+
+`--prune-tags` removes those, through `pwg.photoinfo.pruneTags`, ten photos per request and only
+for the photos the rescan named. `Ausstellung` and every tag with a `?` in its name never reach a
+file, so they are never removed either.
+
+```
+  rescan      105 of 105 photos read
+              tags: 0 added; 3 photos have tags their file does not name
+  prune       4 tags removed from 3 photos
+```
+
+Like the rescan, a prune never fails the run: a call that fails outright ends the line with
+`then stopped (warning)` and the server's message, and the run exits `0`. The next run with the
+flag prunes again.
 
 ## The manifest is the only record of remote state
 
@@ -289,7 +317,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-543 tests, measured 2026-10-09. Everything that decides *what* to do is a pure function and is
+571 tests, measured 2026-10-09. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

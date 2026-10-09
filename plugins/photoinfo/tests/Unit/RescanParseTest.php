@@ -15,6 +15,9 @@ final class RescanParseTest extends TestCase
 {
     private const NOW = 2026;
 
+    /** What the parse gives for a file photoinfo never wrote tags into. */
+    private const NO_TAGS = array('subject' => array(), 'hierarchy' => array(), 'tags_marker' => false);
+
     /**
      * [DT] Every combination the form can save comes back from its EDTF string
      * as the dating that wrote it.
@@ -80,7 +83,9 @@ final class RescanParseTest extends TestCase
             . "<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>\n\n"
             . "<rdf:Description rdf:about='/tmp/t.png'\n"
             . "  xmlns:et='http://ns.exiftool.org/1.0/' et:toolkit='Image::ExifTool 13.25'\n"
-            . "  xmlns:XMP-pwginfo='" . PHOTOINFO_RDF_GROUP_URI . "'>\n"
+            . "  xmlns:XMP-pwginfo='" . PHOTOINFO_RDF_GROUP_URI . "'\n"
+            . "  xmlns:XMP-dc='http://ns.exiftool.org/XMP/XMP-dc/1.0/'\n"
+            . "  xmlns:XMP-lr='http://ns.exiftool.org/XMP/XMP-lr/1.0/'>\n"
             . $body
             . "</rdf:Description>\n</rdf:RDF>\n";
     }
@@ -93,7 +98,7 @@ final class RescanParseTest extends TestCase
             . " <XMP-pwginfo:DateEDTF>1965/1970</XMP-pwginfo:DateEDTF>\n");
 
         $this->assertSame(
-            array('info' => "Zeile <b>eins</b> & \"zwei\"  \nÄpfel", 'edtf' => '1965/1970'),
+            array('info' => "Zeile <b>eins</b> & \"zwei\"  \nÄpfel", 'edtf' => '1965/1970') + self::NO_TAGS,
             photoinfo_parse_rescan_xml($xml));
     }
 
@@ -102,7 +107,7 @@ final class RescanParseTest extends TestCase
     {
         $xml = self::exiftoolXml(" <XMP-pwginfo:Info>1.50</XMP-pwginfo:Info>\n");
 
-        $this->assertSame(array('info' => '1.50', 'edtf' => null), photoinfo_parse_rescan_xml($xml));
+        $this->assertSame(array('info' => '1.50', 'edtf' => null) + self::NO_TAGS, photoinfo_parse_rescan_xml($xml));
     }
 
     /** [ECP] A file with neither tag gives two nulls, which is not a failure. */
@@ -114,7 +119,7 @@ final class RescanParseTest extends TestCase
             . "  xmlns:et='http://ns.exiftool.org/1.0/' et:toolkit='Image::ExifTool 13.25'>\n"
             . "</rdf:Description>\n</rdf:RDF>\n";
 
-        $this->assertSame(array('info' => null, 'edtf' => null), photoinfo_parse_rescan_xml($xml));
+        $this->assertSame(array('info' => null, 'edtf' => null) + self::NO_TAGS, photoinfo_parse_rescan_xml($xml));
     }
 
     /** [NEG] A tag of the same name in another namespace is not photoinfo's. */
@@ -122,7 +127,45 @@ final class RescanParseTest extends TestCase
     {
         $xml = self::exiftoolXml(" <XMP-other:Info xmlns:XMP-other='http://example.test/'>fremd</XMP-other:Info>\n");
 
-        $this->assertSame(array('info' => null, 'edtf' => null), photoinfo_parse_rescan_xml($xml));
+        $this->assertSame(array('info' => null, 'edtf' => null) + self::NO_TAGS, photoinfo_parse_rescan_xml($xml));
+    }
+
+    /**
+     * [BVA] A list field as exiftool -X prints it (13.25, measured 2026-10-09):
+     * absent when empty, plain text for one entry, an rdf:Bag for more.
+     */
+    public function testListFieldsOfNoneOneAndManyEntries(): void
+    {
+        $this->assertSame(array(), photoinfo_parse_rescan_xml(self::exiftoolXml(''))['subject']);
+
+        $one = photoinfo_parse_rescan_xml(self::exiftoolXml(
+            " <XMP-dc:Subject>Anna</XMP-dc:Subject>\n"
+            . " <XMP-lr:HierarchicalSubject>Feste|Kirmes</XMP-lr:HierarchicalSubject>\n"));
+        $this->assertSame(array('Anna'), $one['subject']);
+        $this->assertSame(array('Feste|Kirmes'), $one['hierarchy']);
+
+        $many = photoinfo_parse_rescan_xml(self::exiftoolXml(
+            " <XMP-dc:Subject>\n  <rdf:Bag>\n   <rdf:li>Anna</rdf:li>\n   <rdf:li>Bräuche, Feste</rdf:li>\n  </rdf:Bag>\n </XMP-dc:Subject>\n"
+            . " <XMP-lr:HierarchicalSubject>\n  <rdf:Bag>\n   <rdf:li>Feste|Kirmes</rdf:li>\n   <rdf:li>Häuser|Zug|Mehr</rdf:li>\n  </rdf:Bag>\n </XMP-lr:HierarchicalSubject>\n"));
+        $this->assertSame(array('Anna', 'Bräuche, Feste'), $many['subject']);
+        $this->assertSame(array('Feste|Kirmes', 'Häuser|Zug|Mehr'), $many['hierarchy']);
+    }
+
+    /** [ECP] The marker says the tags were written, even when there are none. */
+    public function testTheMarkerIsReadPresentOrAbsent(): void
+    {
+        $this->assertTrue(photoinfo_parse_rescan_xml(self::exiftoolXml(
+            " <XMP-pwginfo:TagsWritten>1</XMP-pwginfo:TagsWritten>\n"))['tags_marker']);
+        $this->assertFalse(photoinfo_parse_rescan_xml(self::exiftoolXml(
+            " <XMP-dc:Subject>Anna</XMP-dc:Subject>\n"))['tags_marker']);
+    }
+
+    /** [NEG] A Subject of another namespace is not the keywords. */
+    public function testASubjectOfAnotherNamespaceIsIgnored(): void
+    {
+        $xml = self::exiftoolXml(" <XMP-other:Subject xmlns:XMP-other='http://example.test/'>fremd</XMP-other:Subject>\n");
+
+        $this->assertSame(array(), photoinfo_parse_rescan_xml($xml)['subject']);
     }
 
     /** [NEG] Output that is not XML is unreadable, not "no tags". */

@@ -171,3 +171,33 @@ function photoinfo_ws_image($params)
 
   return $image;
 }
+
+/**
+ * Removes the tags a photo has that its file, written with tags, does not
+ * name. The deploy calls it only with --prune-tags.
+ *
+ * @param array $params image_ids, pwg_token
+ * @return array|PwgError array('removed' => array(image id => names),
+ *   'failed' => array(image id => message))
+ */
+function ws_photoinfo_pruneTags($params, &$service)
+{
+  if (get_pwg_token() != $params['pwg_token'])
+  {
+    return new PwgError(403, 'Invalid security token');
+  }
+
+  if (!defined('PROVENANCE_PATH'))
+  {
+    return new PwgError(500, PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE);
+  }
+
+  $ids = provenance_parse_id_list($params['image_ids'], PHOTOINFO_RESCAN_MAX_CHUNK);
+  if ($ids === null or count($ids) == 0)
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM,
+      'image_ids must be 1 to '.PHOTOINFO_RESCAN_MAX_CHUNK.' comma-separated photo ids');
+  }
+
+  return photoinfo_prune_images($ids);
+}

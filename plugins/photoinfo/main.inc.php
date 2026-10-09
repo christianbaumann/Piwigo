@@ -136,4 +136,16 @@ function photoinfo_add_methods($arr)
     PHOTOINFO_PATH . 'include/ws_functions.inc.php',
     array('admin_only' => true, 'post_only' => true)
   );
+
+  $service->addMethod(
+    'pwg.photoinfo.pruneTags',
+    'ws_photoinfo_pruneTags',
+    array(
+      'image_ids' => array('info' => 'At most ' . PHOTOINFO_RESCAN_MAX_CHUNK . ' comma-separated photo ids'),
+      'pwg_token' => array(),
+      ),
+    'Removes from one chunk of photos the tags their files, written with tags, do not name. Writes no file.',
+    PHOTOINFO_PATH . 'include/ws_functions.inc.php',
+    array('admin_only' => true, 'post_only' => true)
+  );
 }

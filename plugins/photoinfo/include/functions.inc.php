@@ -386,6 +386,47 @@ function photoinfo_parse_rescan_xml($xml)
     $values[$key] = $value === '' ? null : $value;
   }
 
+  $values['subject'] = photoinfo_xml_list($document, PHOTOINFO_XMP_DC_URI, 'Subject');
+  $values['hierarchy'] = photoinfo_xml_list($document, PHOTOINFO_XMP_LR_URI, 'HierarchicalSubject');
+  $values['tags_marker'] = $document->getElementsByTagNameNS(PHOTOINFO_RDF_GROUP_URI, 'TagsWritten')->length > 0;
+
+  return $values;
+}
+
+/** exiftool -X's namespaces of the two XMP keyword fields. */
+define('PHOTOINFO_XMP_DC_URI', 'http://ns.exiftool.org/XMP/XMP-dc/1.0/');
+define('PHOTOINFO_XMP_LR_URI', 'http://ns.exiftool.org/XMP/XMP-lr/1.0/');
+
+/**
+ * One list field of exiftool -X's output: absent when empty, plain text for
+ * one entry, an rdf:Bag of rdf:li for more (exiftool 13.25, measured
+ * 2026-10-09).
+ *
+ * @param DOMDocument $document
+ * @param string $namespace
+ * @param string $tag
+ * @return string[]
+ */
+function photoinfo_xml_list($document, $namespace, $tag)
+{
+  $nodes = $document->getElementsByTagNameNS($namespace, $tag);
+  if ($nodes->length == 0)
+  {
+    return array();
+  }
+
+  $items = $nodes->item(0)->getElementsByTagNameNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'li');
+  if ($items->length == 0)
+  {
+    $value = $nodes->item(0)->textContent;
+    return $value === '' ? array() : array($value);
+  }
+
+  $values = array();
+  foreach ($items as $item)
+  {
+    $values[] = $item->textContent;
+  }
   return $values;
 }
 
@@ -551,6 +592,94 @@ function photoinfo_sorted_unique($values)
   sort($values, SORT_STRING);
 
   return $values;
+}
+
+/**
+ * The tags a marked file names, each with the group its hierarchy entry gives
+ * (null for none). An entry splits at its first separator; one without a
+ * separator, or with an empty side, names nothing.
+ *
+ * @param array $file_tags photoinfo_parse_rescan_xml()'s answer
+ * @return array name => group or null
+ */
+function photoinfo_file_tag_names($file_tags)
+{
+  $names = array();
+  foreach ($file_tags['subject'] as $name)
+  {
+    $names[$name] = null;
+  }
+  foreach ($file_tags['hierarchy'] as $entry)
+  {
+    $parts = explode(PHOTOINFO_HIERARCHY_SEPARATOR, $entry, 2);
+    if (count($parts) == 2 and $parts[0] !== '' and $parts[1] !== '')
+    {
+      $names[$parts[1]] = $parts[0];
+    }
+  }
+
+  return $names;
+}
+
+/**
+ * What a rescan does with the tags a file names. Only a file carrying the
+ * marker says anything about tags; local-only names are never linked or
+ * reported. Never removes: pwg.photoinfo.pruneTags does that.
+ *
+ * Tags are compared by id, never by name: the database finds a tag by a name
+ * that differs in case or accents, and by its URL name, so a byte comparison
+ * would report a tag the file does name.
+ *
+ * @param array $file_tags photoinfo_parse_rescan_xml()'s answer
+ * @param array $db_tags the photo's tags, rows: id, name, group (null for none)
+ * @param array $existing_ids file name => id of the tag core's
+ *   tag_id_from_tag_name() finds for it; names it finds none for are left out
+ * @return array array('link' => array(name => group or null), 'not_in_file'
+ *   => array(tag id => name)): the tags to link, and the photo's tags the file
+ *   does not name
+ */
+function photoinfo_rescan_tags($file_tags, $db_tags, $existing_ids)
+{
+  if (empty($file_tags['tags_marker']))
+  {
+    return array('link' => array(), 'not_in_file' => array());
+  }
+
+  $on_photo = array();
+  foreach ($db_tags as $tag)
+  {
+    $on_photo[(int)$tag['id']] = true;
+  }
+
+  $link = array();
+  $named = array();
+  foreach (photoinfo_file_tag_names($file_tags) as $name => $group)
+  {
+    $name = (string)$name;
+    if (photoinfo_tag_is_local_only($name))
+    {
+      continue;
+    }
+
+    $id = isset($existing_ids[$name]) ? (int)$existing_ids[$name] : null;
+    if ($id !== null and isset($on_photo[$id]))
+    {
+      $named[$id] = true;
+      continue;
+    }
+    $link[$name] = $group;
+  }
+
+  $not_in_file = array();
+  foreach ($db_tags as $tag)
+  {
+    if (!isset($named[(int)$tag['id']]) and !photoinfo_tag_is_local_only((string)$tag['name']))
+    {
+      $not_in_file[(int)$tag['id']] = (string)$tag['name'];
+    }
+  }
+
+  return array('link' => $link, 'not_in_file' => $not_in_file);
 }
 
 /**

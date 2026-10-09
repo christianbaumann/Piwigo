@@ -176,6 +176,11 @@ class FakeGallery:
         admin=("webmaster", "p"),
         photo_ids=None,
         rescan_failures=None,
+        rescan_tags_added=None,
+        not_in_file=None,
+        prune_error=None,
+        prune_failures=None,
+        prune_raises=None,
         tag_groups=None,
         tags=None,
         inert_methods=(),
@@ -203,6 +208,17 @@ class FakeGallery:
         # photo id -> the reason pwg.photoinfo.rescan gives for it.
         self.rescan_failures = dict(rescan_failures or {})
         self.rescanned: list[int] = []
+        # photo id -> tags the rescan links from its file, and the tags it has that its
+        # file does not name, as pwg.photoinfo.rescan reports them.
+        self.rescan_tags_added = dict(rescan_tags_added or {})
+        self.not_in_file = {i: list(names) for i, names in (not_in_file or {}).items()}
+        # A message pwg.photoinfo.pruneTags fails every call with; None answers.
+        self.prune_error = prune_error
+        # photo id -> the reason pwg.photoinfo.pruneTags gives for not reading its file.
+        self.prune_failures = dict(prune_failures or {})
+        # An exception the connection raises on a prune request, as a read timeout would.
+        self.prune_raises = prune_raises
+        self.pruned: list[int] = []
         # typetags' groups as typetags.type.list answers them, and core's tag rows as
         # pwg.tags.getAdminList does: ids as strings, id_typetags a string or None.
         self.tag_groups = [dict(group) for group in tag_groups or []]
@@ -302,6 +318,8 @@ class FakeGallery:
             return self._images_page(fields)
         if method == "pwg.photoinfo.rescan":
             return self._rescan(fields)
+        if method == "pwg.photoinfo.pruneTags":
+            return self._prune(fields)
         if method == "pwg.tags.getAdminList":
             return _ok({"tags": [dict(tag, name_raw=tag["name"]) for tag in self.tags]})
         if method == "pwg.tags.add":
@@ -398,6 +416,35 @@ class FakeGallery:
         return _ok(
             {
                 "scanned": len(ids) - len(failed),
+                "failed": {str(i): reason for i, reason in failed.items()} or [],
+                "tags_added": sum(self.rescan_tags_added.get(i, 0) for i in ids),
+                "not_in_file": {
+                    str(i): self.not_in_file[i] for i in ids if self.not_in_file.get(i)
+                }
+                or [],
+            }
+        )
+
+    def _prune(self, fields) -> str:
+        if self.plugin_states.get("photoinfo") != "active":
+            return _fail(501, "unknown method pwg.photoinfo.pruneTags")
+        if fields.get("pwg_token") != self.TOKEN:
+            return _fail(403, "Invalid security token")
+        ids = [int(part) for part in fields.get("image_ids", "").split(",") if part]
+        if not 0 < len(ids) <= self.MAX_RESCAN_CHUNK:
+            return _fail(1003, f"image_ids must be 1 to {self.MAX_RESCAN_CHUNK} photo ids")
+        if self.prune_raises is not None:
+            raise self.prune_raises
+        if self.prune_error is not None:
+            return _fail(500, self.prune_error)
+        self.pruned.extend(ids)
+        failed = {i: self.prune_failures[i] for i in ids if i in self.prune_failures}
+        removed = {
+            i: self.not_in_file.pop(i) for i in ids if self.not_in_file.get(i) and i not in failed
+        }
+        return _ok(
+            {
+                "removed": {str(i): names for i, names in removed.items()} or [],
                 "failed": {str(i): reason for i, reason in failed.items()} or [],
             }
         )

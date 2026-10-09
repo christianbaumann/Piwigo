@@ -285,14 +285,14 @@ UPDATE '.TAGS_TABLE.'
  * One photo's tags with the name of each one's typetags group.
  *
  * @param int $image_id
- * @return array rows: name, group (null for none, or without typetags)
+ * @return array rows: id, name, group (null for none, or without typetags)
  */
 function photoinfo_image_tags($image_id)
 {
   $grouped = defined('TYPETAGS_TABLE');
 
   $query = '
-SELECT t.name, '.($grouped ? 'g.name' : 'NULL').' AS group_name
+SELECT t.id, t.name, '.($grouped ? 'g.name' : 'NULL').' AS group_name
   FROM '.IMAGE_TAG_TABLE.' AS it
     JOIN '.TAGS_TABLE.' AS t ON t.id = it.tag_id'.($grouped ? '
     LEFT JOIN '.TYPETAGS_TABLE.' AS g ON g.id = t.id_typetags' : '').'
@@ -302,7 +302,7 @@ SELECT t.name, '.($grouped ? 'g.name' : 'NULL').' AS group_name
   $tags = array();
   foreach (query2array($query) as $row)
   {
-    $tags[] = array('name' => $row['name'], 'group' => $row['group_name']);
+    $tags[] = array('id' => (int)$row['id'], 'name' => $row['name'], 'group' => $row['group_name']);
   }
 
   return $tags;

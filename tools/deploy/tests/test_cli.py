@@ -406,6 +406,101 @@ def test_the_failure_list_is_capped(config_file, repo, tmp_path):
     assert lines[-1].strip() == "… and 5 more"
 
 
+def _prune_lines(text: str) -> list[str]:
+    """The `prune` line and the continuation lines under it; [] when there is none."""
+    label = f"  {'prune':{cli.LABEL_WIDTH}}"
+    continuation = f"  {'':{cli.LABEL_WIDTH}}"
+    lines = text.splitlines()
+    starts = [i for i, line in enumerate(lines) if line.startswith(label)]
+    if not starts:
+        return []
+    block = [lines[starts[0]]]
+    for line in lines[starts[0] + 1 :]:
+        if not line.startswith(continuation):
+            break
+        block.append(line)
+    return block
+
+
+def test_the_rescan_reports_the_tags_the_files_added_and_did_not_name(
+    config_file, repo, tmp_path
+):
+    """[HAPPY] The mockup's line: what the files added, and the hint to prune."""
+    gallery = FakeGallery(
+        BASE_URL, rescan_tags_added={2: 3}, not_in_file={3: ["Zug"], 4: ["Anna", "Kirmes"]}
+    )
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner() == 0
+
+    assert _rescan_lines(runner.text)[1:] == [
+        f"  {'':{cli.LABEL_WIDTH}}tags: 3 added; 2 photos have tags their file does not name"
+        " (prune with --prune-tags)"
+    ]
+    assert _prune_lines(runner.text) == []
+
+
+def test_prune_tags_reports_what_it_removed(config_file, repo, tmp_path):
+    """[HAPPY] With the flag the hint gives way to what was done."""
+    gallery = FakeGallery(BASE_URL, not_in_file={3: ["Zug"], 4: ["Anna", "Kirmes"]})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner("--prune-tags") == 0
+
+    assert _rescan_lines(runner.text)[1:] == [
+        f"  {'':{cli.LABEL_WIDTH}}tags: 0 added; 2 photos have tags their file does not name"
+    ]
+    assert _prune_lines(runner.text) == [f"  {'prune':{cli.LABEL_WIDTH}}3 tags removed from 2 photos"]
+
+
+def test_a_failed_prune_warns_and_the_run_succeeds(config_file, repo, tmp_path):
+    """[NEG] Upload, install and rescan are done; the next run prunes again."""
+    gallery = FakeGallery(BASE_URL, not_in_file={3: ["Zug"]}, prune_error="database gone")
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner("--prune-tags") == 0
+
+    lines = _prune_lines(runner.text)
+    assert len(lines) == 1
+    assert "0 tags removed from 0 photos, then stopped (warning):" in lines[0]
+    assert "database gone" in lines[0]
+
+
+def test_one_photo_and_one_tag_read_in_the_singular(config_file, repo, tmp_path):
+    """[BVA] One of each: no "1 photos have", no "1 tags removed"."""
+    gallery = FakeGallery(BASE_URL, not_in_file={3: ["Zug"]})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner("--prune-tags") == 0
+
+    assert _rescan_lines(runner.text)[1].endswith("1 photo has tags their file does not name")
+    assert _prune_lines(runner.text) == [f"  {'prune':{cli.LABEL_WIDTH}}1 tag removed from 1 photo"]
+
+
+def test_a_photo_the_prune_could_not_read_is_named(config_file, repo, tmp_path):
+    """[ECP] Like the rescan: named with its reason, and the run succeeds."""
+    gallery = FakeGallery(BASE_URL, not_in_file={3: ["Zug"], 4: ["Anna"]}, prune_failures={4: "gone"})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner("--prune-tags") == 0
+
+    assert _prune_lines(runner.text) == [
+        f"  {'prune':{cli.LABEL_WIDTH}}1 tag removed from 1 photo, 1 failed:",
+        f"  {'':{cli.LABEL_WIDTH}}4: gone",
+    ]
+
+
+@pytest.mark.parametrize(
+    "other", ["--seed-tags-only", "--dry-run", "--audit", "--list-files", "--no-bootstrap"]
+)
+def test_prune_tags_refuses_a_mode_without_a_rescan(run, other):
+    """[NEG] Pruning follows the rescan; beside a mode that runs none it would be dropped."""
+    with pytest.raises(SystemExit) as raised:
+        run("--prune-tags", other)
+    assert raised.value.code == 2
+    assert run.gallery.calls == []
+
+
 def _tags_line(text: str) -> str:
     label = f"  {'tags':{cli.LABEL_WIDTH}}"
     lines = [line for line in text.splitlines() if line.startswith(label)]

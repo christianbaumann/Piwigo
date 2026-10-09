@@ -612,14 +612,21 @@ def test_the_chunk_is_the_one_the_server_accepts():
 
 def test_parse_rescan_reads_failures_by_photo_id():
     """[HAPPY] json_encode turns the PHP id-keyed array into an object with string keys."""
-    result = bootstrap.parse_rescan({"scanned": 8, "failed": {"3": "gone", "12": "bad"}})
+    result = bootstrap.parse_rescan(
+        {"scanned": 8, "failed": {"3": "gone", "12": "bad"}, "tags_added": 0, "not_in_file": []}
+    )
 
     assert result == bootstrap.RescanResult(scanned=8, failed={3: "gone", 12: "bad"})
 
 
 def test_parse_rescan_reads_an_empty_failure_list_as_no_failures():
     """[ECP] An empty PHP array encodes as a JSON list, not an object."""
-    assert bootstrap.parse_rescan({"scanned": 10, "failed": []}).failed == {}
+    assert (
+        bootstrap.parse_rescan(
+            {"scanned": 10, "failed": [], "tags_added": 0, "not_in_file": []}
+        ).failed
+        == {}
+    )
 
 
 @pytest.mark.parametrize(
@@ -630,13 +637,60 @@ def test_parse_rescan_reads_an_empty_failure_list_as_no_failures():
         {"scanned": "10", "failed": []},
         {"scanned": 1},
         {"scanned": 1, "failed": [1]},
+        {"scanned": 1, "failed": []},
+        {"scanned": 1, "failed": [], "tags_added": "2", "not_in_file": []},
+        {"scanned": 1, "failed": [], "tags_added": 0},
+        {"scanned": 1, "failed": [], "tags_added": 0, "not_in_file": ["Zug"]},
+        {"scanned": 1, "failed": [], "tags_added": 0, "not_in_file": {"3": "Zug"}},
     ],
-    ids=["none", "no count", "count as text", "no failed", "non-empty list"],
+    ids=[
+        "none",
+        "no count",
+        "count as text",
+        "no failed",
+        "non-empty list",
+        "no tag fields",
+        "tags added as text",
+        "no not_in_file",
+        "not_in_file a non-empty list",
+        "not_in_file names not a list",
+    ],
 )
 def test_parse_rescan_refuses_a_shape_it_does_not_know(result):
     """[NEG] A misread answer would report photos as read that nothing read."""
     with pytest.raises(RemoteHttpError):
         bootstrap.parse_rescan(result)
+
+
+def test_parse_rescan_reads_the_tags_added_and_the_names_by_photo_id():
+    """[HAPPY] The tags the files added, and per photo the tags its file does not name."""
+    result = bootstrap.parse_rescan(
+        {"scanned": 2, "failed": [], "tags_added": 3, "not_in_file": {"7": ["Zug", "Kirmes"]}}
+    )
+
+    assert result.tags_added == 3
+    assert result.not_in_file == {7: ["Zug", "Kirmes"]}
+
+
+def test_parse_rescan_reads_an_empty_name_list_as_no_photos():
+    """[BVA] An empty PHP array encodes as a JSON list, not an object."""
+    result = bootstrap.parse_rescan({"scanned": 1, "failed": [], "tags_added": 0, "not_in_file": []})
+
+    assert result.not_in_file == {}
+
+
+def test_the_chunks_tag_results_are_merged(cfg):
+    """[HAPPY] 23 photos in three chunks: the counts add up, the names stay per photo."""
+    gallery = active_gallery(
+        photo_ids=list(range(1, 24)),
+        rescan_tags_added={2: 1, 15: 2, 23: 4},
+        not_in_file={3: ["Zug"], 22: ["Kirmes"]},
+    )
+
+    result = bootstrap.rescan_photoinfo(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    assert result.tags_added == 7
+    assert result.not_in_file == {3: ["Zug"], 22: ["Kirmes"]}
 
 
 def test_rescan_sends_every_photo_once_with_the_token(cfg):
@@ -755,6 +809,83 @@ def test_a_run_without_photoinfo_does_not_rescan(cfg, gallery, tmp_path, monkeyp
     assert result.rescan is None
     assert "pwg.photoinfo.rescan" not in gallery.methods_called()
     assert gallery.plugin_states["provenance"] == "active"  # anti-vacuity: the run ran
+
+
+# --- pruning tags the files do not name ---------------------------------------------
+
+
+def test_a_run_without_prune_tags_prunes_nothing(cfg, tmp_path):
+    """[DT] Removing tags is the operator's call: never without the flag."""
+    gallery = FakeGallery(not_in_file={3: ["Zug"]})
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert result.rescan.not_in_file == {3: ["Zug"]}  # anti-vacuity: there was something to prune
+    assert result.prune is None
+    assert "pwg.photoinfo.pruneTags" not in gallery.methods_called()
+
+
+def test_prune_tags_prunes_only_the_photos_the_rescan_named(cfg, tmp_path):
+    """[DT] Photos without such tags are not asked about, and the chunks hold."""
+    named = {i: ["Zug"] for i in (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32)}
+    gallery = FakeGallery(photo_ids=list(range(1, 41)), photos_added=40, not_in_file=named)
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery, prune_tags=True)
+
+    assert sorted(gallery.pruned) == sorted(named)
+    prune_calls = [f for f in gallery.posts_to("ws.php") if f.get("method") == "pwg.photoinfo.pruneTags"]
+    assert all(len(f["image_ids"].split(",")) <= FakeGallery.MAX_RESCAN_CHUNK for f in prune_calls)
+    assert len(prune_calls) == 2
+    assert result.prune == bootstrap.PruneResult(removed=named, failed={}, error=None)
+
+
+def test_prune_tags_with_nothing_to_prune_sends_no_request(cfg, gallery, tmp_path):
+    """[BVA] Every file names every tag: nothing is asked."""
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery, prune_tags=True)
+
+    assert result.prune == bootstrap.PruneResult(removed={}, failed={}, error=None)
+    assert "pwg.photoinfo.pruneTags" not in gallery.methods_called()
+
+
+def test_a_failed_prune_does_not_fail_the_run(cfg, tmp_path):
+    """[NEG] Upload, install and rescan are done; a prune is repeated by the next run."""
+    gallery = FakeGallery(not_in_file={3: ["Zug"]}, prune_error="database gone")
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery, prune_tags=True)
+
+    assert result.prune.removed == {}
+    assert "database gone" in result.prune.error
+    assert result.rescan is not None  # anti-vacuity: the run got that far
+
+
+def test_a_prune_that_times_out_does_not_fail_the_run(cfg, tmp_path):
+    """[NEG] A read timeout is no RemoteHttpError, and must not end a finished deploy either."""
+    gallery = FakeGallery(not_in_file={3: ["Zug"]}, prune_raises=TimeoutError("timed out"))
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery, prune_tags=True)
+
+    assert result.prune.removed == {}
+    assert "timed out" in result.prune.error
+
+
+def test_a_photo_whose_file_cannot_be_read_is_reported_and_the_others_pruned(cfg, tmp_path):
+    """[ECP] One unreadable file must not cost the others their prune."""
+    gallery = FakeGallery(not_in_file={3: ["Zug"], 4: ["Anna"]}, prune_failures={4: "gone"})
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery, prune_tags=True)
+
+    assert result.prune == bootstrap.PruneResult(removed={3: ["Zug"]}, failed={4: "gone"}, error=None)
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [None, {"removed": []}, {"removed": {"3": "Zug"}, "failed": []}, {"removed": [], "failed": [1]}],
+    ids=["none", "no failed", "names not a list", "non-empty failed list"],
+)
+def test_parse_prune_refuses_a_shape_it_does_not_know(answer):
+    """[NEG] A misread answer would report tags as removed that nothing removed."""
+    with pytest.raises(RemoteHttpError):
+        bootstrap.parse_prune(answer)
 
 
 # --- tag groups ---------------------------------------------------------------------

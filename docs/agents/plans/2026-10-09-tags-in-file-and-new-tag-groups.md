@@ -609,46 +609,63 @@ deploy calling both.
 
 ### Changes Required
 
-#### [ ] 1. Reading
+#### [x] 1. Reading
 **Files**: `plugins/photoinfo/include/functions.inc.php`, `rescan.inc.php`
 
-- [ ] `photoinfo_read_file_tags()` also asks for `-XMP-dc:Subject -XMP-lr:HierarchicalSubject -XMP-pwginfo:TagsWritten`
-- [ ] `photoinfo_parse_rescan_xml()` returns `subject` (list), `hierarchy` (list), `tags_marker` (bool)
-- [ ] Pure `photoinfo_rescan_tags($file_tags, $db_tags)` → `array('link' => [name => group|null], 'not_in_file' => [names])`;
+- [x] `photoinfo_read_file_tags()` also asks for `-XMP-dc:Subject -XMP-lr:HierarchicalSubject -XMP-pwginfo:TagsWritten`
+- [x] `photoinfo_parse_rescan_xml()` returns `subject` (list), `hierarchy` (list), `tags_marker` (bool)
+- [x] Pure `photoinfo_rescan_tags($file_tags, $db_tags)` → `array('link' => [name => group|null], 'not_in_file' => [names])`;
   local-only names are neither linked nor reported; nothing when the marker is absent
 
-#### [ ] 2. Applying
+#### [x] 2. Applying
 **File**: `plugins/photoinfo/include/rescan.inc.php`
 
-- [ ] For each `link`: `tag_id_from_tag_name()`; when the tag has no group and a group is named,
+- [x] For each `link`: `tag_id_from_tag_name()`; when the tag has no group and a group is named,
   set it (create the group with typetags' default colour if missing); insert the link
-- [ ] No keyword write, no Freitext assignment, no persons event from here
-- [ ] Answer: existing `scanned`, `failed` plus `tags_added` (int) and `not_in_file` (`{id: [names]}`, `[]` when empty)
+- [x] No keyword write, no Freitext assignment, no persons event from here
+- [x] Answer: existing `scanned`, `failed` plus `tags_added` (int) and `not_in_file` (`{id: [names]}`, `[]` when empty)
 
-#### [ ] 3. Prune
+#### [x] 3. Prune
 **Files**: `main.inc.php`, `ws_functions.inc.php`
 
-- [ ] `pwg.photoinfo.pruneTags`: admin_only, post_only, pwg_token, `image_ids` (≤ `PHOTOINFO_RESCAN_MAX_CHUNK`);
+- [x] `pwg.photoinfo.pruneTags`: admin_only, post_only, pwg_token, `image_ids` (≤ `PHOTOINFO_RESCAN_MAX_CHUNK`);
   re-reads each file, removes the `not_in_file` tags of marked files; answers `removed` and `failed`
 
-#### [ ] 4. Deploy
+#### [x] 4. Deploy
 **Files**: `tools/deploy/pwgdeploy/bootstrap.py`, `cli.py`, `tests/fakes.py`, `README.md`
 
-- [ ] `parse_rescan` reads the two new fields (`RescanResult.tags_added`, `.not_in_file`)
-- [ ] `--prune-tags`: after the rescan, `pwg.photoinfo.pruneTags` over the photos with
+- [x] `parse_rescan` reads the two new fields (`RescanResult.tags_added`, `.not_in_file`)
+- [x] `--prune-tags`: after the rescan, `pwg.photoinfo.pruneTags` over the photos with
   `not_in_file` entries, in chunks
-- [ ] Report lines as in the mockup; a prune never fails the deploy (like the rescan)
-- [ ] `FakeGallery` answers the new fields, `pruneTags`, `typetags.type.list/add/update`,
+- [x] Report lines as in the mockup; a prune never fails the deploy (like the rescan)
+  - As built: the tags line drops the mockup's "from 9 files", since the rescan's answer counts
+    tags only (`tags_added` is an int, as planned); the line shows only when a file added a tag
+    or a photo has tags its file does not name. With `--prune-tags` a `prune` line follows;
+    `--prune-tags` is refused beside `--seed-tags-only`, `--dry-run`, `--audit`, `--list-files`
+    and `--no-bootstrap`.
+- [x] `FakeGallery` answers the new fields, `pruneTags`, `typetags.type.list/add/update`,
   `pwg.tags.getAdminList/add`, `typetags.tags.setType`
 
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] photoinfo unit and integration suites
-- [ ] `cd tools/deploy && uv run pytest`
+- [x] photoinfo unit and integration suites
+- [x] `cd tools/deploy && uv run pytest` (571 passed after the review's fixes, 2026-10-09)
 
 #### Manual Verification:
 - [ ] Next real deploy: report lines read as the mockup; spot-check one photo's tags on the remote
+  - Not run by the agent: the deploy publishes to the owner's web space. A rescan of the local
+    gallery instead would read the real scans and could overwrite a date or info text whose last
+    file write had failed. The answer shapes are pinned on both sides (`RescanTest`,
+    `PruneTagsTest`; `test_bootstrap.py`, `test_cli.py`).
+
+**Verified 2026-10-09** (`/verify`, independent review): Phase 6 approved, the real deploy
+pending with the owner. The review found that the rescan and the prune compared tag names byte
+for byte while the database finds a tag case- and accent-insensitively and by its URL name: a
+tag renamed `Kirche` -> `kirche` would have been pruned and re-linked on every deploy. Both now
+compare by the id core's lookup finds (`photoinfo_existing_tag_ids()`). Also fixed: a rescan
+created an empty group for a tag already in another one; a prune timeout escaped the deploy.
+Each fixed test-first, the new cases proven by mutants.
 
 ---
 
@@ -715,20 +732,20 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 - [x] `…::testTheMarkerIsAlwaysSet` — also for an empty list `[DT]`
 - [x] `…::testACommaInANameStaysOneKeyword` — `Feste, Bräuche, Jahreskreis` `[ERR]`
 - [x] `…::testTheConfigDeclaresTheMarker` (extends the existing URI test) `[HAPPY]`
-- [ ] `RescanParseTest` additions — lists of 0, 1, n entries `[BVA]`; marker absent/present `[ECP]`; another namespace's `Subject` ignored `[NEG]`
-- [ ] `RescanTagsTest` (decision table: marker × in file × in DB × local-only × has group) `[DT]`; no marker → nothing at all `[NEG]`; hierarchy entry without matching Subject still links `[ERR]`; `Group|Tag|More` splits at the first separator `[BVA]`
+- [x] `RescanParseTest` additions — lists of 0, 1, n entries `[BVA]`; marker absent/present `[ECP]`; another namespace's `Subject` ignored `[NEG]`
+- [x] `RescanTagsTest` (decision table: marker × in file × in DB × local-only × has group) `[DT]`; no marker → nothing at all `[NEG]`; hierarchy entry without matching Subject still links `[ERR]`; `Group|Tag|More` splits at the first separator `[BVA]`
 - [x] `FreitextTest` — id == max not new, max+1 new `[BVA]`; grouped new tag skipped `[ECP]`; person tag skipped `[NEG]`; no new tags → empty `[BVA]`
 - [x] `LocalOnlyRuleTest` reads `tag-groups.json` and asserts every group whose tags are local-only is named in `PHOTOINFO_LOCAL_ONLY_TAGS` or has `?` (no transcribed copy) `[ECP]`
 
 **deploy** (`tools/deploy/tests/`)
 - [x] `test_seed.py` — load: duplicate group `[NEG]`, tag in unknown group `[NEG]`, bad colour `[NEG]`, bad emoji `[NEG]`; plan: empty install adds all `[HAPPY]`, seeded install plans nothing `[ST]`, changed colour updates `[ECP]`, a group that exists only remotely is left alone `[NEG]`; verify step raises on a mismatch `[NEG]`
 - [x] `test_seed.py::test_the_freitext_group_exists_in_the_file` — reads `PHOTOINFO_FREITEXT_GROUP` with `php_value`-style regex `[HAPPY]` (moved to Phase 4: the constant is defined there)
-- [ ] `test_bootstrap.py` — seed runs after activation and before the sync `[ST]`; a run without typetags skips the seed `[NEG]`; `parse_rescan` new fields, `[]` for empty `not_in_file` `[BVA]`, unknown shape raises `[NEG]`; `--prune-tags` absent → no prune call `[DT]`, present → only photos with `not_in_file` `[DT]`; prune failure does not fail the run `[NEG]` (the two seed cases done in Phase 3)
+- [x] `test_bootstrap.py` — seed runs after activation and before the sync `[ST]`; a run without typetags skips the seed `[NEG]`; `parse_rescan` new fields, `[]` for empty `not_in_file` `[BVA]`, unknown shape raises `[NEG]`; `--prune-tags` absent → no prune call `[DT]`, present → only photos with `not_in_file` `[DT]`; prune failure does not fail the run `[NEG]` (the two seed cases done in Phase 3)
 - [x] `test_cli.py` — `--seed-tags-only` opens no FTP connection and uploads nothing `[NEG]`
 
 #### Regression — affected existing tests
 - [x] typetags: all unit, integration (`PicturePageSourceTest`, `PluginActivationTest`, `MalformedColorRenderingTest`) and E2E (`rendering.spec.js`, `assign.spec.js`, `remove.spec.js`)
-- [ ] photoinfo: `BuildArgfileTest`, `CoreEditTest`, `RescanTest`, `SyncMetadataTest`
+- [x] photoinfo: `BuildArgfileTest`, `CoreEditTest`, `RescanTest`, `SyncMetadataTest`
 - [ ] persons: `ReindexTest`, `WriteRegionsTest`, `AddRegionTest`, `DeleteRegionTest`, `PersonAdminApiTest`, `IndexRebuildTest`
 - [ ] photoedit: `ApplyRegionsTest`, `ExclusionTest`, `ApplyTurnTest`
 - [x] provenance: `CoreTagCrudCharacterizationTest`, Phase 1's new test
@@ -759,8 +776,8 @@ Technique tags per `.claude/rules/test-design.md`. Fixtures copy gallery images
 
 **typetags** (`tests/Integration/`, Phase 5)
 - [x] `AddNewTagTest` — normal account creates and links a new name, `created` true `[HAPPY]`; an existing name is linked, `created` false, group unchanged `[ECP]`; guest, wrong token, GET refused `[NEG]`; empty / blank name refused `[BVA]`; 255 characters accepted, 256 refused `[BVA]`; unknown image refused, no tag row left behind `[NEG]`; a name with markup is stored as core stores it and rendered escaped `[ERR]`
-- [ ] `RescanTest` additions — adds tags of a marked file `[HAPPY]`; unmarked file adds nothing `[NEG]`; never removes `[ST]`; creates a missing tag and group `[HAPPY]`; reports `not_in_file`, excluding local-only `[DT]`; rescan writes no file (mtime) `[NEG]`
-- [ ] `PruneTagsTest` — removes only `not_in_file` of a marked file `[HAPPY]`; unmarked file untouched `[NEG]`; local-only never removed `[NEG]`; chunk 10 ok, 11 refused `[BVA]`; auth/token/GET refused `[NEG]`
+- [x] `RescanTest` additions — adds tags of a marked file `[HAPPY]`; unmarked file adds nothing `[NEG]`; never removes `[ST]`; creates a missing tag and group `[HAPPY]`; reports `not_in_file`, excluding local-only `[DT]`; rescan writes no file (mtime) `[NEG]`
+- [x] `PruneTagsTest` — removes only `not_in_file` of a marked file `[HAPPY]`; unmarked file untouched `[NEG]`; local-only never removed `[NEG]`; chunk 10 ok, 11 refused `[BVA]`; auth/token/GET refused `[NEG]`
 
 ### End-to-End Tests
 

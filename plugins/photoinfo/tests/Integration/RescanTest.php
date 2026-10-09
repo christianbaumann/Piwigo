@@ -15,6 +15,8 @@ final class RescanTest extends TestCase
     /** The config row provenance's runner takes the exiftool directory from. */
     private const EXIFTOOL_PATH_PARAM = 'provenance_exiftool_path';
     private const INFO = "Hochzeit von Anna und Paul\nim Garten  \n<b>Wichtig</b>";
+    /** The rest of an answer for files that change no tag. */
+    private const NO_TAG_CHANGES = array('tags_added' => 0, 'not_in_file' => array());
 
     private Db $db;
     private FixtureBuilder $fixture;
@@ -35,6 +37,7 @@ final class RescanTest extends TestCase
     protected function tearDown(): void
     {
         $this->db->query("DELETE FROM piwigo_config WHERE param = '" . self::EXIFTOOL_PATH_PARAM . "'");
+        $this->fixture->destroyTestTags();
         $this->fixture->destroyTestImages();
     }
 
@@ -76,7 +79,7 @@ final class RescanTest extends TestCase
 
         $res = $this->rescan((string)$this->image['id']);
 
-        $this->assertSame(array('scanned' => 1, 'failed' => array()), $res['json']['result'], $res['body']);
+        $this->assertSame(array('scanned' => 1, 'failed' => array()) + self::NO_TAG_CHANGES, $res['json']['result'], $res['body']);
         $this->assertSame($saved, $this->photoinfoColumns());
         clearstatcache();
         $this->assertSame($checksum, md5_file($this->image['file']), 'the rescan rewrote the file');
@@ -93,7 +96,7 @@ final class RescanTest extends TestCase
 
         $res = $this->rescan((string)$this->image['id']);
 
-        $this->assertSame(array('scanned' => 1, 'failed' => array()), $res['json']['result'], $res['body']);
+        $this->assertSame(array('scanned' => 1, 'failed' => array()) + self::NO_TAG_CHANGES, $res['json']['result'], $res['body']);
         $this->assertSame($before, $this->photoinfoColumns());
     }
 
@@ -124,7 +127,7 @@ final class RescanTest extends TestCase
 
         $res = $this->rescan($missing . ',' . $this->image['id']);
 
-        $this->assertSame(array('scanned' => 1, 'failed' => array($missing => 'No such photo')), $res['json']['result'], $res['body']);
+        $this->assertSame(array('scanned' => 1, 'failed' => array($missing => 'No such photo')) + self::NO_TAG_CHANGES, $res['json']['result'], $res['body']);
         $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 
@@ -244,7 +247,7 @@ final class RescanTest extends TestCase
 
         $res = $this->rescan($gone['id'] . ',' . $this->image['id']);
 
-        $this->assertSame(array('scanned' => 1, 'failed' => array($gone['id'] => 'File is missing or not readable')),
+        $this->assertSame(array('scanned' => 1, 'failed' => array($gone['id'] => 'File is missing or not readable')) + self::NO_TAG_CHANGES,
             $res['json']['result'], $res['body']);
         $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
     }
@@ -260,12 +263,154 @@ final class RescanTest extends TestCase
 
         $res = $this->rescan((string)$this->image['id']);
 
-        $this->assertSame(array('scanned' => 0, 'failed' => array($this->image['id'] => 'exiftool is not available on this server')),
+        $this->assertSame(array('scanned' => 0, 'failed' => array($this->image['id'] => 'exiftool is not available on this server')) + self::NO_TAG_CHANGES,
             $res['json']['result'], $res['body']);
         $this->assertNull($this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 
+    // ── tags (plan 2026-10-09 Phase 6) ────────────────────────────────────
+
+    /**
+     * [HAPPY] A marked file's tags are linked: an existing tag, and an
+     * ungrouped one the hierarchy puts into an existing group. No file is written.
+     */
+    public function testARescanAddsTheTagsOfAMarkedFile(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $group = $this->fixture->createGroup('Feste ' . $suffix);
+        $anna = $this->fixture->createTag('Anna ' . $suffix);
+        $kirmes = $this->fixture->createTag('Kirmes ' . $suffix);
+        FixtureBuilder::writeKeywords($this->image['file'], array('Anna ' . $suffix, 'Kirmes ' . $suffix),
+            array('Feste ' . $suffix . '|Kirmes ' . $suffix), true);
+        clearstatcache();
+        $checksum = md5_file($this->image['file']);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(2, $res['json']['result']['tags_added'] ?? null, $res['body']);
+        $this->assertSame(array($anna, $kirmes), $this->fixture->tagIdsOf($this->image['id']));
+        $this->assertNull($this->fixture->groupOf($anna));
+        $this->assertSame($group, $this->fixture->groupOf($kirmes));
+        clearstatcache();
+        $this->assertSame($checksum, md5_file($this->image['file']), 'the rescan rewrote the file');
+    }
+
+    /** [NEG] Without the marker a file says nothing about tags. */
+    public function testAnUnmarkedFileAddsNothing(): void
+    {
+        $name = 'Anna ' . bin2hex(random_bytes(4));
+        $this->fixture->createTag($name);
+        FixtureBuilder::writeKeywords($this->image['file'], array($name), array(), false);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(0, $res['json']['result']['tags_added'] ?? null, $res['body']);
+        $this->assertSame(array(), $this->fixture->tagIdsOf($this->image['id']));
+    }
+
+    /** [ST] A rescan never removes: a tag the file does not name stays, and is reported. */
+    public function testARescanNeverRemovesAndReportsWhatTheFileDoesNotName(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $kept = $this->fixture->createTag('Zug ' . $suffix);
+        $this->fixture->linkTag($this->image['id'], $kept);
+        $anna = $this->fixture->createTag('Anna ' . $suffix);
+        FixtureBuilder::writeKeywords($this->image['file'], array('Anna ' . $suffix), array(), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(array($kept, $anna), $this->fixture->tagIdsOf($this->image['id']));
+        $this->assertSame(array((string)$this->image['id'] => array('Zug ' . $suffix)),
+            $res['json']['result']['not_in_file'] ?? null, $res['body']);
+    }
+
+    /** [HAPPY] A tag and a group the install lacks are created from the hierarchy. */
+    public function testAMissingTagAndGroupAreCreated(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $this->assertFalse($this->groupExists('Neu ' . $suffix), 'anti-vacuity: the group must not exist yet');
+        FixtureBuilder::writeKeywords($this->image['file'], array('Kirmes ' . $suffix),
+            array('Neu ' . $suffix . '|Kirmes ' . $suffix), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        // tracked before any assertion, so teardown removes them whatever fails
+        $tag = $this->fixture->tagIdNamed('Kirmes ' . $suffix);
+        $group = $this->fixture->groupIdNamed('Neu ' . $suffix);
+        $this->assertSame(1, $res['json']['result']['tags_added'] ?? null, $res['body']);
+        $this->assertSame($group, $this->fixture->groupOf($tag));
+        $this->assertSame(array($tag), $this->fixture->tagIdsOf($this->image['id']));
+    }
+
+    /**
+     * [ECP] A name that differs in case only is the same tag to the database:
+     * nothing is linked again and nothing reported, so a prune would keep it.
+     */
+    public function testANameDifferingInCaseOnlyIsTheSameTag(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $tag = $this->fixture->createTag('Kirche ' . $suffix);
+        $this->fixture->linkTag($this->image['id'], $tag);
+        FixtureBuilder::writeKeywords($this->image['file'], array('kirche ' . $suffix), array(), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(array('tags_added' => 0, 'not_in_file' => array()),
+            array_intersect_key($res['json']['result'] ?? array(), self::NO_TAG_CHANGES), $res['body']);
+        $this->assertSame(array($tag), $this->fixture->tagIdsOf($this->image['id']));
+    }
+
+    /** [NEG] A tag already in a group keeps it, and the file's group is not created. */
+    public function testATagInAGroupKeepsItAndNoGroupIsCreated(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $orte = $this->fixture->createGroup('Orte ' . $suffix);
+        $paris = $this->fixture->createTag('Paris ' . $suffix, $orte);
+        FixtureBuilder::writeKeywords($this->image['file'], array('Paris ' . $suffix),
+            array('Städte ' . $suffix . '|Paris ' . $suffix), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(1, $res['json']['result']['tags_added'] ?? null, $res['body']);
+        $this->assertSame($orte, $this->fixture->groupOf($paris));
+        $this->assertFalse($this->groupExists('Städte ' . $suffix), 'an empty group was created');
+    }
+
+    /** [ERR] Quotes in a tag's and a group's name reach the database as the file has them. */
+    public function testQuotesInNamesAreKept(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        FixtureBuilder::writeKeywords($this->image['file'], array("O'Brien " . $suffix),
+            array("D'r Kirmes " . $suffix . "|O'Brien " . $suffix), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $tag = $this->fixture->tagIdNamed("O'Brien " . $suffix);
+        $group = $this->fixture->groupIdNamed("D'r Kirmes " . $suffix);
+        $this->assertSame(1, $res['json']['result']['tags_added'] ?? null, $res['body']);
+        $this->assertSame($group, $this->fixture->groupOf($tag));
+    }
+
+    /** [DT] A local-only tag the file does not name is not reported: it never reaches a file. */
+    public function testALocalOnlyTagIsNotReported(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $this->fixture->linkTag($this->image['id'], $this->fixture->createTag('Name ? ' . $suffix));
+        $this->fixture->linkTag($this->image['id'], $this->fixture->createTag('Zug ' . $suffix));
+        FixtureBuilder::writeKeywords($this->image['file'], array(), array(), true);
+
+        $res = $this->rescan((string)$this->image['id']);
+
+        $this->assertSame(array((string)$this->image['id'] => array('Zug ' . $suffix)),
+            $res['json']['result']['not_in_file'] ?? null, $res['body']);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
+
+    private function groupExists(string $name): bool
+    {
+        return (int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_typetags WHERE name = '" . $this->db->escape($name) . "'") > 0;
+    }
 
     private function clientAs(?string $role): WsClient
     {

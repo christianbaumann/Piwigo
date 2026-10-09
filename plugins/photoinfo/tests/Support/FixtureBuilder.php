@@ -649,6 +649,52 @@ class FixtureBuilder
         return $id;
     }
 
+    /** A typetags group the server created while a test ran, so teardown removes it. */
+    public function groupIdNamed(string $name): int
+    {
+        $id = (int)$this->db->scalar("SELECT id FROM piwigo_typetags WHERE name = '" . $this->db->escape($name) . "'");
+        if ($id <= 0)
+        {
+            throw new RuntimeException("no group named $name");
+        }
+        $this->testGroups[] = $id;
+        return $id;
+    }
+
+    /**
+     * Writes keyword fields into a file with a plain exiftool call, as another
+     * install's photoinfo would have, and asserts they landed.
+     *
+     * @param string[] $subject XMP-dc:Subject
+     * @param string[] $hierarchy XMP-lr:HierarchicalSubject entries
+     * @param bool $marker whether XMP-pwginfo:TagsWritten is set
+     */
+    public static function writeKeywords(string $file, array $subject, array $hierarchy, bool $marker): void
+    {
+        $command = 'exiftool -config ' . escapeshellarg(PHOTOINFO_PATH . 'exiftool/pwginfo.config') . ' -q -overwrite_original';
+        foreach ($subject as $name)
+        {
+            $command .= ' ' . escapeshellarg('-XMP-dc:Subject=' . $name);
+        }
+        foreach ($hierarchy as $entry)
+        {
+            $command .= ' ' . escapeshellarg('-XMP-lr:HierarchicalSubject=' . $entry);
+        }
+        if ($marker)
+        {
+            $command .= ' -XMP-pwginfo:TagsWritten=1';
+        }
+        self::run($command . ' ' . escapeshellarg($file));
+
+        $read = self::readKeywords($file);
+        $sortedSubject = $subject;
+        sort($sortedSubject, SORT_STRING);
+        if ($read['XMP-dc:Subject'] !== $sortedSubject or ($read['XMP-pwginfo:TagsWritten'] === '1') !== $marker)
+        {
+            throw new RuntimeException("the keywords were not written into $file");
+        }
+    }
+
     /** Links one tag to one photo directly, asserting it took effect. */
     public function linkTag(int $imageId, int $tagId): void
     {

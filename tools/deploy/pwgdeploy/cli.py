@@ -49,6 +49,8 @@ STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
 # Each a mode of its own; beside --seed-tags-only one of them would be silently dropped,
 # and --dry-run's promise of no socket broken.
 SEED_ONLY_CONFLICTS = ("dry_run", "audit", "list_files", "no_bootstrap")
+# Pruning follows the rescan, which none of these runs.
+PRUNE_TAGS_CONFLICTS = ("seed_tags_only",) + SEED_ONLY_CONFLICTS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -92,6 +94,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="upload even when the remote runs a different core version",
     )
+    parser.add_argument(
+        "--prune-tags",
+        action="store_true",
+        help="after the rescan, remove the tags each photo's file does not name",
+    )
     parser.add_argument("--verbose", action="store_true", help="name each uploaded path")
     return parser
 
@@ -124,6 +131,10 @@ def main(
         clash = [f"--{n.replace('_', '-')}" for n in SEED_ONLY_CONFLICTS if getattr(args, n)]
         if clash:
             parser.error(f"--seed-tags-only cannot be combined with {', '.join(clash)}")
+    if args.prune_tags:
+        clash = [f"--{n.replace('_', '-')}" for n in PRUNE_TAGS_CONFLICTS if getattr(args, n)]
+        if clash:
+            parser.error(f"--prune-tags cannot be combined with {', '.join(clash)}")
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     repo_root = Path(repo_root or REPO_ROOT)
@@ -170,7 +181,9 @@ def main(
         )
 
         if not args.dry_run and not args.no_bootstrap:
-            _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted)
+            _bootstrap(
+                out, config, state_dir, transport_factory, client_factory, wanted, args.prune_tags
+            )
         elif args.no_bootstrap:
             _line(out, "bootstrap", "skipped (--no-bootstrap)")
     except DeployError as error:
@@ -379,9 +392,11 @@ def _report_paths(out, label: str, paths: list[str], what: str) -> None:
         _continuation(out, f"… and {unnamed} more")
 
 
-def _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted):
+def _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted, prune_tags):
     client = client_factory(config)
-    result = bootstrap.run(config, state_dir, transport_factory(config), client, wanted)
+    result = bootstrap.run(
+        config, state_dir, transport_factory(config), client, wanted, prune_tags=prune_tags
+    )
 
     _line(out, "install", "installed" if result.installed else "already installed - skipped")
     _line(
@@ -405,7 +420,9 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted
         f"{result.sync.albums_deleted} albums)",
     )
     if result.rescan is not None:
-        _report_rescan(out, result.rescan)
+        _report_rescan(out, result.rescan, pruning=result.prune is not None)
+    if result.prune is not None:
+        _report_prune(out, result.prune)
 
 
 def _seed_tags_only(out, config, client_factory, wanted) -> None:
@@ -427,7 +444,7 @@ def _report_seed(out, result: seed.SeedResult) -> None:
     )
 
 
-def _report_rescan(out, rescan: bootstrap.RescanResult) -> None:
+def _report_rescan(out, rescan: bootstrap.RescanResult, pruning: bool = False) -> None:
     """Failed photos are named with their reasons but never fail the deploy: the upload
     and install are done and correct, and a photo whose file cannot be read keeps its
     date and info text empty until the next run. Every photo failing — a host without
@@ -438,6 +455,39 @@ def _report_rescan(out, rescan: bootstrap.RescanResult) -> None:
         summary += f", {len(rescan.failed)} failed{warning}:"
     _line(out, "rescan", summary)
     failed = sorted(rescan.failed.items())
+    for photo_id, reason in failed[:MAX_REPORTED_RESCAN_FAILURES]:
+        _continuation(out, f"{photo_id}: {reason}")
+    unnamed = len(failed) - MAX_REPORTED_RESCAN_FAILURES
+    if unnamed > 0:
+        _continuation(out, f"… and {unnamed} more")
+    if rescan.tags_added or rescan.not_in_file:
+        _continuation(out, _tags_summary(rescan, pruning))
+
+
+def _tags_summary(rescan: bootstrap.RescanResult, pruning: bool) -> str:
+    """What the files said about tags: added are linked already; the others are only
+    removed with --prune-tags, which the line suggests when it was not given."""
+    summary = f"tags: {rescan.tags_added} added"
+    photos = len(rescan.not_in_file)
+    if photos:
+        verb = "has" if photos == 1 else "have"
+        summary += f"; {_plural(photos, 'photo')} {verb} tags their file does not name"
+        if not pruning:
+            summary += " (prune with --prune-tags)"
+    return summary
+
+
+def _report_prune(out, prune: bootstrap.PruneResult) -> None:
+    """Like the rescan, a prune never fails the deploy: a stopped one is a warning, and
+    the next run with --prune-tags repeats it."""
+    removed = sum(len(names) for names in prune.removed.values())
+    summary = f"{_plural(removed, 'tag')} removed from {_plural(len(prune.removed), 'photo')}"
+    if prune.error is not None:
+        summary += f", then stopped (warning): {prune.error}"
+    elif prune.failed:
+        summary += f", {len(prune.failed)} failed:"
+    _line(out, "prune", summary)
+    failed = sorted(prune.failed.items())
     for photo_id, reason in failed[:MAX_REPORTED_RESCAN_FAILURES]:
         _continuation(out, f"{photo_id}: {reason}")
     unnamed = len(failed) - MAX_REPORTED_RESCAN_FAILURES
