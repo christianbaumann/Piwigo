@@ -38,7 +38,7 @@ before it had none.
 | Integration | DDEV up; real MariaDB and real `ws.php` | seconds | two parts meeting across a real boundary |
 | E2E | DDEV up + Chromium in the container | slowest | the shipped page as a user sees it |
 
-The run commands and the fresh-clone setup are in CLAUDE.md's Testing section — one copy,
+The run commands and the fresh-clone setup are in `.claude/rules/plugin-test-suites.md` — one copy,
 cited here rather than repeated.
 
 **Measured 2026-08-29** (dates attached because counts rot): unit 56 tests / 33,009
@@ -219,6 +219,9 @@ So a later reader can tell a considered omission from an oversight.
 | An E2E spec per workflow the German handbook documents | Each workflow's outcome is already witnessed at the layer that can express it - `CoreAlbumCharacterizationTest`, `CorePhotoTextCharacterizationTest`, `CoreTagCrudCharacterizationTest` and `CoreUploadCharacterizationTest` at integration, the plugin suites at all three. What the browser adds is the *controls* the handbook names, and those got their own specs (see *The handbook's own claims* below). Browser coverage of the uploader was already refused with a stated reason earlier in this file | Restating an integration rule at the browser layer violates the placement rule in `.claude/rules/testing.md`: break the low-level behaviour and its own test must go red first |
 | Pixel-diffing the handbook screenshots against a stored baseline | Rejected for the same reason screenshot comparison was rejected for the gallery itself: a photo gallery re-renders differently on a font, derivative or theme change that broke nothing, so the check fails on changes nobody made and is then disabled | Not a test of behaviour. `shoot.js`'s `assertOutput()` asserts the falsifiable part - every declared shot exists and no undeclared file sits beside them - and whether a shot still shows the screen its text describes is in the ledger |
 | A test over the handbook's prose - reading a page and checking what it says | `check.php` covers what a machine can decide: every `src` and `href` resolves, every screenshot is referenced and every reference resolves, each page is well-formed XML, every quoted `admin.php?page=` route is one `admin.php:129-176` really resolves, and no em-dash or emoji. Beyond that there is no oracle but a reader | *Build no apparatus that proves another apparatus* (`.claude/rules/test-design.md`). A scan that reads a document looking for a word is the example the rule names |
+| A photo's tags written into its file on upload (`pwg.images.add`, `addSimple`, `uploadAsync`, the upload screen) | Not built: those paths set tags after `loc_end_add_uploaded_file` and photoinfo hooks none of them; the upload forms here set no tags. A photo's file gets its keywords at its first tag edit. See [decision 0050](decisions/0050-uploads-and-iptc-import-do-not-write-tags.md) | No behaviour exists to test. The paths that do write are one `TagWriteTest` case each |
+| Core's keyword import (`$conf['use_iptc']`) and `site_update`'s metadata step against the keywords photoinfo writes | `use_iptc` is `false` in this install, so core never reads `IPTC:Keywords` back; if it were on, it would replace a photo's tags with them. Neither path writes keywords, and no test enables `use_iptc` ([decision 0050](decisions/0050-uploads-and-iptc-import-do-not-write-tags.md)) | Would assert a configuration this install does not run. The read side that does exist is `pwg.photoinfo.rescan`, covered by `RescanTest` and `RescanTagsTest`. Same shape as the `IPTC:DateCreated` row in the open table below |
+| Striped tab and emoji on the public tags page's letter, cloud and cumulus modes | Unchanged on purpose by the tags-in-file plan (Phase 2, "Not changed: (e, f)"): those modes colour the text only and show no badge, so there is nothing to stripe | Outside the change's blast radius, like the `typetags_tags()` row above. Every place a badge is drawn is covered: `GroupStyleTest` for the markup, `rendering.spec.js`, `assign.spec.js` and `admin-striped.spec.js` for the painted result |
 
 ## Mutant table — unit suite
 
@@ -512,6 +515,116 @@ itself, and only the parity is read below).
 Not run, because they are not unit-layer code: `photoedit_jpeg_quality()`, `photoedit_is_lossy()` and
 the pipeline's use of both. `ApplyJpegTest` covers them in integration, and
 `.claude/rules/mutation-testing.md` keeps mutants to the unit layer.
+
+## Mutant table — tags in the file and new tag groups (2026-10-09)
+
+The closing strength check of `docs/agents/plans/2026-10-09-tags-in-file-and-new-tag-groups.md`,
+unit layer only. Baselines before the first mutant: photoinfo unit 255 tests / 479 assertions,
+typetags unit 80 tests / 33070 assertions (2026-10-09). Each substitution was a literal string
+checked to occur **exactly once** in its file before it was applied, the file was asserted to have
+changed, and the container's `md5sum` was polled until it matched the host's after every apply and
+every revert. Reverts restored a `cp` backup; afterwards `git diff --stat -- plugins/photoinfo/include`
+and `git -C plugins/typetags diff --stat` were both empty and both suites green at the baseline counts.
+
+`photoinfo_new_freitext_tags()`:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| F1 `$id > $max_before` → `>=` | `FreitextTest` above-the-maximum `[BVA]` | killed: `testOnlyIdsAboveTheMaximumAreNew` alone |
+| F2 the `group === null` clause dropped | the grouped-tag case | killed: `testANewGroupedTagIsLeftAlone` alone |
+| F3 `!in_array(person)` → `in_array` | the person-tag case | killed: 5 `FreitextTest` cases |
+| F4 the linked-tag clause dropped | the not-linked case | killed: `testANewTagNotLinkedToTheSavedPhotosIsLeftAlone` alone |
+| F5 `and in_array(linked)` → `or` | the not-linked case | killed: 6 `FreitextTest` cases |
+| F6 `array_map('intval', $person_tag_ids)` dropped | `testIdsReadAsStringsAreComparedAsNumbers` | **survived**: weak test. The string-id case passes person id `'7'`, which matches no row, so the strict `in_array` against a string id is never exercised. Reachable: the caller (`writer.inc.php`) passes `query2array()` output, i.e. strings, so without the cast a person's tag typed in a save would be put into Freitext |
+| F7 `array_map('intval', $linked_tag_ids)` dropped | the same string-id case | killed: that alone |
+
+`photoinfo_tag_is_local_only()`:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| L1 `or` → `and` | `LocalOnlyRuleTest` | killed: 2 `LocalOnlyRuleTest`, 2 `RescanTagsTest` `[DT]` rows, 2 `TagKeywordsTest` cases |
+| L2 the `?` clause dropped | the question-mark cases | killed: 4 cases across the three files |
+| L3 the list clause dropped | the `Ausstellung` cases | killed: 4 cases across the three files |
+| L4 `in_array(..., true)` → `false` | none | **survived**: equivalent. Every caller passes a string and the list holds only the non-numeric `Ausstellung`, so loose and strict comparison cannot differ |
+| L5 `strpos(...) !== false` → `=== false` | everything | killed: 17 cases |
+
+`photoinfo_file_keywords()` (with its helper `photoinfo_sorted_unique()`):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| K1 the local-only skip dropped | the `Ausstellung` and `?` cases | killed: those two |
+| K2 the empty-name skip dropped | a name that is only control characters | killed: `testControlCharactersInANameBecomeSpaces` alone |
+| K3 separator check `=== false` → `!== false` | the pipe-in-group case | killed: 5 `TagKeywordsTest` cases |
+| K4 `$group !== '' and` → `or` | the ungrouped case | killed: 5 `TagKeywordsTest` cases |
+| K5 control characters in a name kept | the name control-character case | killed: that alone |
+| K6 control characters in a group kept | the group control-character case | killed: that alone |
+| K7 `array_unique` dropped | `testOutputIsSortedAndDeduplicated` | killed: that alone |
+| K8 `sort` dropped | the same | killed: that alone |
+| K9 the name's `trim` dropped | the name control-character case | killed: that alone |
+| K10 hierarchy written `Name|Group` | the grouped case | killed: 4 `TagKeywordsTest` cases |
+
+`photoinfo_rescan_tags()` (with its helper `photoinfo_file_tag_names()`):
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| R1 the marker check negated | `testWithoutTheMarkerNothingHappens` | killed: that and 6 `[DT]`/hierarchy cases |
+| R2 the local-only skip in the file loop dropped | the "local-only in the file" `[DT]` row | killed: that alone |
+| R3 the `isset($on_photo[$id])` clause dropped | the "existing tag the photo lacks" `[DT]` row | killed: that alone |
+| R4 `$id !== null and isset(...)` → `or` | the same row | killed: that alone |
+| R5 a named tag not recorded in `$named` | the "in both" rows | killed: 2 `[DT]` rows and `testOrderDoesNotMatter` |
+| R6 the local-only filter in the database loop dropped | the "local-only in the database only" row | killed: that alone |
+| R7 `!isset($named[...])` → `isset` | the "in both" and "in the database only" rows | killed: 4 `[DT]` rows and `testOrderDoesNotMatter` |
+| R8 a linked tag loses its group | the "in the file only, with a group" row | killed: that and `testAHierarchyEntryWithoutItsSubjectStillLinks` |
+| R9 both empty-side checks dropped | `testAMalformedEntryNamesNothing` | killed: that alone |
+| R11 only the empty-group check dropped | the same | killed: that alone |
+| R12 only the empty-name check dropped | the same | killed: that alone |
+| R10 `explode(..., 2)` limit dropped | `testAnEntrySplitsAtTheFirstSeparator` | killed: that alone |
+
+`photoinfo_build_tags_argfile()`:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| A1 the empty-list delete line dropped | `testAnEmptyListDeletesEachField` | killed: that alone |
+| A2 `count == 0` → `<= 1` | the one-line-per-keyword case | killed: `testEveryKeywordIsOneLinePerField` alone |
+| A3 the marker line dropped | `testTheMarkerIsAlwaysSet` | killed: that and the one-line-per-keyword case |
+| A4 the keywords field fed the hierarchy list | the one-line-per-keyword case | killed: that alone |
+| A5 the `-charset iptc=UTF8` lines dropped | the same | killed: that alone |
+| A6 `=` → `+=` per value | the same | killed: that and `testACommaInANameStaysOneKeyword` |
+
+`typetags_emoji_codepoints()`:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| E1 `count > 8` → `>=` | `testEightCodePointsAreTheMaximum` `[BVA]` | killed: that alone |
+| E2 `count > 8 + 1` | the same | killed: that alone |
+| E3 `> 0x10FFFF` → `>=` | `testTheUnicodeRangeIsTheBound` `[BVA]` | killed: that alone |
+| E4 `> 0x10FFFF + 1` | the same | killed: that alone |
+| E5 `< 1` → `< 0` | `testGarbageIsRefused` (`'0'`) | **survived**: equivalent. Code point 0 is below `0x80` and NUL is not in `TYPETAGS_EMOJI_ASCII`, so the ASCII check refuses it on the next line; the `< 1` clause is redundant for every input |
+| E6 surrogate `>= 0xD800` → `>` | `testGarbageIsRefused` (`'D800'`) | killed: that alone |
+| E7 surrogate `<= 0xDFFF` → `<` | none | **survived**: weak test. Only the lower surrogate boundary `D800` is tested; typed `DFFF` is reachable and the mutant stores it. (A pasted surrogate cannot arrive: it is not valid UTF-8, and `preg_split('//u')` fails first) |
+| E8 surrogate `and` → `or` | every valid case | killed: 7 cases |
+| E9 the ASCII check removed | `testAsciiTextIsNoPartOfAnEmoji` | killed: that alone |
+| E10 `< 0x80` → `< 0x7F` | the same | killed: that alone (DEL, `0x7F`, is in its input) |
+| E11 hex `{1,6}` → `{1,5}` | `testTheUnicodeRangeIsTheBound` | killed: that alone |
+| E12 the `U+` prefix not accepted | `testTheUPlusNotationIsAccepted` | killed: that alone |
+| E13 `%X` → `%x` | every valid case | killed: 7 cases |
+| E14 blanks not stripped on the pasted path | none | **survived**: weak test. No case pastes characters with blanks between them; the docblock promises "separated by blanks", and with the mutant a pasted `🖼 ️` becomes `1F5BC 20 FE0F`, which the ASCII check then refuses |
+| E15 empty input → `false` instead of `''` | `testEmptyMeansNone` | killed: that alone |
+| E16 `trim` dropped | the same | killed: that and `testTypedCodePointsAreNormalised` |
+| E17 the non-ASCII detector negated | everything | killed: 9 cases |
+
+`typetags_badge_style()`:
+
+| Mutant | Expected killer | Result |
+|---|---|---|
+| B1 the `$striped` ternary negated | both `BadgeStyleTest` shapes | killed: 2 cases |
+| B2 `false` passed to `typetags_badge_colors()` | the striped cases | killed: 2 cases |
+| B3 striped left padding `24px` → `8px` | the striped case | killed: that alone |
+| B4 `border-radius`/`display` dropped | the non-striped case | killed: that alone |
+| B5 the colour part dropped | all three | killed: 3 cases |
+
+Three weak tests (F6, E7, E14) and two equivalent mutants (L4, E5); the tests were not changed in
+this pass.
 
 ## The two tooltips only a browser can witness (2026-08-31)
 
@@ -1004,6 +1117,8 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-10-08 | Screenshots `23-datum-info.png`, `24-datum-zeitraum.png`, `25-info-bearbeiten.png` and the re-shot `11-foto-oeffentlich.png`, `22-drehen-rahmen.png` opened as images: each shows only demo-album content and the screen its text describes. The other 11 re-shots differed only in ids, timestamps or thumbnails and were reverted. | Not replaced: framing is a judgment; `shoot.js`'s `assertNoForeignPhoto()` covers the foreign-photo half; for the `shootSpan()` shot it checks both rows, and `shootSpan()` refuses a clip that any other element touches. |
 | 2026-10-08 | Whether the new German handbook text reads naturally: read by an agent against the existing pages' tone. | **Open for the owner**: a native reader's judgment. |
 | 2026-10-08 | The exiftool-writing suites against **exiftool 12.76**, the remote's version: the CPAN `Image-ExifTool-12.76` tarball unpacked under `.agent-tests/`, linked as `/usr/local/bin/exiftool` in the web container (php-fpm keeps the container's PATH, `clear_env = no`, where `/usr/local/bin` precedes `/usr/bin`), removed afterwards. Integration: photoinfo 119, provenance 201 (4 skipped), persons 112 (1 skipped), photoedit 81, all OK; photoinfo E2E 30 passed. A logging wrapper over one `SetInfoTest` run recorded 25 of 36 calls with `php-fpm` as grandparent, so the HTTP path used 12.76. The suites' own read-backs ran on 12.76 too; ImageMagick stayed the independent reader. | Not replaced: a one-off. Pinning a second exiftool into the suites would vendor a binary for one host; repeat this before a deploy after an exiftool-facing change. |
+| 2026-10-09 | The striped tab (`Kategorie ?`, `Name ?`) and the emoji (`Ausstellung`, `Freitext`) on the picture page, the photo properties chips and the admin tags page look as in the brainstorm drafts (S5, A1, F5 on C5) and read legibly: confirmed by the owner (tags-in-file plan, Phase 2 manual box). The plan's testing steps ask for modus light and dark; which skins the owner looked at is not recorded. | **Mostly replaced 2026-10-09** by `rendering.spec.js` and `admin-striped.spec.js`: tab, border and text colour by computed style on all three screens, the emoji in each badge, and the text starting after the border and tab. Whether the result reads comfortably stays a judgment, like the badge-contrast row in the open table below. |
+| 2026-10-09 | Whether digiKam or Lightroom read the keywords photoinfo writes (`XMP-dc:Subject`, `IPTC:Keywords`) and show `XMP-lr:HierarchicalSubject` as a `Group > Tag` tree. | **Open: not checked.** Neither program is installed here. `TagWriteTest` reads the fields back with a plain exiftool call; no independent reader (as ImageMagick is for the caption and the regions) checks them yet. See the open table below. |
 
 ### Open — no oracle, so no test
 
@@ -1023,3 +1138,4 @@ than accumulating. Nothing is marked done on prose alone.
 | Whether a screenshot still shows the screen the text beside it describes | Subjective. `assertOutput()` in `shoot.js` proves every declared shot exists and that no undeclared file sits beside them, and `assertNoForeignPhoto()` proves no frame held a photo outside the demo album. That a shot is *framed on the right thing* has no oracle. |
 | Whether digiKam, Lightroom or a phone's gallery show photoinfo's caption and `DateCreated` the way the suites read them | The suites read the standard slots back with exiftool and, for the caption, ImageMagick; what a given release of a given program displays is not a fact a fixture settles, same limit as the MWG region row above. |
 | A date taken from `IPTC:DateCreated` with `$conf['use_iptc']` enabled | Not a missing oracle but an unhandled path (decision 0041): core maps IPTC after the `format_exif_data` hook, so photoinfo cannot protect a month-precision date there without a core change. `use_iptc` is `false` in this install. |
+| Whether digiKam, Lightroom or another tool show a photo's tags and their group hierarchy the way photoinfo writes them | No such program runs in the DDEV web image. The suites read the three keyword fields and the marker back with exiftool; which field a given release of a given program shows, and whether it builds the tree from `HierarchicalSubject`, is not a fact a fixture settles. Same limit as the caption and region rows above. |

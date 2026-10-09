@@ -673,27 +673,31 @@ Each fixed test-first, the new cases proven by mutants.
 
 ### Changes Required
 
-- [ ] Decisions (`docs/agents/decisions/`):
+- [x] Decisions (`docs/agents/decisions/`):
   - `0046-a-photos-tags-travel-in-its-file.md` — fields, marker, local-only rule, merge-only rescan, prune by flag
   - `0047-new-tags-typed-while-tagging-go-to-freitext.md`
   - `0048-typetags-emoji-are-stored-as-code-points.md` — utf8mb3, no charset migration
   - `0049-tag-writes-take-the-persons-lock-first.md` — and provenance's write-back does not
   - `0050-uploads-and-iptc-import-do-not-write-tags.md`
-- [ ] `CLAUDE.md`: photoinfo bullet mentions tags; persons bullet mentions its one new event
+- [x] `CLAUDE.md`: photoinfo bullet mentions tags; persons bullet mentions its one new event
   (still no core change); typetags bullet mentions the striped/emoji columns
-- [ ] `.claude/rules/plugin-test-suites.md`: new FixtureBuilder helpers and seed scenarios
-- [ ] `.claude/rules/deployment.md`: the seed step, `--seed-tags-only`, `--prune-tags`
-- [ ] `docs/agents/TESTING.md`: Phase 1 red-runs, photoinfo keyword mutant table, hand-check
+- [x] `.claude/rules/plugin-test-suites.md`: new FixtureBuilder helpers and seed scenarios
+- [x] `.claude/rules/deployment.md`: the seed step, `--seed-tags-only`, `--prune-tags`
+- [x] `docs/agents/TESTING.md`: Phase 1 red-runs, photoinfo keyword mutant table, hand-check
   rows (badge legibility; other tools reading the keywords), non-coverage rows (uploads,
   `use_iptc`, public tags page modes)
-- [ ] `docs/backlog.md`: close "save labels/tags in the image meta data" and "eight colored
+- [x] `docs/backlog.md`: close "save labels/tags in the image meta data" and "eight colored
   tags have no seeding script"; update the typetags "ahead of origin" count
-- [ ] `handbuch/`: the tags page explains `Kategorie ?`, `Name ?`, `Ausstellung` (stays local)
+- [-] `handbuch/`: the tags page explains `Kategorie ?`, `Name ?`, `Ausstellung` (stays local)
   and Freitext; re-shoot only the shots whose screen changed (`.claude/rules/handbook.md`),
   then `ddev exec php handbuch/tools/check.php`
-- [ ] Mutation table for `photoinfo_file_keywords()`, `photoinfo_build_tags_argfile()`,
+- [x] Mutation table for `photoinfo_file_keywords()`, `photoinfo_build_tags_argfile()`,
   `photoinfo_tag_is_local_only()`, `photoinfo_rescan_tags()`, `photoinfo_new_freitext_tags()`,
   `typetags_badge_style()`, `typetags_emoji_codepoints()` (`.claude/rules/mutation-testing.md`)
+  - As run 2026-10-09: 62 mutants, 57 killed. L4 and E5 are equivalent. Three survivors show a
+    weak test, none a wrong result: F6 (`photoinfo_new_freitext_tags()` without the `intval` on
+    person ids; the ids arrive as strings from `query2array()`), E7 (surrogate upper edge `DFFF`
+    untested), E14 (pasted characters separated by a blank untested). Open with the owner
 
 ---
 

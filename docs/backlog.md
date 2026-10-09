@@ -19,9 +19,6 @@
   when the rest of its open questions were closed.
 - **`deploy.local.json` still carries `admin.password: "REPLACE_ME"`.** The next install bakes in
   whatever is in that file. Set a real one before the next deploy.
-- **The remote's eight colored tags have no committed seeding script.** They were recreated by
-  hand on 2026-09-01 after the gallery loss; since [decision 0023](agents/decisions/0023-no-database-transfer-to-the-remote.md)
-  means no database ever transfers to the remote, any future wipe loses them again the same way.
 - **`pwg.persons.rescan` is not called by the deploy, and is not a listed manual step.** Person
   regions live only in the image files (decision 0020), so after any resync they return to the
   remote's index only if someone calls this method by hand. `tools/deploy/README.md`'s command
@@ -36,7 +33,6 @@ is generated. `tools/deploy/README.md` has the full list.)*
 
 - l10n('Invalid tag name') has no translation
 - search function by: tag, person
-- save labels/ tags in the image meta data
 - enforce a 1:1 photo-album relationship (core allows many-to-many via `piwigo_image_category`; freetext-per-album assumes 1:1)
 - (low prio) provenance: make `owner` a reference to a people table, so "all photos provided by X" is queryable — distinct from person tagging (who is depicted)
 - (low prio) provenance: detect file-vs-DB divergence after third-party metadata edits (candidate signal: `images.date_metadata_update`)

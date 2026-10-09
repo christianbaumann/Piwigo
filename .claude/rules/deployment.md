@@ -13,6 +13,7 @@ uv run pwg-deploy deploy.local.json          # upload + install + plugins + sync
 uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts deletions too
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
+uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pytest                                    # 571 tests, measured 2026-10-09
 ```
 
@@ -145,10 +146,32 @@ the preflight compares `include/constants.php`'s `PHPWG_VERSION` against the rem
 Exact string equality, never an ordering; `--allow-version-change` overrides. **The tool never
 posts to `upgrade.php`** — run it in a browser yourself, then re-run the deploy. Albums
 and photos are re-created by the `site_update` scan; person regions by `pwg.persons.rescan` out
-of the image files; photoinfo's date and info text by `pwg.photoinfo.rescan`, which the deploy runs
-itself (below). **Provenance columns have no path to the remote at all** — they live in the
+of the image files; photoinfo's date, info text and tags by `pwg.photoinfo.rescan`, which the deploy runs
+itself (below); the tag groups and their colours by the seed from `tag-groups.json` (below). **Provenance columns have no path to the remote at all** — they live in the
 database and the file is only an export target — so a photo whose provenance was not written back
 before upload has none on the remote.
+
+## The deploy seeds the tag groups
+
+`tools/deploy/tag-groups.json` is the single record of the Colored Tags groups (name, colour,
+`striped`, `emoji` as code points) and of which tag belongs in which group; the database holding
+them never travels. `bootstrap.run()` applies it with `seed.seed_tags()` after `activate_plugins`
+and before the sync, only when typetags is among the activated plugins, and reports one `tags`
+line. Report, exit codes and the local DDEV credential file are in the
+[README](../../tools/deploy/README.md#the-tag-groups). What an agent needs beside it:
+
+- The seed adds and corrects, never deletes, then reads both lists back and raises on any
+  difference. Names are matched as `utf8mb3_general_ci` compares them (`seed.collated()`), since
+  the server refuses a second name it calls equal.
+- The file is read and validated before anything connects, so a mistake in it stops a deploy
+  before the upload.
+- `--seed-tags-only` logs in and seeds, nothing else: no FTP connection, no activation, so
+  typetags must already be active. It is how the local install is seeded, and is refused beside
+  `--dry-run`, `--audit`, `--list-files` and `--no-bootstrap` (`SEED_ONLY_CONFLICTS` in `cli.py`).
+- Two PHP facts are tied to the file by tests rather than copied: `test_seed.py` reads
+  `PHOTOINFO_FREITEXT_GROUP` and asserts the file has that group, and photoinfo's
+  `LocalOnlyRuleTest` reads the file and asserts every local-only group matches
+  `photoinfo_tag_is_local_only()`.
 
 ## The deploy rescans photoinfo's values
 
@@ -164,6 +187,14 @@ The report line, its `(warning)` and the exit codes are in the
   re-run repeats the rescan. Every run reads the whole gallery, one exiftool run per photo.
 - The photo list is `pwg.categories.getImages` as the deploy login, which honours album
   permissions: a photo only in an album made private on the remote is skipped and not reported.
+- The rescan also adds the tags a file marked with `XMP-pwginfo:TagsWritten` names, and never
+  removes one ([decision 0046](../../docs/agents/decisions/0046-a-photos-tags-travel-in-its-file.md)).
+  It counts per photo the tags the remote has that the file does not name, reported on the
+  rescan's `tags:` continuation line. `--prune-tags` removes those afterwards through
+  `pwg.photoinfo.pruneTags` (`prune_photo_tags()`, `RESCAN_CHUNK` photos per request) and adds a
+  `prune` line; it never fails the run. It is refused beside `--seed-tags-only` and the four flags
+  that one is refused beside (`PRUNE_TAGS_CONFLICTS`), since none of them runs the rescan. A photo
+  whose tags were never written has no marker and is neither read for tags nor pruned.
 
 ## The remote's compiled templates are never purged
 
