@@ -359,12 +359,6 @@ final class TagWriteTest extends TestCase
             'pwg_token' => $this->ws->token(),
             ));
 
-        // persons leaves the old name's tag behind, unlinked; teardown removes it
-        if ((int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_tags WHERE name = '" . $this->db->escape($this->tagName('Anna')) . "'") > 0)
-        {
-            $this->fixture->tagIdNamed($this->tagName('Anna'));
-        }
-
         $this->assertTagsWritten($res);
 
         foreach (array($this->image, $other) as $photo)
@@ -379,6 +373,8 @@ final class TagWriteTest extends TestCase
         $this->fixture->assertPluginActive('persons');
         $this->addRegion($this->tagName('Anna'), 0.15);
         $this->addRegion($this->tagName('Bert'), 0.85);
+        // persons leaves a deleted person's tag to core's orphan-tag cleanup; teardown removes it
+        $this->fixture->tagIdNamed($this->tagName('Anna'));
 
         $res = $this->ws->call('pwg.persons.delete', array(
             'person_id' => $this->personId($this->tagName('Anna')), 'pwg_token' => $this->ws->token(),
