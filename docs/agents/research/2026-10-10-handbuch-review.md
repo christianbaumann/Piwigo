@@ -37,7 +37,7 @@ doubtful, 3 need a screen check.
 | B1 | 01 Herkunft | both buttons also absent while the album has 0 photos (`album_provenance.tpl:21-34`) | one sentence |
 | B2 | 01, 02, index | way into the admin area is the link **Administration** (`menubar_identification.tpl:21`); never named | index: "Die Verwaltung erreicht man über den Link **Administration**." |
 | B3 | 02 Ins Album verschieben | provenance adds panel *Herkunft der verschobenen Fotos* (Beibehalten / Leeren / Durch die des Zielalbums ersetzen) (`provenance/main.inc.php:76`) | one sentence |
-| B4 | 02 Große Mengen | same name rule for folders, skipped silently (`admin/site_update.php:243, 525`) | "Dasselbe gilt für Ordnernamen; solche Ordner werden ohne Meldung übergangen." |
+| B4 | 02 Große Mengen | same name rule for folders, skipped silently (`admin/site_update.php:243, 525`) | "Dasselbe gilt für Ordnernamen; solche Ordner werden ohne Meldung übergangen." Corrected 2026-10-10 in review: the folder itself is reported as `PWG-UPDATE-1` (`admin/site_update.php:301-306`), only the files in it are skipped silently (`:520`) |
 | B5 | 02 Große Mengen | "zwei Wege" FTP vs `galleries/`: both need Synchronisieren, so one way | "Dateien per FTP in `galleries/` ablegen und unter Werkzeuge » Synchronisieren einlesen." |
 | B6 | 03 Datum und Bilddatei | "erste Tag, den die Angabe umfasst" wrong for *vor 1965* (shows 1.1.1965) (`photoinfo/include/date.inc.php:135-140`) | "der erste Tag der eingetragenen Angabe" |
 | B7 | 04 local-only hinweis | also any tag named *Ausstellung*, any group, case-insensitive (`photoinfo/include/functions.inc.php:503, 550-570`) | add "und jedes Schlagwort namens Ausstellung" |

@@ -159,6 +159,8 @@ test('[NEG] a clear the file does not take keeps the row clickable and says why'
 
 test('[NEG] a date the file does not take is saved, and the page gives the reason in German', async ({ page }) => {
   makeReadOnly(fixture.image_id);
+  // Anti-vacuity: the row starts without a date, so a date found afterwards was saved here.
+  expect(readRow(fixture.image_id).date_creation).toBeNull();
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
 

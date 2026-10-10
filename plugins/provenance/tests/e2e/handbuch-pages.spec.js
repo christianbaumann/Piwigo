@@ -24,10 +24,10 @@ const HANDBUCH_DIR = path.resolve(__dirname, '../../../../handbuch');
  * Lower bound on the pages a run must have opened.
  *
  * Without it a directory that stopped matching would report no problem: zero
- * pages, zero failures. A floor, not a count: the handbook is an index and seven
- * pages (2026-10-10).
+ * pages, zero failures. The handbook is an index and seven pages (2026-10-10);
+ * all eight are the floor.
  */
-const MIN_PAGES = 6;
+const MIN_PAGES = 8;
 
 const pages = fs
   .readdirSync(HANDBUCH_DIR)
