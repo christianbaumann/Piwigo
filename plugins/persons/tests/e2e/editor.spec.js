@@ -75,6 +75,23 @@ async function holdSaves(page) {
   return () => release();
 }
 
+/**
+ * Makes a person exist in the index without being on this photo: tagged, then
+ * removed again. getList never offers somebody already on the photo
+ * (ws_functions.inc.php), so this is the state a person tagged elsewhere is in.
+ * Leaves tagging mode on. Commits with a click, not with Enter, so the specs
+ * about what Enter does do not rely on it in their setup.
+ */
+async function knownButNotOnPhoto(picture, name) {
+  await picture.dragBox(FIRST_BOX);
+  await picture.typeName(name);
+  await picture.pickerOption(name).click();
+  await expect(picture.savedBoxes).toHaveCount(1);
+  const [regionId] = await picture.savedRegionIds();
+  await picture.deleteButton(Number(regionId)).click();
+  await expect(picture.savedBoxes).toHaveCount(0);
+}
+
 test.describe('tagging a person', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
@@ -322,6 +339,59 @@ test.describe('tagging a person', () => {
     expect(counts[ADA], 'the person the box was tagged with is not in the index').toBeDefined();
     expect(counts[ADA].regions, 'the region did not land on the existing person').toBe(1);
     expect(counts[ADA].photos).toBe(1);
+  });
+
+  /**
+   * [ERR] Characterization: records today's highlight, read off editor.js
+   * (renderOptions() ends in setHighlight(0), the Enter handler commits the
+   * highlighted entry); no requirement confirms it. The handbook relies on it.
+   */
+  test('[HAPPY] the first entry is highlighted as the list opens, and Enter takes it', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.enterTaggingMode();
+    await knownButNotOnPhoto(picture, ADA);
+
+    await picture.dragBox(SECOND_BOX);
+    await picture.existingPickerOption(ADA).waitFor();
+
+    // Anti-vacuity: nothing typed, and the person just used heads the list.
+    await expect(picture.pickerInput).toHaveValue('');
+    expect((await picture.pickerEntries())[0]).toEqual({ name: ADA, create: false });
+
+    await expect(picture.highlightedPickerOption).toHaveCount(1);
+    await expect(picture.highlightedPickerOption).toHaveAttribute('data-persons-name', ADA);
+
+    await picture.pickerInput.press('Enter');
+    await expect(picture.savedBoxes).toHaveCount(1);
+    expect(await picture.savedNames()).toEqual([ADA]);
+  });
+
+  /**
+   * [ERR] Characterization: records today's list order, read off editor.js
+   * (renderOptions() appends the create entry after the matches); no
+   * requirement confirms it. A fragment is never an exact match, so both are listed.
+   */
+  test('[ECP] a partial match is listed before Anlegen', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.enterTaggingMode();
+    await knownButNotOnPhoto(picture, ADA);
+
+    const fragment = ADA.slice(6, 12);
+    await picture.dragBox(SECOND_BOX);
+    // Waits for the create entry, which only the answer to the typed search
+    // brings: the list the picker opens with already holds the match.
+    await picture.typeName(fragment);
+
+    const entries = await picture.pickerEntries();
+    // Anti-vacuity: a match and the create entry, so there is an order to check.
+    expect(entries.length).toBeGreaterThanOrEqual(2);
+    expect(entries[0]).toEqual({ name: ADA, create: false });
+    expect(entries[entries.length - 1]).toEqual({ name: fragment, create: true });
+    await expect(picture.highlightedPickerOption).toHaveAttribute('data-persons-name', ADA);
   });
 
   /**
@@ -1033,6 +1103,35 @@ test.describe('leaving tagging mode', () => {
     await picture.exitTaggingMode();
 
     expect(await picture.sameDocument()).toBe(true);
+  });
+
+  /**
+   * [ERR] Characterization: records today's flag, read off editor.js (write()
+   * sets `changed` on success and never resets it); no requirement confirms it.
+   * One save that went through is enough for the reload.
+   */
+  test('[ST] leaving after a save and a later refused save reloads', async ({ page }) => {
+    seeded = seed('empty');
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    await picture.markDocument();
+
+    await picture.enterTaggingMode();
+    await tag(picture, FIRST_BOX, ADA, 1);
+
+    setExiftool('missing');
+    await picture.dragBox(SECOND_BOX);
+    await picture.typeName(GRACE);
+    await picture.pickerInput.press('Enter');
+    // Anti-vacuity: the later save really was attempted and refused.
+    await expect(picture.editorMessage).toHaveClass(/persons-editor-error/);
+    await expect(picture.savedBoxes).toHaveCount(1);
+
+    await picture.exitTaggingModeAndAwaitReload();
+
+    expect(await picture.sameDocument()).toBe(false);
+    await expect(picture.personRowLinks).toHaveText([ADA]);
   });
 });
 

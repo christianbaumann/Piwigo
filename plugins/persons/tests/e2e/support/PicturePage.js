@@ -75,6 +75,8 @@ class PicturePage {
     this.picker = page.locator('#persons-picker');
     this.pickerInput = page.locator('#persons-picker-input');
     this.pickerOptions = page.locator('#persons-picker-list .persons-picker-option');
+    /** The entry Enter would commit. */
+    this.highlightedPickerOption = page.locator('#persons-picker-list .persons-picker-option.persons-picker-highlighted');
     /** The box being drawn, before it has been named and saved. */
     this.draft = page.locator('#persons-overlay .person-draft');
     /** Only the boxes that exist on the server; a draft has no region id yet. */
@@ -1120,6 +1122,21 @@ class PicturePage {
   async searchForExisting(fragment, name) {
     await this.pickerInput.fill(fragment);
     await this.existingPickerOption(name).waitFor();
+  }
+
+  /**
+   * The picker's entries in list order: the name each commits, and whether it
+   * is the create-new entry rather than an existing person.
+   *
+   * @returns {Promise<{name: string|null, create: boolean}[]>}
+   */
+  async pickerEntries() {
+    return this.pickerOptions.evaluateAll((els) =>
+      els.map((el) => ({
+        name: el.getAttribute('data-persons-name'),
+        create: el.classList.contains('persons-picker-create'),
+      }))
+    );
   }
 
   /** The region ids of the boxes the server has saved, in DOM order. */
