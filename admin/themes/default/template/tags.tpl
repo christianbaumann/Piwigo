@@ -107,8 +107,8 @@ if (!$.cookie("pwg_tags_per_page")) {
         <select id="MergeOptionsChoices"> 
         </select>
       </div>
-      <button class="icon-ok ConfirmMergeButton">Confirm merge</button>
-      <a id="CancelMerge">Cancel</a>
+      <button class="icon-ok ConfirmMergeButton">{'Confirm merge'|@translate}</button>
+      <a id="CancelMerge">{'Cancel'|@translate}</a>
     </div>
 
   </div>

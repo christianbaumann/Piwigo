@@ -249,16 +249,15 @@ test.describe('the controls the handbook tells a reader to click', () => {
   });
 
   /**
-   * [ERR] The merge panel's own two buttons are hardcoded English.
+   * [HAPPY] The merge panel's own two buttons are German (decision O1 of the
+   * handbook third pass).
    *
-   * `tags.tpl:110-111` emits `Confirm merge` and `Cancel` as literals with no
-   * `|@translate`, so a German install shows English there. The oracle is those
-   * two literals, not a requirement - which is why the strings are named here
-   * rather than read from the page: the point of the test is that they are not
-   * translation keys. 04-schlagworte.html tells the reader so, and this fails
-   * the day that stops being true, which is the day the handbook must change.
+   * Upstream `tags.tpl` hard-codes `Confirm merge` and `Cancel`; the fork passes
+   * both through `|@translate`. The expected values are core's German for those
+   * keys, `language/de_DE/admin.lang.php` ('Confirm merge' line 755, 'Cancel'
+   * line 801), and 04-schlagworte.html quotes them.
    */
-  test('the merge panel opens two interactions deep and its own buttons are untranslated', async ({ page }) => {
+  test('the merge panel opens two interactions deep and its buttons are German', async ({ page }) => {
     const tags = new TagListPage(page);
     await tags.goto();
 
@@ -275,8 +274,8 @@ test.describe('the controls the handbook tells a reader to click', () => {
     const heading = await serverText(tags.mergeBlock.locator('p').first());
     expect(heading).not.toBe('');
 
-    expect(await serverText(tags.mergeConfirm)).toBe('Confirm merge');
-    expect(await serverText(tags.mergeCancel)).toBe('Cancel');
+    expect(await serverText(tags.mergeConfirm)).toBe('Zusammenführen bestätigen');
+    expect(await serverText(tags.mergeCancel)).toBe('Abbrechen');
 
     await tags.mergeCancel.click();
     await expect(tags.mergeBlock).toBeHidden();
