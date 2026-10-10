@@ -11,10 +11,10 @@
 <h2>Fotos zu einem Album hinzufügen</h2>
 
 <p>
-  Der übliche Weg ist der Upload im Browser unter
-  <span class="pwgScreen">Fotos » Hinzufügen</span>
-  (<code>admin.php?page=photos_add</code>). Ein Foto kann anschließend weiteren Alben
-  zugeordnet werden, ohne es erneut hochzuladen. Beides ist der Verwaltung vorbehalten.
+  Fotos hochladen und weiteren Alben zuordnen dürfen nur Administratoren. Hochgeladen wird im
+  Browser unter <span class="pwgScreen">Verwaltung » Fotos » Hinzufügen</span>
+  (<code>admin.php?page=photos_add</code>); ein Foto kann danach weiteren Alben zugeordnet
+  werden, ohne es erneut hochzuladen.
 </p>
 
 <h3>Fotos hochladen</h3>
@@ -46,8 +46,8 @@
 
 <p>
   Nach dem Upload meldet die Seite <strong>... Fotos hochgeladen</strong> und darunter
-  <strong>Album ... enthält jetzt ... Fotos</strong>, wobei der Albumname ein Link zum Album
-  ist. Dazu erscheinen zwei Weiterführungen: <strong>Dieses Set von ... Fotos verwalten</strong>
+  <strong>Album ... enthält jetzt ... Fotos</strong>, wobei der Albumname ein Link zu den
+  Eigenschaften des Albums ist. Dazu erscheinen zwei Weiterführungen: <strong>Dieses Set von ... Fotos verwalten</strong>
   öffnet die eben hochgeladenen Fotos in der Stapelverarbeitung,
   <strong>Ein weiteres Fotoset hinzufügen</strong> beginnt von vorn. Die Fotos sind sofort im
   Album sichtbar.
@@ -56,8 +56,8 @@
 <div class="hinweis">
   <p>
     Erlaubt sind <strong>jpg, jpeg, png, gif</strong> und <strong>webp</strong>. Andere Dateien
-    weist Piwigo ab. Die Angabe steht neben der Schaltfläche <strong>Fotos hinzufügen</strong>
-    auf dem Bildschirm. Eine einzelne Datei darf bis zu 1000 MB groß sein.
+    weist Piwigo ab. Die Liste steht auch neben der Schaltfläche
+    <strong>Fotos hinzufügen</strong>. Eine einzelne Datei darf bis zu 1000 MB groß sein.
   </p>
 </div>
 
@@ -66,7 +66,8 @@
   diesem Album denselben Dateinamen hat, aktualisieren Sie die Datei, ohne die Eigenschaften
   des Fotos zu ändern.</em> Damit wird eine bestehende Bilddatei ersetzt, während Titel,
   Beschreibung und Schlagworte des Fotos erhalten bleiben. Ohne diesen Schalter entsteht ein
-  zweites Foto.
+  zweites Foto, außer die Datei ist byte-gleich mit einem vorhandenen Foto: dann wird nur dieses
+  mit dem Album verbunden.
 </p>
 
 <h3>Ein anderes Zielalbum wählen</h3>
@@ -94,8 +95,8 @@
 <h3>Vorhandene Fotos einem weiteren Album zuordnen</h3>
 
 <p>
-  Ein bereits hochgeladenes Foto kann in mehreren Alben erscheinen. Das geschieht in der
-  <span class="pwgScreen">Stapelverarbeitung</span> (<code>admin.php?page=batch_manager</code>).
+  Ein bereits hochgeladenes Foto kann in mehreren Alben erscheinen. Die Zuordnung geschieht in
+  der Stapelverarbeitung (<code>admin.php?page=batch_manager</code>).
 </p>
 
 <ol>
@@ -137,25 +138,28 @@
     <strong>Mit einem Album verbinden</strong> fügt das Foto einem weiteren Album hinzu. Die
     bisherigen Alben bleiben erhalten. Soll das Foto das alte Album verlassen, ist
     <strong>Ins Album verschieben</strong> die richtige Aktion; sie löst alle anderen
-    Verknüpfungen bis auf das physische Album, in dem die Datei liegt. <strong>Von Album abtrennen</strong> entfernt das Foto aus einem einzelnen
-    Album.
+    Verknüpfungen bis auf das physische Album, in dem die Datei liegt. Dabei erscheint der
+    Bereich <strong>Herkunft der verschobenen Fotos</strong> mit der Wahl
+    <strong>Beibehalten, was das Foto bereits hat</strong>, <strong>Leeren</strong> oder
+    <strong>Durch die des Zielalbums ersetzen</strong>. <strong>Von Album abtrennen</strong>
+    entfernt das Foto aus einem einzelnen Album.
   </p>
 </div>
 
 <h3>Große Mengen ohne Browser</h3>
 
 <p>
-  Für sehr viele Dateien gibt es zwei weitere Wege, die Zugang zum Server voraussetzen: das
-  Hochladen per FTP mit anschließendem Einlesen unter
-  <span class="pwgScreen">Werkzeuge » Synchronisieren</span>, und das direkte Ablegen der
-  Dateien im Verzeichnis <code>galleries/</code>. Dieses Handbuch beschreibt sie nicht, nennt
-  aber zwei Fallen:
+  Sehr viele Dateien lassen sich mit Zugang zum Server per FTP im Verzeichnis
+  <code>galleries/</code> ablegen und unter
+  <span class="pwgScreen">Verwaltung » Werkzeuge » Synchronisieren</span> einlesen. Dieses
+  Handbuch beschreibt den Weg nicht, nennt aber zwei Fallen:
 </p>
 
 <ul>
   <li>
     Das Einlesen akzeptiert nur Dateinamen aus Buchstaben ohne Umlaute, Ziffern, Punkt,
     Bindestrich und Unterstrich. Namen mit Umlauten oder Leerzeichen werden abgewiesen.
+    Dasselbe gilt für Ordnernamen; solche Ordner werden ohne Meldung übergangen.
   </li>
   <li>
     Im Abschnitt <strong>Simulation</strong> ist das Kästchen bei jedem Aufruf angehakt:
@@ -166,7 +170,7 @@
 
 <nav class="zurueck">
   <a href="index.html">Zurück zum Inhalt</a> ·
-  <a href="01-alben.html">Zurück: Album anlegen</a> ·
+  <a href="01-alben.html">Zurück: Album anlegen und beschreiben</a> ·
   <a href="03-fototexte.html">Weiter: Titel, Autor, Datum und Beschreibung</a>
 </nav>
 
