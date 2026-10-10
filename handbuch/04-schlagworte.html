@@ -11,12 +11,11 @@
 <h2>Schlagworte vergeben</h2>
 
 <p>
-  Schlagworte beschreiben, was auf einem Foto zu sehen ist, quer zu den Alben. Sie werden in
-  der Verwaltung unter <span class="pwgScreen">Schlagworte</span>
+  Schlagworte beschreiben, was auf einem Foto zu sehen ist, quer zu den Alben. Sie werden unter
+  <span class="pwgScreen">Verwaltung » Fotos » Schlagworte</span>
   (<code>admin.php?page=tags</code>) angelegt und dort oder an einem einzelnen Foto zugeordnet.
-  Ein Teil der Schlagworte trägt eine Farbe. Farbige Schlagworte können angemeldete Benutzer
-  auch direkt auf der Fotoseite setzen, ohne Zugang zur Verwaltung, und dort auch ein neues
-  Schlagwort eintippen. Die Schlagworte eines Fotos werden außerdem in seine Bilddatei
+  Das ist Administratoren vorbehalten; farbige Schlagworte kann jeder angemeldete Benutzer auch
+  auf der Fotoseite setzen. Die Schlagworte eines Fotos werden außerdem in seine Bilddatei
   geschrieben, siehe <a href="#bilddatei">Schlagworte in der Bilddatei</a>.
 </p>
 
@@ -29,11 +28,11 @@
 
 <ul>
   <li>
-    <strong>Anlegen</strong>: auf <strong>Schlagwort hinzufügen</strong> klicken, den Namen
-    eingeben und bestätigen.
+    Anlegen: auf <strong>Schlagwort hinzufügen</strong> klicken, den Namen eingeben und
+    bestätigen.
   </li>
   <li>
-    <strong>Suchen</strong>: das Feld <strong>Suchen</strong> rechts filtert die Liste.
+    Suchen: das Feld <strong>Suchen</strong> rechts filtert die Liste.
   </li>
 </ul>
 
@@ -85,19 +84,17 @@
   </li>
   <li>
     Auf <strong>Zusammenführen</strong> klicken und im Feld darunter das Schlagwort wählen, das
-    übrig bleiben soll. Der Hinweis <em>Die anderen Schlagworte werden entfernt</em> steht
-    darüber.
+    übrig bleiben soll. Darüber steht <em>Die anderen Schlagworte werden entfernt</em>.
   </li>
   <li>
-    Mit <strong>Confirm merge</strong> bestätigen. Alle Fotos der anderen Schlagworte tragen
-    danach das gewählte, die anderen Schlagworte sind gelöscht.
+    Auf <strong>Zusammenführen bestätigen</strong> klicken. Alle Fotos der anderen Schlagworte
+    tragen danach das gewählte, die anderen Schlagworte sind gelöscht.
   </li>
 </ol>
 
 <div class="hinweis">
   <p>
-    Die beiden Schaltflächen dieses Dialogs sind nicht übersetzt und heißen auf einer deutschen
-    Oberfläche <strong>Confirm merge</strong> und <strong>Cancel</strong>.
+    <strong>Abbrechen</strong> blendet das Feld wieder aus, ohne etwas zu ändern.
   </p>
 </div>
 
@@ -107,8 +104,7 @@
   Trägt kein Foto ein Schlagwort mehr, meldet die Seite oben
   <strong>Sie haben ... nicht benutzte Schlagworte</strong> mit dem Link
   <strong>Überprüfung</strong>. Die Meldung erscheint erst, wenn das Schlagwort seit mehr als
-  einem Tag unbenutzt und unverändert ist. Ein gerade angelegtes Schlagwort taucht dort also
-  noch nicht auf. Der Link löscht nichts, sondern zeigt zuerst die Namen. Erst
+  einem Tag unbenutzt und unverändert ist. Der Link löscht nichts, sondern zeigt zuerst die Namen. Erst
   <strong>Lösche diese</strong> entfernt sie; <strong>Behalte diese</strong> blendet die
   Meldung nur aus.
 </p>
@@ -144,10 +140,10 @@
 <h3>Farbige Schlagworte</h3>
 
 <p>
-  Ein Schlagwort kann eine Farbe bekommen. Farbige Schlagworte werden überall als farbige
-  Plakette dargestellt und sind dadurch auf einen Blick von den übrigen zu unterscheiden. In
-  dieser Galerie gibt es zwölf Farben (im Folgenden auch Gruppen genannt). Elf davon tragen je
-  ein gleichnamiges Schlagwort; diese acht sind die Themen:
+  Ein Schlagwort kann eine Farbe bekommen. Farbige Schlagworte erscheinen auf der Fotoseite und
+  in den Eigenschaften eines Fotos als farbige Plakette, in der Schlagwortverwaltung mit einem
+  farbigen Punkt. Es gibt zwölf Farben, im Folgenden auch Gruppen genannt. Acht davon sind
+  Themen:
 </p>
 
 <ul>
@@ -162,7 +158,7 @@
 </ul>
 
 <p>
-  Die übrigen vier sind besondere Gruppen mit eigener Bedeutung, siehe den nächsten Abschnitt.
+  Dazu kommen vier besondere Gruppen, siehe den nächsten Abschnitt.
 </p>
 
 <p>Eine Farbe wird in der Schlagwortverwaltung vergeben:</p>
@@ -220,19 +216,18 @@
 
 <div class="hinweis">
   <p>
-    Schlagworte mit der Farbe <strong>Ausstellung</strong>, <strong>Kategorie ?</strong> oder
-    <strong>Name ?</strong>, gleich wie sie heißen, sowie jedes Schlagwort und jede Farbe mit
-    einem Fragezeichen im Namen bleiben in dieser Galerie. Sie
-    werden nicht in die Bilddatei geschrieben und erscheinen deshalb auch nicht in der
-    Online-Galerie, die aus den Bilddateien aufgebaut wird.
+    Ein Schlagwort bleibt in der Arbeitskopie, wenn es selbst oder seine Farbe Ausstellung heißt,
+    gleich ob groß oder klein geschrieben, oder ein Fragezeichen im Namen trägt. Das betrifft
+    also auch jedes Schlagwort mit der Farbe <strong>Kategorie ?</strong> oder
+    <strong>Name ?</strong>. Solche Schlagworte werden nicht in die Bilddatei geschrieben und
+    erscheinen deshalb nicht in der Online-Galerie.
   </p>
 </div>
 
 <h3>Farbige Schlagworte auf der Fotoseite setzen</h3>
 
 <p>
-  Das ist der Weg für alle angemeldeten Benutzer, auch ohne Verwaltungsrechte. Auf der Seite
-  eines Fotos steht rechts der Abschnitt <strong>Schlagworte</strong> mit den bereits
+  Auf der Fotoseite steht rechts der Abschnitt <strong>Schlagworte</strong> mit den bereits
   vergebenen. Die noch nicht vergebenen farbigen Schlagworte stehen am Fuß der rechten Spalte,
   unterhalb aller Angaben und damit auch unterhalb von <strong>Herkunft</strong>, jeweils mit
   einem <strong>+</strong> davor.
@@ -250,18 +245,16 @@
 
 <ul>
   <li>
-    <strong>Hinzufügen</strong>: auf eine Plakette mit <strong>+</strong> klicken. Der
-    Kurzhinweis lautet <em>Schlagwort hinzufügen</em>. Das Schlagwort wandert sofort zu den
-    vergebenen.
+    Hinzufügen: auf eine Plakette mit <strong>+</strong> klicken (Kurzhinweis
+    <em>Schlagwort hinzufügen</em>). Das Schlagwort wandert sofort zu den vergebenen.
   </li>
   <li>
-    <strong>Entfernen</strong>: auf das <strong>x</strong> einer vergebenen farbigen Plakette
-    klicken. Der Kurzhinweis lautet <em>Schlagwort entfernen</em>.
+    Entfernen: auf das <strong>x</strong> einer vergebenen farbigen Plakette klicken
+    (Kurzhinweis <em>Schlagwort entfernen</em>).
   </li>
   <li>
-    <strong>Eintippen</strong>: den Namen in das Feld <strong>Neues Schlagwort
-    eingeben</strong> schreiben und <strong>Hinzufügen</strong> klicken oder die Eingabetaste
-    drücken. Ein neuer Name wird als Schlagwort angelegt und kommt in die Gruppe
+    Eintippen: den Namen in das Feld <strong>Neues Schlagwort eingeben</strong> schreiben und
+    <strong>Hinzufügen</strong> klicken oder <em>Enter</em> drücken. Ein neuer Name wird als Schlagwort angelegt und kommt in die Gruppe
     <strong>Freitext</strong>. Gibt es den Namen schon, wird das vorhandene Schlagwort
     zugeordnet und behält seine Farbe. Schlägt das fehl, steht der Grund neben dem Feld und
     der eingetippte Text bleibt stehen.
@@ -281,7 +274,7 @@
 <p>
   Ändern sich die Schlagworte eines Fotos, auf welchem Weg auch immer, werden sie auch in die
   Bilddatei geschrieben, zusammen mit dem Namen ihrer Farbe. Andere Bildprogramme zeigen sie
-  dann als Stichwörter der Datei. Ausgenommen sind die Schlagworte, die nur in dieser Galerie
+  dann als Stichwörter der Datei. Ausgenommen sind die Schlagworte, die nur in der Arbeitskopie
   bleiben (siehe <a href="#besondere">Die vier besonderen Gruppen</a>).
 </p>
 
@@ -292,10 +285,11 @@
     noch nicht in seiner Datei.
   </li>
   <li>
-    Kann die Datei nicht geschrieben werden, zeigt die Verwaltung nach dem Sichern oben eine
-    Fehlermeldung, die mit <em>Photo Info:</em> beginnt. Die Schlagworte sind dann in der
-    Galerie gespeichert, die Datei blieb unverändert. In dem Fall die Verwaltung der Galerie
-    benachrichtigen.
+    Kann die Datei nicht geschrieben werden, steht nach dem Sichern oben eine Fehlermeldung,
+    die mit <em>Fotoinfo:</em> beginnt. Das gilt in den Eigenschaften eines Fotos und in der
+    Stapelverarbeitung; auf der Fotoseite und in der Schlagwortverwaltung erscheint keine
+    Meldung. Die Schlagworte sind dann in der Galerie gespeichert, die Datei blieb unverändert.
+    In dem Fall den Webmaster benachrichtigen.
   </li>
 </ul>
 
