@@ -12,9 +12,8 @@
 
 <p>
   Die Texte eines Fotos stehen in seinen Eigenschaften
-  (<code>admin.php?page=photo-&lt;nummer&gt;-properties</code>). Dorthin führt die
-  Stapelverarbeitung oder ein Klick auf ein Foto in der Verwaltung. Die Seite ist der
-  Verwaltung vorbehalten.
+  (<code>admin.php?page=photo-&lt;nummer&gt;-properties</code>), erreichbar mit einem Klick auf
+  das Foto unter <span class="pwgScreen">Verwaltung » Fotos » Stapelverarbeitung</span>.
 </p>
 
 <figure>
@@ -39,19 +38,18 @@
     wurde. Ein Klick auf das Feld öffnet einen Kalender.
     <strong>Einstellung löschen</strong> darunter leert das Datum wieder. Ein hier gesetztes
     Datum gilt immer als genauer Tag. Wer nur das Jahr kennt oder ein ungefähres Datum
-    eintragen will, benutzt das Feld <strong>Datum</strong> auf der Fotoseite, siehe unten,
-    <strong>Datum und Info auf der Fotoseite</strong>.
+    eintragen will, benutzt das Feld <strong>Datum</strong> auf der Fotoseite, siehe
+    <a href="#fotoseite">Datum und Info auf der Fotoseite</a>.
   </li>
   <li>
-    <strong>Beschreibung</strong>: freier Text zum Foto. Auf der Fotoseite heißt derselbe Text
-    <strong>Info</strong>.
+    <strong>Beschreibung</strong>: freier Text zum Foto.
   </li>
 </ul>
 
 <p>
   Auf dem Bildschirm liegen zwischen <strong>Aufnahmedatum</strong> und
-  <strong>Beschreibung</strong> noch drei weitere Felder, siehe unten,
-  <strong>Die weiteren Felder derselben Seite</strong>.
+  <strong>Beschreibung</strong> noch drei weitere Felder, siehe
+  <a href="#weitere-felder">Die weiteren Felder derselben Seite</a>.
 </p>
 
 <p>
@@ -66,7 +64,7 @@
   </p>
 </div>
 
-<h3>Die weiteren Felder derselben Seite</h3>
+<h3 id="weitere-felder">Die weiteren Felder derselben Seite</h3>
 
 <ul>
   <li>
@@ -94,7 +92,7 @@
 <div class="hinweis">
   <p>
     Beim Sichern gilt für <strong>Verknüpfte Alben</strong> genau die Liste, die im Feld steht.
-    Ein Album, das hier fehlt, verliert das Foto. Das Feld ergänzt also nicht, es ersetzt.
+    Ein Album, das hier fehlt, verliert das Foto.
     Wer ein Foto einem weiteren Album hinzufügen will, ohne die bisherigen zu verlieren,
     benutzt in der Stapelverarbeitung die Aktion <strong>Mit einem Album verbinden</strong>
     (siehe <a href="02-fotos.html">Fotos zu einem Album hinzufügen</a>). Das Album, in dem die
@@ -132,12 +130,11 @@
 </ul>
 
 <p>
-  Der Abschnitt hat eine eigene Schaltfläche <strong>Einstellungen sichern</strong> direkt
-  darunter. Sie sichert die Notiz. Die Meldung lautet danach
-  <strong>Herkunft gespeichert</strong>.
+  Für die Notiz gibt es eine eigene Schaltfläche <strong>Einstellungen sichern</strong> direkt
+  darunter. Danach erscheint <strong>Herkunft gespeichert</strong>.
 </p>
 
-<h3>Datum und Info auf der Fotoseite</h3>
+<h3 id="fotoseite">Datum und Info auf der Fotoseite</h3>
 
 <p>
   Datum und Beschreibung lassen sich auch direkt auf der öffentlichen Fotoseite bearbeiten,
@@ -227,8 +224,7 @@
 
 <ul>
   <li>
-    Datum und Info werden nicht nur in der Galerie gespeichert, sondern auch in die Bilddatei
-    geschrieben. Andere Bildprogramme zeigen sie dann in der Bildbeschreibung der Datei, vor
+    Datum und Info werden in der Galerie gespeichert und in die Bilddatei geschrieben. Andere Bildprogramme zeigen sie dann in der Bildbeschreibung der Datei, vor
     dem Text zur Herkunft.
   </li>
   <li>
@@ -237,8 +233,8 @@
     gespeichert wird, steht auch auf der anderen.
   </li>
   <li>
-    Bei einem Datum wie <em>ca. 1965</em> steht in den Eigenschaften der erste Tag, den die
-    Angabe umfasst, hier also der 1. Januar 1965. Solange das Aufnahmedatum dort nicht
+    Bei einem Datum wie <em>ca. 1965</em> steht in den Eigenschaften der erste Tag der
+    eingetragenen Angabe, hier also der 1. Januar 1965. Solange das Aufnahmedatum dort nicht
     verändert wird, bleibt es beim Sichern der Eigenschaften bei <em>ca. 1965</em>. Wird es
     dort oder in der Stapelverarbeitung geändert, gilt es danach als genauer Tag.
   </li>
@@ -246,10 +242,11 @@
 
 <div class="hinweis">
   <p>
-    Erscheint nach dem Speichern die Meldung
+    Erscheint nach dem Speichern auf der Fotoseite die Meldung
     <em>Gespeichert, aber nicht in die Bilddatei geschrieben</em>, ist die Angabe in der
-    Galerie gespeichert, aber die Bilddatei blieb unverändert. Der Grund steht hinter der
-    Meldung. In dem Fall die Verwaltung der Galerie benachrichtigen.
+    Galerie gespeichert, aber die Bilddatei blieb unverändert. Dahinter steht der Grund auf
+    Deutsch, etwa <em>Die Datei fehlt oder ist nicht beschreibbar</em>. Nur seltene technische
+    Gründe erscheinen auf Englisch. In jedem Fall den Webmaster benachrichtigen.
   </p>
 </div>
 
@@ -257,17 +254,17 @@
 
 <figure>
   <img src="assets/screenshots/11-foto-oeffentlich.png" alt="Die Fotoseite, wie Besucher sie sehen" />
-  <figcaption>Die Fotoseite. Links das Foto mit seinem Titel, rechts die Angaben.</figcaption>
+  <figcaption>Die Fotoseite. Links das Foto, rechts die Angaben.</figcaption>
 </figure>
 
 <ul>
-  <li><strong>Titel</strong>: als Überschrift über dem Foto und im Titel des Browserfensters.</li>
+  <li><strong>Titel</strong>: in der Kopfzeile, nach dem Albumpfad, und im Titel des
+    Browserfensters.</li>
   <li><strong>Autor</strong>: rechts in den Angaben unter <strong>Autor</strong>.</li>
   <li>
     <strong>Aufnahmedatum</strong>: rechts unter <strong>Datum</strong>. Weiter unten steht
     unter <strong>Veröffentlicht am</strong> das Datum des Uploads.
   </li>
-  <li><strong>Beschreibung</strong>: rechts unter <strong>Info</strong>.</li>
   <li>
     <strong>Herkunft</strong>: rechts als eigene Zeile. Die fünf Angaben stehen dort
     hintereinander, durch senkrechte Striche getrennt.
@@ -276,7 +273,7 @@
 
 <nav class="zurueck">
   <a href="index.html">Zurück zum Inhalt</a> ·
-  <a href="02-fotos.html">Zurück: Fotos hinzufügen</a> ·
+  <a href="02-fotos.html">Zurück: Fotos zu einem Album hinzufügen</a> ·
   <a href="04-schlagworte.html">Weiter: Schlagworte vergeben</a>
 </nav>
 
