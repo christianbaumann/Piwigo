@@ -275,6 +275,12 @@ Style: brief, steps as full sentences, notes may be fragments, no em/en dashes, 
 #### [ ] 4.1 `01-alben.html`: A1, B1, D3, D4, E7
 #### [ ] 4.2 `02-fotos.html`: A2, A3, B3, B4, B5, D3, D5, E7
 #### [ ] 4.3 `03-fototexte.html`: A4, B6, D1 (O3), D5, E2, E4, E7
+  Code first (owner, 2026-10-10, answer a to the Phase 1 verify question): the picture page's
+  *Gespeichert, aber nicht in die Bilddatei geschrieben: %s* fills `%s` with the ws answer's raw
+  English `message` (`plugins/photoinfo/template/info.js:62`, `date.js:230`). Translate the
+  reason on the picture page too (the ws API answer stays English, `TagWriteTest.php:382`).
+  Test first in photoinfo E2E: a failed write shows the German reason, oracle read from the de_DE
+  language file; red today. Then the text says the reason is German.
 #### [ ] 4.4 `04-schlagworte.html`: A9, B7, B8 (O6), D1, D2 (O4), D6, E1, E6, E7; merge step and hinweis per O1; *Fotoinfo:* per O2
 #### [ ] 4.5 `05-personen.html` + new `07-fotoseite.html`: A5, A6, B10, C1/C2 results, D1, E3, E6, E7; zoom section moves to 07 (O7, P5), 05 links it
 #### [ ] 4.6 `06-drehen.html`: A7, A8, B11, C3, D1, D2, E7; nav gets *Weiter* to 07
