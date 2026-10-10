@@ -11,18 +11,17 @@
 <h2>Foto drehen und zuschneiden</h2>
 
 <p>
-  Ein seitlich eingescanntes Foto lässt sich aufrichten und ein Scanrand abschneiden. Gedreht
-  wird in Vierteldrehungen, zugeschnitten auf ein frei gezogenes Rechteck. Das Ergebnis wird in
-  die Bilddatei selbst geschrieben, nicht nur in die Anzeige. Das geschieht auf der öffentlichen
-  Fotoseite und ist dem Webmaster vorbehalten: andere Administratoren und angemeldete Benutzer
-  sehen die Schaltfläche nicht.
+  Ein seitlich eingescanntes Foto lässt sich auf der Fotoseite aufrichten und ein Scanrand
+  abschneiden. Gedreht wird in Vierteldrehungen, zugeschnitten auf ein frei gezogenes Rechteck.
+  Das Ergebnis wird in die Bilddatei selbst geschrieben, nicht nur in die Anzeige. Das ist dem
+  Webmaster vorbehalten.
 </p>
 
 <div class="hinweis">
   <p>
-    In der veröffentlichten Galerie ist die Funktion abgeschaltet. Gedreht und zugeschnitten
-    wird in der Arbeitskopie, aus der die Galerie veröffentlicht wird; das bearbeitete Foto
-    kommt mit der nächsten Veröffentlichung dorthin.
+    In der Online-Galerie ist die Funktion abgeschaltet. Gedreht und zugeschnitten wird in der
+    Arbeitskopie; das bearbeitete Foto kommt mit der nächsten Veröffentlichung in die
+    Online-Galerie.
   </p>
 </div>
 
@@ -31,13 +30,14 @@
 <ol>
   <li>
     Das Foto öffnen und in der Leiste über dem Bild auf <strong>Drehen/Zuschneiden</strong>
-    klicken. Der Kurzhinweis lautet <em>Foto drehen oder zuschneiden</em>.
+    klicken (Kurzhinweis <em>Foto drehen oder zuschneiden</em>).
   </li>
   <li>
     An Stelle der übrigen Schaltflächen stehen jetzt vier in der Leiste: <strong>&#8634;</strong>
     (<em>Nach links drehen</em>), <strong>&#8635;</strong> (<em>Nach rechts drehen</em>),
-    <strong>Speichern</strong> und <strong>Abbrechen</strong>. Über dem Foto liegt ein
-    gestrichelter Rahmen, der zunächst das ganze Foto umfasst.
+    <strong>Speichern</strong> und <strong>Abbrechen</strong>. Die Pfeile zum Blättern bleiben;
+    ein Klick darauf verwirft die Vorschau. Über dem Foto liegt ein gestrichelter Rahmen, der
+    zunächst das ganze Foto umfasst.
   </li>
   <li>
     Mit den beiden Pfeilen das Foto so lange drehen, bis es richtig herum steht. Jeder Klick
@@ -72,14 +72,16 @@
 <p>
   Solange der Bearbeitungsmodus offen ist, lässt sich das Foto nicht vergrößern, ein Klick auf
   das Foto führt nicht zum nächsten Foto und die Rahmen der Personen sind ausgeblendet. War
-  gerade der Markierungsmodus für Personen offen, wird er beim Öffnen beendet.
+  gerade der Markierungsmodus für Personen offen, wird er beim Öffnen beendet. Wurde dabei eine
+  Person markiert oder entfernt, lädt die Seite neu und der Bearbeitungsmodus öffnet sich nicht;
+  dann erneut auf <strong>Drehen/Zuschneiden</strong> klicken.
 </p>
 
 <h3>Abbrechen</h3>
 
 <ul>
   <li>
-    <strong>Abbrechen</strong> oder <strong>Esc</strong> verlässt den Bearbeitungsmodus. Die
+    <strong>Abbrechen</strong> oder <em>Esc</em> verlässt den Bearbeitungsmodus. Die
     Vorschau springt zurück, an der Datei ändert sich nichts.
   </li>
   <li>
@@ -102,9 +104,9 @@
 <ul>
   <li>
     <em>Diese Personen-Markierungen werden entfernt:</em> mit den Namen dahinter. Das kommt vor,
-    wenn der Zuschnitt ein markiertes Gesicht ganz oder zu mehr als der Hälfte abschneidet. Diese Markierungen
-    werden beim Speichern gelöscht. Alle anderen Markierungen wandern mit: nach dem Drehen und
-    Zuschneiden sitzen ihre Rahmen wieder auf denselben Gesichtern.
+    wenn die Mitte eines markierten Gesichts außerhalb des Zuschnitts liegt oder nur ein kleiner
+    Rest davon bleibt. Diese Markierungen werden beim Speichern gelöscht. Alle anderen
+    Markierungen wandern mit und sitzen danach wieder auf denselben Gesichtern.
   </li>
   <li>
     <em>Beim Speichern wird das JPEG neu komprimiert, dabei geht etwas Bildqualität
@@ -122,7 +124,7 @@
 <p>
   Eine Schaltfläche zum Rückgängigmachen gibt es nicht. Vor jedem Speichern legt die Galerie aber
   eine Kopie der unveränderten Datei an. Ein bearbeitetes Foto lässt sich mit dieser Kopie
-  wiederherstellen; das ist ein Fall für die Serververwaltung.
+  wiederherstellen. Dafür den Webmaster benachrichtigen.
 </p>
 
 <h3>Wenn die Schaltfläche grau ist</h3>
@@ -140,13 +142,14 @@
   <li>
     <em>exiftool ist auf diesem Server nicht vorhanden, deshalb kann das Foto nicht bearbeitet
     werden.</em> oder <em>exec() ist auf diesem Server abgeschaltet, deshalb kann das Foto nicht
-    bearbeitet werden.</em> Beides ist ein Fall für die Serververwaltung.
+    bearbeitet werden.</em> In beiden Fällen den Webmaster benachrichtigen.
   </li>
 </ul>
 
 <nav class="zurueck">
   <a href="index.html">Zurück zum Inhalt</a> ·
-  <a href="05-personen.html">Zurück: Personen auf Fotos markieren</a>
+  <a href="05-personen.html">Zurück: Personen auf Fotos markieren</a> ·
+  <a href="07-fotoseite.html">Weiter: Die Fotoseite</a>
 </nav>
 
 </body>
