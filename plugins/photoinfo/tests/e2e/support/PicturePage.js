@@ -42,6 +42,15 @@ class PicturePage {
     this.newTagButton = page.locator('#typetags-new-tag button[type="submit"]');
   }
 
+  /**
+   * Any element on the page showing the text.
+   *
+   * @param {string} text
+   */
+  textOnPage(text) {
+    return this.page.getByText(text);
+  }
+
   /** @param {number} tagId */
   tagLink(tagId) {
     return this.page.locator(`#Tags dd a[data-tag-id="${tagId}"]`);
@@ -74,6 +83,7 @@ class PicturePage {
    * Types a name into typetags' field and waits for the server's answer.
    *
    * @param {string} name
+   * @returns {Promise<any>} the answer's result
    */
   async addNewTag(name) {
     await this.newTagField.fill(name);
@@ -81,7 +91,7 @@ class PicturePage {
       (r) => r.url().includes('ws.php') && (r.request().postData() || '').includes('typetags.image.addNewTag')
     );
     await this.newTagButton.click();
-    await answer;
+    return (await (await answer).json()).result;
   }
 
   /**
