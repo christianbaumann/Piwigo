@@ -2,7 +2,8 @@
 const { test, expect } = require('@playwright/test');
 const { PicturePage } = require('./support/PicturePage');
 const { statePath } = require('./support/accounts');
-const { seed, readFile, readRow, restore } = require('./support/seed');
+const { seed, readFile, readRow, makeReadOnly, restore } = require('./support/seed');
+const { germanTextOf } = require('./support/lang');
 
 /**
  * Editing the info text on the picture page. What the file holds in detail is
@@ -56,6 +57,19 @@ test('[ST] the keyboard opens the editor, and Cancel closes it without saving', 
   await expect(picture.infoView).toBeVisible();
   await expect(picture.infoView).not.toContainText('verworfen');
   expect(readRow(fixture.image_id).comment).toBeNull();
+});
+
+test('[NEG] a text the file does not take is saved, and the page gives the reason in German', async ({ page }) => {
+  makeReadOnly(fixture.image_id);
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+
+  await picture.infoView.click();
+  await picture.infoTextarea.fill('Nicht in der Datei');
+  await picture.saveButton.click();
+
+  await expect(picture.infoMessage).toContainText(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'));
+  expect(readRow(fixture.image_id).comment).toBe('Nicht in der Datei');
 });
 
 test.describe('as a normal user', () => {

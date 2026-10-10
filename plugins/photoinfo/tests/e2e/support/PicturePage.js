@@ -16,6 +16,7 @@ class PicturePage {
     this.infoTextarea = page.locator('#photoinfo-info-form textarea');
     this.saveButton = page.locator('#photoinfo-info-form input[type=submit]');
     this.cancelButton = page.locator('#photoinfo-info-form .photoinfo-cancel');
+    this.infoMessage = page.locator('#photoinfo-info-form .photoinfo-message');
     this.coreDescription = page.locator('.imageComment');
 
     this.dateRow = page.locator('#PhotoDate');

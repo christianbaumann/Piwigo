@@ -59,7 +59,7 @@
           saved = json.result.info;
           textarea.value = saved;
           view.textContent = saved;
-          message.textContent = form.dataset.errorWrite.replace('%s', json.result.message);
+          message.textContent = form.dataset.errorWrite.replace('%s', json.result.message_l10n);
           saveButton.disabled = false;
           return;
         }

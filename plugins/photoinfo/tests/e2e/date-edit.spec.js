@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 const { PicturePage } = require('./support/PicturePage');
 const { statePath } = require('./support/accounts');
 const { seed, readDate, readRow, makeReadOnly, restore } = require('./support/seed');
+const { germanTextOf } = require('./support/lang');
 
 /**
  * Editing the date on the picture page. Validation and the file's tags in
@@ -154,6 +155,19 @@ test('[NEG] a clear the file does not take keeps the row clickable and says why'
   expect(readRow(fixture.image_id).date_creation).toBeNull();
   await picture.dateCancelButton.click();
   await expect(picture.datePlaceholder).toBeVisible();
+});
+
+test('[NEG] a date the file does not take is saved, and the page gives the reason in German', async ({ page }) => {
+  makeReadOnly(fixture.image_id);
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+
+  await picture.dateView.click();
+  await picture.fillDate('1965', '', '');
+  await picture.dateSaveButton.click();
+
+  await expect(picture.dateMessage).toContainText(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'));
+  expect(readRow(fixture.image_id).date_creation).not.toBeNull();
 });
 
 test.describe('as a normal user', () => {

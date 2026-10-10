@@ -50,6 +50,7 @@ UPDATE '.IMAGES_TABLE.'
     'info' => $info,
     'written' => $result['ok'],
     'message' => $result['message'],
+    'message_l10n' => photoinfo_l10n_reason($result['message']),
     );
 }
 
@@ -105,7 +106,21 @@ function ws_photoinfo_setDate($params, &$service)
     'edtf' => photoinfo_dating_edtf($dating),
     'written' => $result['ok'],
     'message' => $result['message'],
+    'message_l10n' => photoinfo_l10n_reason($result['message']),
     );
+}
+
+/**
+ * The reason a file write failed, in the caller's language, for the picture
+ * page. The answer's message stays the English key.
+ *
+ * @param string $message
+ * @return string
+ */
+function photoinfo_l10n_reason($message)
+{
+  load_language('plugin.lang', PHOTOINFO_PATH);
+  return l10n($message);
 }
 
 /**

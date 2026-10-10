@@ -227,7 +227,7 @@
           } else {
             view.textContent = json.result.date;
           }
-          message.textContent = form.dataset.errorWrite.replace('%s', json.result.message);
+          message.textContent = form.dataset.errorWrite.replace('%s', json.result.message_l10n);
           saveButton.disabled = false;
           return;
         }
