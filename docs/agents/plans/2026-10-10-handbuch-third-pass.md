@@ -308,14 +308,14 @@ Style: brief, steps as full sentences, notes may be fragments, no em/en dashes, 
 #### [x] 5.1 `handbuch/tools/seed.php:886`: `added_by` = id of `persons_webmaster` looked up by
 username; refuse if missing (names `create-test-users.php`)
 #### [x] 5.2 `handbuch/tools/shoot.js`: declare `26-fotoseite-leiste.png`, `#imageToolBar` as NORMAL
-#### [ ] 5.3 seed, shoot, restore (`.claude/rules/handbook.md`); keep 09, 24, 25, 26 and 11 if A4's
+#### [x] 5.3 seed, shoot, restore (`.claude/rules/handbook.md`); keep 09, 24, 25, 26 and 11 if A4's
 caption changed it; revert every other re-shoot
-#### [ ] 5.4 view each kept shot against its text; 07 references shot 26
+#### [x] 5.4 view each kept shot against its text; 07 references shot 26
 
 ### Success Criteria
-- [ ] `shoot.js` `assertOutput()` passes; `check.php` green; `handbuch-pages.spec.js` green
-- [ ] install back to 5 albums after `--restore`
-- [ ] 09 shows `persons_webmaster`, not `chriss`
+- [x] `shoot.js` `assertOutput()` passes; `check.php` green; `handbuch-pages.spec.js` green (26 shots; 13 passed, 2026-10-10)
+- [x] install back to 5 albums after `--restore` (5 albums, 105 photos)
+- [x] 09 shows `persons_webmaster`, not `chriss`
 
 ---
 
