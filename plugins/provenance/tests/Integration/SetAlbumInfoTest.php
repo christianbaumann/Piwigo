@@ -280,15 +280,22 @@ final class SetAlbumInfoTest extends TestCase
      *
      * Behaviour: template/album_provenance.tpl:21-34, the buttons sit behind
      * {if $PROVENANCE_ALBUM.PHOTO_COUNT > 0}. The write button additionally needs
-     * exiftool, which this install has; that is asserted, not assumed.
+     * exiftool on the server; both halves of that are asserted below.
      */
     public function testAnEmptyAlbumOffersNeitherApplyNorWrite(): void
     {
         $tpl = (string)file_get_contents(PROVENANCE_PATH . 'template/album_provenance.tpl');
         $this->assertStringContainsString(self::APPLY_BUTTON, $tpl, 'the template no longer carries the apply button this test looks for');
         $this->assertStringContainsString(self::WRITE_BUTTON, $tpl, 'the template no longer carries the write button this test looks for');
+        // The write button also needs exiftool. The server finds it on its PATH unless a
+        // provenance_exiftool_path row points elsewhere (a killed photoinfo RescanTest leaves one).
         require_once PROVENANCE_PATH . 'include/exiftool.inc.php';
         $this->assertTrue(provenance_exiftool_available(), 'precondition: without exiftool the write button is absent for another reason');
+        $this->assertSame(
+            0,
+            (int)$this->db->scalar("SELECT COUNT(*) FROM `piwigo_config` WHERE param = 'provenance_exiftool_path'"),
+            'precondition: a provenance_exiftool_path row hides exiftool from the server'
+        );
 
         $album = $this->fixture->createTestAlbum('provenance-buttons-' . bin2hex(random_bytes(4)));
         $this->assertSame(
