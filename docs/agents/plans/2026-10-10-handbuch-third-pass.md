@@ -252,6 +252,9 @@ picture page tells the user", `test.skip` with reason and link to the backlog en
 
 ## Phase 3: Screen checks C1-C3
 
+**Status: C1, C2 implemented and verified 2026-10-10** (05d73ae6e, dc88ca757, 212786d2c; each case
+watched red under its own mutant). C3 waits for the owner's hand check (ledger row in TESTING.md).
+
 ### Overview
 
 Settle what the code cannot, then pin it.
@@ -276,6 +279,9 @@ UI, no test).
 ---
 
 ## Phase 4: Handbook text, one commit per page
+
+**Status: implemented and verified 2026-10-10** apart from 06's dialog labels (C3) and the owner's
+reading of the German (ledger). Review follow-up bfce627ff.
 
 ### Overview
 
@@ -305,6 +311,8 @@ Style: brief, steps as full sentences, notes may be fragments, no em/en dashes, 
 
 ## Phase 5: Seed and screenshots
 
+**Status: implemented and verified 2026-10-10** (e6aa4cffa, 3038b47da).
+
 #### [x] 5.1 `handbuch/tools/seed.php:886`: `added_by` = id of `persons_webmaster` looked up by
 username; refuse if missing (names `create-test-users.php`)
 #### [x] 5.2 `handbuch/tools/shoot.js`: declare `26-fotoseite-leiste.png`, `#imageToolBar` as NORMAL
@@ -321,6 +329,8 @@ caption changed it; revert every other re-shoot
 
 ## Phase 6: Records
 
+**Status: 6.1-6.4 done 2026-10-10** (762c7911b, 317f6d292); 6.5 after C3.
+
 #### [x] 6.1 `docs/agents/TESTING.md`: dated "third pass" section (findings, tests added, C1-C3
 results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom ledger row; dated note on the
 `Confirm merge` mutant row (`:892`): since O1 that mutant is the shipped behaviour and the spec is
@@ -331,7 +341,7 @@ results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom l
 #### [ ] 6.5 research note `status: implemented`; this plan `status: implemented`
 
 ### Success Criteria
-- [ ] `bash tools/test-hooks.sh` green; commit gate passes
+- [x] `bash tools/test-hooks.sh` green; commit gate passes (2026-10-10)
 
 ---
 
@@ -370,10 +380,10 @@ results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom l
 - [x] `provenance handbuch-pages.spec.js`: picks up 07 by glob
 
 ### Regression
-- [ ] typetags unit, integration, E2E (core `tags.tpl`, tag paths)
-- [ ] photoinfo unit, integration, E2E
-- [ ] persons, photoedit, provenance: unit, integration, E2E
-- [ ] each suite twice in a row
+- [x] typetags unit, integration, E2E (core `tags.tpl`, tag paths) (E2E 45 passed, twice, 2026-10-10)
+- [x] photoinfo unit, integration, E2E (268 / 179 / 54 + 1 skipped, once, after 4.3, 2026-10-10)
+- [x] persons, photoedit, provenance: unit, integration, E2E (persons E2E 151, photoedit E2E 28, provenance E2E 55, 2026-10-10)
+- [-] each suite twice in a row (twice: typetags, persons unit + integration, photoedit, provenance; once: persons E2E, photoinfo)
 
 ### Manual Testing Steps
 1. C3: confirm dialog labels in the container's Chromium (browser UI, not reachable by a spec).
