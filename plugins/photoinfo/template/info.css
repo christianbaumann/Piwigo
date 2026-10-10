@@ -32,3 +32,15 @@
 .photoinfo-message:empty {
   display: none;
 }
+
+#PhotoDate .photoinfo-cancel,
+#PhotoInfo .photoinfo-cancel,
+#PhotoDate .photoinfo-cancel:hover,
+#PhotoInfo .photoinfo-cancel:hover {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

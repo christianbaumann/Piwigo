@@ -84,6 +84,36 @@ class PicturePage {
     await answer;
   }
 
+  /**
+   * Opens the date or the info editor and reads how the browser paints its
+   * Cancel and Save, and a probe submit button put into the same form for the
+   * moment of the reading: the probe is what the skin makes of a plain submit.
+   *
+   * @param {'date'|'info'} editor
+   */
+  async editorButtonLook(editor) {
+    const view = editor === 'date' ? this.dateView : this.infoView;
+    const form = editor === 'date' ? this.dateForm : this.infoForm;
+    await view.click();
+    await form.waitFor({ state: 'visible' });
+    return form.evaluate((el) => {
+      const PROPS = ['backgroundColor', 'backgroundImage', 'borderTopWidth', 'color'];
+      const cancel = el.querySelector('.photoinfo-cancel');
+      const save = el.querySelector('input[type=submit]');
+      const probe = document.createElement('input');
+      probe.type = 'submit';
+      probe.value = 'probe';
+      save.parentNode.appendChild(probe);
+      const look = (button) => {
+        const style = window.getComputedStyle(button);
+        return Object.fromEntries(PROPS.map((prop) => [prop, style[prop]]));
+      };
+      const result = { cancel: look(cancel), save: look(save), probe: look(probe) };
+      probe.remove();
+      return result;
+    });
+  }
+
   /** @param {string} picturePath as seed.php prints it */
   async goto(picturePath) {
     await this.page.goto(picturePath);

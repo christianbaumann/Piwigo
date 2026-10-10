@@ -100,7 +100,7 @@ Three defects the handbook currently works around. Each: failing test, fix, suit
 
 ### Changes Required
 
-#### [ ] 1.1 O8: photoinfo *Abbrechen* as a quiet secondary control
+#### [x] 1.1 O8: photoinfo *Abbrechen* as a quiet secondary control
 
 **Test first**: `plugins/photoinfo/tests/e2e/editor-buttons.spec.js` (new), page object additions
 in `support/PicturePage.js` (`cancelLook()`, `saveLook()`, reading computed `backgroundColor`,
@@ -134,7 +134,7 @@ the same form (same props), so the fix cannot touch *Speichern*.
 }
 ```
 
-#### [ ] 1.2 O2: German *Fotoinfo:* prefix and not-writable message
+#### [x] 1.2 O2: German *Fotoinfo:* prefix and not-writable message
 
 **Test first**: `plugins/photoinfo/tests/Integration/CoreEditTest.php` and `TagWriteTest.php`:
 replace the constant-built `WRITE_FAILED` oracle with the German literal
@@ -152,7 +152,7 @@ German prefix too.
 - `plugins/photoinfo/language/de_DE/plugin.lang.php`, `en_UK/plugin.lang.php`: two keys.
 - `handbuch/04-schlagworte.html:296` quotes *Fotoinfo:* (in Phase 4).
 
-#### [ ] 1.3 O1: translate the merge buttons in core
+#### [x] 1.3 O1: translate the merge buttons in core
 
 **Test first**: `plugins/provenance/tests/e2e/core-admin-screens.spec.js:251-283`: rename to
 "the merge panel opens two interactions deep and its buttons are German", expect
@@ -173,9 +173,9 @@ label helper if the spec has one, else as literals with a comment naming
 ### Success Criteria
 
 #### Automated Verification
-- [ ] 1.1 red before the CSS, green after: photoinfo E2E
-- [ ] 1.2 red before, green after: photoinfo unit + integration
-- [ ] 1.3 red before, green after: provenance E2E `core-admin-screens.spec.js`
+- [x] 1.1 red before the CSS, green after: photoinfo E2E
+- [x] 1.2 red before, green after: photoinfo unit + integration
+- [x] 1.3 red before, green after: provenance E2E `core-admin-screens.spec.js`
 - [ ] typetags E2E green (its prefilter touches `tags.tpl`)
 
 #### Manual Verification
@@ -329,15 +329,15 @@ results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom l
   not in the override file).
 
 ### Integration Tests
-- [ ] `photoinfo CoreEditTest`: failed write shows German prefix and message `[HAPPY]`
-- [ ] `photoinfo TagWriteTest`: same through the tag path; absence cases `[NEG]`
-- [ ] `photoinfo FreitextAssignTest`: absence cases updated `[NEG]`
+- [x] `photoinfo CoreEditTest`: failed write shows German prefix and message `[HAPPY]`
+- [x] `photoinfo TagWriteTest`: same through the tag path; absence cases `[NEG]`
+- [x] `photoinfo FreitextAssignTest`: absence cases updated `[NEG]`
 - [ ] `provenance CoreUploadCharacterizationTest`: byte-identical upload `[ERR]`
 - [ ] provenance album screen source: buttons at 0 and 1 photos `[BVA]`
 
 ### End-to-End Tests
-- [ ] `photoinfo editor-buttons.spec.js`: per skin `[ECP]`
-- [ ] `provenance core-admin-screens.spec.js`: merge buttons German `[HAPPY]`
+- [x] `photoinfo editor-buttons.spec.js`: per skin `[ECP]`
+- [x] `provenance core-admin-screens.spec.js`: merge buttons German `[HAPPY]`
 - [ ] `persons editor.spec.js`: A5 `[HAPPY]` `[ECP]`, B10 `[ST]`
 - [ ] `photoedit edit-mode.spec.js`: A7 `[ST]`, B11 `[ST]`
 - [ ] `persons picture-zoom.spec.js`: C1 `[ECP]`
