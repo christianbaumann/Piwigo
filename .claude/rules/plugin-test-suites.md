@@ -170,7 +170,9 @@ photo and region counts straight from the database, which is the oracle the pers
 screen's own numbers are compared against - a browser cannot reach MariaDB, and a screen that
 agreed only with itself would prove nothing. `seed.php --exiftool=missing|present` writes or
 removes a `persons_exiftool_path` config row pointing at a directory holding no binary, which is
-how the disabled-editor spec forces a host without exiftool rather than waiting for one.
+how the disabled-editor spec forces a host without exiftool rather than waiting for one. `seed.php --originals=allowed|denied` sets `persons_normal`'s
+`enabled_high`, which decides whether the picture page offers it the original and so what the zoom's
+*100 %* means (`picture-zoom.spec.js`); `--restore` puts `allowed` back.
 `--restore` deletes the album, the photo row and the
 copied file with exiftool's `_original` sidecar when it finds a snapshot, and — before it even
 looks for one — removes that config row and the persons the specs create through the UI. Both are

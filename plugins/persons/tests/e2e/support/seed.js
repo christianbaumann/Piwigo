@@ -67,6 +67,19 @@ function setExiftool(state) {
 }
 
 /**
+ * Whether the normal test account may see original files. The zoom's 100 % is
+ * the largest file the viewer is offered, so this decides what 100 % means.
+ * --restore puts 'allowed' back.
+ *
+ * @param {'allowed'|'denied'} state
+ */
+function setOriginals(state) {
+  return JSON.parse(
+    execFileSync('php', [SEED_SCRIPT, `--originals=${state}`], { encoding: 'utf8' })
+  );
+}
+
+/**
  * Every person in the index with the counts the database holds.
  *
  * The oracle the admin screen's own numbers are compared against - a browser
@@ -78,4 +91,4 @@ function personCounts() {
   return JSON.parse(execFileSync('php', [SEED_SCRIPT, '--person-counts'], { encoding: 'utf8' }));
 }
 
-module.exports = { seed, restore, readFileRegions, setExiftool, personCounts };
+module.exports = { seed, restore, readFileRegions, setExiftool, setOriginals, personCounts };

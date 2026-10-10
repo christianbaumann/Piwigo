@@ -1,6 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-const { seed, restore } = require('./support/seed');
+const { seed, restore, setOriginals } = require('./support/seed');
 const { PicturePage } = require('./support/PicturePage');
 const { SKINS, MIN_SKINS } = require('./support/skins');
 
@@ -188,6 +188,37 @@ test.describe('the zoom buttons', () => {
 
     await picture.zoomOut();
     expect((await picture.imageDisplay()).width).toBe(natural.width);
+  });
+
+  // [ECP] an account core offers the original: 100 % is the original's size
+  test('100 % shows the original to an account that may see originals', async ({ page }) => {
+    setOriginals('allowed');
+    const picture = new PicturePage(page);
+    const { seeded } = await openFitted(picture);
+    // Anti-vacuity: the original is bigger than every derivative, so the two classes differ.
+    const derivatives = await picture.derivatives();
+    expect(derivatives[derivatives.length - 1].w).toBeLessThan(seeded.width);
+
+    await picture.zoomToNatural();
+    const natural = await picture.imageDisplay();
+    expectWidth(natural, seeded.width);
+    expect(natural.naturalWidth).toBe(seeded.width);
+  });
+
+  // [ECP] an account core offers no original: 100 % is the largest derivative's size
+  test('100 % shows the largest size an account without originals may load', async ({ page }) => {
+    setOriginals('denied');
+    const picture = new PicturePage(page);
+    const { seeded } = await openFitted(picture);
+    const derivatives = await picture.derivatives();
+    const largest = derivatives[derivatives.length - 1];
+    // Anti-vacuity: the largest derivative is smaller than the original.
+    expect(largest.w).toBeLessThan(seeded.width);
+
+    await picture.zoomToNatural();
+    const natural = await picture.imageDisplay();
+    expectWidth(natural, largest.w);
+    expect(natural.naturalWidth).toBe(largest.w);
   });
 
   // [ST] a step the area outgrew is fit: it does not come back when the area shrinks again

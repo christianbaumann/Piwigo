@@ -22,6 +22,7 @@
  *   php tests/e2e/support/seed.php --scenario=empty --source=small
  *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
  *   php tests/e2e/support/seed.php --exiftool=missing|present
+ *   php tests/e2e/support/seed.php --originals=allowed|denied
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -211,6 +212,39 @@ function set_exiftool_state(Db $db, string $state): array
     return array('exiftool' => $state);
 }
 
+/** The account the picture page specs run as, whose access to originals --originals sets. */
+const ORIGINALS_ACCOUNT = 'persons_normal';
+
+/**
+ * Lets the normal test account see original files, or not.
+ *
+ * core offers the original only when the viewer's piwigo_user_infos.enabled_high
+ * is 'true' (picture.php), and the zoom's 100 % is the largest file offered. The
+ * column defaults to 'true' and create-test-users.php inherits it rather than
+ * setting it, so both states are forced rather than hoped for. --restore puts
+ * 'true' back: the column default, and what this test-only account holds when
+ * nothing forced it.
+ */
+function set_originals_state(Db $db, string $state): array
+{
+    if (!in_array($state, array('allowed', 'denied'), true))
+    {
+        fail('--originals must be one of: allowed, denied');
+    }
+
+    $value = $state === 'allowed' ? 'true' : 'false';
+    $user = "SELECT id FROM piwigo_users WHERE username = '" . $db->escape(ORIGINALS_ACCOUNT) . "'";
+    $db->query("UPDATE piwigo_user_infos SET enabled_high = '$value' WHERE user_id = ($user)");
+
+    $stored = $db->scalar("SELECT enabled_high FROM piwigo_user_infos WHERE user_id = ($user)");
+    if ($stored !== $value)
+    {
+        fail('could not force ' . ORIGINALS_ACCOUNT . "'s originals to $state; run tests/Support/create-test-users.php");
+    }
+
+    return array('originals' => $state);
+}
+
 /**
  * What the image file itself says, read by a plain exiftool call.
  *
@@ -308,7 +342,7 @@ SELECT p.name,
     return $counts;
 }
 
-$args = getopt('', array('scenario::', 'source::', 'restore', 'read-file-regions::', 'exiftool::', 'person-counts'));
+$args = getopt('', array('scenario::', 'source::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -323,6 +357,7 @@ if (isset($args['restore']))
     // the UI are known by name rather than by anything the snapshot holds - a
     // leftover one puts a stranger at the top of the next run's picker.
     $db->query("DELETE FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
+    set_originals_state($db, 'allowed');
     $builder->destroyPersons(array_merge(SEEDED_PERSONS, EDITOR_PERSONS));
 
     $snapshot = load_snapshot();
@@ -344,6 +379,12 @@ if (isset($args['restore']))
 if (isset($args['exiftool']))
 {
     echo json_encode(set_exiftool_state($db, (string)$args['exiftool'])), "\n";
+    exit(0);
+}
+
+if (isset($args['originals']))
+{
+    echo json_encode(set_originals_state($db, (string)$args['originals'])), "\n";
     exit(0);
 }
 
