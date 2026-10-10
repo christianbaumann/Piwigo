@@ -191,6 +191,15 @@ label helper if the spec has one, else as literals with a comment naming
 
 ## Phase 2: Tests for behaviour the text will rely on
 
+**Status: implemented and verified 2026-10-10** (commits d8c5a87bc, 68ad0a9a9, bfab10567, 5253d10b6,
+b9e5db95a and the review follow-ups 4f5a207c1, 3504d18f7, aae7e1be5). Each test watched red under
+its named break; the B8 test watched red un-skipped. Deviations: A2's break is the
+`upload_detect_duplicate` condition in `add_uploaded_file()` (the test forces the config row on,
+so flipping the row would change the test, not the behaviour); B1 lives in `SetAlbumInfoTest`;
+A7 asserts both arrows over a new photoedit `seed.php --scenario=neighbours`; the B8 oracle is
+read from `PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE` and the de_DE file (`support/lang.js`), and since
+`tags_message` is the English key, the backlog entry says the fix must deliver German.
+
 ### Overview
 
 Characterize today's behaviour before the text describes it. Tag `[ERR]` where the oracle is the
@@ -198,35 +207,35 @@ code. Each passes first run, so each is watched red by breaking the behaviour, t
 
 ### Changes Required
 
-#### [ ] 2.1 A2 md5 duplicate
+#### [x] 2.1 A2 md5 duplicate
 `plugins/provenance/tests/Integration/CoreUploadCharacterizationTest.php`:
 `testAByteIdenticalUploadLinksTheExistingPhotoInsteadOfAddingOne` `[ERR]`. Upload the fixture
 twice into two albums; assert one image row, linked to both. Red by setting
 `upload_detect_duplicate` false in the test's config row (restored in tearDown).
 
-#### [ ] 2.2 B1 provenance buttons absent at 0 photos
+#### [x] 2.2 B1 provenance buttons absent at 0 photos
 `plugins/provenance/tests/Integration/` album screen source test (existing page-source test class
 for the album screen): `testAnEmptyAlbumOffersNeitherApplyNorWrite` `[BVA]` 0 vs 1 photo. Red by
 removing the condition in `album_provenance.tpl:21-34`.
 
-#### [ ] 2.3 A5 first entry highlighted
+#### [x] 2.3 A5 first entry highlighted
 `plugins/persons/tests/e2e/editor.spec.js`: "[HAPPY] the first entry is highlighted as the list
 opens, and Enter takes it"; "[ECP] a partial match is listed before Anlegen". Red by removing
 `setHighlight(0)` (`editor.js:576-581`).
 
-#### [ ] 2.4 B10 success then failure still reloads
+#### [x] 2.4 B10 success then failure still reloads
 `editor.spec.js`: "[ST] leaving after a save and a later refused save reloads". Red by resetting
 `changed` on failure.
 
-#### [ ] 2.5 A7 nav arrows stay in edit mode
+#### [x] 2.5 A7 nav arrows stay in edit mode
 `plugins/photoedit/tests/e2e/edit-mode.spec.js`: "[ST] the navigation arrows stay visible in edit
 mode and leave the page". Red by hiding them in `editor.css`.
 
-#### [ ] 2.6 B11 tagging changes, then edit mode
+#### [x] 2.6 B11 tagging changes, then edit mode
 `edit-mode.spec.js`: "[ST] entering edit mode after a tagging change reloads instead of opening".
 Red by removing the reload in persons' `editor.js:541-545`.
 
-#### [ ] 2.7 B8 known gap
+#### [x] 2.7 B8 known gap
 `plugins/photoinfo/tests/e2e/tags-freitext.spec.js` or a new spec: "a failed tag write on the
 picture page tells the user", `test.skip` with reason and link to the backlog entry.
 `docs/backlog.md`: entry for typetags ignoring `tags_message`.
@@ -234,9 +243,10 @@ picture page tells the user", `test.skip` with reason and link to the backlog en
 ### Success Criteria
 
 #### Automated Verification
-- [ ] each new test green on unchanged code, red under its named break, green after revert
+- [x] each new test green on unchanged code, red under its named break, green after revert
   (checksum poll per `.claude/rules/mutation-testing.md` before each run)
-- [ ] provenance integration, persons E2E, photoedit E2E, photoinfo E2E green twice in a row
+- [x] provenance integration, persons E2E, photoedit E2E, photoinfo E2E green twice in a row
+  (serial, 2026-10-10: provenance 211 tests/4 skipped; persons 147; photoedit 28; photoinfo 52 + 1 skipped)
 
 ---
 
@@ -346,17 +356,17 @@ results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom l
 - [x] `photoinfo CoreEditTest`: failed write shows German prefix and message `[HAPPY]`
 - [x] `photoinfo TagWriteTest`: same through the tag path; absence cases `[NEG]`
 - [x] `photoinfo FreitextAssignTest`: absence cases updated `[NEG]`
-- [ ] `provenance CoreUploadCharacterizationTest`: byte-identical upload `[ERR]`
-- [ ] provenance album screen source: buttons at 0 and 1 photos `[BVA]`
+- [x] `provenance CoreUploadCharacterizationTest`: byte-identical upload `[ERR]`
+- [x] provenance album screen source: buttons at 0 and 1 photos `[BVA]`
 
 ### End-to-End Tests
 - [x] `photoinfo editor-buttons.spec.js`: per skin `[ECP]`
 - [x] `provenance core-admin-screens.spec.js`: merge buttons German `[HAPPY]`
-- [ ] `persons editor.spec.js`: A5 `[HAPPY]` `[ECP]`, B10 `[ST]`
-- [ ] `photoedit edit-mode.spec.js`: A7 `[ST]`, B11 `[ST]`
+- [x] `persons editor.spec.js`: A5 `[HAPPY]` `[ECP]`, B10 `[ST]`
+- [x] `photoedit edit-mode.spec.js`: A7 `[ST]`, B11 `[ST]`
 - [ ] `persons picture-zoom.spec.js`: C1 `[ECP]`
 - [ ] `persons overlay.spec.js`: C2 extended
-- [ ] photoinfo: B8 `test.skip` known gap
+- [x] photoinfo: B8 `test.skip` known gap
 - [ ] `provenance handbuch-pages.spec.js`: picks up 07 by glob
 
 ### Regression
