@@ -78,6 +78,12 @@ over HTTP is. So for an integration test over HTTP, wait at least `revalidate_fr
 after the checksums agree, on apply and on revert. Hit in `plugins/photoedit`, 2026-10-05:
 removing the webmaster check "survived" until the run waited three seconds, then died.
 
+Smarty has the same shift for a core or theme `.tpl`. It recompiles only when the source is
+**newer** than the compiled file, at one-second resolution, so a revert landing in the same second
+as the mutant's compile leaves the mutant's compiled page in `_data/templates_c/`, and the
+"reverted" run stays red. After reverting a template mutant, `ddev exec touch <file>` a second
+later before re-running. Hit on core's `tags.tpl`, 2026-10-10.
+
 Python has its own version of the same shift, and it bites *after* the revert rather than
 before it. CPython decides a cached `.pyc` is current from the source's **mtime and size**
 only — never its contents. A mutant that keeps the byte length (transposing two

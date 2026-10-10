@@ -890,6 +890,7 @@ runtime), and reverted afterwards; `git diff` over `admin/`, `include/`, `themes
 | a row action's `title` replaced with an English literal (`albums.js:361`) | the row-label spec | killed |
 | the `Duplicate` entry deleted from the tag menu (`tags.tpl:70`) | the five-entries spec | killed |
 | `Confirm merge` translated into German (`tags.tpl:110`) | the `[ERR]` merge spec | killed (2026-10-10: since O1 of the handbook third pass the German label is the shipped behaviour and the spec is `[HAPPY]`; this mutant is now the fix) |
+| `\|@translate` removed from `Confirm merge` (`tags.tpl:110`), 2026-10-10 | the `[HAPPY]` merge spec | killed (received `Confirm merge`) |
 | `id="place-end"` renamed on the add-album radio (`albums.tpl:181`) | the add-album dialog spec | killed |
 | `slideToggle()` removed from the Optionen control (`photos_add_direct.js:92`) | the upload-screen spec | killed |
 | `id="associate_as"` renamed (`batch_manager_global.tpl`) | the associate-picker spec | killed |
@@ -1085,6 +1086,97 @@ reads handbook prose and compares it against a template is the apparatus-proving
 `test-design.md` forbids — so this stays a dated hand check rather than a test, added to the ledger
 below.
 
+## Reading the handbook against the application, third pass (2026-10-10)
+
+A third walkthrough against the local install, the same method as 2026-08-31: text written after
+2026-09-01 read line by line, older text spot-checked, all 25 shots viewed. 196 labels checked, all
+196 resolving verbatim. 169 claims checked: 9 wrong (A1-A9), 12 incomplete or doubtful (B1-B12) and
+3 only a screen can settle (C1-C3). Beside them 7 consistency, 7 style, 3 screenshot and 2
+translation findings (counts 2026-10-10). Full detail and the owner decisions O1-O9 in
+[2026-10-10-handbuch-review.md](research/2026-10-10-handbuch-review.md), implemented in
+[2026-10-10-handbuch-third-pass.md](plans/2026-10-10-handbuch-third-pass.md). All approved; B9 (the
+255-a-day tag cap) and B12 (the API and IPTC exceptions) stay out of the handbook, since no family
+member reaches either.
+
+### Four code changes the text could not work around
+
+Each test first, red before the fix.
+
+- **O8**: under the newspaper skin photoinfo's *Abbrechen* was blue and read as the main button.
+  `info.css` makes it a plain text control. `editor-buttons.spec.js` (new, 39eebd096, 969c7927e):
+  `[ECP]` one case per modus skin (18, measured 2026-10-10), both editors, red in all 18 before the
+  CSS. *Speichern* is compared against a probe submit outside the editor row, so a rule scoped to
+  the editor shows as a difference (watched red with `#PhotoDate input[type=submit]`). Anti-vacuity:
+  `[ERR] the skin list is not empty`, and `[ERR] the skin parameter takes effect`, watched red with
+  both sides on newspaper.
+- **O2**: the admin pages' `Photo Info: File is missing or not writable` is now *Fotoinfo: ...*
+  through `l10n()`; the keys stay English (04f27ef7b). `CoreEditTest` and `TagWriteTest` `[HAPPY]`,
+  the absence cases there and in `FreitextAssignTest` `[NEG]`. The oracle is read from the de_DE file
+  (`FixtureBuilder::germanText`), and the test accounts now get de_DE explicitly.
+- **O1**: core's `tags.tpl:110-111` hard-coded *Confirm merge* / *Cancel*; both now pass through
+  `|@translate` (54de614a5, fork-local core change in `CLAUDE.md`, upstream candidate in
+  `docs/backlog.md`). `core-admin-screens.spec.js` "the merge panel opens two interactions deep and
+  its buttons are German" `[HAPPY]`, red before, green twice after. The `Confirm merge` mutant row under
+  *The handbook's own claims* above records the rest.
+- **Picture page reason** (Phase 4.3, owner answer a): *Gespeichert, aber nicht in die Bilddatei
+  geschrieben: %s* filled `%s` with the web service's English `message`. `setInfo` and `setDate` now
+  answer `message_l10n` beside it; the API's `message` stays English (469fed6b6). Two `[NEG]` cases
+  in `date-edit.spec.js` and `info-edit.spec.js`, oracle from the de_DE file, red with
+  `File is missing or not writable`.
+
+### Tests for behaviour the text now relies on
+
+Characterization of today's behaviour before the text describes it. Each passed on its first run, so
+each was watched red under a named break and reverted with the checksum poll
+`.claude/rules/mutation-testing.md` asks for.
+
+| Finding | Test (commit) | Tag | Watched red by |
+|---|---|---|---|
+| A2 byte-identical upload links the existing photo | `CoreUploadCharacterizationTest::testAByteIdenticalUploadLinksTheExistingPhotoInsteadOfAddingOne` (d8c5a87bc) | `[ERR]` | the `upload_detect_duplicate` condition in `add_uploaded_file()` replaced by `false` |
+| B1 no provenance buttons at 0 photos | `SetAlbumInfoTest::testAnEmptyAlbumOffersNeitherApplyNorWrite` (68ad0a9a9, 3504d18f7) | `[BVA]` 0 vs 1 photo | the `PHOTO_COUNT` condition removed from `album_provenance.tpl` |
+| A5 first picker entry highlighted | persons `editor.spec.js` "the first entry is highlighted as the list opens, and Enter takes it", "a partial match is listed before Anlegen" (bfab10567) | `[HAPPY]`, `[ECP]` | `setHighlight(0)` removed from `editor.js` |
+| B10 success then refusal still reloads | persons `editor.spec.js` "leaving after a save and a later refused save reloads" (bfab10567) | `[ST]` | `changed` reset on a failed write |
+| A7 arrows stay in edit mode | photoedit `edit-mode.spec.js` "the navigation arrows stay visible in edit mode and leave the page", both arrows over the new `seed.php --scenario=neighbours` (5253d10b6, aae7e1be5) | `[ST]` | the arrows hidden in `editor.css` |
+| B11 tagging change, then edit mode | photoedit `edit-mode.spec.js` "entering edit mode after a tagging change reloads instead of opening" (5253d10b6) | `[ST]` | persons' `reloadAfterChange()` removed from `exit()` |
+| B8 silent tag-write failure on the picture page | photoinfo `tags-freitext.spec.js` "the picture page says the tag was not written into the file" (b9e5db95a, 4f5a207c1) | `[NEG]`, `test.skip` known gap | watched red before the skip. Oracle from `PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE` and the de_DE file; the product fix is in `docs/backlog.md` (O6) and must deliver German, since `tags_message` carries the English key |
+
+A3 (where the upload result's album link leads) has no test: browser coverage of the uploader is
+refused in the non-coverage table above, so the text rests on `photos_add_direct.js:468-470`.
+
+Suites after Phase 2, serial, twice in a row (2026-10-10): provenance integration 211 tests / 4
+skipped, persons E2E 147, photoedit E2E 28, photoinfo E2E 52 + 1 skipped. Persons E2E after Phase 3:
+151 (2026-10-10).
+
+### The three screen checks
+
+- **C1** `[ECP]`: *100 %* is the largest file the viewer is offered (`naturalScale()`), the original
+  only with `enabled_high`, which every account here has. Pinned both ways in
+  `picture-zoom.spec.js` ("100 % shows the original to an account that may see originals", "100 %
+  shows the largest size an account without originals may load"), with `seed.php
+  --originals=allowed|denied` forcing `persons_normal`'s `enabled_high` (05d73ae6e). Watched red:
+  `naturalScale()` on the largest derivative kills the allowed case only, `naturalScale()` = 1 the
+  denied case only.
+- **C2** `[ECP]`: outside tagging mode the stale-box tooltip shows only over the name label (the box
+  takes no pointer events, the label inherits its `title`); in tagging mode anywhere over the box.
+  `overlay.spec.js` "explains itself over its name, not over the rest of the box, outside tagging
+  mode" and "explains itself anywhere over the box in tagging mode", German text read from the de_DE
+  file through a named key constant (dc88ca757, 212786d2c). Watched red: pointer events on
+  `.person-box`, none on the label, none on the tagging overlay, each killing exactly its own case.
+- **C3**: `06-drehen.html` names *OK* / *Abbrechen* for the two questions before a save. Both are a
+  native `window.confirm` (`photoedit/template/editor.js:239`), whose buttons the browser draws in
+  its own language; no page code sets them and no spec can read them. Hand check, pending with the
+  owner (ledger below).
+
+### Pages and screenshots
+
+New `07-fotoseite.html` *Die Fotoseite*, appended so no file or shot is renamed (O7): the section
+*Das Foto vergrößern* moved there from `05-personen.html`, which links to it; the index lists chapter
+7. 07 carries the new shot `26-fotoseite-leiste.png` (the picture page toolbar). Re-taken: 09 (F1:
+shows `persons_webmaster` instead of the owner's login; `seed.php` looks the account up by username
+and refuses if it is missing), 24 and 25 (the O8 look). Every other re-shot file was churn from fresh
+ids and was reverted (3038b47da). 26 shots; install back at 5 albums / 105 photos after `--restore`;
+`check.php` green after each page; `handbuch-pages.spec.js` 13 passed (all 2026-10-10).
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,
@@ -1149,6 +1241,9 @@ than accumulating. Nothing is marked done on prose alone.
 | 2026-10-08 | The exiftool-writing suites against **exiftool 12.76**, the remote's version: the CPAN `Image-ExifTool-12.76` tarball unpacked under `.agent-tests/`, linked as `/usr/local/bin/exiftool` in the web container (php-fpm keeps the container's PATH, `clear_env = no`, where `/usr/local/bin` precedes `/usr/bin`), removed afterwards. Integration: photoinfo 119, provenance 201 (4 skipped), persons 112 (1 skipped), photoedit 81, all OK; photoinfo E2E 30 passed. A logging wrapper over one `SetInfoTest` run recorded 25 of 36 calls with `php-fpm` as grandparent, so the HTTP path used 12.76. The suites' own read-backs ran on 12.76 too; ImageMagick stayed the independent reader. | Not replaced: a one-off. Pinning a second exiftool into the suites would vendor a binary for one host; repeat this before a deploy after an exiftool-facing change. |
 | 2026-10-09 | The striped tab (`Kategorie ?`, `Name ?`) and the emoji (`Ausstellung`, `Freitext`) on the picture page, the photo properties chips and the admin tags page look as in the brainstorm drafts (S5, A1, F5 on C5) and read legibly: confirmed by the owner (tags-in-file plan, Phase 2 manual box). The plan's testing steps ask for modus light and dark; which skins the owner looked at is not recorded. | **Mostly replaced 2026-10-09** by `rendering.spec.js` and `admin-striped.spec.js`: tab, border and text colour by computed style on all three screens, the emoji in each badge, and the text starting after the border and tab. Whether the result reads comfortably stays a judgment, like the badge-contrast row in the open table below. |
 | 2026-10-09 | Whether digiKam or Lightroom read the keywords photoinfo writes (`XMP-dc:Subject`, `IPTC:Keywords`) and show `XMP-lr:HierarchicalSubject` as a `Group > Tag` tree. | **Partly replaced 2026-10-09** by `plugins/photoinfo/tests/Integration/TagWriteTest.php` → `testAnIndependentReaderFindsTheKeywordsInTheStandardXmpSlots`: ImageMagick (`convert <file> xmp:-`) extracts the raw XMP packet, and `dc:subject` as an `rdf:Bag` holding both names and `lr:hierarchicalSubject` holding `Group|Tag` are asserted as text in it, so the standard slots are witnessed by a reader that is not exiftool. Watched red against `photoinfo_build_tags_argfile()` with the subject list emptied and, separately, with the hierarchy list emptied. Since 2026-10-09 also by `testExiv2ReadsTheKeywordsFromAllThreeFields`: exiv2 (from `webimage_extra_packages` in `.ddev/config.yaml`) reads `Xmp.dc.subject`, `Xmp.lr.hierarchicalSubject` and `Iptc.Application2.Keywords`, the first read of `IPTC:Keywords` not done by exiftool; watched red against each of the three field lines dropped from `photoinfo_build_tags_argfile()`, each failing on its own field. **Still open:** whether digiKam or Lightroom actually display the keywords and build the `Group > Tag` tree — neither program is installed here. See the open table below. |
+| 2026-10-10 | The section *Das Foto vergrößern* (2026-10-05 row above) moved from `handbuch/05-personen.html` to the new `handbuch/07-fotoseite.html` (O7 of the handbook third pass, ecdc84fea), with the C1 result added (*100 %* is the original for every account here); 05 links to it, the index lists chapter 7, and 07 shows the new shot 26. Whether the moved text still describes what `photo.zoom.js` ships. | **Checked 2026-10-10** by a review agent reading 07 against `photo.zoom.js` and `photo.zoom.css`: keys, the 400 % limit, Ctrl/Cmd+wheel, drag-to-pan and the narrow-window rule hold. Not replaceable, same as the 2026-10-05 row; the behaviour stays witnessed by `picture-fit`, `picture-zoom` and `picture-pan`. |
+| 2026-10-10 | C3 of the handbook third pass: the two questions before a photoedit save (`window.confirm`, `photoedit/template/editor.js:239`) show the buttons *OK* and *Abbrechen*, as `handbuch/06-drehen.html` says, in a German browser. | **Pending owner, 2026-10-10.** Browser UI: the labels come from the browser's language, not from page code, and no spec can read a native dialog's buttons. |
+| 2026-10-10 | Whether the German reads naturally on every page the third pass changed: `01`-`06`, the new `07-fotoseite.html` and `index.html`. | **Pending owner, 2026-10-10**: a native reader's judgment. |
 
 ### Open — no oracle, so no test
 

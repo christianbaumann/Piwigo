@@ -321,7 +321,7 @@ caption changed it; revert every other re-shoot
 
 ## Phase 6: Records
 
-#### [ ] 6.1 `docs/agents/TESTING.md`: dated "third pass" section (findings, tests added, C1-C3
+#### [x] 6.1 `docs/agents/TESTING.md`: dated "third pass" section (findings, tests added, C1-C3
 results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom ledger row; dated note on the
 `Confirm merge` mutant row (`:892`): since O1 that mutant is the shipped behaviour and the spec is
 `[HAPPY]`, no longer `[ERR]`
