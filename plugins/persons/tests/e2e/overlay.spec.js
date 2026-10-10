@@ -2,6 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { seed, restore } = require('./support/seed');
 const { PicturePage } = require('./support/PicturePage');
+const { germanTextOf } = require('./support/lang');
 
 /**
  * The read-only person overlay on the public picture page, in a real browser.
@@ -485,8 +486,42 @@ test.describe('a stale person region', () => {
       const style = await picture.boxStyle(region.region_id);
       expect(style.borderStyle).toBe('dashed');
       expect(style.opacity).toBeLessThan(1);
-      expect(style.title).not.toBe('');
+      expect(style.title).toBe(germanTextOf('PERSONS_STALE_TITLE'));
     }
+  });
+
+  /**
+   * [ECP] Outside tagging mode the box takes no pointer events, so only its
+   * name label, which does, brings up the explanation.
+   */
+  test('explains itself over its name, not over the rest of the box, outside tagging mode', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    const region = seeded.regions[0].region_id;
+    const explanation = germanTextOf('PERSONS_STALE_TITLE');
+
+    const centre = await picture.hoverBox(region);
+    // Anti-vacuity: the point is inside the box, and the name is on screen to be hovered.
+    expect(await picture.boxContains(region, centre)).toBe(true);
+    await expect.poll(async () => (await picture.labelStyle(region)).opacity).toBeGreaterThan(0);
+    expect(await picture.tooltipAt(centre)).not.toBe(explanation);
+
+    const onName = await picture.hoverLabel(region);
+    expect(await picture.tooltipAt(onName)).toBe(explanation);
+  });
+
+  /** [ECP] In tagging mode the overlay takes pointer events, and the whole box explains itself. */
+  test('explains itself anywhere over the box in tagging mode', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    const region = seeded.regions[0].region_id;
+
+    await picture.enterTaggingMode();
+    const centre = await picture.hoverBox(region);
+    expect(await picture.boxContains(region, centre)).toBe(true);
+    expect(await picture.tooltipAt(centre)).toBe(germanTextOf('PERSONS_STALE_TITLE'));
   });
 
   /** [HAPPY] A focused stale name keeps its box as dimmed as a hovered one. */

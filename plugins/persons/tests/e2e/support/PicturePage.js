@@ -339,6 +339,23 @@ class PicturePage {
   }
 
   /**
+   * The tooltip the browser would show at a viewport point: the title of the
+   * element hit there, or of its nearest ancestor carrying one. The native
+   * tooltip itself is browser UI no page can read, but this is the element it
+   * is taken from, so an element that takes no pointer events never shows its
+   * own.
+   *
+   * @param {{x: number, y: number}} point
+   */
+  async tooltipAt(point) {
+    return this.page.evaluate(({ x, y }) => {
+      const hit = document.elementFromPoint(x, y);
+      const titled = hit && hit.closest('[title]');
+      return titled ? titled.getAttribute('title') : '';
+    }, point);
+  }
+
+  /**
    * Whether a viewport point lies inside a box's rendered rect.
    *
    * @param {number} regionId
