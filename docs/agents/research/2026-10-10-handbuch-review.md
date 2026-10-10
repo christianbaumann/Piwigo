@@ -57,6 +57,19 @@ doubtful, 3 need a screen check.
 
 Done in the fix phase, before the page's text changes.
 
+Results (2026-10-10):
+
+- **C1**: *100 %* is the largest file the viewer is offered (`naturalScale()`). core offers the
+  original only with `enabled_high = 'true'`, the column default; every account here has it
+  (`chriss`, `guest`, the test accounts), so for all of them *100 %* is the original size. Without
+  it, *100 %* is the largest derivative. Pinned both ways in `persons/tests/e2e/picture-zoom.spec.js`
+  (`seed.php --originals=allowed|denied`).
+- **C2**: the tooltip shows, but not over the box itself outside tagging mode: the box takes no
+  pointer events, its name label does, and the label inherits the box's `title`. So outside tagging
+  mode the explanation comes up over the name; in tagging mode anywhere over the box. Pinned in
+  `persons/tests/e2e/overlay.spec.js` ("explains itself ..."), German text read from the de_DE file.
+- **C3**: open, browser UI; owner checks the dialog labels by hand (ledger in `docs/agents/TESTING.md`).
+
 ## D. Consistency between pages
 
 | # | Issue | Where | Fix |

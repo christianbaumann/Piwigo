@@ -256,22 +256,22 @@ picture page tells the user", `test.skip` with reason and link to the backlog en
 
 Settle what the code cannot, then pin it.
 
-#### [ ] 3.1 C1 *100 %* for `persons_normal`
+#### [x] 3.1 C1 *100 %* for `persons_normal`
 Check whether the account sees originals (`enabled_high`), then compare the zoom at 100 % with the
 original and the largest derivative. Pin in `persons/tests/e2e/picture-zoom.spec.js` as a normal
 account: "[ECP] 100 % shows the largest size this account may load".
 
-#### [ ] 3.2 C2 stale tooltip
+#### [x] 3.2 C2 stale tooltip
 Hover a stale box outside and inside tagging mode. Pin the result in `overlay.spec.js` (extend
 "is drawn dashed, dimmed and with an explanation" with the German text and where it shows).
 
-#### [ ] 3.3 C3 confirm buttons
+#### [-] 3.3 C3 confirm buttons
 `window.confirm` in the container's Chromium; record the labels in the TESTING.md ledger (browser
 UI, no test).
 
 ### Success Criteria
-- [ ] each finding recorded with result in the research note
-- [ ] persons E2E green
+- [-] each finding recorded with result in the research note (C1, C2 done; C3 waits for the owner)
+- [x] persons E2E green (151 passed, 2026-10-10)
 
 ---
 
@@ -282,32 +282,32 @@ UI, no test).
 Per page: apply the A/B/D/E rows, the O decisions; `check.php`; handbook E2E; commit.
 Style: brief, steps as full sentences, notes may be fragments, no em/en dashes, no emojis.
 
-#### [ ] 4.1 `01-alben.html`: A1, B1, D3, D4, E7
-#### [ ] 4.2 `02-fotos.html`: A2, A3, B3, B4, B5, D3, D5, E7
-#### [ ] 4.3 `03-fototexte.html`: A4, B6, D1 (O3), D5, E2, E4, E7
+#### [x] 4.1 `01-alben.html`: A1, B1, D3, D4, E7
+#### [x] 4.2 `02-fotos.html`: A2, A3, B3, B4, B5, D3, D5, E7
+#### [x] 4.3 `03-fototexte.html`: A4, B6, D1 (O3), D5, E2, E4, E7
   Code first (owner, 2026-10-10, answer a to the Phase 1 verify question): the picture page's
   *Gespeichert, aber nicht in die Bilddatei geschrieben: %s* fills `%s` with the ws answer's raw
   English `message` (`plugins/photoinfo/template/info.js:62`, `date.js:230`). Translate the
   reason on the picture page too (the ws API answer stays English, `TagWriteTest.php:382`).
   Test first in photoinfo E2E: a failed write shows the German reason, oracle read from the de_DE
   language file; red today. Then the text says the reason is German.
-#### [ ] 4.4 `04-schlagworte.html`: A9, B7, B8 (O6), D1, D2 (O4), D6, E1, E6, E7; merge step and hinweis per O1; *Fotoinfo:* per O2
-#### [ ] 4.5 `05-personen.html` + new `07-fotoseite.html`: A5, A6, B10, C1/C2 results, D1, E3, E6, E7; zoom section moves to 07 (O7, P5), 05 links it
-#### [ ] 4.6 `06-drehen.html`: A7, A8, B11, C3, D1, D2, E7; nav gets *Weiter* to 07
-#### [ ] 4.7 `index.html`: B2 (*Administration* link), D7, O3, O4 terms defined once, chapter 7, "sieben Arbeitsschritte"
+#### [x] 4.4 `04-schlagworte.html`: A9, B7, B8 (O6), D1, D2 (O4), D6, E1, E6, E7; merge step and hinweis per O1; *Fotoinfo:* per O2
+#### [x] 4.5 `05-personen.html` + new `07-fotoseite.html`: A5, A6, B10, C1/C2 results, D1, E3, E6, E7; zoom section moves to 07 (O7, P5), 05 links it
+#### [-] 4.6 `06-drehen.html`: A7, A8, B11, C3, D1, D2, E7; nav gets *Weiter* to 07
+#### [x] 4.7 `index.html`: B2 (*Administration* link), D7, O3, O4 terms defined once, chapter 7, "sieben Arbeitsschritte"
 
 ### Success Criteria
-- [ ] `ddev exec php handbuch/tools/check.php` green after each page
-- [ ] provenance E2E `handbuch-pages.spec.js` green (07 needs its `<img>`: shot 26, Phase 5; until
+- [x] `ddev exec php handbuch/tools/check.php` green after each page
+- [x] provenance E2E `handbuch-pages.spec.js` green (13 passed, 2026-10-10; 07 needs its `<img>`: shot 26, Phase 5; until
   then 07 references shot 11, replaced in 5)
 
 ---
 
 ## Phase 5: Seed and screenshots
 
-#### [ ] 5.1 `handbuch/tools/seed.php:886`: `added_by` = id of `persons_webmaster` looked up by
+#### [x] 5.1 `handbuch/tools/seed.php:886`: `added_by` = id of `persons_webmaster` looked up by
 username; refuse if missing (names `create-test-users.php`)
-#### [ ] 5.2 `handbuch/tools/shoot.js`: declare `26-fotoseite-leiste.png`, `#imageToolBar` as NORMAL
+#### [x] 5.2 `handbuch/tools/shoot.js`: declare `26-fotoseite-leiste.png`, `#imageToolBar` as NORMAL
 #### [ ] 5.3 seed, shoot, restore (`.claude/rules/handbook.md`); keep 09, 24, 25, 26 and 11 if A4's
 caption changed it; revert every other re-shoot
 #### [ ] 5.4 view each kept shot against its text; 07 references shot 26
@@ -325,9 +325,9 @@ caption changed it; revert every other re-shoot
 results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom ledger row; dated note on the
 `Confirm merge` mutant row (`:892`): since O1 that mutant is the shipped behaviour and the spec is
 `[HAPPY]`, no longer `[ERR]`
-#### [ ] 6.2 `.claude/rules/handbook.md`: page count and topic list (eight files incl. index)
-#### [ ] 6.3 `handbuch-pages.spec.js:27` comment ("six pages")
-#### [ ] 6.4 `docs/backlog.md`: B8 product fix (`tags.tpl` upstream candidate already added in 1.3)
+#### [x] 6.2 `.claude/rules/handbook.md`: page count and topic list (eight files incl. index)
+#### [x] 6.3 `handbuch-pages.spec.js:27` comment ("six pages")
+#### [x] 6.4 `docs/backlog.md`: B8 product fix (`tags.tpl` upstream candidate already added in 1.3)
 #### [ ] 6.5 research note `status: implemented`; this plan `status: implemented`
 
 ### Success Criteria
@@ -364,10 +364,10 @@ results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom l
 - [x] `provenance core-admin-screens.spec.js`: merge buttons German `[HAPPY]`
 - [x] `persons editor.spec.js`: A5 `[HAPPY]` `[ECP]`, B10 `[ST]`
 - [x] `photoedit edit-mode.spec.js`: A7 `[ST]`, B11 `[ST]`
-- [ ] `persons picture-zoom.spec.js`: C1 `[ECP]`
-- [ ] `persons overlay.spec.js`: C2 extended
+- [x] `persons picture-zoom.spec.js`: C1 `[ECP]`
+- [x] `persons overlay.spec.js`: C2 extended
 - [x] photoinfo: B8 `test.skip` known gap
-- [ ] `provenance handbuch-pages.spec.js`: picks up 07 by glob
+- [x] `provenance handbuch-pages.spec.js`: picks up 07 by glob
 
 ### Regression
 - [ ] typetags unit, integration, E2E (core `tags.tpl`, tag paths)
