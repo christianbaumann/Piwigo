@@ -17,6 +17,9 @@ let fixture;
 /** A width inside modus' collapsed action menu (picture.css.tpl, max-width 600px). */
 const NARROW_VIEWPORT = { width: 400, height: 800 };
 
+/** Where the B11 case draws its person box, as fractions of the rendered photo. */
+const PERSON_BOX = { left: 0.3, top: 0.3, w: 0.2, h: 0.25 };
+
 /** Keys the theme or core act on: zoom, and photo navigation. */
 const WATCHED_KEYS = ['+', 'ArrowLeft', 'ArrowRight', 'ArrowUp'];
 
@@ -150,6 +153,54 @@ test('[ST] entering edit mode ends persons tagging first', async ({ page }) => {
 
   await expect(picture.personsTagging).toHaveCount(0);
   await expect(picture.editMode).toHaveCount(1);
+});
+
+/**
+ * [ERR] Characterization: records today's toolbar, read off editor.css (edit
+ * mode hides only .actionButtons' other children); no requirement confirms it.
+ * The arrows stay, and following one drops the unsaved preview.
+ */
+test('[ST] the navigation arrows stay visible in edit mode and leave the page', async ({ page }) => {
+  // An arrow is a link only with a photo to go to; the beforeEach photo has none.
+  restore();
+  fixture = seed('neighbour');
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+  const writes = picture.watchWrites();
+
+  await picture.editButton.click();
+  await picture.turnRightButton.click();
+  // Anti-vacuity: an unsaved preview is on the photo.
+  await expect(picture.editMode).toHaveCount(1);
+  await expect.poll(() => picture.previewTransform()).not.toBe('');
+
+  await expect(picture.nextArrow).toBeVisible();
+  await picture.nextArrow.click();
+
+  await page.waitForURL((url) => url.href.endsWith(String(fixture.next_path)));
+  await expect(picture.editMode).toHaveCount(0);
+  expect(writes()).toBe(0);
+});
+
+/**
+ * [ERR] Characterization: records today's hand-over, read off both editor.js
+ * files (photoedit leaves persons' tagging first; persons reloads on leaving
+ * after a change); no requirement confirms it. Edit mode does not open, and
+ * after the reload the button has to be clicked again.
+ */
+test('[ST] entering edit mode after a tagging change reloads instead of opening', async ({ page }) => {
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+  await picture.personsTagToggle.click();
+  await expect(picture.personsTagging).toHaveCount(1);
+  await picture.tagPerson(PERSON_BOX, fixture.kept_name);
+  await picture.markDocument();
+
+  await picture.clickEditAndAwaitReload();
+
+  expect(await picture.sameDocument()).toBe(false);
+  await expect(picture.editMode).toHaveCount(0);
+  await expect(picture.editButton).toBeVisible();
 });
 
 test('[ST] on a narrow screen the controls stay reachable in the collapsed menu', async ({ page }) => {

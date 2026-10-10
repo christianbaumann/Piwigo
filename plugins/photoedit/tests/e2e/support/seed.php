@@ -12,6 +12,7 @@
  *   php tests/e2e/support/seed.php --scenario=marked   a generated 300x200 PNG, for specs that save
  *   php tests/e2e/support/seed.php --scenario=regions  marked, plus two person regions in the file
  *   php tests/e2e/support/seed.php --scenario=jpeg     marked, as an upright JPEG
+ *   php tests/e2e/support/seed.php --scenario=neighbour photo, plus a next photo in the same album
  *   php tests/e2e/support/seed.php --age-derivatives   backdate the seeded photo's derivatives
  *   php tests/e2e/support/seed.php --restore
  *
@@ -30,6 +31,55 @@ function fail(string $message): void
 }
 
 $args = getopt('', array('scenario::', 'restore', 'age-derivatives'));
+
+/** How far apart the two photos' upload dates are put, so the album order is not left to a tie. */
+const NEIGHBOUR_DATE_STEP = '1 DAY';
+
+/**
+ * Puts a next photo after the seeded one, so the theme offers a working
+ * navigation arrow.
+ *
+ * The album is ordered by date_available DESC first (order_by_inside_category),
+ * and both rows were inserted in the same second, so the order would fall to
+ * the random file names. Forcing the dates makes the seeded photo the first,
+ * and the order is asserted with the install's own ORDER BY clause, read from
+ * piwigo_config. On a failed check the fixtures are removed before exiting: no
+ * snapshot is saved yet, so --restore would never find them.
+ *
+ * @return int the next photo's id
+ */
+function seed_next_photo(Db $db, FixtureBuilder $builder, int $mainId, int $catId): int
+{
+    $next = $builder->createTestImage();
+    $builder->attachImage((int)$next['id'], $catId);
+
+    $db->query('UPDATE piwigo_images SET date_available = NOW() WHERE id = ' . $mainId);
+    $db->query('UPDATE piwigo_images SET date_available = NOW() - INTERVAL ' . NEIGHBOUR_DATE_STEP
+        . ' WHERE id = ' . (int)$next['id']);
+
+    $orderBy = (string)$db->scalar("SELECT value FROM piwigo_config WHERE param = 'order_by_inside_category'");
+    $order = array();
+    if (stripos($orderBy, 'ORDER BY') !== false)
+    {
+        $result = $db->query(
+            'SELECT id FROM piwigo_images WHERE id IN'
+            . ' (SELECT image_id FROM piwigo_image_category WHERE category_id = ' . $catId . ') ' . $orderBy
+        );
+        while ($row = $result->fetch_assoc())
+        {
+            $order[] = (int)$row['id'];
+        }
+    }
+
+    if ($order !== array($mainId, (int)$next['id']))
+    {
+        $builder->destroyTestImages();
+        $builder->destroyTestAlbums();
+        fail("the photos are not in the order seeded, next under '$orderBy': " . json_encode($order));
+    }
+
+    return (int)$next['id'];
+}
 
 /** How far back --age-derivatives sets the derivatives' mtime: old enough for a browser to cache them for hours. */
 const DERIVATIVE_AGE_SECONDS = 10 * 24 * 3600;
@@ -93,9 +143,9 @@ if (isset($args['restore']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg'), true))
+if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg', 'neighbour'), true))
 {
-    fail('--scenario must be: photo, marked, regions, jpeg');
+    fail('--scenario must be: photo, marked, regions, jpeg, neighbour');
 }
 
 if (is_file(SNAPSHOT_FILE))
@@ -113,7 +163,7 @@ catch (RuntimeException $e)
 }
 
 // marked: a generated landscape PNG, which a save rewrites - never a copy of a scan.
-if ($scenario === 'photo')
+if ($scenario === 'photo' or $scenario === 'neighbour')
 {
     $image = $builder->createTestImage();
 }
@@ -132,6 +182,7 @@ if ($scenario === 'regions')
 }
 $catId = $builder->createTestAlbum('Photoedit E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
+$nextId = $scenario === 'neighbour' ? seed_next_photo($db, $builder, (int)$image['id'], $catId) : null;
 $builder->invalidateUserCache();
 
 $dir = dirname(SNAPSHOT_FILE);
@@ -150,4 +201,5 @@ echo json_encode(array(
     'cut_name' => FixtureBuilder::REGION_CUT['name'],
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
     'album_path' => '/index.php?/category/' . $catId,
+    'next_path' => $nextId === null ? null : '/picture.php?/' . $nextId . '/category/' . $catId,
     )), "\n";

@@ -13,6 +13,8 @@ class PicturePage {
     this.image = page.locator('#theMainImage');
     /** The theme's next link; with no next photo it leads back to the album. */
     this.nextLink = page.locator('#linkNext');
+    /** The toolbar's arrow to the next photo; a link only when there is one. */
+    this.nextArrow = page.locator('#imageToolBar .navigationButtons a.pwg-button:has(.pwg-icon-arrow-e)');
 
     this.editButton = page.locator('#photoedit-toggle');
     this.controls = page.locator('#photoedit-controls');
@@ -34,6 +36,9 @@ class PicturePage {
     this.personsTagToggle = page.locator('#persons-tag-toggle');
     /** The persons stage only while its tagging mode is on. */
     this.personsTagging = page.locator('#persons-stage.persons-tagging');
+    this.personsPickerInput = page.locator('#persons-picker-input');
+    /** The persons boxes that exist on the server; a draft has no region id yet. */
+    this.personsSavedBoxes = page.locator('#persons-overlay .person-box[data-person-region]');
 
     /** The ellipsis that opens modus' collapsed action menu on a narrow screen. */
     this.actionMenuSwitch = page.locator('#imageActionsSwitch');
@@ -185,6 +190,98 @@ class PicturePage {
     await this.page.mouse.down();
     await this.page.mouse.move(to.x, to.y, { steps: 5 });
     await this.page.mouse.up();
+  }
+
+  /**
+   * The persons picker entry that commits a given name, existing person or new.
+   *
+   * @param {string} name
+   */
+  personsPickerOption(name) {
+    return this.page.locator(`#persons-picker-list .persons-picker-option[data-persons-name="${name}"]`);
+  }
+
+  /**
+   * Tags one person in persons' tagging mode, which must be on: drags a box over
+   * the photo, names it and waits until the server has saved it.
+   *
+   * @param {{left: number, top: number, w: number, h: number}} box fractions of the rendered photo
+   * @param {string} name
+   */
+  async tagPerson(box, name) {
+    const image = await this.image.boundingBox();
+    if (!image) {
+      throw new Error('the photo has no box to draw on');
+    }
+    await this.page.mouse.move(image.x + box.left * image.width, image.y + box.top * image.height);
+    await this.page.mouse.down();
+    await this.page.mouse.move(
+      image.x + (box.left + box.w) * image.width,
+      image.y + (box.top + box.h) * image.height,
+      { steps: 10 }
+    );
+    await this.page.mouse.up();
+    await this.personsPickerInput.fill(name);
+    await this.personsPickerOption(name).click();
+    await this.personsSavedBoxes.first().waitFor();
+  }
+
+  /**
+   * Marks the document currently loaded, so a later navigation can be told
+   * apart from none at all: a reload replaces the window object and the mark
+   * with it, and beforeunload and pagehide clear it as soon as one starts.
+   */
+  async markDocument() {
+    await this.page.evaluate(() => {
+      const w = /** @type {any} */ (window);
+      w.__photoeditDocumentMark = true;
+      const clear = () => {
+        w.__photoeditDocumentMark = false;
+      };
+      window.addEventListener('beforeunload', clear);
+      window.addEventListener('pagehide', clear);
+    });
+  }
+
+  /**
+   * Clicks the edit button where it is expected to reload the page instead of
+   * opening edit mode, and waits for the reload. The load event is listened for
+   * before the click, so a reload over before the click resolves is not missed.
+   */
+  async clickEditAndAwaitReload() {
+    const loaded = this.page.waitForEvent('load');
+    await this.editButton.click();
+    await loaded;
+    await this.waitForPhoto();
+  }
+
+  /**
+   * Counts the writes the editor sends from now on: pwg.photoedit.apply
+   * requests that are not a dry run.
+   *
+   * @returns {() => number} the count so far
+   */
+  watchWrites() {
+    let writes = 0;
+    this.page.on('request', (request) => {
+      const body = request.postData() || '';
+      if (body.includes('method=pwg.photoedit.apply') && !body.includes('dry_run')) {
+        writes++;
+      }
+    });
+    return () => writes;
+  }
+
+  /** Whether the document markDocument() marked is still the one loaded. */
+  async sameDocument() {
+    try {
+      return await this.page.evaluate(() => /** @type {any} */ (window).__photoeditDocumentMark === true);
+    } catch (error) {
+      if (/Execution context was destroyed|navigation/i.test(String(error))) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   /** The photo's rendered width in CSS pixels. */
