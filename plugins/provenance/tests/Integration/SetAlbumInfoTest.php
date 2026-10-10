@@ -20,6 +20,10 @@ final class SetAlbumInfoTest extends TestCase
     /** The injected template must carry at least this many element ids for the page check to mean anything. */
     private const MIN_INJECTED_IDS = 5;
 
+    /** The two album-wide actions the template offers only for an album holding photos. */
+    private const APPLY_BUTTON = 'id="provenance-apply"';
+    private const WRITE_BUTTON = 'id="provenance-write"';
+
     private Db $db;
     private WsClient $ws;
     private FixtureBuilder $fixture;
@@ -55,6 +59,8 @@ final class SetAlbumInfoTest extends TestCase
     protected function tearDown(): void
     {
         $this->clearAlbum();
+        $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
         $this->fixture->restore();
         $this->db->query('DELETE FROM ' . self::HISTORY_TABLE . ' WHERE id > ' . $this->baselineHistoryId);
         $this->ws->logout();
@@ -268,7 +274,53 @@ final class SetAlbumInfoTest extends TestCase
         $this->assertStringContainsString('value="2026-08-29"', $res['body']);
     }
 
+    /**
+     * [BVA] An album with no photos offers neither the apply nor the write
+     * button; the same album with one photo offers both.
+     *
+     * Behaviour: template/album_provenance.tpl:21-34, the buttons sit behind
+     * {if $PROVENANCE_ALBUM.PHOTO_COUNT > 0}. The write button additionally needs
+     * exiftool, which this install has; that is asserted, not assumed.
+     */
+    public function testAnEmptyAlbumOffersNeitherApplyNorWrite(): void
+    {
+        $tpl = (string)file_get_contents(PROVENANCE_PATH . 'template/album_provenance.tpl');
+        $this->assertStringContainsString(self::APPLY_BUTTON, $tpl, 'the template no longer carries the apply button this test looks for');
+        $this->assertStringContainsString(self::WRITE_BUTTON, $tpl, 'the template no longer carries the write button this test looks for');
+        require_once PROVENANCE_PATH . 'include/exiftool.inc.php';
+        $this->assertTrue(provenance_exiftool_available(), 'precondition: without exiftool the write button is absent for another reason');
+
+        $album = $this->fixture->createTestAlbum('provenance-buttons-' . bin2hex(random_bytes(4)));
+        $this->assertSame(
+            0,
+            (int)$this->db->scalar("SELECT COUNT(*) FROM `piwigo_image_category` WHERE category_id = $album"),
+            'the fixture did not take effect: the new album already holds a photo'
+        );
+
+        $empty = $this->albumScreen($album);
+        $this->assertStringNotContainsString(self::APPLY_BUTTON, $empty, 'an empty album offers the apply button');
+        $this->assertStringNotContainsString(self::WRITE_BUTTON, $empty, 'an empty album offers the write button');
+
+        $this->fixture->attachImage($this->fixture->createTestImage()['id'], $album);
+
+        $one = $this->albumScreen($album);
+        $this->assertStringContainsString(self::APPLY_BUTTON, $one, 'an album with one photo lacks the apply button');
+        $this->assertStringContainsString(self::WRITE_BUTTON, $one, 'an album with one photo lacks the write button');
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
+
+    /** The album properties screen's source, asserted to be the rendered screen carrying the injected block. */
+    private function albumScreen(int $catId): string
+    {
+        $res = $this->ws->fetchPage('/admin.php?page=album-' . $catId . '-properties');
+
+        $this->assertSame(200, $res['http_code']);
+        $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($res['body']), 'the album screen did not render');
+        $this->assertStringContainsString('id="provenance-open"', $res['body'], 'the injected block is missing altogether');
+
+        return $res['body'];
+    }
 
     private function save(array $values, ?int $catId = null): array
     {
