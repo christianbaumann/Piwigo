@@ -94,6 +94,12 @@ then shots, then records. Commit on `master` after each green step (memory: work
 
 ## Phase 1: Code fixes behind the text
 
+**Status: implemented and verified 2026-10-10** (commits 54de614a5, 04f27ef7b, 39eebd096 and the
+verify follow-up). Verify added two checks to `editor-buttons.spec.js`: the probe now sits outside
+the editor row, so a rule scoped to the editor shows as a Save/probe difference (watched red with
+`#PhotoDate input[type=submit]`), and `[ERR] the skin parameter takes effect` (watched red with
+both sides on newspaper). Open: shots 24/25 (Phase 5).
+
 ### Overview
 
 Three defects the handbook currently works around. Each: failing test, fix, suite green, commit.
@@ -176,7 +182,7 @@ label helper if the spec has one, else as literals with a comment naming
 - [x] 1.1 red before the CSS, green after: photoinfo E2E
 - [x] 1.2 red before, green after: photoinfo unit + integration
 - [x] 1.3 red before, green after: provenance E2E `core-admin-screens.spec.js`
-- [ ] typetags E2E green (its prefilter touches `tags.tpl`)
+- [x] typetags E2E green (its prefilter touches `tags.tpl`) (45 passed, 2026-10-10)
 
 #### Manual Verification
 - [ ] Shots 24/25 re-taken in Phase 5 show the new look
@@ -300,10 +306,12 @@ caption changed it; revert every other re-shoot
 ## Phase 6: Records
 
 #### [ ] 6.1 `docs/agents/TESTING.md`: dated "third pass" section (findings, tests added, C1-C3
-results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom ledger row
+results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom ledger row; dated note on the
+`Confirm merge` mutant row (`:892`): since O1 that mutant is the shipped behaviour and the spec is
+`[HAPPY]`, no longer `[ERR]`
 #### [ ] 6.2 `.claude/rules/handbook.md`: page count and topic list (eight files incl. index)
 #### [ ] 6.3 `handbuch-pages.spec.js:27` comment ("six pages")
-#### [ ] 6.4 `docs/backlog.md`: B8 product fix, `tags.tpl` upstream candidate
+#### [ ] 6.4 `docs/backlog.md`: B8 product fix (`tags.tpl` upstream candidate already added in 1.3)
 #### [ ] 6.5 research note `status: implemented`; this plan `status: implemented`
 
 ### Success Criteria

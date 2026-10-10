@@ -32,6 +32,15 @@ test('[ERR] the skin list is not empty', () => {
   expect(SKINS).toContain('newspaper');
 });
 
+test('[ERR] the skin parameter takes effect: newspaper and clear paint a submit differently', async ({ page }) => {
+  const picture = new PicturePage(page);
+  const probeOf = async (skin) => {
+    await picture.goto(`${fixture.picture_path}&skin=${skin}`);
+    return (await picture.editorButtonLook('date')).probe;
+  };
+  expect(await probeOf('newspaper')).not.toEqual(await probeOf('clear'));
+});
+
 for (const skin of SKINS) {
   test(`[ECP] ${skin}: Abbrechen has no fill and no border, Speichern keeps the skin's submit look`, async ({ page }) => {
     const picture = new PicturePage(page);

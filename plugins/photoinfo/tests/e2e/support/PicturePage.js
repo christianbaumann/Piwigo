@@ -86,8 +86,10 @@ class PicturePage {
 
   /**
    * Opens the date or the info editor and reads how the browser paints its
-   * Cancel and Save, and a probe submit button put into the same form for the
-   * moment of the reading: the probe is what the skin makes of a plain submit.
+   * Cancel and Save, and a probe submit button put next to the editor's info
+   * row - outside it, so a rule scoped to the editor shows up as a difference -
+   * for the moment of the reading: the probe is what the skin makes of a plain
+   * submit.
    *
    * @param {'date'|'info'} editor
    */
@@ -103,7 +105,7 @@ class PicturePage {
       const probe = document.createElement('input');
       probe.type = 'submit';
       probe.value = 'probe';
-      save.parentNode.appendChild(probe);
+      el.closest('.imageInfo').parentNode.appendChild(probe);
       const look = (button) => {
         const style = window.getComputedStyle(button);
         return Object.fromEntries(PROPS.map((prop) => [prop, style[prop]]));
