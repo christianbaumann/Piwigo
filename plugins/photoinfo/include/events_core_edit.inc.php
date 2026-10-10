@@ -324,7 +324,8 @@ function photoinfo_report_core_edit($result)
     return;
   }
 
-  $message = PHOTOINFO_ADMIN_ERROR_PREFIX.$result['message'];
+  load_language('plugin.lang', PHOTOINFO_PATH);
+  $message = l10n(PHOTOINFO_ADMIN_ERROR_PREFIX).l10n($result['message']);
   if (!isset($page['errors']) or !in_array($message, $page['errors']))
   {
     $page['errors'][] = $message;

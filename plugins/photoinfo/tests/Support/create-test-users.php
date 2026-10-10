@@ -84,6 +84,7 @@ foreach (TestUsers::ROLES as $username => $status)
         $row['user_id'] = $userId;
         $row['status'] = $status;
         $row['level'] = $level;
+        $row['language'] = TestUsers::LANGUAGE;
         $row['registration_date'] = date('Y-m-d H:i:s');
         $row['activation_key'] = null;
         $row['activation_key_expire'] = null;
@@ -103,7 +104,10 @@ foreach (TestUsers::ROLES as $username => $status)
     }
     else
     {
-        $db->query("UPDATE piwigo_user_infos SET status = '$status', level = $level WHERE user_id = $userId");
+        $db->query(
+            "UPDATE piwigo_user_infos SET status = '$status', level = $level, language = '" . TestUsers::LANGUAGE . "'
+             WHERE user_id = $userId"
+        );
     }
 
     // Assert the state took effect rather than trusting the writes above.
@@ -111,6 +115,12 @@ foreach (TestUsers::ROLES as $username => $status)
     if ($actual !== $status)
     {
         fwrite(STDERR, "Failed to give $username status $status (got: " . var_export($actual, true) . ")\n");
+        exit(1);
+    }
+    $language = $db->scalar("SELECT language FROM piwigo_user_infos WHERE user_id = $userId");
+    if ($language !== TestUsers::LANGUAGE)
+    {
+        fwrite(STDERR, "Failed to give $username language " . TestUsers::LANGUAGE . " (got: " . var_export($language, true) . ")\n");
         exit(1);
     }
 

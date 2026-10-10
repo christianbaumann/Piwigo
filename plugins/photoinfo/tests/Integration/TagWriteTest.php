@@ -13,8 +13,6 @@ final class TagWriteTest extends TestCase
 {
     /** A rendered admin page shorter than this is an error page or a redirect. */
     private const MIN_PAGE_BYTES = 2000;
-    /** The message a read-only file puts on an admin page. */
-    private const WRITE_FAILED = PHOTOINFO_ADMIN_ERROR_PREFIX . PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE;
     /** How long the outside writer keeps the persons lock. */
     private const HOLD_SECONDS = 2;
     /** Attempts, 100 ms apart, at seeing the outside writer's lock taken. */
@@ -393,7 +391,7 @@ final class TagWriteTest extends TestCase
 
         $body = $this->postProperties($this->image['id'], array('tags' => array('~~' . $kirmes . '~~')));
 
-        $this->assertSame(1, substr_count($body, self::WRITE_FAILED), 'the failed write was not reported once');
+        $this->assertSame(1, substr_count($body, self::writeFailed()), 'the failed write was not reported once');
         $this->assertSame(array($kirmes), $this->fixture->tagIdsOf($this->image['id']));
     }
 
@@ -703,7 +701,7 @@ final class TagWriteTest extends TestCase
             ), $fields));
 
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body), 'the Batch Manager did not answer');
-        $this->assertStringNotContainsString(PHOTOINFO_ADMIN_ERROR_PREFIX, $body, 'a file write failed');
+        $this->assertStringNotContainsString(FixtureBuilder::germanText(PHOTOINFO_ADMIN_ERROR_PREFIX), $body, 'a file write failed');
     }
 
     private function setInfo(array $fields): array
@@ -739,5 +737,12 @@ final class TagWriteTest extends TestCase
             usleep(100000);
         }
         $this->fail('the outside writer never took the persons lock');
+    }
+
+    /** The message a read-only file puts on an admin page, in the accounts' German. */
+    private static function writeFailed(): string
+    {
+        return FixtureBuilder::germanText(PHOTOINFO_ADMIN_ERROR_PREFIX)
+            . FixtureBuilder::germanText(PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE);
     }
 }

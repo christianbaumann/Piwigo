@@ -20,5 +20,7 @@ $lang['End month'] = 'End month';
 $lang['End day'] = 'End day';
 $lang['The end must not lie before the start'] = 'The end must not lie before the start';
 $lang['A range needs an end year'] = 'A range needs an end year';
+$lang['Photo Info: '] = 'Photo Info: ';
+$lang['File is missing or not writable'] = 'File is missing or not writable';
 
 ?>

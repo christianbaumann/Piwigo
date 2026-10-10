@@ -245,7 +245,7 @@ final class FreitextAssignTest extends TestCase
             ), $fields));
 
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body), 'the properties screen did not answer');
-        $this->assertStringNotContainsString(PHOTOINFO_ADMIN_ERROR_PREFIX, $body, 'a file write failed');
+        $this->assertStringNotContainsString(FixtureBuilder::germanText(PHOTOINFO_ADMIN_ERROR_PREFIX), $body, 'a file write failed');
     }
 
     private function postBatch(array $fields): void
@@ -257,6 +257,6 @@ final class FreitextAssignTest extends TestCase
             ), $fields));
 
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body), 'the Batch Manager did not answer');
-        $this->assertStringNotContainsString(PHOTOINFO_ADMIN_ERROR_PREFIX, $body, 'a file write failed');
+        $this->assertStringNotContainsString(FixtureBuilder::germanText(PHOTOINFO_ADMIN_ERROR_PREFIX), $body, 'a file write failed');
     }
 }

@@ -24,6 +24,12 @@ class TestUsers
         self::NORMAL    => 'normal',
         );
 
+    /**
+     * Every account's language: the admin pages a suite reads show photoinfo's
+     * German messages, and the oracle is read from the de_DE language file.
+     */
+    public const LANGUAGE = 'de_DE';
+
     /** Written by create-test-users.php, read by Config, git-ignored under local/. */
     public const ENV_FILE = 'local/config/photoinfo-test.env';
 

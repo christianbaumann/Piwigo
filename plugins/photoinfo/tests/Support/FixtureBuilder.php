@@ -382,6 +382,22 @@ class FixtureBuilder
     }
 
     /**
+     * The German text photoinfo's de_DE language file gives an English key, read
+     * from the file itself so no test carries a second copy of the wording. The
+     * test accounts run in de_DE (create-test-users.php).
+     */
+    public static function germanText(string $key): string
+    {
+        $lang = array();
+        include PHOTOINFO_PATH . 'language/de_DE/plugin.lang.php';
+        if (!isset($lang[$key]) or $lang[$key] === '' or $lang[$key] === $key)
+        {
+            throw new RuntimeException("photoinfo's de_DE language file has no German text for '$key'");
+        }
+        return $lang[$key];
+    }
+
+    /**
      * Reads the caption slots and the info tag back from a file with a plain
      * exiftool call in its own process - not through either plugin, whose
      * writing is what is under test. XMP carries its namespace, so the custom

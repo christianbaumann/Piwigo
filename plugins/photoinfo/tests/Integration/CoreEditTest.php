@@ -16,8 +16,6 @@ final class CoreEditTest extends TestCase
     private const CAPTION_SLOTS = array('XMP-dc:Description', 'IPTC:Caption-Abstract', 'EXIF:ImageDescription');
     /** A rendered admin page shorter than this is an error page or a redirect. */
     private const MIN_PAGE_BYTES = 2000;
-    /** The message a read-only file puts on an admin page. */
-    private const WRITE_FAILED = PHOTOINFO_ADMIN_ERROR_PREFIX . PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE;
 
     private Db $db;
     private FixtureBuilder $fixture;
@@ -217,7 +215,7 @@ final class CoreEditTest extends TestCase
 
         $body = $this->postProperties($this->image['id'], array('date_creation' => '1965-03-14'));
 
-        $this->assertSame(1, substr_count($body, self::WRITE_FAILED), 'the failed write was not reported once');
+        $this->assertSame(1, substr_count($body, self::writeFailed()), 'the failed write was not reported once');
         $this->assertExactDay($this->image, '1965-03-14 00:00:00');
     }
 
@@ -230,7 +228,7 @@ final class CoreEditTest extends TestCase
 
         $body = $this->postBatchDate(array($this->image['id'], $other['id']), array('date_creation' => '1965-03-14'));
 
-        $this->assertSame(1, substr_count($body, self::WRITE_FAILED), 'the failed write was not reported once');
+        $this->assertSame(1, substr_count($body, self::writeFailed()), 'the failed write was not reported once');
         $this->assertExactDay($other, '1965-03-14 00:00:00');
     }
 
@@ -280,7 +278,7 @@ final class CoreEditTest extends TestCase
     private function saveProperties(int $imageId, array $fields): void
     {
         $body = $this->postProperties($imageId, $fields);
-        $this->assertStringNotContainsString(self::WRITE_FAILED, $body, 'the file write failed');
+        $this->assertStringNotContainsString(self::writeFailed(), $body, 'the file write failed');
     }
 
     private function postProperties(int $imageId, array $fields): string
@@ -304,7 +302,7 @@ final class CoreEditTest extends TestCase
     private function batchDate(array $ids, array $fields): void
     {
         $body = $this->postBatchDate($ids, $fields);
-        $this->assertStringNotContainsString(self::WRITE_FAILED, $body, 'a file write failed');
+        $this->assertStringNotContainsString(self::writeFailed(), $body, 'a file write failed');
     }
 
     private function postBatchDate(array $ids, array $fields): string
@@ -393,5 +391,12 @@ final class CoreEditTest extends TestCase
         $this->assertNull($dates['XMP-photoshop:DateCreated']);
         $this->assertNull($dates['IPTC:DateCreated']);
         $this->assertNull($dates['XMP-pwginfo:DateEDTF']);
+    }
+
+    /** The message a read-only file puts on an admin page, in the accounts' German. */
+    private static function writeFailed(): string
+    {
+        return FixtureBuilder::germanText(PHOTOINFO_ADMIN_ERROR_PREFIX)
+            . FixtureBuilder::germanText(PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE);
     }
 }
