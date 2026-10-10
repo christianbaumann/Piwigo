@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 const { PicturePage } = require('./support/PicturePage');
 const { PhotoPropertiesPage } = require('./support/PhotoPropertiesPage');
 const { seed, restore, trackTag, makeReadOnly } = require('./support/seed');
-const { germanString } = require('./support/lang');
+const { germanTextOf } = require('./support/lang');
 
 /**
  * A tag typed in while tagging lands in the Freitext group and shows that
@@ -68,10 +68,11 @@ test.describe('a failed tag write on the picture page', () => {
 
   // Known gap (handbook third pass, B8): the tag is saved but its file write
   // fails, and photoinfo answers with tags_written false and a tags_message,
-  // which typetags' script ignores. The visitor learns nothing. Recorded in
-  // docs/backlog.md (typetags ignores tags_message); un-skipping this is the
-  // first step of the fix.
-  test.skip('[NEG] the picture page says the tag was not written into the file', async ({ page }) => {
+  // which typetags' script ignores. The visitor learns nothing. tags_message
+  // is the English key (TagWriteTest pins it), so the fix must also deliver
+  // the reason in German. Un-skipping this is the first step of the fix.
+  test('[NEG] the picture page says the tag was not written into the file', async ({ page }) => {
+    test.skip(true, 'known gap B8: typetags ignores tags_message, see docs/backlog.md');
     const photo = seed('photo');
     makeReadOnly(photo.image_id);
     const name = `Kirmes refused ${RUN}`;
@@ -82,6 +83,6 @@ test.describe('a failed tag write on the picture page', () => {
     trackTag(name);
     expect(answer.tags_written).toBe(false);
 
-    await expect(picture.textOnPage(germanString('File is missing or not writable'))).toBeVisible();
+    await expect(picture.textOnPage(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'))).toBeVisible();
   });
 });
