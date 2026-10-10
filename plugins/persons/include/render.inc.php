@@ -84,7 +84,7 @@ function persons_assign_overlay($image_id, $image)
     'PERSONS_PATH'        => PERSONS_PATH,
     'PERSONS_BOXES'       => array_values($boxes),
     'PERSONS_NAMES'       => array_values($names),
-    'PERSONS_STALE_TITLE' => l10n('Region may be out of date: the image was resized since it was tagged'),
+    'PERSONS_STALE_TITLE' => l10n(PERSONS_STALE_TITLE),
     'PERSONS_IMAGE_ID'    => $image_id,
     'PERSONS_TOKEN'       => get_pwg_token(),
     'PERSONS_ROTATION'    => $rotation,

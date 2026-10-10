@@ -39,6 +39,9 @@ define('PERSONS_MIN_BOX_FRACTION', 0.01);
  */
 define('PERSONS_STALE_RATIO_TOLERANCE', 0.02);
 
+/** The tooltip of a stale region's box, as a language key. */
+define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');
+
 /** Persons offered in the picker before the user has typed anything. */
 define('PERSONS_PICKER_RECENT_LIMIT', 10);
 
