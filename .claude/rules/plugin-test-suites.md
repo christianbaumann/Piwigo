@@ -243,9 +243,11 @@ creates a throwaway album with one photo copied into `upload/photoedit-test/`, n
 centre of interest), for the specs that save; `--scenario=regions` is `marked` plus two MWG regions
 written into the file (`FixtureBuilder::REGION_KEPT`, `REGION_CUT`), for the lost-region warning;
 `--scenario=jpeg` is `marked` as an upright JPEG, for the re-encode note;
-`--scenario=neighbour` is `photo` plus a next photo in the same album (dates forced, order asserted),
-printed as `next_path`, so the toolbar's next arrow is a link;
-`--restore` removes any of them, and the persons rows a save indexed from those regions, with its backups under
+`--scenario=neighbours` is `photo` plus a previous and a next photo in the same album (dates forced
+so the seeded photo is the middle one, order asserted), printed as `previous_path` and `next_path`,
+so both toolbar arrows are links;
+`--restore` removes any of them, and the persons named like those regions, whether a save indexed them
+or a spec tagged them through the UI, with its backups under
 `_data/photoedit/originals/`. The integration suite's `ApplyTurnTest` runs its corner and caption
 cases once per core image library by setting the `graphics_library` config row, because only GD
 drops a PNG's metadata - with ImageMagick the exiftool copy-back is invisible. `ApplyJpegTest` does

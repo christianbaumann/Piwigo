@@ -15,6 +15,8 @@ class PicturePage {
     this.nextLink = page.locator('#linkNext');
     /** The toolbar's arrow to the next photo; a link only when there is one. */
     this.nextArrow = page.locator('#imageToolBar .navigationButtons a.pwg-button:has(.pwg-icon-arrow-e)');
+    /** The toolbar's arrow to the previous photo; a link only when there is one. */
+    this.previousArrow = page.locator('#imageToolBar .navigationButtons a.pwg-button:has(.pwg-icon-arrow-w)');
 
     this.editButton = page.locator('#photoedit-toggle');
     this.controls = page.locator('#photoedit-controls');

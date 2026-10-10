@@ -4,8 +4,9 @@ const { PicturePage } = require('./support/PicturePage');
 const { seed, restore } = require('./support/seed');
 
 /**
- * Entering and leaving edit mode as the webmaster. Nothing is saved here;
- * turn-save.spec.js saves.
+ * Entering and leaving edit mode as the webmaster. No edit is saved here;
+ * turn-save.spec.js saves. One case saves a persons region, which writes the
+ * photo's file.
  *
  * The persons plugin must be active too; its overlay is part of what edit mode
  * hides.
@@ -163,7 +164,7 @@ test('[ST] entering edit mode ends persons tagging first', async ({ page }) => {
 test('[ST] the navigation arrows stay visible in edit mode and leave the page', async ({ page }) => {
   // An arrow is a link only with a photo to go to; the beforeEach photo has none.
   restore();
-  fixture = seed('neighbour');
+  fixture = seed('neighbours');
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
   const writes = picture.watchWrites();
@@ -174,6 +175,7 @@ test('[ST] the navigation arrows stay visible in edit mode and leave the page', 
   await expect(picture.editMode).toHaveCount(1);
   await expect.poll(() => picture.previewTransform()).not.toBe('');
 
+  await expect(picture.previousArrow).toBeVisible();
   await expect(picture.nextArrow).toBeVisible();
   await picture.nextArrow.click();
 
@@ -193,6 +195,7 @@ test('[ST] entering edit mode after a tagging change reloads instead of opening'
   await picture.goto(fixture.picture_path);
   await picture.personsTagToggle.click();
   await expect(picture.personsTagging).toHaveCount(1);
+  // A name seed.php --restore deletes the person of, as it does a save's regions.
   await picture.tagPerson(PERSON_BOX, fixture.kept_name);
   await picture.markDocument();
 

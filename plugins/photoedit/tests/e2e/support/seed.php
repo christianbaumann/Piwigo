@@ -12,7 +12,7 @@
  *   php tests/e2e/support/seed.php --scenario=marked   a generated 300x200 PNG, for specs that save
  *   php tests/e2e/support/seed.php --scenario=regions  marked, plus two person regions in the file
  *   php tests/e2e/support/seed.php --scenario=jpeg     marked, as an upright JPEG
- *   php tests/e2e/support/seed.php --scenario=neighbour photo, plus a next photo in the same album
+ *   php tests/e2e/support/seed.php --scenario=neighbours photo, plus a previous and a next photo in the same album
  *   php tests/e2e/support/seed.php --age-derivatives   backdate the seeded photo's derivatives
  *   php tests/e2e/support/seed.php --restore
  *
@@ -32,28 +32,32 @@ function fail(string $message): void
 
 $args = getopt('', array('scenario::', 'restore', 'age-derivatives'));
 
-/** How far apart the two photos' upload dates are put, so the album order is not left to a tie. */
+/** How far apart the neighbours' upload dates are put, so the album order is not left to a tie. */
 const NEIGHBOUR_DATE_STEP = '1 DAY';
 
 /**
- * Puts a next photo after the seeded one, so the theme offers a working
- * navigation arrow.
+ * Puts a previous and a next photo either side of the seeded one, so the
+ * theme offers both navigation arrows as links.
  *
  * The album is ordered by date_available DESC first (order_by_inside_category),
- * and both rows were inserted in the same second, so the order would fall to
- * the random file names. Forcing the dates makes the seeded photo the first,
- * and the order is asserted with the install's own ORDER BY clause, read from
- * piwigo_config. On a failed check the fixtures are removed before exiting: no
- * snapshot is saved yet, so --restore would never find them.
+ * and all three rows were inserted in the same second, so the order would fall
+ * to the random file names. Forcing the dates makes the seeded photo the middle
+ * one, and the order is asserted with the install's own ORDER BY clause, read
+ * from piwigo_config. On a failed check the fixtures are removed before
+ * exiting: no snapshot is saved yet, so --restore would never find them.
  *
- * @return int the next photo's id
+ * @return array previous and next photo ids
  */
-function seed_next_photo(Db $db, FixtureBuilder $builder, int $mainId, int $catId): int
+function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catId): array
 {
+    $previous = $builder->createTestImage();
     $next = $builder->createTestImage();
+    $builder->attachImage((int)$previous['id'], $catId);
     $builder->attachImage((int)$next['id'], $catId);
 
     $db->query('UPDATE piwigo_images SET date_available = NOW() WHERE id = ' . $mainId);
+    $db->query('UPDATE piwigo_images SET date_available = NOW() + INTERVAL ' . NEIGHBOUR_DATE_STEP
+        . ' WHERE id = ' . (int)$previous['id']);
     $db->query('UPDATE piwigo_images SET date_available = NOW() - INTERVAL ' . NEIGHBOUR_DATE_STEP
         . ' WHERE id = ' . (int)$next['id']);
 
@@ -71,14 +75,14 @@ function seed_next_photo(Db $db, FixtureBuilder $builder, int $mainId, int $catI
         }
     }
 
-    if ($order !== array($mainId, (int)$next['id']))
+    if ($order !== array((int)$previous['id'], $mainId, (int)$next['id']))
     {
         $builder->destroyTestImages();
         $builder->destroyTestAlbums();
-        fail("the photos are not in the order seeded, next under '$orderBy': " . json_encode($order));
+        fail("the photos are not in the order previous, seeded, next under '$orderBy': " . json_encode($order));
     }
 
-    return (int)$next['id'];
+    return array('previous' => (int)$previous['id'], 'next' => (int)$next['id']);
 }
 
 /** How far back --age-derivatives sets the derivatives' mtime: old enough for a browser to cache them for hours. */
@@ -133,7 +137,8 @@ if (isset($args['restore']))
 
     $builder->importTestObjects($snapshot);
     $builder->destroyTestImages();
-    // A save made persons index the regions --scenario=regions wrote.
+    // A save made persons index the regions --scenario=regions wrote, and a
+    // spec that tags a person through the UI uses one of these names too.
     $builder->destroyPersons(array(FixtureBuilder::REGION_KEPT['name'], FixtureBuilder::REGION_CUT['name']));
     $builder->destroyTestAlbums();
     unlink(SNAPSHOT_FILE);
@@ -143,9 +148,9 @@ if (isset($args['restore']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg', 'neighbour'), true))
+if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg', 'neighbours'), true))
 {
-    fail('--scenario must be: photo, marked, regions, jpeg, neighbour');
+    fail('--scenario must be: photo, marked, regions, jpeg, neighbours');
 }
 
 if (is_file(SNAPSHOT_FILE))
@@ -163,7 +168,7 @@ catch (RuntimeException $e)
 }
 
 // marked: a generated landscape PNG, which a save rewrites - never a copy of a scan.
-if ($scenario === 'photo' or $scenario === 'neighbour')
+if ($scenario === 'photo' or $scenario === 'neighbours')
 {
     $image = $builder->createTestImage();
 }
@@ -182,7 +187,7 @@ if ($scenario === 'regions')
 }
 $catId = $builder->createTestAlbum('Photoedit E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
-$nextId = $scenario === 'neighbour' ? seed_next_photo($db, $builder, (int)$image['id'], $catId) : null;
+$neighbours = $scenario === 'neighbours' ? seed_neighbours($db, $builder, (int)$image['id'], $catId) : null;
 $builder->invalidateUserCache();
 
 $dir = dirname(SNAPSHOT_FILE);
@@ -201,5 +206,6 @@ echo json_encode(array(
     'cut_name' => FixtureBuilder::REGION_CUT['name'],
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
     'album_path' => '/index.php?/category/' . $catId,
-    'next_path' => $nextId === null ? null : '/picture.php?/' . $nextId . '/category/' . $catId,
+    'previous_path' => $neighbours === null ? null : '/picture.php?/' . $neighbours['previous'] . '/category/' . $catId,
+    'next_path' => $neighbours === null ? null : '/picture.php?/' . $neighbours['next'] . '/category/' . $catId,
     )), "\n";
