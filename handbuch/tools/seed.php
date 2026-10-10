@@ -61,6 +61,14 @@ const DEMO_PERSONS = array('Anna Beispiel', 'Berta Muster');
  */
 const SHOOT_PERSONS = array('Clara Beispiel');
 
+/**
+ * The account the demo photos are recorded as added by.
+ *
+ * The picture page shows the uploader's login, and a screenshot of it is
+ * published: the install's real webmaster must never appear there.
+ */
+const DEMO_PHOTO_OWNER = 'persons_webmaster';
+
 /** Font with usable umlauts, present in the DDEV web image. */
 const DEMO_FONT = '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf';
 
@@ -712,6 +720,28 @@ function tag_id_by_name(string $name): int
     return (int)$row['id'];
 }
 
+/** Resolves the demo photos' owner to a user id, refusing when the account is missing. */
+function demo_photo_owner_id(): int
+{
+    global $conf;
+
+    $row = pwg_db_fetch_assoc(pwg_query(
+        'SELECT ' . $conf['user_fields']['id'] . ' AS id FROM ' . USERS_TABLE
+        . ' WHERE ' . $conf['user_fields']['username'] . " = '"
+        . pwg_db_real_escape_string(DEMO_PHOTO_OWNER) . "'"
+        ));
+
+    if (empty($row['id']))
+    {
+        fail(
+            "this install has no user '" . DEMO_PHOTO_OWNER . "', whom the demo photos are added by. Create it with:\n"
+            . "  ddev exec php plugins/persons/tests/Support/create-test-users.php"
+            );
+    }
+
+    return (int)$row['id'];
+}
+
 /** Removes the person rows and the mirrored tags for the given names. */
 function destroy_persons(array $names): void
 {
@@ -821,6 +851,7 @@ if (load_snapshot() !== null)
 }
 
 assert_scenes_are_photographable();
+$ownerId = demo_photo_owner_id();
 
 // The album first, with its provenance, so the photos can be given the same
 // inherited values in one place.
@@ -883,7 +914,7 @@ foreach (DEMO_PHOTOS as $photo)
         'width' => DEMO_WIDTH,
         'height' => DEMO_HEIGHT,
         'md5sum' => md5_file($file),
-        'added_by' => (int)$conf['webmaster_id'],
+        'added_by' => $ownerId,
         'rotation' => 0,
         'provenance_physical_album' => DEMO_ALBUM_PROVENANCE['provenance_physical_album'],
         'provenance_owner' => DEMO_ALBUM_PROVENANCE['provenance_owner'],

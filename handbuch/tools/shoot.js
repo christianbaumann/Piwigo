@@ -777,6 +777,17 @@ const SHOTS = [
       await page.click('#photoinfo-info-form .photoinfo-cancel');
     },
   },
+  {
+    file: '26-fotoseite-leiste.png',
+    role: 'NORMAL',
+    async take(page, demo) {
+      await open(page, demo.photos.sommerfest.picture_path);
+      // The zoom buttons are the last thing modus adds to the bar.
+      await page.waitForSelector('#imageToolBar #zoomFit', { state: 'visible', timeout: ELEMENT_TIMEOUT });
+      await page.mouse.move(0, 0);
+      await shoot(page.locator('#imageToolBar'), this.file, demo.image_dir);
+    },
+  },
 ];
 
 // ------------------------------------------------------------------- the run
