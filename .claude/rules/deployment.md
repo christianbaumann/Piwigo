@@ -217,12 +217,12 @@ The report line, its `(warning)` and the exit codes are in the
 
 The deploy uploads files and nothing under `_data/templates_c/` is touched, so a compiled page on
 the remote survives every deploy. A change to an injected plugin `.tpl` reaches it anyway (it is
-`{include}`d), but a change to a prefilter's *code* does not, and neither does anything in
-`plugins/typetags/template/tags.tpl`
+`{include}`d), but a change to a prefilter's *code* does not
 ([decision 0036](../../docs/agents/decisions/0036-prefilters-include-plugin-templates.md)). After
 such a deploy, purge by hand: Werkzeuge → Wartung → *Kompilierte Vorlagen entfernen*. The first
 deploy carrying decision 0036 needs that purge once, because the remote's compiled pages still hold
-the old pasted-in copies.
+the old pasted-in copies; so does the first deploy carrying typetags' admin `{include}` (submodule
+commit `6407fe3`), for the compiled admin tags page.
 
 ## Photo edits travel as files
 
