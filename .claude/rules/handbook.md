@@ -60,7 +60,8 @@ strings replaced on purpose ([decision 0052](../../docs/agents/decisions/0052-na
 
 It needs its own `!` re-include in `.gitignore` under the blanket `/local/*` rule, which is already
 there. `$conf['compiled_template_cache_language']` is `false`, so a translation change needs no
-`_data/templates_c/` clear — but a change to a plugin **template** embedded by a prefilter does.
+`_data/templates_c/` clear — but a change to a prefilter's **code** does (a template it includes does
+not, [decision 0036](../../docs/agents/decisions/0036-prefilters-include-plugin-templates.md)).
 
 `plugins/provenance/tests/Unit/GermanOverrideKeyTest.php` guards every key structurally: a renamed
 or dropped upstream literal reverts a screen to English with no error anywhere, because `l10n()`
