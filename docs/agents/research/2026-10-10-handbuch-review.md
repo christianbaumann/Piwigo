@@ -4,7 +4,7 @@ git_commit: a2a9e953a
 branch: master
 topic: "Handbook third pass: labels, claims, cross-page consistency, brevity, screenshots"
 tags: [research, handbuch, documentation, persons, photoedit, photoinfo, typetags, provenance]
-status: approved 2026-10-10
+status: implemented 2026-10-11
 ---
 
 # Handbook review, third pass

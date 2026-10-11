@@ -4,7 +4,7 @@ git_commit: a2a9e953a7ec48bcc34a8c97b7ca8cce64e60380
 branch: master
 topic: "Handbook third pass: fixes, missing tests, new page Die Fotoseite"
 tags: [plan, handbuch, photoinfo, persons, photoedit, provenance, core, documentation]
-status: draft
+status: implemented
 ---
 
 # Handbook third pass, implementation plan
@@ -329,7 +329,7 @@ caption changed it; revert every other re-shoot
 
 ## Phase 6: Records
 
-**Status: 6.1-6.4 done 2026-10-10** (762c7911b, 317f6d292); 6.5 after C3.
+**Status: 6.1-6.4 done 2026-10-10** (762c7911b, 317f6d292); 6.5 done 2026-10-11.
 
 #### [x] 6.1 `docs/agents/TESTING.md`: dated "third pass" section (findings, tests added, C1-C3
 results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom ledger row; dated note on the
@@ -338,7 +338,7 @@ results, hand checks); fix "five documented workflows" (`:1166`); move-of-zoom l
 #### [x] 6.2 `.claude/rules/handbook.md`: page count and topic list (eight files incl. index)
 #### [x] 6.3 `handbuch-pages.spec.js:27` comment ("six pages")
 #### [x] 6.4 `docs/backlog.md`: B8 product fix (`tags.tpl` upstream candidate already added in 1.3)
-#### [ ] 6.5 research note `status: implemented`; this plan `status: implemented`
+#### [x] 6.5 research note `status: implemented`; this plan `status: implemented`
 
 ### Success Criteria
 - [x] `bash tools/test-hooks.sh` green; commit gate passes (2026-10-10)
