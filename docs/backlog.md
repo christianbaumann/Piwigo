@@ -17,10 +17,6 @@
   over from
   [2026-09-01-ftp-deploy-blank-vs-existing-remote.md](agents/research/2026-09-01-ftp-deploy-blank-vs-existing-remote.md)
   when the rest of its open questions were closed.
-- **`pwg.persons.rescan` is not called by the deploy, and is not a listed manual step.** Person
-  regions live only in the image files (decision 0020), so after any resync they return to the
-  remote's index only if someone calls this method by hand. `tools/deploy/README.md`'s command
-  sequence does not name it.
 
 *(Answered 2026-08-31: `.ddev` and `tools` are no longer uploaded — see
 [decision 0022](agents/decisions/0022-the-tools-directory-is-not-published.md). Of `local/`, only

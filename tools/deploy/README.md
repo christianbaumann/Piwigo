@@ -5,7 +5,8 @@ and only the ones that changed since the last run — then completes the remote 
 HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of four of the
 five fork-local plugins (photoedit stays inactive, see `.claude/rules/deployment.md`), a
 seed of the tag groups and tags `tag-groups.json` names, a `site_update` scan that turns the
-uploaded `galleries/` tree into albums and photos, and a photoinfo rescan that reads each photo's date and info text back out of its file.
+uploaded `galleries/` tree into albums and photos, a persons rescan that rebuilds the person
+index from the face regions in each file, and a photoinfo rescan that reads each photo's date and info text back out of its file.
 
 > **The target is a sandbox instance.** This tool installs a gallery, overwrites a config file
 > and deletes remote paths. It is **never** safe to point at a production install. See
@@ -77,7 +78,7 @@ reports the plugins already active.
 | `--dry-run` | enumerate, hash and diff; open no socket. Reports what *would* be sent **and deleted** |
 | `--list-files` | print the published file set and exit |
 | `--audit` | list the remote and report what the manifest does not cover; delete nothing |
-| `--no-bootstrap` | upload only; skip install, config, plugins, tag groups, sync and rescan |
+| `--no-bootstrap` | upload only; skip install, config, plugins, tag groups, sync and rescans |
 | `--seed-tags-only` | log in and apply `tag-groups.json`, nothing else: no upload, no FTP connection (see below) |
 | `--no-prune` | never delete, not even a path the previous manifest recorded |
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
@@ -145,6 +146,28 @@ anything, so a mistake in it stops the deploy with exit `3` before the upload:
 ```bash
 uv run pwg-deploy --seed-tags-only deploy.ddev.json
 ```
+
+## The persons rescan
+
+Person regions live only in the image files; the persons plugin's two tables are an index built
+from them ([decision 0020](../../docs/agents/decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md)).
+So after the sync, every run lists every photo, as the photoinfo rescan below does, and asks
+`pwg.persons.rescan` to index their regions, ten photos per request. It runs only when persons is
+among the activated plugins, and it runs before the photoinfo rescan. It writes no file except one
+whose regions need correcting for a rotation the remote's database recorded since they were
+written.
+
+```
+  sync        106 photos, 4 albums, 0 errors (deleted: 0 photos, 0 albums)
+  persons     105 of 106 photos read, 1 failed:
+              57: File is missing or not readable
+  rescan      105 of 106 photos read, 1 failed:
+              57: File is missing or not readable
+```
+
+Failed photos, the `(warning)` when every photo fails, and the exit codes follow the same rules as
+the photoinfo rescan: the run exits `0`, a whole request failing exits `7`. A photo that fails
+keeps whatever regions the remote's index had for it.
 
 ## The photoinfo rescan
 
@@ -317,7 +340,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-579 tests, measured 2026-10-11. Everything that decides *what* to do is a pure function and is
+594 tests, measured 2026-10-11. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

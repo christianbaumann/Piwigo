@@ -136,7 +136,8 @@ class FakeGallery:
     checks of include/ws_functions/pwg.extensions.php:53-88, the summary markup of
     admin/themes/default/template/site_update.tpl:19-24, the paging of
     pwg.categories.getImages (include/ws_functions/pwg.categories.php:19-232), the
-    chunk limit and answer of pwg.photoinfo.rescan (plugins/photoinfo/include/), the tag
+    chunk limit and answer of pwg.photoinfo.rescan (plugins/photoinfo/include/) and of
+    pwg.persons.rescan (plugins/persons/include/ws_functions.inc.php), the tag
     rows of pwg.tags.getAdminList/add (include/ws_functions/pwg.tags.php) and typetags'
     group methods (plugins/typetags/main.inc.php).
     """
@@ -159,6 +160,10 @@ class FakeGallery:
         "plugins/photoinfo/include/functions.inc.php",
         r"define\('PHOTOINFO_RESCAN_MAX_CHUNK',\s*(\d+)\);",
     )
+    MAX_PERSONS_CHUNK = php_value(
+        "plugins/persons/include/functions.inc.php",
+        r"define\('PERSONS_WRITEBACK_MAX_CHUNK',\s*(\d+)\);",
+    )
 
     def __init__(
         self,
@@ -178,6 +183,7 @@ class FakeGallery:
         rescan_failures=None,
         rescan_tags_added=None,
         not_in_file=None,
+        persons_failures=None,
         prune_error=None,
         prune_failures=None,
         prune_raises=None,
@@ -212,6 +218,9 @@ class FakeGallery:
         # file does not name, as pwg.photoinfo.rescan reports them.
         self.rescan_tags_added = dict(rescan_tags_added or {})
         self.not_in_file = {i: list(names) for i, names in (not_in_file or {}).items()}
+        # photo id -> the reason pwg.persons.rescan gives for it, and every id it was sent.
+        self.persons_failures = dict(persons_failures or {})
+        self.persons_rescanned: list[int] = []
         # A message pwg.photoinfo.pruneTags fails every call with; None answers.
         self.prune_error = prune_error
         # photo id -> the reason pwg.photoinfo.pruneTags gives for not reading its file.
@@ -320,6 +329,8 @@ class FakeGallery:
             return self._rescan(fields)
         if method == "pwg.photoinfo.pruneTags":
             return self._prune(fields)
+        if method == "pwg.persons.rescan":
+            return self._persons_rescan(fields)
         if method == "pwg.tags.getAdminList":
             return _ok({"tags": [dict(tag, name_raw=tag["name"]) for tag in self.tags]})
         if method == "pwg.tags.add":
@@ -422,6 +433,25 @@ class FakeGallery:
                     str(i): self.not_in_file[i] for i in ids if self.not_in_file.get(i)
                 }
                 or [],
+            }
+        )
+
+    def _persons_rescan(self, fields) -> str:
+        if self.plugin_states.get("persons") != "active":
+            return _fail(501, "unknown method pwg.persons.rescan")
+        if fields.get("pwg_token") != self.TOKEN:
+            return _fail(403, "Invalid security token")
+        ids = [int(part) for part in fields.get("image_ids", "").split(",") if part]
+        if not ids:
+            return _fail(1003, "image_ids is empty")
+        if len(ids) > self.MAX_PERSONS_CHUNK:
+            return _fail(1003, f"At most {self.MAX_PERSONS_CHUNK} photos per call")
+        self.persons_rescanned.extend(ids)
+        failed = {i: self.persons_failures[i] for i in ids if i in self.persons_failures}
+        return _ok(
+            {
+                "scanned": len(ids) - len(failed),
+                "failed": {str(i): reason for i, reason in failed.items()} or [],
             }
         )
 

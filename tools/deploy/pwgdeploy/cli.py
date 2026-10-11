@@ -419,6 +419,8 @@ def _bootstrap(out, config, state_dir, transport_factory, client_factory, wanted
         f"{result.sync.errors} errors (deleted: {result.sync.photos_deleted} photos, "
         f"{result.sync.albums_deleted} albums)",
     )
+    if result.persons is not None:
+        _report_reads(out, "persons", result.persons)
     if result.rescan is not None:
         _report_rescan(out, result.rescan, pruning=result.prune is not None)
     if result.prune is not None:
@@ -445,23 +447,27 @@ def _report_seed(out, result: seed.SeedResult) -> None:
 
 
 def _report_rescan(out, rescan: bootstrap.RescanResult, pruning: bool = False) -> None:
+    _report_reads(out, "rescan", rescan)
+    if rescan.tags_added or rescan.not_in_file:
+        _continuation(out, _tags_summary(rescan, pruning))
+
+
+def _report_reads(out, label: str, rescan: bootstrap.RescanResult) -> None:
     """Failed photos are named with their reasons but never fail the deploy: the upload
     and install are done and correct, and a photo whose file cannot be read keeps its
-    date and info text empty until the next run. Every photo failing — a host without
-    exiftool — is flagged a warning, like a missing SITE CHMOD."""
+    date, info text or person regions as they were until the next run. Every photo failing — a
+    host without exiftool — is flagged a warning, like a missing SITE CHMOD."""
     summary = f"{rescan.scanned} of {rescan.total} photos read"
     if rescan.failed:
         warning = " (warning)" if rescan.scanned == 0 else ""
         summary += f", {len(rescan.failed)} failed{warning}:"
-    _line(out, "rescan", summary)
+    _line(out, label, summary)
     failed = sorted(rescan.failed.items())
     for photo_id, reason in failed[:MAX_REPORTED_RESCAN_FAILURES]:
         _continuation(out, f"{photo_id}: {reason}")
     unnamed = len(failed) - MAX_REPORTED_RESCAN_FAILURES
     if unnamed > 0:
         _continuation(out, f"… and {unnamed} more")
-    if rescan.tags_added or rescan.not_in_file:
-        _continuation(out, _tags_summary(rescan, pruning))
 
 
 def _tags_summary(rescan: bootstrap.RescanResult, pruning: bool) -> str:
