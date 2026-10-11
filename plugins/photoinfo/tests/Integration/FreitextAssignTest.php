@@ -27,6 +27,8 @@ final class FreitextAssignTest extends TestCase
     private string $suffix;
     private array $freitext;
     private bool $photoinfoOff = false;
+    /** @var string[] names typed in, adopted in tearDown whether or not the case got that far */
+    private array $typedNames = array();
 
     protected function setUp(): void
     {
@@ -54,6 +56,10 @@ final class FreitextAssignTest extends TestCase
         {
             $this->performPluginAction('activate', 'photoinfo');
             $this->fixture->assertPluginActive('photoinfo');
+        }
+        foreach ($this->typedNames as $name)
+        {
+            $this->fixture->trackTagsNamed($name);
         }
         $this->fixture->destroyTestTags();
         $this->fixture->destroyTestImages();
@@ -199,7 +205,9 @@ final class FreitextAssignTest extends TestCase
     /** A name unique to this run, so no real tag of the install is touched. */
     private function tagName(string $base): string
     {
-        return $base . ' ' . $this->suffix;
+        $name = $base . ' ' . $this->suffix;
+        $this->typedNames[] = $name;
+        return $name;
     }
 
     private function assertInFreitextAndFile(string $name): void

@@ -665,6 +665,16 @@ class FixtureBuilder
         return $id;
     }
 
+    /** Every tag of this name, if the server created one, so teardown removes it even after a failed case. */
+    public function trackTagsNamed(string $name): void
+    {
+        $rows = $this->db->query("SELECT id FROM piwigo_tags WHERE name = '" . $this->db->escape($name) . "'");
+        while ($row = $rows->fetch_assoc())
+        {
+            $this->testTags[] = (int)$row['id'];
+        }
+    }
+
     /** A typetags group the server created while a test ran, so teardown removes it. */
     public function groupIdNamed(string $name): int
     {
