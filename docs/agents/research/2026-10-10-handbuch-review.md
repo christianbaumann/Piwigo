@@ -68,7 +68,7 @@ Results (2026-10-10):
   pointer events, its name label does, and the label inherits the box's `title`. So outside tagging
   mode the explanation comes up over the name; in tagging mode anywhere over the box. Pinned in
   `persons/tests/e2e/overlay.spec.js` ("explains itself ..."), German text read from the de_DE file.
-- **C3**: open, browser UI; owner checks the dialog labels by hand (ledger in `docs/agents/TESTING.md`).
+- **C3**: checked 2026-10-11 in a headed Chrome (de-DE): the photoedit question shows **Abbrechen** and **OK**, as 06 says (ledger in `docs/agents/TESTING.md`).
 
 ## D. Consistency between pages
 

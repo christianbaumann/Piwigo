@@ -185,7 +185,7 @@ label helper if the spec has one, else as literals with a comment naming
 - [x] typetags E2E green (its prefilter touches `tags.tpl`) (45 passed, 2026-10-10)
 
 #### Manual Verification
-- [ ] Shots 24/25 re-taken in Phase 5 show the new look
+- [x] Shots 24/25 re-taken in Phase 5 show the new look (checked against the live page with `playwright-cli`, 2026-10-11, at the owner's request)
 
 ---
 
@@ -253,7 +253,7 @@ picture page tells the user", `test.skip` with reason and link to the backlog en
 ## Phase 3: Screen checks C1-C3
 
 **Status: C1, C2 implemented and verified 2026-10-10** (05d73ae6e, dc88ca757, 212786d2c; each case
-watched red under its own mutant). C3 waits for the owner's hand check (ledger row in TESTING.md).
+watched red under its own mutant). C3 checked 2026-10-11 in a headed Chrome: **Abbrechen** / **OK** (ledger row in TESTING.md).
 
 ### Overview
 
@@ -268,12 +268,12 @@ account: "[ECP] 100 % shows the largest size this account may load".
 Hover a stale box outside and inside tagging mode. Pin the result in `overlay.spec.js` (extend
 "is drawn dashed, dimmed and with an explanation" with the German text and where it shows).
 
-#### [-] 3.3 C3 confirm buttons
+#### [x] 3.3 C3 confirm buttons
 `window.confirm` in the container's Chromium; record the labels in the TESTING.md ledger (browser
 UI, no test).
 
 ### Success Criteria
-- [-] each finding recorded with result in the research note (C1, C2 done; C3 waits for the owner)
+- [x] each finding recorded with result in the research note (C3 2026-10-11)
 - [x] persons E2E green (151 passed, 2026-10-10)
 
 ---
@@ -299,7 +299,7 @@ Style: brief, steps as full sentences, notes may be fragments, no em/en dashes, 
   language file; red today. Then the text says the reason is German.
 #### [x] 4.4 `04-schlagworte.html`: A9, B7, B8 (O6), D1, D2 (O4), D6, E1, E6, E7; merge step and hinweis per O1; *Fotoinfo:* per O2
 #### [x] 4.5 `05-personen.html` + new `07-fotoseite.html`: A5, A6, B10, C1/C2 results, D1, E3, E6, E7; zoom section moves to 07 (O7, P5), 05 links it
-#### [-] 4.6 `06-drehen.html`: A7, A8, B11, C3, D1, D2, E7; nav gets *Weiter* to 07
+#### [x] 4.6 `06-drehen.html`: A7, A8, B11, C3, D1, D2, E7; nav gets *Weiter* to 07
 #### [x] 4.7 `index.html`: B2 (*Administration* link), D7, O3, O4 terms defined once, chapter 7, "sieben Arbeitsschritte"
 
 ### Success Criteria
