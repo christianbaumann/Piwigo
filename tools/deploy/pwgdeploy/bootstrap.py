@@ -1,6 +1,7 @@
 """Turning an uploaded tree into an installed gallery.
 
-Seven steps — install, config, session, plugins, tag groups, sync, photoinfo rescan — each of which asks
+Eight steps — install, config, session, plugins, tag groups, sync, persons rescan, photoinfo
+rescan — each of which asks
 the server what state it is in before changing it, so running the whole thing twice is
 safe by construction rather than by the operator remembering.
 
@@ -73,6 +74,7 @@ MIN_SUMMARY_DELETED_LINES = 2
 MAX_REPORTED_ERRORS = 10
 
 TYPETAGS_PLUGIN = "typetags"
+PERSONS_PLUGIN = "persons"
 PHOTOINFO_PLUGIN = "photoinfo"
 IMAGES_METHOD = "pwg.categories.getImages"
 RESCAN_METHOD = "pwg.photoinfo.rescan"
@@ -82,6 +84,10 @@ IMAGE_PAGE_SIZE = 500
 # PHOTOINFO_RESCAN_MAX_CHUNK in plugins/photoinfo/include/functions.inc.php; the method
 # refuses a longer id list rather than truncating it.
 RESCAN_CHUNK = 10
+PERSONS_RESCAN_METHOD = "pwg.persons.rescan"
+# PERSONS_WRITEBACK_MAX_CHUNK in plugins/persons/include/functions.inc.php; refused, never
+# truncated, like photoinfo's.
+PERSONS_RESCAN_CHUNK = 10
 
 
 @dataclass(frozen=True)
@@ -97,7 +103,7 @@ class SyncCounts:
 class RescanResult:
     scanned: int
     failed: dict[int, str]
-    """Photo id -> the reason pwg.photoinfo.rescan gave for not reading it."""
+    """Photo id -> the reason the rescan method gave for not reading it."""
     tags_added: int = 0
     """Tags linked to photos because their files name them."""
     not_in_file: dict[int, list[str]] = field(default_factory=dict)
@@ -130,6 +136,8 @@ class BootstrapResult:
     """None when typetags was not among the plugins this run activated."""
     rescan: RescanResult | None = None
     """None when photoinfo was not among the plugins this run activated."""
+    persons: RescanResult | None = None
+    """None when persons was not among the plugins this run activated. Carries no tags."""
     prune: PruneResult | None = None
     """None unless the run was asked to prune and photoinfo was active."""
 
@@ -516,6 +524,39 @@ def _names_by_photo(value: Mapping | None) -> bool:
     )
 
 
+# --- persons rescan -------------------------------------------------------------------
+
+
+def rescan_persons(client, base_url: str, token: str) -> RescanResult:
+    """Rebuild every photo's person index from the regions in its file (decision 0020:
+    the file is the source of truth, the two tables are derived)."""
+    return merge_rescans(
+        parse_persons_rescan(
+            ws_call(
+                client,
+                base_url,
+                PERSONS_RESCAN_METHOD,
+                {"image_ids": ",".join(map(str, chunk)), "pwg_token": token},
+            )
+        )
+        for chunk in chunks(image_ids(client, base_url), PERSONS_RESCAN_CHUNK)
+    )
+
+
+def parse_persons_rescan(result: Any) -> RescanResult:
+    """One chunk's answer: `scanned` and `failed` only (ws_persons_rescan)."""
+    fields = result if isinstance(result, Mapping) else {}
+    scanned = fields.get("scanned")
+    failed = _id_keyed(fields.get("failed"))
+    if not isinstance(scanned, int) or failed is None:
+        raise RemoteHttpError(
+            f"{PERSONS_RESCAN_METHOD} returned an unexpected result: {result!r:.200}"
+        )
+    return RescanResult(
+        scanned=scanned, failed={int(key): str(reason) for key, reason in failed.items()}
+    )
+
+
 # --- pruning tags the files do not name ------------------------------------------------
 
 
@@ -567,7 +608,7 @@ def run(
     prune_tags: bool = False,
 ) -> BootstrapResult:
     """Install if needed, publish the config, log in, activate, seed the tag groups, scan,
-    rescan, then - only when asked - prune the tags the files do not name."""
+    rescan persons and photoinfo, then - only when asked - prune the tags the files do not name."""
     wanted = tag_groups or seed.load_tag_groups(seed.TAG_GROUPS_PATH)
     installed_now = False
     if not is_installed(client, config.site.base_url):
@@ -584,6 +625,17 @@ def run(
         else None
     )
     counts = sync(client, config.site.base_url)
+    # Persons before photoinfo: the order decides who has the last word on a person tag.
+    # Indexing a photo makes its mirrored person tags match its face regions and removes
+    # one without a region (persons_sync_image_tags()); photoinfo's rescan links what the
+    # file's keywords name and never removes. Persons first, the photo ends with every tag
+    # its file names, as locally, and photoinfo's not_in_file count already sees the region
+    # tags. Photoinfo first, persons would strip a keyword-only person tag it just restored.
+    persons = (
+        rescan_persons(client, config.site.base_url, token)
+        if PERSONS_PLUGIN in plugins
+        else None
+    )
     rescan = (
         rescan_photoinfo(client, config.site.base_url, token)
         if PHOTOINFO_PLUGIN in plugins
@@ -602,5 +654,6 @@ def run(
         sync=counts,
         seed=seeded,
         rescan=rescan,
+        persons=persons,
         prune=pruned,
     )

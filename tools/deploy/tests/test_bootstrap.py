@@ -727,6 +727,71 @@ def test_an_empty_gallery_sends_no_rescan_request(cfg):
     assert "pwg.photoinfo.rescan" not in gallery.methods_called()
 
 
+# --- persons rescan -----------------------------------------------------------------
+
+
+def test_the_persons_chunk_is_the_one_the_server_accepts():
+    """[BVA] Read from PERSONS_WRITEBACK_MAX_CHUNK: a change there goes red here."""
+    assert bootstrap.PERSONS_RESCAN_CHUNK == FakeGallery.MAX_PERSONS_CHUNK
+
+
+def test_persons_rescan_sends_every_photo_once_in_chunks_the_method_accepts(cfg):
+    """[HAPPY][BVA] 23 photos is two full chunks and a partial one."""
+    gallery = active_gallery(photo_ids=list(range(1, 24)))
+
+    result = bootstrap.rescan_persons(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    calls = [f for f in gallery.posts_to("ws.php") if f.get("method") == "pwg.persons.rescan"]
+    sizes = [len(f["image_ids"].split(",")) for f in calls]
+    assert sizes == [FakeGallery.MAX_PERSONS_CHUNK, FakeGallery.MAX_PERSONS_CHUNK, 3]
+    assert all(f["pwg_token"] == FakeGallery.TOKEN for f in calls)
+    assert sorted(gallery.persons_rescanned) == list(range(1, 24))
+    assert len(gallery.persons_rescanned) == 23
+    assert result == bootstrap.RescanResult(scanned=23, failed={})
+
+
+def test_a_photo_the_persons_rescan_could_not_read_is_reported_by_id(cfg):
+    """[ECP] One unreadable file must not cost the gallery its person index."""
+    gallery = active_gallery(
+        photo_ids=list(range(1, 24)), persons_failures={4: "gone", 17: "bad"}
+    )
+
+    result = bootstrap.rescan_persons(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    assert result.scanned == 21
+    assert result.failed == {4: "gone", 17: "bad"}
+    assert len(gallery.persons_rescanned) == 23
+
+
+def test_an_empty_gallery_sends_no_persons_rescan_request(cfg):
+    """[BVA] The method refuses an empty id list."""
+    gallery = active_gallery(photo_ids=[])
+
+    result = bootstrap.rescan_persons(gallery, cfg.site.base_url, FakeGallery.TOKEN)
+
+    assert result == bootstrap.RescanResult(scanned=0, failed={})
+    assert "pwg.persons.rescan" not in gallery.methods_called()
+    assert "pwg.categories.getImages" in gallery.methods_called()  # anti-vacuity
+
+
+def test_parse_persons_rescan_reads_failures_by_photo_id():
+    """[HAPPY] json_encode writes an id-keyed array as an object with string keys."""
+    result = bootstrap.parse_persons_rescan({"scanned": 9, "failed": {"12": "gone"}})
+
+    assert result == bootstrap.RescanResult(scanned=9, failed={12: "gone"})
+
+
+@pytest.mark.parametrize(
+    "result",
+    [None, {"failed": []}, {"scanned": "1", "failed": []}, {"scanned": 1}, {"scanned": 1, "failed": ["x"]}],
+    ids=["none", "no count", "count as text", "no failed", "non-empty list"],
+)
+def test_parse_persons_rescan_refuses_a_shape_it_does_not_know(result):
+    """[NEG] A misread answer would report photos as indexed that nothing read."""
+    with pytest.raises(RemoteHttpError):
+        bootstrap.parse_persons_rescan(result)
+
+
 # --- the whole bootstrap ------------------------------------------------------------
 
 
@@ -773,9 +838,9 @@ def test_the_config_is_uploaded_after_the_install(cfg, gallery, tmp_path):
     assert transport.paths("put") == []
 
 
-def test_the_rescan_follows_the_sync(cfg, gallery, tmp_path):
-    """[ST] The sync registers the photos the rescan reads, and the rescan is the only
-    request allowed after it."""
+def test_the_rescans_follow_the_sync(cfg, gallery, tmp_path):
+    """[ST] The sync registers the photos the rescans read, and the rescans are the only
+    requests allowed after it."""
     bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
 
     urls = gallery.urls()
@@ -784,8 +849,51 @@ def test_the_rescan_follows_the_sync(cfg, gallery, tmp_path):
     assert after  # anti-vacuity: something follows the sync at all
     assert {call[2]["method"] for call in after} == {
         "pwg.categories.getImages",
+        "pwg.persons.rescan",
         "pwg.photoinfo.rescan",
     }
+
+
+def test_the_persons_rescan_finishes_before_the_photoinfo_rescan_starts(cfg, gallery, tmp_path):
+    """[ST] Persons removes a person tag without a region, photoinfo restores what the
+    file's keywords name: the later one has the last word, and that must be photoinfo
+    (the comment at the call site in bootstrap.run() says why)."""
+    bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    methods = gallery.methods_called()
+    persons = [i for i, m in enumerate(methods) if m == "pwg.persons.rescan"]
+    photoinfo = [i for i, m in enumerate(methods) if m == "pwg.photoinfo.rescan"]
+    assert persons and photoinfo  # anti-vacuity: both ran
+    assert max(persons) < min(photoinfo)
+
+
+def test_a_run_rebuilds_the_person_index_of_every_photo_the_sync_registered(
+    cfg, gallery, tmp_path
+):
+    """[HAPPY] Person regions live only in the files (decision 0020); the remote's index
+    exists only after this step."""
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert sorted(gallery.persons_rescanned) == list(range(1, gallery.photos_added + 1))
+    assert len(gallery.persons_rescanned) == gallery.photos_added
+    assert result.persons == bootstrap.RescanResult(scanned=gallery.photos_added, failed={})
+
+
+def test_a_run_without_persons_does_not_rebuild_the_person_index(
+    cfg, gallery, tmp_path, monkeypatch
+):
+    """[DT] The method exists only while persons is active."""
+    monkeypatch.setattr(
+        bootstrap,
+        "PLUGINS_TO_ACTIVATE",
+        tuple(name for name in bootstrap.PLUGINS_TO_ACTIVATE if name != "persons"),
+    )
+
+    result = bootstrap.run(cfg, tmp_path, FakeTransport(), gallery)
+
+    assert result.persons is None
+    assert "pwg.persons.rescan" not in gallery.methods_called()
+    assert result.rescan is not None  # anti-vacuity: the run reached the rescans
 
 
 def test_a_run_rescans_every_photo_the_sync_registered(cfg, gallery, tmp_path):

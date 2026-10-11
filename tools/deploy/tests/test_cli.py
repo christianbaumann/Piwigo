@@ -127,7 +127,7 @@ def test_the_report_names_every_step(run):
     """[HAPPY] The operator reads this instead of the log; each step says what it did."""
     run()
 
-    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "tags", "sync", "rescan"):
+    for label in ("transport", "file set", "manifest", "preflight", "upload", "chmod", "install", "config", "plugins", "tags", "sync", "persons", "rescan"):
         assert label in run.text, f"{label} missing from:\n{run.text}"
 
 
@@ -336,13 +336,13 @@ def test_the_report_names_what_the_sync_deleted(config_file, repo, tmp_path):
     assert "deleted: 7 photos, 2 albums" in run.text
 
 
-def _rescan_lines(text: str) -> list[str]:
-    """The `rescan` line and the continuation lines under it."""
-    label = f"  {'rescan':{cli.LABEL_WIDTH}}"
+def _rescan_lines(text: str, name: str = "rescan") -> list[str]:
+    """The `rescan` (or another) line and the continuation lines under it."""
+    label = f"  {name:{cli.LABEL_WIDTH}}"
     continuation = f"  {'':{cli.LABEL_WIDTH}}"
     lines = text.splitlines()
     starts = [i for i, line in enumerate(lines) if line.startswith(label)]
-    assert len(starts) == 1, f"expected one rescan line, got {starts}"
+    assert len(starts) == 1, f"expected one {name} line, got {starts}"
     block = [lines[starts[0]]]
     for line in lines[starts[0] + 1 :]:
         if not line.startswith(continuation):
@@ -356,6 +356,30 @@ def test_the_report_says_how_many_photos_the_rescan_read(run):
     assert run() == 0
 
     assert _rescan_lines(run.text) == [f"  {'rescan':{cli.LABEL_WIDTH}}106 of 106 photos read"]
+
+
+def test_the_report_says_how_many_photos_the_persons_rescan_read(run):
+    """[HAPPY] The remote's person index exists only after this step."""
+    assert run() == 0
+
+    assert _rescan_lines(run.text, "persons") == [
+        f"  {'persons':{cli.LABEL_WIDTH}}106 of 106 photos read"
+    ]
+
+
+def test_a_photo_the_persons_rescan_could_not_read_is_named_and_the_run_succeeds(
+    config_file, repo, tmp_path
+):
+    """[ECP] Same policy as the photoinfo rescan: the photo's problem, not the deploy's."""
+    gallery = FakeGallery(BASE_URL, persons_failures={7: "File is missing or not readable"})
+    runner = Run(config_file, repo, tmp_path, gallery=gallery)
+
+    assert runner() == 0
+
+    lines = _rescan_lines(runner.text, "persons")
+    assert "105 of 106 photos read, 1 failed:" in lines[0]
+    assert lines[1:] == [f"  {'':{cli.LABEL_WIDTH}}7: File is missing or not readable"]
+    assert _rescan_lines(runner.text)[0].endswith("106 of 106 photos read")  # not mixed up
 
 
 def test_failed_photos_are_named_with_their_reasons_and_the_run_succeeds(

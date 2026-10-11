@@ -14,7 +14,7 @@ uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts del
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
-uv run pytest                                    # 571 tests, measured 2026-10-09
+uv run pytest                                    # 586 tests, measured 2026-10-11
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -146,8 +146,8 @@ the preflight compares `include/constants.php`'s `PHPWG_VERSION` against the rem
 Exact string equality, never an ordering; `--allow-version-change` overrides. **The tool never
 posts to `upgrade.php`** — run it in a browser yourself, then re-run the deploy. Albums
 and photos are re-created by the `site_update` scan; person regions by `pwg.persons.rescan` out
-of the image files; photoinfo's date, info text and tags by `pwg.photoinfo.rescan`, which the deploy runs
-itself (below); the tag groups and their colours by the seed from `tag-groups.json` (below). **Provenance columns have no path to the remote at all** — they live in the
+of the image files and photoinfo's date, info text and tags by `pwg.photoinfo.rescan`, both of which
+the deploy runs itself (below); the tag groups and their colours by the seed from `tag-groups.json` (below). **Provenance columns have no path to the remote at all** — they live in the
 database and the file is only an export target — so a photo whose provenance was not written back
 before upload has none on the remote.
 
@@ -172,6 +172,23 @@ line. Report, exit codes and the local DDEV credential file are in the
   `PHOTOINFO_FREITEXT_GROUP` and asserts the file has that group, and photoinfo's
   `LocalOnlyRuleTest` reads the file and asserts every name in `PHOTOINFO_LOCAL_ONLY_TAGS` is a
   group there, so renaming that group cannot switch the rule off unnoticed (decision 0051).
+
+## The deploy rebuilds the person index
+
+After the sync, `bootstrap.run()` rebuilds the remote's person index from the regions in the files
+through `pwg.persons.rescan`
+([decision 0020](../../docs/agents/decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md)),
+only when persons is among the activated plugins, and reports one `persons` line. Report and exit
+code are in the [README](../../tools/deploy/README.md#the-persons-rescan). What an agent needs
+beside it:
+
+- `PERSONS_RESCAN_CHUNK` in `bootstrap.py` mirrors `PERSONS_WRITEBACK_MAX_CHUNK`; the tests read the
+  PHP value. Same photo list, same exit-0 policy for failed photos as the photoinfo rescan below.
+- It runs **before** the photoinfo rescan, and the order matters: indexing a photo makes its
+  mirrored person tags match its face regions and removes one without a region
+  (`persons_sync_image_tags()`), while photoinfo's rescan adds what the file's keywords name and
+  never removes. Persons first, the photo ends with every tag its file names, and photoinfo's
+  `not_in_file` count already sees the region tags. The reason is also at the call site.
 
 ## The deploy rescans photoinfo's values
 
@@ -211,9 +228,9 @@ the old pasted-in copies.
 
 A turn made with `plugins/photoedit` rewrites the image file and nothing else that a deploy could
 carry ([decision 0034](../../docs/agents/decisions/0034-photo-edits-change-the-file.md)). So the
-flow is: edit locally on the picture page → commit the changed file under `galleries/` → deploy →
-on the remote, re-read the edited photo's metadata and delete its derivatives → run
-`pwg.persons.rescan`, as after any deploy, so the person index is rebuilt from the edited file.
+flow is: edit locally on the picture page → commit the changed file under `galleries/` → deploy
+(its persons rescan rebuilds the person index from the edited file) → on the remote, re-read the
+edited photo's metadata and delete its derivatives.
 
 Both remote steps are manual and easy to miss; do them in the Batch Manager with the edited photos
 selected:
