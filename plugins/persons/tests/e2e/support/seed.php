@@ -92,15 +92,14 @@ const NEIGHBOUR_DATE_STEP = '1 DAY';
  * one, and the order is asserted - with the install's own ORDER BY clause, read
  * from piwigo_config rather than typed here a second time.
  *
- * On a failed check the fixtures are removed before exiting: fail() runs before
- * any snapshot is saved, so --restore would never find them.
- *
  * @return array previous and next photo ids
  */
 function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catId): array
 {
     $previous = $builder->createTestImage();
+    save_test_objects($builder);
     $next = $builder->createTestImage();
+    save_test_objects($builder);
     $builder->attachImage((int)$previous['id'], $catId);
     $builder->attachImage((int)$next['id'], $catId);
 
@@ -113,8 +112,6 @@ function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catI
     $orderBy = (string)$db->scalar("SELECT value FROM piwigo_config WHERE param = 'order_by_inside_category'");
     if (stripos($orderBy, 'ORDER BY') === false)
     {
-        $builder->destroyTestImages();
-        $builder->destroyTestAlbums();
         fail("order_by_inside_category is not an ORDER BY clause: '$orderBy'");
     }
 
@@ -131,8 +128,6 @@ function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catI
     $expected = array((int)$previous['id'], $mainId, (int)$next['id']);
     if ($order !== $expected)
     {
-        $builder->destroyTestImages();
-        $builder->destroyTestAlbums();
         fail('neighbours are not in the order previous, seeded, next: ' . json_encode($order));
     }
 
@@ -168,7 +163,22 @@ function save_snapshot(array $snapshot): void
     {
         fail("could not create snapshot directory $dir");
     }
-    file_put_contents(SNAPSHOT_FILE, json_encode($snapshot, JSON_PRETTY_PRINT));
+    // Written aside and renamed: a seed killed mid-write must not leave a
+    // truncated snapshot that every later seed refuses.
+    $tmp = SNAPSHOT_FILE . '.tmp';
+    if (file_put_contents($tmp, json_encode($snapshot, JSON_PRETTY_PRINT)) === false or !rename($tmp, SNAPSHOT_FILE))
+    {
+        fail('could not write the snapshot ' . SNAPSHOT_FILE);
+    }
+}
+
+/**
+ * Records everything the builder owns, as soon as it owns it: a seed that fails
+ * or throws after creating a photo still leaves --restore a snapshot naming it.
+ */
+function save_test_objects(FixtureBuilder $builder): void
+{
+    save_snapshot(array('test_objects' => $builder->exportTestObjects()));
 }
 
 /** The config row that points the plugin at its exiftool binary. */
@@ -428,6 +438,15 @@ if (!$builder->tableExists('piwigo_person_region'))
     fail('the persons plugin is not installed; activate it before seeding');
 }
 
+// A snapshot still here belongs to a seed nobody restored, a spec killed before
+// its afterEach. Carried forward, so the next --restore removes that seed's
+// photo and album too instead of this seed overwriting the only record of them.
+$leftover = load_snapshot();
+if ($leftover !== null)
+{
+    $builder->importTestObjects($leftover['test_objects'] ?? array());
+}
+
 // --source=small copies the smallest gallery image instead of the first one,
 // for the picture page's upscaling case. Only the seeded photo, not its
 // neighbours. The spec asserts the size it needs against what is printed.
@@ -441,7 +460,9 @@ catch (InvalidArgumentException $e)
 {
     fail('--source: ' . $e->getMessage());
 }
+save_test_objects($builder);
 $catId = $builder->createTestAlbum('Persons E2E ' . bin2hex(random_bytes(4)));
+save_test_objects($builder);
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
 
@@ -526,7 +547,7 @@ foreach (persons_indexed_regions((int)$image['id']) as $row)
         );
 }
 
-save_snapshot(array('test_objects' => $builder->exportTestObjects()));
+save_test_objects($builder);
 
 $output = array(
     'scenario' => $scenario,

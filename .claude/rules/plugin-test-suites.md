@@ -185,7 +185,13 @@ looks for one — removes that config row and the persons the specs create throu
 are unconditional because all three outlive a snapshot: a spec killed mid-run would otherwise leave every
 later page without an editor, and a leftover person puts a stranger at the top of the next run's
 picker, where `PicturePage.typeName()` would commit them. It rewrites an image file in place, so it
-is never pointed at a real scan.
+is never pointed at a real scan. A seed writes the snapshot as soon as it has created anything, so a
+seed that fails halfway is still restorable, and a seed that finds an unrestored snapshot carries its
+objects forward, so one `--restore` after a killed run removes both seeds' albums and photos.
+`tests/Integration/SeedRestoreTest` runs `seed.php` as its own process to prove both
+([research note](../../docs/agents/research/2026-10-11-persons-test-leak.md)). Check for leftovers
+inside the container (`ddev exec find ...`): a host listing taken right after a run can still show
+files the container already deleted, until Mutagen catches up.
 
 `admin-persons.spec.js` presses **Rescan all files**, which re-reads every photo in the gallery -
 the seeded one and the install's own alike - because that is what the button does. The index is
