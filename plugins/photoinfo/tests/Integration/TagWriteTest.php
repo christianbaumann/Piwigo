@@ -166,6 +166,45 @@ final class TagWriteTest extends TestCase
         $this->assertFileTags($this->image, array(), array());
     }
 
+    /**
+     * [NEG] A read-only file: each of typetags' three calls brings the reason
+     * in the account's German for the picture page to show.
+     */
+    public function testTheTypetagsCallsBringTheFailureInGerman(): void
+    {
+        $kirmes = $this->tag('Kirmes', $this->group);
+        $anna = $this->tag('Anna', $this->group);
+        $this->lockFile($this->image);
+        $token = $this->ws->token();
+        $german = FixtureBuilder::germanText(PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE);
+
+        $calls = array(
+            'typetags.image.addTag' => array('tag_id' => $kirmes),
+            'typetags.image.addNewTag' => array('tag_name' => $this->tagName('Anna')),
+            'typetags.image.removeTag' => array('tag_id' => $kirmes),
+            );
+        foreach ($calls as $method => $fields)
+        {
+            $res = $this->ws->call($method, array('image_id' => $this->image['id'], 'pwg_token' => $token) + $fields);
+            $this->assertOk($res);
+            $this->assertFalse($res['json']['result']['tags_written'] ?? null, $method . ': ' . $res['body']);
+            $this->assertSame($german, $res['json']['result']['tags_message_l10n'] ?? null, $method);
+        }
+        $this->assertSame(array($anna), $this->fixture->tagIdsOf($this->image['id']), 'the database stays saved');
+    }
+
+    /** [HAPPY] A written file: the answer carries no reason to show. */
+    public function testASuccessfulTypetagsCallBringsNoReason(): void
+    {
+        $kirmes = $this->tag('Kirmes', $this->group);
+
+        $res = $this->ws->call('typetags.image.addTag',
+            array('image_id' => $this->image['id'], 'tag_id' => $kirmes, 'pwg_token' => $this->ws->token()));
+
+        $this->assertTagsWritten($res);
+        $this->assertArrayNotHasKey('tags_message_l10n', $res['json']['result']);
+    }
+
     // ── the admin tags page ───────────────────────────────────────────────
 
     /** [HAPPY] A rename rewrites every photo with the tag. */

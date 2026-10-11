@@ -61,6 +61,15 @@ function makeReadOnly(imageId) {
   run(`--read-only=${imageId}`);
 }
 
+/**
+ * Makes the photo's file writable again.
+ *
+ * @param {number} imageId
+ */
+function makeWritable(imageId) {
+  run(`--writable=${imageId}`);
+}
+
 /** Removes whatever the seed created. Safe to call unseeded. */
 function restore() {
   run('--restore');
@@ -76,4 +85,4 @@ function trackTag(name) {
   return run(`--track-tag=${name}`);
 }
 
-module.exports = { seed, readFile, readDate, readRow, makeReadOnly, restore, trackTag };
+module.exports = { seed, readFile, readDate, readRow, makeReadOnly, makeWritable, restore, trackTag };

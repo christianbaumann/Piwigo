@@ -41,6 +41,7 @@ class PicturePage {
     // typetags' field for a new tag, and the Tags row its answer lands in
     this.newTagField = page.locator('#typetags-new-tag input[name="tag_name"]');
     this.newTagButton = page.locator('#typetags-new-tag button[type="submit"]');
+    this.tagWarning = page.locator('#typetags-new-tag .typetags-tag-warning');
   }
 
   /**
@@ -88,10 +89,40 @@ class PicturePage {
    */
   async addNewTag(name) {
     await this.newTagField.fill(name);
+    return this.answerTo('typetags.image.addNewTag', this.newTagButton);
+  }
+
+  /**
+   * Clicks the x on a tag's badge and waits for the server's answer.
+   *
+   * @param {string} name
+   * @returns {Promise<any>} the answer's result
+   */
+  async removeTag(name) {
+    return this.answerTo('typetags.image.removeTag',
+      this.page.locator('#Tags dd a', { hasText: name }).locator('.typetag-remove'));
+  }
+
+  /**
+   * Clicks a tag's + badge below the Tags row and waits for the server's answer.
+   *
+   * @param {string} name
+   * @returns {Promise<any>} the answer's result
+   */
+  async addTag(name) {
+    return this.answerTo('typetags.image.addTag',
+      this.page.locator('#typetags-unassigned .typetag-add', { hasText: name }));
+  }
+
+  /**
+   * @param {string} method the web-service method the click calls
+   * @param {import('@playwright/test').Locator} target
+   */
+  async answerTo(method, target) {
     const answer = this.page.waitForResponse(
-      (r) => r.url().includes('ws.php') && (r.request().postData() || '').includes('typetags.image.addNewTag')
+      (r) => r.url().includes('ws.php') && (r.request().postData() || '').includes(method)
     );
-    await this.newTagButton.click();
+    await target.click();
     return (await (await answer).json()).result;
   }
 

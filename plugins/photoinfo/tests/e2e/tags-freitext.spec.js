@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { PicturePage } = require('./support/PicturePage');
 const { PhotoPropertiesPage } = require('./support/PhotoPropertiesPage');
-const { seed, restore, trackTag, makeReadOnly } = require('./support/seed');
+const { seed, restore, trackTag, makeReadOnly, makeWritable } = require('./support/seed');
 const { germanTextOf } = require('./support/lang');
 
 /**
@@ -66,13 +66,10 @@ test.describe('a failed tag write on the picture page', () => {
     restore();
   });
 
-  // Known gap (handbook third pass, B8): the tag is saved but its file write
-  // fails, and photoinfo answers with tags_written false and a tags_message,
-  // which typetags' script ignores. The visitor learns nothing. tags_message
-  // is the English key (TagWriteTest pins it), so the fix must also deliver
-  // the reason in German. Un-skipping this is the first step of the fix.
-  test('[NEG] the picture page says the tag was not written into the file', async ({ page }) => {
-    test.skip(true, 'known gap B8: typetags ignores tags_message, see docs/backlog.md');
+  // photoinfo answers a failed tag write with tags_written false and the
+  // reason in the account's German (tags_message_l10n); typetags' script shows
+  // it next to the tag field, and the tag stays saved.
+  test('[NEG] the picture page says the new tag was not written into the file', async ({ page }) => {
     const photo = seed('photo');
     makeReadOnly(photo.image_id);
     const name = `Kirmes refused ${RUN}`;
@@ -80,9 +77,49 @@ test.describe('a failed tag write on the picture page', () => {
     await picture.goto(photo.picture_path);
 
     const answer = await picture.addNewTag(name);
-    trackTag(name);
+    const tag = trackTag(name);
     expect(answer.tags_written).toBe(false);
 
     await expect(picture.textOnPage(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'))).toBeVisible();
+    await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
+  });
+
+  test('[NEG][ST] removing a tag says it was not written, and the next written change clears that', async ({ page }) => {
+    const photo = seed('photo');
+    const name = `Kirmes removed ${RUN}`;
+    const notWritten = germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE');
+    const picture = new PicturePage(page);
+    await picture.goto(photo.picture_path);
+    expect((await picture.addNewTag(name)).tags_written).toBe(true);
+    const tag = trackTag(name);
+    await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
+    await expect(picture.textOnPage(notWritten)).toHaveCount(0);
+
+    makeReadOnly(photo.image_id);
+    expect((await picture.removeTag(name)).tags_written).toBe(false);
+    await expect(picture.tagWarning).toHaveText(notWritten);
+    await expect(picture.tagLink(tag.tag_id)).toHaveCount(0);
+
+    makeWritable(photo.image_id);
+    expect((await picture.addTag(name)).tags_written).toBe(true);
+    await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
+    await expect(picture.tagWarning).toBeHidden();
+    await expect(picture.textOnPage(notWritten)).toHaveCount(0);
+  });
+
+  test('[NEG] adding an existing tag says it was not written into the file', async ({ page }) => {
+    const photo = seed('photo');
+    const name = `Kirmes added ${RUN}`;
+    const picture = new PicturePage(page);
+    await picture.goto(photo.picture_path);
+    expect((await picture.addNewTag(name)).tags_written).toBe(true);
+    const tag = trackTag(name);
+    expect((await picture.removeTag(name)).tags_written).toBe(true);
+
+    makeReadOnly(photo.image_id);
+    expect((await picture.addTag(name)).tags_written).toBe(false);
+
+    await expect(picture.textOnPage(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'))).toBeVisible();
+    await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
   });
 });

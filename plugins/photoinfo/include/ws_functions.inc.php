@@ -111,19 +111,6 @@ function ws_photoinfo_setDate($params, &$service)
 }
 
 /**
- * The reason a file write failed, in the caller's language, for the picture
- * page. The answer's message stays the English key.
- *
- * @param string $message
- * @return string
- */
-function photoinfo_l10n_reason($message)
-{
-  load_language('plugin.lang', PHOTOINFO_PATH);
-  return l10n($message);
-}
-
-/**
  * Restores one chunk of photos' dates and info texts from their files. Writes
  * the database only, never a file.
  *

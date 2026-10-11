@@ -429,3 +429,16 @@ UPDATE '.IMAGES_TABLE.'
 ;';
   pwg_query($query);
 }
+
+/**
+ * The reason a file write failed, in the caller's language, for the picture
+ * page. The answer's message stays the English key.
+ *
+ * @param string $message
+ * @return string
+ */
+function photoinfo_l10n_reason($message)
+{
+  load_language('plugin.lang', PHOTOINFO_PATH);
+  return l10n($message);
+}

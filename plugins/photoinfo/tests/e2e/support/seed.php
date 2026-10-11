@@ -13,6 +13,7 @@
  *   php tests/e2e/support/seed.php --read-row=<id>     the photo's comment and date columns
  *   php tests/e2e/support/seed.php --read-date=<id>    the photo's date tags
  *   php tests/e2e/support/seed.php --read-only=<id>    makes the photo's file unwritable, so a save's file write fails
+ *   php tests/e2e/support/seed.php --writable=<id>     makes it writable again
  *   php tests/e2e/support/seed.php --track-tag=<name> records a tag the browser created, for --restore
  *   php tests/e2e/support/seed.php --restore
  *
@@ -30,7 +31,7 @@ function fail(string $message): void
     exit(1);
 }
 
-$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:', 'track-tag:'));
+$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:', 'writable:', 'track-tag:'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -55,6 +56,19 @@ try
             fail("could not make $file read-only");
         }
         echo json_encode(array('read_only' => true)), "\n";
+        exit(0);
+    }
+
+    if (isset($args['writable']))
+    {
+        $file = PIWIGO_ROOT . ltrim((string)$builder->imageRow((int)$args['writable'])['path'], './');
+        chmod($file, 0644);
+        clearstatcache();
+        if (!is_writable($file))
+        {
+            fail("could not make $file writable");
+        }
+        echo json_encode(array('read_only' => false)), "\n";
         exit(0);
     }
 

@@ -299,7 +299,8 @@ prints an XMP date with colons and, without photoinfo's config, reads the EDTF r
 the fraction `0.997…`. The E2E specs run as the webmaster;
 `auth.setup.js` saves all three sessions. `tests/e2e/support/seed.php --scenario=photo` creates a
 public album with one copied photo, `--read-file=<id>` and `--read-date=<id>` print the file's caption
-and date tags, `--read-row=<id>` the photo's `comment` and date columns, and `--restore` removes the album, the row, the file and exiftool's
+and date tags, `--read-row=<id>` the photo's `comment` and date columns, `--read-only=<id>` and `--writable=<id>`
+chmod the photo's file so a write fails or works again, and `--restore` removes the album, the row, the file and exiftool's
 `_original` sidecar. Never point it at a production install. `PluginActivationTest` deactivates
 photoinfo and provenance for one case and reactivates both in `tearDown`; a run killed in between
 leaves them off, so reactivate them by hand. `CoreEditWithoutProvenanceTest` does the same with provenance alone,
