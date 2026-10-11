@@ -118,17 +118,11 @@ final class SetAlbumInfoTest extends TestCase
      * [NEG] Quotes and backslashes are stored as typed, in every text field.
      *
      * include/common.inc.php runs addslashes() over every request value; a
-     * handler that escapes that value again for SQL stores core's slashes too:
-     * `a"b\c'd` is stored as `a\"b\\c\'d` (measured 2026-10-11), as in
-     * SetPhotoInfoTest.
+     * handler that escapes that value again for SQL stores core's slashes too,
+     * as this one did until 2026-10-11 (`a\"b\\c\'d`).
      */
     public function testQuotesAndBackslashesAreStoredAsTyped(): void
     {
-        $this->markTestSkipped(
-            'known gap: the fields are stored with core\'s added slashes - ' .
-            'see the "provenance stores request values with core\'s added slashes" item in docs/backlog.md'
-        );
-
         $typed = 'a"b\\c\'d';
 
         $res = $this->save(array('physical_album' => $typed, 'owner' => $typed, 'scanned_on' => '', 'note' => $typed));

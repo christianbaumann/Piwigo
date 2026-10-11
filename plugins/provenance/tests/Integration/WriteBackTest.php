@@ -77,6 +77,7 @@ final class WriteBackTest extends TestCase
     {
         $this->clearExiftoolPathOverride();
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
         $this->fixture->restore();
         $this->db->query('DELETE FROM ' . self::HISTORY_TABLE . ' WHERE id > ' . $this->baselineHistoryId);
         $this->ws->logout();
@@ -358,6 +359,44 @@ final class WriteBackTest extends TestCase
         $this->assertSame($text, $this->tagValue($tags, '-XMP-pwgprov:Owner'));
         $this->assertStringContainsString($text, (string)$this->tagValue($tags, PROVENANCE_IPTC_CAPTION_TAG));
         $this->assertStringContainsString($text, (string)$this->tagValue($tags, 'EXIF:ImageDescription'));
+    }
+
+    /**
+     * [NEG] Quotes and backslashes typed into the album and photo screens reach
+     * the file as typed.
+     *
+     * Saved through the two save methods rather than the fixture, because the
+     * slashes core adds to every request value are what would otherwise travel
+     * on into the file.
+     */
+    public function testQuotesAndBackslashesSavedThroughTheScreensReachTheFile(): void
+    {
+        $typed = 'a"b\\c\'d';
+        $catId = $this->fixture->createTestAlbum('provenance-test quotes');
+        $this->fixture->attachImage($this->image['id'], $catId);
+
+        $saves = array(
+            $this->ws->call('pwg.provenance.setAlbumInfo', array(
+                'cat_id' => $catId, 'physical_album' => '', 'owner' => $typed, 'scanned_on' => '', 'note' => '',
+                'pwg_token' => $this->ws->token(),
+            )),
+            $this->ws->call('pwg.provenance.applyToPhotos', array(
+                'cat_id' => $catId, 'image_ids' => (string)$this->image['id'], 'pwg_token' => $this->ws->token(),
+            )),
+            $this->ws->call('pwg.provenance.setPhotoInfo', array(
+                'image_id' => $this->image['id'], 'note' => $typed, 'pwg_token' => $this->ws->token(),
+            )),
+            $this->writeBack(array($this->image['id'])),
+        );
+        foreach ($saves as $res)
+        {
+            $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        }
+
+        $tags = $this->readTags();
+        $this->assertSame($typed, $this->tagValue($tags, 'XMP-' . PROVENANCE_XMP_PREFIX . ':Owner'));
+        $this->assertSame($typed, $this->tagValue($tags, 'XMP-' . PROVENANCE_XMP_PREFIX . ':PhotoNote'));
+        $this->assertStringContainsString($typed, (string)$this->tagValue($tags, 'EXIF:ImageDescription'));
     }
 
     // ── failure paths ─────────────────────────────────────────────────────

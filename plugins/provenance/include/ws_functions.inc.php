@@ -119,6 +119,13 @@ SELECT '.implode(', ', $columns).'
 
   $before = pwg_db_fetch_assoc($result);
 
+  // include/common.inc.php adds slashes to every request value; the text goes
+  // into the file as well as the database, so it is taken back to what was typed.
+  foreach (array('physical_album', 'owner', 'scanned_on', 'note') as $name)
+  {
+    $param[$name] = stripslashes((string)$param[$name]);
+  }
+
   $physical_album = provenance_clean_short_text($param['physical_album']);
   $owner = provenance_clean_short_text($param['owner']);
 
@@ -344,7 +351,9 @@ SELECT provenance_note
 
   list($before) = pwg_db_fetch_row($result);
 
-  $note = provenance_clean_note($param['note']);
+  // include/common.inc.php adds slashes to every request value; see
+  // ws_provenance_setAlbumInfo().
+  $note = provenance_clean_note(stripslashes((string)$param['note']));
 
   pwg_query('
 UPDATE '.IMAGES_TABLE.'

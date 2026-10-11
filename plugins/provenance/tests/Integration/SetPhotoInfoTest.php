@@ -104,19 +104,12 @@ final class SetPhotoInfoTest extends TestCase
     /**
      * [NEG] Quotes and backslashes are stored as typed.
      *
-     * Known gap: include/common.inc.php adds slashes to every request value and
-     * the handler escapes the slashed value again, so `a"b\c'd` is stored as
-     * `a\"b\\c\'d` (measured 2026-10-07). See the "provenance stores request
-     * values with core's added slashes" item in docs/backlog.md; un-skipping this
-     * test is the fix's first step. plugins/photoinfo's setInfo strips them.
+     * include/common.inc.php adds slashes to every request value; a handler
+     * that escapes that value again for SQL stores core's slashes too, as this
+     * one did until 2026-10-11 (`a\"b\\c\'d`).
      */
     public function testQuotesAndBackslashesAreStoredAsTyped(): void
     {
-        $this->markTestSkipped(
-            'known gap: the note is stored with core\'s added slashes - ' .
-            'see the "provenance stores request values with core\'s added slashes" item in docs/backlog.md'
-        );
-
         $this->save('a"b\\c\'d');
 
         $this->assertSame('a"b\\c\'d', $this->photo()['provenance_note']);
