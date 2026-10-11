@@ -24,14 +24,15 @@ A credential file that still carries `deploy.example.json`'s placeholder fails v
 * [x] Add a test that `deploy.example.json` still uses that constant as its placeholder, so the guard and the example cannot drift apart
 * [x] Rewrite the `REPLACE_ME` paragraph in `.claude/rules/deployment.md`: the trap is now guarded
 * [x] In `docs/backlog.md`, remove the `REPLACE_ME` item and the out-of-date "typetags submodule is three commits ahead" line
-* [ ] Owner (manual): set a real `admin.password` in `tools/deploy/deploy.local.json` (manual testing required)
+* [x] Owner (manual): set a real `admin.password` in `tools/deploy/deploy.local.json`
+  **Note:** 2026-10-11: the owner changed the remote webmaster's password; a `pwg.session.login` against the remote with it returned `webmaster` / status `webmaster`, and the same value was written into the git-ignored file.
 
 ## Verification
 
 * [x] Validation of a config whose `admin.password` is `REPLACE_ME` fails with a message naming `admin.password`
   **Note:** Verified via `test_the_placeholder_is_refused_naming_the_field[admin-password]` and `test_every_rejection_names_the_offending_field[admin.password-16]`
-* [-] `uv run pwg-deploy --dry-run deploy.local.json` refuses until the owner has set the password, then passes
-  **Note:** Refusal verified 2026-10-11: exit 3, `ConfigError: admin.password still holds the placeholder 'REPLACE_ME'`; `--dry-run deploy.ddev.json` (no placeholder) passes. The "then passes" half needs the owner's real password (manual testing required)
+* [x] `uv run pwg-deploy --dry-run deploy.local.json` refuses until the owner has set the password, then passes
+  **Note:** Refusal verified 2026-10-11: exit 3, `ConfigError: admin.password still holds the placeholder 'REPLACE_ME'`; `--dry-run deploy.ddev.json` (no placeholder) passes. Then passes, 2026-10-11 after the password was set: exit 0, `80 new, 53 changed, 3300 unchanged, 0 removed (would send)`
 * [x] Removing the guard turns the new tests red
   **Note:** Verified 2026-10-11: guard condition replaced by `if False:` turned 7 tests red; restored, green
 * [x] `cd tools/deploy && uv run pytest` passes
