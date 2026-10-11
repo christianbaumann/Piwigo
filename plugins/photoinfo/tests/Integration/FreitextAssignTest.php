@@ -52,18 +52,25 @@ final class FreitextAssignTest extends TestCase
 
     protected function tearDown(): void
     {
-        if ($this->photoinfoOff)
+        // The cleanup runs even when reactivating photoinfo fails.
+        try
         {
-            $this->performPluginAction('activate', 'photoinfo');
-            $this->fixture->assertPluginActive('photoinfo');
+            if ($this->photoinfoOff)
+            {
+                $this->performPluginAction('activate', 'photoinfo');
+                $this->fixture->assertPluginActive('photoinfo');
+            }
         }
-        foreach ($this->typedNames as $name)
+        finally
         {
-            $this->fixture->trackTagsNamed($name);
+            foreach ($this->typedNames as $name)
+            {
+                $this->fixture->trackTagsNamed($name);
+            }
+            $this->fixture->destroyTestTags();
+            $this->fixture->destroyTestImages();
+            $this->fixture->destroyTestAlbums();
         }
-        $this->fixture->destroyTestTags();
-        $this->fixture->destroyTestImages();
-        $this->fixture->destroyTestAlbums();
     }
 
     /** [HAPPY] A name typed into the photo properties tag field. */

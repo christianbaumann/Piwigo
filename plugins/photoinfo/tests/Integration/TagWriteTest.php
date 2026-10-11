@@ -36,6 +36,8 @@ final class TagWriteTest extends TestCase
     private string $suffix;
     private int $group;
     private ?string $marker = null;
+    /** @var string[] names built in, adopted in tearDown whether or not the case got that far */
+    private array $typedNames = array();
 
     protected function setUp(): void
     {
@@ -63,6 +65,12 @@ final class TagWriteTest extends TestCase
         if ($this->marker !== null)
         {
             @unlink($this->marker);
+        }
+        // A tag the server created or renamed (a duplicate's copy, a renamed
+        // person's tag) is otherwise adopted only after assertions that can fail.
+        foreach ($this->typedNames as $name)
+        {
+            $this->fixture->trackTagsNamed($name);
         }
         $this->fixture->destroyTestTags();
         $this->fixture->destroyTestImages();
@@ -551,7 +559,9 @@ final class TagWriteTest extends TestCase
     /** A name unique to this run, so no real tag of the install is touched. */
     private function tagName(string $base): string
     {
-        return $base . ' ' . $this->suffix;
+        $name = $base . ' ' . $this->suffix;
+        $this->typedNames[] = $name;
+        return $name;
     }
 
     private function groupName(): string
