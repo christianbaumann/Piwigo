@@ -212,8 +212,9 @@ function ws_photoinfo_images_setInfo($params, &$service)
  *
  * @param array $results photoinfo_write_tags()'s answer
  * @return array 'tags_written' => whether every write worked, 'tags_message'
- *   => the first failure's message, and on a failure 'tags_message_l10n' => that
- *   message in the caller's language; empty when nothing was written
+ *   => the first failure's message, and on a failure 'tags_message_l10n' => the
+ *   picture page's warning with that message, in the caller's language; empty
+ *   when nothing was written
  */
 function photoinfo_tag_write_answer($results)
 {
@@ -227,10 +228,12 @@ function photoinfo_tag_write_answer($results)
   {
     if (!$result['ok'])
     {
+      // photoinfo_l10n_reason() loads the plugin's language file the prefix needs
+      $reason = photoinfo_l10n_reason($result['message']);
       return array(
         'tags_written' => false,
         'tags_message' => $result['message'],
-        'tags_message_l10n' => photoinfo_l10n_reason($result['message']),
+        'tags_message_l10n' => sprintf(l10n(PHOTOINFO_NOT_WRITTEN_MESSAGE), $reason),
         );
     }
   }

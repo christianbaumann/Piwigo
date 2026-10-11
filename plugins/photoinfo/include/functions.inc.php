@@ -23,6 +23,9 @@ define('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE', 'File is missing or not writable')
 /** What a failed file write on one of core's admin screens is introduced with. */
 define('PHOTOINFO_ADMIN_ERROR_PREFIX', 'Photo Info: ');
 
+/** What a failed file write on the picture page says, %s being the reason. */
+define('PHOTOINFO_NOT_WRITTEN_MESSAGE', 'Saved, but not written into the image file: %s');
+
 /** XMP namespace the writer declares. Must match exiftool/pwginfo.config. */
 define('PHOTOINFO_XMP_PREFIX', 'pwginfo');
 define('PHOTOINFO_XMP_NAMESPACE_URI', 'http://piwigo.org/ns/photoinfo/1.0/');

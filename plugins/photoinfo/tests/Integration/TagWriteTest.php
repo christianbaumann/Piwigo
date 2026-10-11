@@ -167,8 +167,9 @@ final class TagWriteTest extends TestCase
     }
 
     /**
-     * [NEG] A read-only file: each of typetags' three calls brings the reason
-     * in the account's German for the picture page to show.
+     * [NEG] A read-only file: each of typetags' three calls brings the warning
+     * for the picture page in the account's German: saved, but not written,
+     * and why.
      */
     public function testTheTypetagsCallsBringTheFailureInGerman(): void
     {
@@ -176,7 +177,8 @@ final class TagWriteTest extends TestCase
         $anna = $this->tag('Anna', $this->group);
         $this->lockFile($this->image);
         $token = $this->ws->token();
-        $german = FixtureBuilder::germanText(PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE);
+        $german = sprintf(FixtureBuilder::germanText(PHOTOINFO_NOT_WRITTEN_MESSAGE),
+            FixtureBuilder::germanText(PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE));
 
         $calls = array(
             'typetags.image.addTag' => array('tag_id' => $kirmes),

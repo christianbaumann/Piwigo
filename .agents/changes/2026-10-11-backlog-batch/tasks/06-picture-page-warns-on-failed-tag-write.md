@@ -44,6 +44,8 @@ When a tag change on the picture page is saved but photoinfo cannot write it int
 
 ## Open for the owner
 
-* [ ] (manual testing required) Wording: the page shows the bare reason ("Die Datei fehlt oder ist nicht beschreibbar"), as the design specifies; the date and info editors say "Gespeichert, aber nicht in die Bilddatei geschrieben: %s". Keep the bare reason, or use the same prefix?
-* [ ] (manual testing required) German reading of the changed handbook sentence in `handbuch/04-schlagworte.html` (*Schlagworte in der Bilddatei*)
+* [x] Wording: the page showed the bare reason; the date and info editors say "Gespeichert, aber nicht in die Bilddatei geschrieben: %s"
+  **Note:** Owner, 2026-10-11: use the same prefix. **Deviation from design.md (B8):** `tags_message_l10n` is now the whole warning, `sprintf()` of new constant `PHOTOINFO_NOT_WRITTEN_MESSAGE` (the editors' existing key) with the translated reason, not the bare reason. Built in photoinfo, so typetags just shows it. Tests updated first and watched red (English prefix: the language file loads only inside `photoinfo_l10n_reason()`, so the reason is translated first)
+* [x] German reading of the changed handbook sentence in `handbuch/04-schlagworte.html` (*Schlagworte in der Bilddatei*)
+  **Note:** Owner, 2026-10-11: check via a critical subagent. Done; its wording applied, `check.php` OK, recorded in the hand-check ledger of `docs/agents/TESTING.md`
 * [ ] (manual) After the next deploy, purge the remote's compiled templates (the typetags picture prefilter's code changed)

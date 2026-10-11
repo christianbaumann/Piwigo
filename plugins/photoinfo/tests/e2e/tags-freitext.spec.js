@@ -17,6 +17,12 @@ const { germanTextOf } = require('./support/lang');
  */
 const RUN = Date.now().toString(36);
 
+/** The picture page's warning for a read-only file: saved, but not written, and why. */
+function notWrittenWarning() {
+  return germanTextOf('PHOTOINFO_NOT_WRITTEN_MESSAGE')
+    .replace('%s', germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'));
+}
+
 test.describe('a typed tag in the Freitext group', () => {
   test.afterEach(async () => {
     restore();
@@ -80,14 +86,14 @@ test.describe('a failed tag write on the picture page', () => {
     const tag = trackTag(name);
     expect(answer.tags_written).toBe(false);
 
-    await expect(picture.textOnPage(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'))).toBeVisible();
+    await expect(picture.tagWarning).toHaveText(notWrittenWarning());
     await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
   });
 
   test('[NEG][ST] removing a tag says it was not written, and the next written change clears that', async ({ page }) => {
     const photo = seed('photo');
     const name = `Kirmes removed ${RUN}`;
-    const notWritten = germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE');
+    const notWritten = notWrittenWarning();
     const picture = new PicturePage(page);
     await picture.goto(photo.picture_path);
     expect((await picture.addNewTag(name)).tags_written).toBe(true);
@@ -119,7 +125,7 @@ test.describe('a failed tag write on the picture page', () => {
     makeReadOnly(photo.image_id);
     expect((await picture.addTag(name)).tags_written).toBe(false);
 
-    await expect(picture.textOnPage(germanTextOf('PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE'))).toBeVisible();
+    await expect(picture.tagWarning).toHaveText(notWrittenWarning());
     await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
   });
 });
