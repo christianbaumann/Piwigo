@@ -14,6 +14,16 @@ class FixtureBuilder
     /** Where createTestImage() puts its copies, relative to the gallery root. */
     private const TEST_IMAGE_DIR = 'upload/persons-test/';
 
+    /** createMarkedImage()'s size: not square, so a quarter turn is visible in the shape. */
+    private const MARKED_IMAGE_WIDTH = 600;
+    private const MARKED_IMAGE_HEIGHT = 400;
+
+    /**
+     * The red block in createMarkedImage(), centre origin, raw file. Off every
+     * axis of symmetry, so each of the four turns puts it somewhere else.
+     */
+    public const MARKER = array('x' => 0.15, 'y' => 0.25, 'w' => 0.2, 'h' => 0.3);
+
     /** createTestImage() sources: the first gallery image by id, or the smallest by pixel area. */
     public const SOURCE_FIRST = 'first';
     public const SOURCE_SMALL = 'small';
@@ -158,6 +168,53 @@ class FixtureBuilder
         }
         self::stripCopiedMetadata($dir . $name);
 
+        return $this->registerTestImage($dir, $name);
+    }
+
+    /**
+     * A photo whose content says where its corner is: a white
+     * MARKED_IMAGE_WIDTH x MARKED_IMAGE_HEIGHT PNG with one red block, MARKER
+     * in MWG fractions of the raw file. A browser that finds the red pixels on
+     * the page knows where the page shows that part of the file, without asking
+     * the plugin's own rotation helpers.
+     *
+     * @return array as createTestImage()
+     */
+    public function createMarkedImage(): array
+    {
+        $dir = PIWIGO_ROOT . self::TEST_IMAGE_DIR;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir))
+        {
+            throw new RuntimeException("cannot create $dir");
+        }
+
+        $image = imagecreatetruecolor(self::MARKED_IMAGE_WIDTH, self::MARKED_IMAGE_HEIGHT);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        $m = self::MARKER;
+        imagefilledrectangle(
+            $image,
+            (int)round(($m['x'] - $m['w'] / 2) * self::MARKED_IMAGE_WIDTH),
+            (int)round(($m['y'] - $m['h'] / 2) * self::MARKED_IMAGE_HEIGHT),
+            (int)round(($m['x'] + $m['w'] / 2) * self::MARKED_IMAGE_WIDTH) - 1,
+            (int)round(($m['y'] + $m['h'] / 2) * self::MARKED_IMAGE_HEIGHT) - 1,
+            imagecolorallocate($image, 255, 0, 0)
+        );
+
+        $name = 'persons-test-' . bin2hex(random_bytes(8)) . '.png';
+        if (!imagepng($image, $dir . $name))
+        {
+            throw new RuntimeException("cannot write $dir$name");
+        }
+
+        return $this->registerTestImage($dir, $name);
+    }
+
+    /**
+     * Registers a file already under TEST_IMAGE_DIR as an image row this
+     * builder owns.
+     */
+    private function registerTestImage(string $dir, string $name): array
+    {
         clearstatcache(true, $dir . $name);
         $size = filesize($dir . $name);
         if ($size < 1)

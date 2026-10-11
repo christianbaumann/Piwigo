@@ -20,6 +20,8 @@
  *   php tests/e2e/support/seed.php --scenario=empty
  *   php tests/e2e/support/seed.php --scenario=neighbours
  *   php tests/e2e/support/seed.php --scenario=empty --source=small
+ *   php tests/e2e/support/seed.php --scenario=marked --rotation=3
+ *   php tests/e2e/support/seed.php --scenario=marked-empty --rotation=3
  *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
  *   php tests/e2e/support/seed.php --exiftool=missing|present
  *   php tests/e2e/support/seed.php --originals=allowed|denied
@@ -342,7 +344,7 @@ SELECT p.name,
     return $counts;
 }
 
-$args = getopt('', array('scenario::', 'source::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts'));
+$args = getopt('', array('scenario::', 'source::', 'rotation::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -401,9 +403,24 @@ if (isset($args['read-file-regions']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('overlay', 'stale', 'empty', 'neighbours'), true))
+if (!in_array($scenario, array('overlay', 'stale', 'empty', 'neighbours', 'marked', 'marked-empty'), true))
 {
-    fail('--scenario must be one of: overlay, stale, empty, neighbours');
+    fail('--scenario must be one of: overlay, stale, empty, neighbours, marked, marked-empty');
+}
+
+// 'marked' and 'marked-empty' generate a photo with a red block at
+// FixtureBuilder::MARKER instead of copying one, and give it the images.rotation
+// code --rotation asks for, as core would for a JPEG with an EXIF Orientation.
+// 'marked' tags the block; 'marked-empty' is the editor's untagged start.
+$marked = in_array($scenario, array('marked', 'marked-empty'), true);
+$wantedRotation = (int)($args['rotation'] ?? 0);
+if (!in_array($wantedRotation, array(0, 1, 2, 3), true))
+{
+    fail('--rotation must be a code 0..3');
+}
+if ($wantedRotation !== 0 && !$marked)
+{
+    fail('--rotation needs --scenario=marked or marked-empty');
 }
 
 if (!$builder->tableExists('piwigo_person_region'))
@@ -416,7 +433,9 @@ if (!$builder->tableExists('piwigo_person_region'))
 // neighbours. The spec asserts the size it needs against what is printed.
 try
 {
-    $image = $builder->createTestImage($args['source'] ?? FixtureBuilder::SOURCE_FIRST);
+    $image = $marked
+        ? $builder->createMarkedImage()
+        : $builder->createTestImage($args['source'] ?? FixtureBuilder::SOURCE_FIRST);
 }
 catch (InvalidArgumentException $e)
 {
@@ -425,6 +444,15 @@ catch (InvalidArgumentException $e)
 $catId = $builder->createTestAlbum('Persons E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $builder->invalidateUserCache();
+
+if ($marked)
+{
+    $db->query('UPDATE piwigo_images SET rotation = ' . $wantedRotation . ' WHERE id = ' . (int)$image['id']);
+    if ((int)$db->scalar('SELECT rotation FROM piwigo_images WHERE id = ' . (int)$image['id']) !== $wantedRotation)
+    {
+        fail("the photo's rotation did not become $wantedRotation");
+    }
+}
 
 // 'neighbours' puts a previous and a next photo either side of the seeded one,
 // for the theme's click-to-navigate zones; like 'empty' it writes no regions.
@@ -437,19 +465,22 @@ if ($scenario === 'neighbours')
 // 'empty' is the state the editor starts from: a photo nobody has tagged yet.
 // It writes no regions at all rather than writing some and deleting them, so
 // the file really is untouched when the first box is drawn onto it.
-if (!in_array($scenario, array('empty', 'neighbours'), true))
+if (!in_array($scenario, array('empty', 'neighbours', 'marked-empty'), true))
 {
+    $regions = $scenario === 'marked'
+        ? array(array_merge(array('name' => SEEDED_PERSONS[0]), FixtureBuilder::MARKER))
+        : SEEDED_REGIONS;
     list($appliedW, $appliedH) = applied_dimensions($scenario, $image);
-    $builder->writeRegionsWithExiftool($image, SEEDED_REGIONS, $appliedW, $appliedH);
+    $builder->writeRegionsWithExiftool($image, $regions, $appliedW, $appliedH);
 
     $outcome = persons_reindex_image((int)$image['id'], $image['file']);
     if (!$outcome['ok'])
     {
         fail('seed reindex failed: ' . $outcome['message']);
     }
-    if ($outcome['regions'] !== count(SEEDED_REGIONS))
+    if ($outcome['regions'] !== count($regions))
     {
-        fail('seed indexed ' . $outcome['regions'] . ' of ' . count(SEEDED_REGIONS) . ' regions');
+        fail('seed indexed ' . $outcome['regions'] . ' of ' . count($regions) . ' regions');
     }
 }
 else
@@ -476,7 +507,7 @@ foreach (persons_indexed_regions((int)$image['id']) as $row)
             'w' => (float)$row['area_w'],
             'h' => (float)$row['area_h'],
             ),
-        $rotation
+        persons_display_turns($rotation)
         );
     $corner = persons_center_to_corner($rotated['x'], $rotated['y'], $rotated['w'], $rotated['h']);
 
@@ -507,6 +538,11 @@ $output = array(
     'album_path' => '/index.php?/category/' . $catId,
     'regions' => $expected,
     );
+if ($marked)
+{
+    $output['rotation'] = $rotation;
+    $output['marker'] = FixtureBuilder::MARKER;
+}
 if ($neighbours !== null)
 {
     $output['previous_path'] = '/picture.php?/' . $neighbours['previous'] . '/category/' . $catId;

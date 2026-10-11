@@ -114,7 +114,7 @@ function persons_display_box($row, $rotation)
       'w' => (float)$row['area_w'],
       'h' => (float)$row['area_h'],
       ),
-    $rotation
+    persons_display_turns($rotation)
     );
 
   // MWG: a region whose centre is off the picture is dropped, one that merely

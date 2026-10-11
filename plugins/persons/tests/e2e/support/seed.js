@@ -22,12 +22,16 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * in piwigo_images. `source: 'small'` copies the smallest gallery image instead
  * of the first one, for the picture page's upscaling case.
  *
- * @param {'overlay'|'stale'|'empty'|'neighbours'} scenario
- * @param {{source?: 'first'|'small'}} [options]
+ * 'marked' and 'marked-empty' generate a photo with one red block, given the
+ * images.rotation code `rotation`; 'marked' tags the block, and both return
+ * `marker`, the block in MWG fractions of the raw file.
+ *
+ * @param {'overlay'|'stale'|'empty'|'neighbours'|'marked'|'marked-empty'} scenario
+ * @param {{source?: 'first'|'small', rotation?: number}} [options]
  */
-function seed(scenario, { source = 'first' } = {}) {
+function seed(scenario, { source = 'first', rotation = 0 } = {}) {
   return JSON.parse(
-    execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`, `--source=${source}`], { encoding: 'utf8' })
+    execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`, `--source=${source}`, `--rotation=${rotation}`], { encoding: 'utf8' })
   );
 }
 

@@ -1191,6 +1191,67 @@ class PicturePage {
       return { left: r.left, top: r.top, width: r.width, height: r.height };
     });
   }
+
+  /**
+   * A saved box as fractions of the rendered photo.
+   *
+   * @param {number} regionId
+   */
+  async boxFractions(regionId) {
+    const image = await this.imageRect();
+    const box = await this.boxRect(regionId);
+    return {
+      left: (box.left - image.left) / image.width,
+      top: (box.top - image.top) / image.height,
+      w: box.width / image.width,
+      h: box.height / image.height,
+    };
+  }
+
+  /**
+   * Where the loaded photo shows its red block, as fractions of the photo, read
+   * from the pixels the browser decoded - the independent oracle for what the
+   * page shows, whatever rotation the server applied. `pixels` is how many red
+   * pixels were found, so a caller can refuse a vacuous answer.
+   */
+  async redBlockFractions() {
+    return this.image.evaluate((img) => {
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.drawImage(img, 0, 0);
+      const data = context.getImageData(0, 0, width, height).data;
+
+      let minX = width;
+      let minY = height;
+      let maxX = -1;
+      let maxY = -1;
+      let pixels = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          if (data[i] > 200 && data[i + 1] < 80 && data[i + 2] < 80) {
+            pixels++;
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+          }
+        }
+      }
+
+      return {
+        pixels,
+        left: minX / width,
+        top: minY / height,
+        w: (maxX + 1 - minX) / width,
+        h: (maxY + 1 - minY) / height,
+      };
+    });
+  }
 }
 
 module.exports = { PicturePage };

@@ -154,13 +154,18 @@ that proves a normal account is refused overrides the storage state for itself.
 `tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
 into that photo's file with a plain exiftool call, indexes them, and prints the box corners the
 specs assert against — computed with the same pure helpers the page uses, so no spec carries a
-second copy of the conversion. Four scenarios: `--scenario=overlay` writes the photo's own
+second copy of the conversion. Six scenarios: `--scenario=overlay` writes the photo's own
 `AppliedToDimensions`, so nothing is stale; `--scenario=stale` writes a ratio no crop of the photo
 could have, which is what a region written before a re-crop looks like; `--scenario=empty` writes
 nothing into the file at all, which is what the editor specs start from — anything found in that
 file afterwards was put there by the browser; `--scenario=neighbours` is `empty` plus a previous
 and a next photo in the same album, their upload dates forced so the seeded photo is the middle
-one, which `picture-display.spec.js` clicks the theme's navigation zones on. Any scenario takes
+one, which `picture-display.spec.js` clicks the theme's navigation zones on;
+`--scenario=marked` generates a white PNG with one red block (`FixtureBuilder::MARKER`) instead of
+copying a photo, tags the block, and gives the photo the `images.rotation` code `--rotation=<0..3>`
+asks for; `--scenario=marked-empty` is the same untagged. `rotation.spec.js` finds the red pixels
+in the photo the browser loaded and asserts the box sits on them, so its oracle is the image, not
+the plugin's rotation helpers (decision 0035). Any scenario takes
 `--source=small`, which copies the smallest gallery image by pixel area instead of the first one,
 for `picture-fit.spec.js`'s upscaling case; every scenario prints the seeded photo's `width` and
 `height`, and the spec asserts the size it needs against them. `seed.php --read-file-regions=<id>` reads one photo's

@@ -324,21 +324,44 @@ function persons_clip_region($region)
 }
 
 /**
- * Rotates a normalized centre-origin region by an images.rotation code.
+ * The quarter turns clockwise the page shows a raw file turned by.
  *
- * images.rotation is a code 0..3 meaning quarter turns clockwise, not degrees -
- * see include/derivative.inc.php:74-92, which reads it the same way and swaps
- * width and height for the odd codes. Anything outside 0..3 is taken modulo 4,
- * matching core; a negative code is treated as no rotation, because core never
- * produces one and guessing a direction for it would be inventing behaviour.
+ * images.rotation counts counter-clockwise: core maps Exif Orientation 6 to
+ * code 3, and i.php turns the file counter-clockwise by the code's angle
+ * (decision 0035). So the page shows the raw file turned (4 - code) % 4
+ * quarters clockwise. Anything outside 0..3 is taken modulo 4, matching core;
+ * a negative code is treated as no rotation, because core never produces one
+ * and guessing a direction for it would be inventing behaviour.
  *
- * @param array $region x, y, w, h (plus any other keys, preserved)
- * @param int $rotation_code
- * @return array
+ * @param int $rotation_code images.rotation
+ * @return int 0..3
  */
-function persons_rotate_region($region, $rotation_code)
+function persons_display_turns($rotation_code)
 {
   $code = (int)$rotation_code;
+
+  if ($code < 0)
+  {
+    return 0;
+  }
+
+  return (4 - $code % 4) % 4;
+}
+
+/**
+ * Turns a normalized centre-origin region by quarter turns clockwise.
+ *
+ * The turns are not an images.rotation code: persons_display_turns() converts
+ * one. Anything outside 0..3 is taken modulo 4; a negative count is treated as
+ * no turn.
+ *
+ * @param array $region x, y, w, h (plus any other keys, preserved)
+ * @param int $turns quarter turns clockwise
+ * @return array
+ */
+function persons_rotate_region($region, $turns)
+{
+  $code = (int)$turns;
 
   if ($code < 0)
   {
@@ -488,6 +511,12 @@ function persons_region_is_stale($applied_w, $applied_h, $image_w, $image_h)
  *
  * Anything else (a crop, a non-proportional resize) is left alone; staleness
  * already covers it.
+ *
+ * The delta is current minus stored because images.rotation counts
+ * counter-clockwise (decision 0035): a file turned so that it still looks the
+ * same on the page had its pixels turned that many quarters clockwise. Baking
+ * Orientation 6 in, for example, takes the code from 3 to 0 and the pixels a
+ * quarter clockwise: (0 - 3) mod 4 = 1.
  *
  * @param int|null $stored_rotation images.rotation when the regions were written
  * @param int|null $current_rotation images.rotation now

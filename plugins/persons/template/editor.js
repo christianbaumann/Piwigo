@@ -16,8 +16,10 @@
  *
  * A box is drawn in display space - the photo as it is shown, already rotated.
  * The API stores MWG's convention: normalized, centre origin, *before*
- * rotation. toStored() is the inverse of persons_rotate_region() followed by
- * persons_corner_to_center(), and nothing else here touches coordinates. The
+ * rotation. toStored() is the inverse of persons_display_box(): the page shows
+ * the raw file turned persons_display_turns() quarters clockwise, so going back
+ * takes images.rotation's own code in clockwise quarters (core counts it
+ * counter-clockwise, decision 0035). Nothing else here touches coordinates. The
  * drag is in the browser, so this conversion cannot be pushed down to PHP the
  * way the render path was.
  * ---------------------------------------------------------------------------
@@ -251,7 +253,8 @@
 				h: box.h
 			};
 
-			var turns = (4 - (rotation % 4) + 4) % 4;
+			/* Undoes the display turn, (4 - code) % 4 clockwise; negative codes are none, as in PHP. */
+			var turns = rotation > 0 ? rotation % 4 : 0;
 			for (var turn = 0; turn < turns; turn++) {
 				region = { x: 1 - region.y, y: region.x, w: region.h, h: region.w };
 			}
