@@ -30,7 +30,7 @@
   </li>
   <li>
     Auf <strong>Fotos hinzufügen</strong> klicken und die Dateien auswählen, oder die Dateien
-    in das Feld <strong>Dateien hier hin ziehen.</strong> ziehen.
+    auf die Ablagefläche (<strong>Dateien hier hin ziehen.</strong>) ziehen.
   </li>
   <li>
     Auf <strong>Upload starten</strong> klicken. Die Schaltfläche ist erst aktiv, wenn
@@ -41,13 +41,13 @@
 
 <figure>
   <img src="assets/screenshots/05-fotos-hochladen.png" alt="Die Seite zum Hochladen von Fotos" />
-  <figcaption>Der Upload. Über der Ablagefläche stehen das Zielalbum und die erlaubten Dateitypen.</figcaption>
+  <figcaption>Der Upload. Über der Ablagefläche stehen das Zielalbum und die Schaltfläche Fotos hinzufügen, rechts daneben die erlaubten Dateitypen.</figcaption>
 </figure>
 
 <p>
   Nach dem Upload meldet die Seite <strong>... Fotos hochgeladen</strong> und darunter
   <strong>Album ... enthält jetzt ... Fotos</strong>, wobei der Albumname ein Link zu den
-  Eigenschaften des Albums ist. Dazu erscheinen zwei Weiterführungen: <strong>Dieses Set von ... Fotos verwalten</strong>
+  Eigenschaften des Albums ist. Dazu erscheinen zwei Links: <strong>Dieses Set von ... Fotos verwalten</strong>
   öffnet die eben hochgeladenen Fotos in der Stapelverarbeitung,
   <strong>Ein weiteres Fotoset hinzufügen</strong> beginnt von vorn. Die Fotos sind sofort im
   Album sichtbar.
@@ -56,7 +56,7 @@
 <div class="hinweis">
   <p>
     Erlaubt sind <strong>jpg, jpeg, png, gif</strong> und <strong>webp</strong>. Andere Dateien
-    weist Piwigo ab. Die Liste steht auch neben der Schaltfläche
+    weist Piwigo ab. Die Liste steht auch rechts neben der Schaltfläche
     <strong>Fotos hinzufügen</strong>. Eine einzelne Datei darf bis zu 1000 MB groß sein.
   </p>
 </div>
@@ -65,9 +65,9 @@
   Die Schaltfläche <strong>Optionen</strong> blendet einen Schalter ein: <em>Wenn ein Foto in
   diesem Album denselben Dateinamen hat, aktualisieren Sie die Datei, ohne die Eigenschaften
   des Fotos zu ändern.</em> Damit wird eine bestehende Bilddatei ersetzt, während Titel,
-  Beschreibung und Schlagworte des Fotos erhalten bleiben. Ohne diesen Schalter entsteht ein
-  zweites Foto, außer die Datei ist byte-gleich mit einem vorhandenen Foto: dann wird nur dieses
-  mit dem Album verbunden.
+  Beschreibung und Schlagworte des Fotos erhalten bleiben. Ist der Schalter aus, entsteht ein
+  zweites Foto, es sei denn, die Datei ist genau dieselbe wie die eines vorhandenen Fotos; dann
+  wird nur das vorhandene Foto dem Album zugeordnet.
 </p>
 
 <h3>Ein anderes Zielalbum wählen</h3>
@@ -106,7 +106,7 @@
   <li>
     Unter <strong>Filter</strong> über <strong>Einen Filter hinzufügen</strong> den Filter
     <strong>Album</strong> wählen und das Album eintragen, aus dem die Fotos stammen. Mit
-    <strong>Unteralben miteinbeziehen</strong> zählen auch deren Fotos mit.
+    <strong>Unteralben miteinbeziehen</strong> gehören auch die Fotos der Unteralben dazu.
     <strong>Fotoset aktualisieren</strong> wendet den Filter an. Das Ergebnis ist das
     <em>Fotoset</em>, auf das die Aktion später wirkt.
   </li>
@@ -135,14 +135,16 @@
 
 <div class="hinweis">
   <p>
-    <strong>Mit einem Album verbinden</strong> fügt das Foto einem weiteren Album hinzu. Die
-    bisherigen Alben bleiben erhalten. Soll das Foto das alte Album verlassen, ist
-    <strong>Ins Album verschieben</strong> die richtige Aktion; sie löst alle anderen
-    Verknüpfungen bis auf das physische Album, in dem die Datei liegt. Dabei erscheint der
-    Bereich <strong>Herkunft der verschobenen Fotos</strong> mit der Wahl
-    <strong>Beibehalten, was das Foto bereits hat</strong>, <strong>Leeren</strong> oder
-    <strong>Durch die des Zielalbums ersetzen</strong>. <strong>Von Album abtrennen</strong>
-    entfernt das Foto aus einem einzelnen Album.
+    <strong>Mit einem Album verbinden</strong> ordnet das Foto einem weiteren Album zu. Die
+    bisherigen Alben bleiben erhalten. Soll das Foto das alte Album verlassen,
+    <strong>Ins Album verschieben</strong> wählen. Das Foto liegt danach im Zielalbum und in
+    keinem anderen mehr, außer in dem Album, in dem die Datei gespeichert ist. Bei dieser Aktion
+    erscheint der Bereich <strong>Herkunft der verschobenen Fotos</strong> mit drei
+    Möglichkeiten: <strong>Beibehalten, was das Foto bereits hat</strong>,
+    <strong>Leeren</strong> oder <strong>Durch die des Zielalbums ersetzen</strong>.
+  </p>
+  <p>
+    <strong>Von Album abtrennen</strong> entfernt das Foto aus einem einzelnen Album.
   </p>
 </div>
 
@@ -157,8 +159,8 @@
 
 <ul>
   <li>
-    Das Einlesen akzeptiert nur Dateinamen aus Buchstaben ohne Umlaute, Ziffern, Punkt,
-    Bindestrich und Unterstrich. Namen mit Umlauten oder Leerzeichen werden abgewiesen.
+    Das Einlesen akzeptiert nur Dateinamen, die ausschließlich aus Buchstaben (ohne Umlaute),
+    Ziffern, Punkt, Bindestrich und Unterstrich bestehen. Namen mit Umlauten oder Leerzeichen werden abgewiesen.
     Dasselbe gilt für Ordnernamen: ein solcher Ordner wird als Fehler gemeldet, die Dateien
     darin werden ohne eigene Meldung übergangen.
   </li>
