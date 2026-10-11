@@ -15,9 +15,28 @@ from pwgdeploy.errors import ConfigError
 EXAMPLE_FILE = Path(__file__).resolve().parents[1] / "deploy.example.json"
 
 
-def valid() -> dict:
-    """The committed example, re-read per test so a mutation cannot leak between tests."""
+FILLED_IN = "s3cret-set-by-the-owner"
+PLACEHOLDER_FIELDS = [
+    ("ftp", "password"),
+    ("mysql", "password"),
+    ("admin", "password"),
+    ("mail", "password"),
+]
+
+
+def example() -> dict:
     return json.loads(EXAMPLE_FILE.read_text(encoding="utf-8"))
+
+
+def valid() -> dict:
+    """The committed example with its placeholders filled in, as an operator would.
+
+    Re-read per test so a mutation cannot leak between tests.
+    """
+    raw = example()
+    for section, key in PLACEHOLDER_FIELDS:
+        raw[section][key] = FILLED_IN
+    return raw
 
 
 # --- happy path ------------------------------------------------------------
@@ -26,7 +45,7 @@ def valid() -> dict:
 def test_loads_the_example_file():
     """[HAPPY] Structural guard: the committed example cannot drift from the loader."""
     assert EXAMPLE_FILE.stat().st_size > 100, "the example file is suspiciously small"
-    cfg = config.load_file(EXAMPLE_FILE)
+    cfg = config.load(valid())
     assert cfg.ftp.host == "ftp.example.net"
     assert cfg.mysql.prefix == "piwigo_"
     assert cfg.admin.username == "webmaster"
@@ -95,6 +114,36 @@ def test_empty_password_is_rejected(section, key):
     raw[section][key] = ""
     with pytest.raises(ConfigError, match=f"{section}.{key}"):
         config.load(raw)
+
+
+@pytest.mark.parametrize(("section", "key"), PLACEHOLDER_FIELDS)
+def test_the_placeholder_is_refused_naming_the_field(section, key):
+    """[NEG] [ECP] A deploy on 2026-09-01 made the placeholder the live webmaster password."""
+    raw = valid()
+    raw[section][key] = config.PLACEHOLDER
+    with pytest.raises(ConfigError, match=f"{section}.{key}"):
+        config.load(raw)
+
+
+def test_a_value_merely_containing_the_placeholder_passes():
+    """[BVA] Only the untouched placeholder is refused, not a password built around it."""
+    raw = valid()
+    raw["admin"]["password"] = config.PLACEHOLDER + "-but-changed"
+    assert config.load(raw).admin.password == config.PLACEHOLDER + "-but-changed"
+
+
+def test_the_example_uses_the_guarded_placeholder():
+    """[HAPPY] Structural guard: the example and the guard cannot drift apart."""
+    raw = example()
+    assert len(PLACEHOLDER_FIELDS) > 0
+    for section, key in PLACEHOLDER_FIELDS:
+        assert raw[section][key] == config.PLACEHOLDER, f"{section}.{key}"
+
+
+def test_the_unedited_example_is_refused():
+    """[NEG] Copied and not edited, the example must not reach install.php."""
+    with pytest.raises(ConfigError, match="ftp.password"):
+        config.load_file(EXAMPLE_FILE)
 
 
 def test_missing_required_string_names_the_key():
@@ -280,7 +329,7 @@ def test_the_mail_section_is_loaded():
         port=465,
         secure="ssl",
         user="noreply@example.net",
-        password="REPLACE_ME",
+        password=FILLED_IN,
         sender_email="noreply@example.net",
         sender_name="",
     )
@@ -407,6 +456,7 @@ REJECTIONS = [
     ("mail.port", lambda r: r["mail"].__setitem__("port", 0)),
     ("mail.sender_email", lambda r: r["mail"].__setitem__("sender_email", "nobody")),
     ("mail.password", lambda r: r["mail"].__setitem__("password", "")),
+    ("admin.password", lambda r: r["admin"].__setitem__("password", config.PLACEHOLDER)),
 ]
 
 
@@ -427,11 +477,16 @@ def test_every_rejection_names_the_offending_field(field, break_it):
 
 
 def test_the_example_copies_to_a_working_local_credential_file(tmp_path):
-    """[HAPPY] The documented workflow is `cp deploy.example.json deploy.local.json`.
+    """[HAPPY] The documented workflow is `cp deploy.example.json deploy.local.json`,
+    then filling in the secrets: the copy is refused until they are.
 
     Automates the copyable half of the plan's Phase 1 manual check. Whether every field
     is *self-explanatory* is a human judgement and stays in the hand-check ledger.
     """
     local = tmp_path / "deploy.local.json"
     local.write_bytes(EXAMPLE_FILE.read_bytes())
-    assert config.load_file(local) == config.load_file(EXAMPLE_FILE)
+    with pytest.raises(ConfigError, match=config.PLACEHOLDER):
+        config.load_file(local)
+
+    local.write_text(json.dumps(valid()), encoding="utf-8")
+    assert config.load_file(local) == config.load(valid())

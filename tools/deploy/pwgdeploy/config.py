@@ -43,6 +43,10 @@ MAIL_SECURE_VALUES = ("ssl", "tls")
 # Core splits smtp_host on ':' for the port, PHPMailer splits it on ';' into a host list.
 MAIL_HOST_FORBIDDEN = re.compile(r"[:/;\s]")
 
+# deploy.example.json's value for every secret. Left unedited it would go live: on
+# 2026-09-01 it became the remote's webmaster password.
+PLACEHOLDER = "REPLACE_ME"
+
 SECTIONS = ("ftp", "mysql", "admin", "site")
 OPTIONAL_SECTIONS = ("mail",)
 
@@ -250,6 +254,8 @@ def _required_string(raw: Mapping[str, Any], key: str, section: str) -> str:
         raise ConfigError(f"{section}.{key} must be a string")
     if not value.strip():
         raise ConfigError(f"{section}.{key} must not be empty")
+    if value == PLACEHOLDER:
+        raise ConfigError(f"{section}.{key} still holds the placeholder {PLACEHOLDER!r}")
     return value
 
 

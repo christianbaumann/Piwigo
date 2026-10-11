@@ -14,7 +14,7 @@ uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts del
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
-uv run pytest                                    # 571 tests, measured 2026-10-09
+uv run pytest                                    # 579 tests, measured 2026-10-11
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -37,15 +37,15 @@ Every value is validated locally against the rule the remote enforces (`config.p
 `install.php` line for each), so a bad table prefix fails in milliseconds rather than after a
 128 MB upload. Validation lives there and nowhere else.
 
-**Validation checks "non-empty string", not "you actually edited this field".** Every password in
-`deploy.example.json` is the literal placeholder `REPLACE_ME`, and `_required_string()` accepts it
-unchanged — nothing catches a forgotten `admin.password` before it is submitted to `install.php`
-as the real webmaster password. Confirmed 2026-09-01: a deploy ran clean with `admin.password`
-still `REPLACE_ME`, and that literal string became the working login. Diff every field in a new
-`deploy.*.json` against the example before the first run against a given target.
+**The example's placeholder is refused.** Every secret in `deploy.example.json` is the literal
+`REPLACE_ME` (`config.PLACEHOLDER`), and `_required_string()` rejects any field still holding it,
+naming the field. Before that guard a deploy ran clean on 2026-09-01 with `admin.password` still
+`REPLACE_ME`, and the literal string became the working login. The guard only knows the
+placeholder: a host, user or e-mail address copied unedited from the example still passes, so diff
+every field in a new `deploy.*.json` against the example before the first run against a target.
 
-The optional `mail` section has the same trap with a louder failure: copied unedited, it points the
-remote at `smtp.example.net` and every gallery mail fails. Delete the section to keep PHP `mail()`.
+The optional `mail` section: copied with only its password changed, it points the remote at
+`smtp.example.net` and every gallery mail fails. Delete the section to keep PHP `mail()`.
 `mail.host` is validated as a bare name because core splits it on `:` for the port and PHPMailer
 on `;` into a host list - `smtp.x.net:587` would otherwise go live as port 587, not `mail.port`.
 
