@@ -11,9 +11,11 @@
 <h2>Schlagworte vergeben</h2>
 
 <p>
-  Schlagworte beschreiben, was auf einem Foto zu sehen ist, quer zu den Alben. Sie werden unter
+  Schlagworte beschreiben, was auf einem Foto zu sehen ist, unabhängig davon, in welchem
+  Album es liegt. Sie werden unter
   <span class="pwgScreen">Verwaltung » Fotos » Schlagworte</span>
-  (<code>admin.php?page=tags</code>) angelegt und dort oder an einem einzelnen Foto zugeordnet.
+  (<code>admin.php?page=tags</code>) angelegt und in den Eigenschaften eines Fotos oder in der
+  Stapelverarbeitung zugeordnet.
   Das ist Administratoren vorbehalten; farbige Schlagworte kann jeder angemeldete Benutzer auch
   auf der Fotoseite setzen. Die Schlagworte eines Fotos werden außerdem in seine Bilddatei
   geschrieben, siehe <a href="#bilddatei">Schlagworte in der Bilddatei</a>.
@@ -56,7 +58,7 @@
   </li>
   <li>
     <strong>Duplikat</strong>: legt eine Kopie des Schlagworts an, deren Name die Ergänzung
-    <strong>(kopieren)</strong> trägt. Es wird sofort und ohne Rückfrage angelegt.
+    <strong>(kopieren)</strong> trägt. Die Kopie entsteht sofort und ohne Rückfrage.
   </li>
   <li>
     <strong>Löschen</strong>: entfernt das Schlagwort. Die Rückfrage
@@ -80,7 +82,7 @@
   <li>
     Mindestens zwei Schlagworte anklicken. Unter <strong>Ihre Auswahl</strong> erscheinen die
     gewählten Namen. Solange weniger als zwei ausgewählt sind, bleibt
-    <strong>Zusammenführen</strong> grau.
+    <strong>Zusammenführen</strong> ausgegraut.
   </li>
   <li>
     Auf <strong>Zusammenführen</strong> klicken und im Feld darunter das Schlagwort wählen, das
@@ -113,7 +115,7 @@
 
 <p>
   In den Eigenschaften eines Fotos (<code>admin.php?page=photo-&lt;nummer&gt;-properties</code>)
-  steht das Feld <strong>Schlagworte</strong>. Eintippen schlägt vorhandene Schlagworte vor,
+  steht das Feld <strong>Schlagworte</strong>. Beim Eintippen werden vorhandene Schlagworte vorgeschlagen,
   das <strong>x</strong> an einem Eintrag entfernt ihn. Gesichert wird mit
   <strong>Einstellungen sichern</strong>.
 </p>
@@ -140,10 +142,10 @@
 <h3>Farbige Schlagworte</h3>
 
 <p>
-  Ein Schlagwort kann eine Farbe bekommen. Farbige Schlagworte erscheinen auf der Fotoseite und
+  Ein Schlagwort kann einer Gruppe angehören und trägt dann deren Farbe. Farbige Schlagworte erscheinen auf der Fotoseite und
   in den Eigenschaften eines Fotos als farbige Plakette, in der Schlagwortverwaltung mit einem
-  farbigen Punkt. Es gibt zwölf Farben, im Folgenden auch Gruppen genannt. Acht davon sind
-  Themen:
+  farbigen Punkt. Es gibt zwölf Gruppen, jede mit
+  eigener Farbe. Acht davon sind Themen:
 </p>
 
 <ul>
@@ -161,7 +163,7 @@
   Dazu kommen vier besondere Gruppen, siehe den nächsten Abschnitt.
 </p>
 
-<p>Eine Farbe wird in der Schlagwortverwaltung vergeben:</p>
+<p>Einer Gruppe zugeordnet wird ein Schlagwort in der Schlagwortverwaltung:</p>
 
 <ol>
   <li>
@@ -170,23 +172,24 @@
   </li>
   <li>
     Auf <strong>Farbe</strong> klicken und unter <strong>Schlagwort-Farben festlegen</strong>
-    eine der vorhandenen Farben anklicken. Die erste, schwarze Fläche heißt
-    <strong>Farbe entfernen</strong> und nimmt die Farbe wieder weg.
+    eine der vorhandenen Gruppen anklicken. Die erste, schwarze Fläche heißt
+    <strong>Farbe entfernen</strong> und nimmt das Schlagwort wieder aus seiner Gruppe.
   </li>
   <li>
-    Fehlt die passende Farbe, unter <strong>Eine neue Farbe hinzufügen</strong> Name und Farbe
+    Fehlt die passende Gruppe, unter <strong>Eine neue Farbe hinzufügen</strong> Name und Farbe
     eingeben und auf <strong>Erstellen</strong> klicken.
   </li>
   <li>
-    Mit <strong>Schlagwort-Farben festlegen</strong> anwenden, dann <strong>Schließen</strong>.
+    Auf <strong>Schlagwort-Farben festlegen</strong> klicken, damit die Gruppe zugewiesen wird,
+    danach auf <strong>Schließen</strong> klicken.
   </li>
 </ol>
 
 <h3 id="besondere">Die vier besonderen Gruppen</h3>
 
 <p>
-  Vier Farben sehen anders aus als die übrigen: zwei tragen am linken Rand einen rot-weiß
-  gestreiften Rand, zwei ein kleines Bild vor dem Namen.
+  Vier Gruppen sehen anders aus als die übrigen: zwei sind am linken Rand rot-weiß gestreift,
+  zwei tragen ein kleines Bild vor dem Namen.
 </p>
 
 <ul>
@@ -197,7 +200,7 @@
   </li>
   <li>
     <strong>Name ?</strong> (rot-weiß gestreift): ein Merkzeichen für ein Foto, auf dem noch
-    nicht alle Personen erkannt sind. Ist der Name bekannt, die Person markieren (siehe
+    nicht alle Personen benannt sind. Ist der Name bekannt, die Person markieren (siehe
     <a href="05-personen.html">Personen auf Fotos markieren</a>) und
     <strong>Name ?</strong> wieder entfernen.
   </li>
@@ -216,11 +219,11 @@
 
 <div class="hinweis">
   <p>
-    Ein Schlagwort bleibt in der Arbeitskopie, wenn es selbst oder seine Farbe Ausstellung heißt,
-    gleich ob groß oder klein geschrieben, oder wenn es selbst oder seine Farbe ein Fragezeichen
-    im Namen trägt, etwa jedes Schlagwort der Farben <strong>Kategorie ?</strong> und
-    <strong>Name ?</strong>. Solche Schlagworte werden nicht in die Bilddatei geschrieben und
-    erscheinen deshalb nicht in der Online-Galerie.
+    Manche Schlagworte werden nicht in die Bilddatei geschrieben und erscheinen deshalb nicht
+    in der Online-Galerie: Schlagworte, die Ausstellung heißen oder zur Gruppe Ausstellung
+    gehören (Groß- und Kleinschreibung egal), und Schlagworte, deren Name oder Gruppenname ein
+    Fragezeichen enthält, also alle aus <strong>Kategorie ?</strong> und
+    <strong>Name ?</strong>.
   </p>
 </div>
 
@@ -254,7 +257,7 @@
   </li>
   <li>
     Eintippen: den Namen in das Feld <strong>Neues Schlagwort eingeben</strong> schreiben und
-    <strong>Hinzufügen</strong> klicken oder <em>Enter</em> drücken. Ein neuer Name wird als Schlagwort angelegt und kommt in die Gruppe
+    auf <strong>Hinzufügen</strong> klicken oder <em>Enter</em> drücken. Ein neuer Name wird als Schlagwort angelegt und kommt in die Gruppe
     <strong>Freitext</strong>. Gibt es den Namen schon, wird das vorhandene Schlagwort
     zugeordnet und behält seine Farbe. Schlägt das fehl, steht der Grund neben dem Feld und
     der eingetippte Text bleibt stehen.
@@ -264,8 +267,8 @@
 <p>
   Alles wirkt sofort, ohne Speichern. Vergebene Schlagworte stehen in einer Zeile, durch
   Kommas getrennt; farbige als Plakette, farblose als schlichter Text. Ein Schlagwort ohne
-  Farbe lässt sich hier nur durch Eintippen seines Namens zuordnen; entfernt wird es in der
-  Verwaltung. Nicht angemeldete Besucher sehen weder das <strong>+</strong> noch das
+  Farbe lässt sich hier nur durch Eintippen seines Namens zuordnen; entfernt wird es in den
+  Eigenschaften des Fotos oder in der Stapelverarbeitung. Nicht angemeldete Besucher sehen weder das <strong>+</strong> noch das
   <strong>x</strong> noch das Feld.
 </p>
 
@@ -273,7 +276,7 @@
 
 <p>
   Ändern sich die Schlagworte eines Fotos, auf welchem Weg auch immer, werden sie auch in die
-  Bilddatei geschrieben, zusammen mit dem Namen ihrer Farbe. Andere Bildprogramme zeigen sie
+  Bilddatei geschrieben, zusammen mit dem Namen ihrer Gruppe. Andere Bildprogramme zeigen sie
   dann als Stichwörter der Datei. Ausgenommen sind die Schlagworte, die nur in der Arbeitskopie
   bleiben (siehe <a href="#besondere">Die vier besonderen Gruppen</a>).
 </p>
