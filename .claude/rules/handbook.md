@@ -52,8 +52,9 @@ manual, repeated on every re-shoot, and unrecoverable if missed once.
 
 ## The German strings the handbook shows
 
-Nineteen strings (measured 2026-10-09) core and the Colored Tags plugin leave in English or French are translated in the
-tracked `local/language/de_DE.lang.php` — a **flat** file, not a directory
+Nineteen strings core and the Colored Tags plugin leave in English or French, and five core German
+strings replaced on purpose ([decision 0052](../../docs/agents/decisions/0052-named-core-german-strings-are-replaced-on-purpose.md)),
+24 keys in all (measured 2026-10-11), are translated in the tracked `local/language/de_DE.lang.php` — a **flat** file, not a directory
 (`include/common.inc.php:239` loads it with `'local'=>true`, which resolves to
 `<dir><language>.<filename>`). It merges over core and wins.
 

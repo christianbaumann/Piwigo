@@ -18,6 +18,19 @@ final class GermanOverrideKeyTest extends TestCase
     private const OVERRIDE = 'local/language/de_DE.lang.php';
     private const CORE_ADMIN_LANG = 'language/de_DE/admin.lang.php';
 
+    /**
+     * Core German strings the override replaces on purpose (decision 0052), each with
+     * the wording core ships today. If core changes one, the replacement is
+     * reconsidered rather than kept over a wording nobody has looked at.
+     */
+    private const REPLACED_CORE = array(
+        'Delete them' => 'Lösche diese',
+        'Keep them' => 'Behalte diese',
+        ' (copy)' => '(kopieren)',
+        'Tag name' => 'Tag-Name',
+        'include child albums' => 'Unteralben miteinbeziehen',
+        );
+
     /** A file shorter than this is a stub or a failed read, on which a count assertion says nothing. */
     private const MIN_BYTES = 500;
 
@@ -136,6 +149,31 @@ final class GermanOverrideKeyTest extends TestCase
                 "{'Create'|translate}",
                 1,
             ),
+            'Delete them' => array(
+                'admin/themes/default/template/tags.tpl',
+                "{'Delete them'|@translate}",
+                1,
+            ),
+            'Keep them' => array(
+                'admin/themes/default/template/tags.tpl',
+                "{'Keep them'|@translate}",
+                1,
+            ),
+            ' (copy)' => array(
+                'admin/themes/default/template/tags.tpl',
+                "{' (copy)'|@translate}",
+                1,
+            ),
+            'Tag name' => array(
+                'admin/themes/default/template/tags.tpl',
+                "{'Tag name'|@translate}",
+                1,
+            ),
+            'include child albums' => array(
+                'admin/themes/default/template/include/batch_manager_filter.inc.tpl',
+                "{'include child albums'|@translate}",
+                1,
+            ),
         );
     }
 
@@ -160,10 +198,25 @@ final class GermanOverrideKeyTest extends TestCase
         return $rows;
     }
 
-    /** The subset the fork translates itself, and so the subset that can shadow core. */
+    /** The subset the fork translates itself, and so the subset that can shadow core, minus what it replaces on purpose. */
     public static function overriddenKeys(): array
     {
-        return array_filter(self::translations(), static fn (array $row): bool => self::OVERRIDE === $row[1]);
+        return array_filter(
+            self::translations(),
+            static fn (array $row): bool => self::OVERRIDE === $row[1] and !isset(self::REPLACED_CORE[$row[0]])
+        );
+    }
+
+    /** @return array<string, array{0: string, 1: string}> */
+    public static function replacedCoreStrings(): array
+    {
+        $rows = array();
+        foreach (self::REPLACED_CORE as $key => $german)
+        {
+            $rows[$key] = array($key, $german);
+        }
+
+        return $rows;
     }
 
     private function read(string $file): string
@@ -255,5 +308,20 @@ final class GermanOverrideKeyTest extends TestCase
                 'core already translates ' . $key . ' in ' . basename($file) . '; the override would shadow it'
             );
         }
+    }
+
+    /**
+     * [ERR] A core German string the override replaces on purpose is still the
+     * wording that was replaced (decision 0052). Red when core changes it: then
+     * core's new wording may be good enough and the replacement can go.
+     */
+    #[PHPUnit\Framework\Attributes\DataProvider('replacedCoreStrings')]
+    public function testAReplacedCoreStringIsStillTheOneReplaced(string $key, string $german): void
+    {
+        $this->assertSame(
+            1,
+            substr_count($this->read(self::CORE_ADMIN_LANG), "\$lang['" . $key . "'] = '" . $german . "';"),
+            'core no longer translates ' . $key . ' as ' . $german . '; reconsider the replacement in ' . self::OVERRIDE
+        );
     }
 }

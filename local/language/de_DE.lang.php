@@ -42,3 +42,13 @@ $lang['The tag was not saved'] = 'Das Schlagwort wurde nicht gespeichert';
 $lang['Invalid tag name'] = 'Ungültiger Schlagwortname';
 $lang['You have typed in too many new tags today'] = 'Heute wurden schon zu viele neue Schlagworte eingegeben';
 $lang['Couleur'] = 'Farbe';
+
+// Core German strings replaced on purpose (docs/agents/decisions/0052): core's own
+// wording is a du-imperative, English, or a verb where a noun belongs.
+// admin/themes/default/template/tags.tpl - the question about tags no photo uses, and duplicating
+$lang['Delete them'] = 'Löschen';
+$lang['Keep them'] = 'Behalten';
+$lang[' (copy)'] = ' (Kopie)';
+$lang['Tag name'] = 'Name des Schlagworts';
+// admin/themes/default/template/include/batch_manager_filter.inc.tpl
+$lang['include child albums'] = 'Unteralben einbeziehen';
