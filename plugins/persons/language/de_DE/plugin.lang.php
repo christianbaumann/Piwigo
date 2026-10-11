@@ -1,7 +1,7 @@
 <?php
 
 $lang['Persons'] = 'Personen';
-$lang['Region may be out of date: the image was resized since it was tagged'] = 'Der Bereich ist womöglich veraltet: das Bild wurde nach der Markierung skaliert';
+$lang['Region may be out of date: the image was resized since it was tagged'] = 'Der Bereich ist womöglich veraltet: das Bild wurde nach der Markierung zugeschnitten';
 $lang['Tag people'] = 'Personen markieren';
 $lang['Done tagging'] = 'Markieren beenden';
 $lang['Who is this?'] = 'Wer ist das?';

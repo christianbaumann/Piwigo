@@ -1,7 +1,7 @@
 <?php
 
 $lang['Persons'] = 'Persons';
-$lang['Region may be out of date: the image was resized since it was tagged'] = 'Region may be out of date: the image was resized since it was tagged';
+$lang['Region may be out of date: the image was resized since it was tagged'] = 'Region may be out of date: the image was cropped since it was tagged';
 $lang['Tag people'] = 'Tag people';
 $lang['Done tagging'] = 'Done tagging';
 $lang['Who is this?'] = 'Who is this?';
