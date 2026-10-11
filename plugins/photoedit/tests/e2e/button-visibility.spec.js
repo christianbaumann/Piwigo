@@ -33,10 +33,9 @@ test('[HAPPY] the webmaster sees the edit button', async ({ page }) => {
 for (const [label, state] of [
   ['an administrator who is not a webmaster', statePath('ADMIN')],
   ['a normal user', statePath('NORMAL')],
-  ['a guest', undefined],
 ]) {
   test(`[NEG] ${label} has no edit button`, async ({ browser }) => {
-    const context = await browser.newContext({ storageState: state ?? { cookies: [], origins: [] } });
+    const context = await browser.newContext({ storageState: state });
     try {
       const picture = new PicturePage(await context.newPage());
       await picture.goto(fixture.picture_path);

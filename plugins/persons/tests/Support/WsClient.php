@@ -70,21 +70,17 @@ class WsClient
         );
     }
 
-    /** GET a gallery page, reusing this client's session (or as a guest). */
-    public function fetchPage(string $path, bool $useCookies = true): array
+    /** GET a gallery page, reusing this client's session. */
+    public function fetchPage(string $path): array
     {
         $ch = curl_init();
-        $opts = array(
+        curl_setopt_array($ch, array(
             CURLOPT_URL => Config::baseUrl() . $path,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
-        );
-        if ($useCookies)
-        {
-            $opts[CURLOPT_COOKIEJAR] = $this->cookieFile;
-            $opts[CURLOPT_COOKIEFILE] = $this->cookieFile;
-        }
-        curl_setopt_array($ch, $opts);
+            CURLOPT_COOKIEJAR => $this->cookieFile,
+            CURLOPT_COOKIEFILE => $this->cookieFile,
+        ));
         $body = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

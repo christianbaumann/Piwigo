@@ -93,38 +93,3 @@ test.describe('public provenance row', () => {
     await expect(picture.rowAnywhere).toHaveCount(0);
   });
 });
-
-/**
- * The same row for someone who is not logged in.
- *
- * A separate describe because it needs a context with no stored session, which
- * is a per-file/per-describe fixture rather than something a spec can drop.
- *
- * What this adds over PicturePageSourceTest::testGuestGetsTheRow, which already
- * owns "the server emits the row for a guest": the guest page is a different
- * render - no admin toolbar, a different menubar, a different body class - and
- * only a browser says whether the theme still lays the row out where a visitor
- * can read it. The rule lives one layer down; this witnesses the rendering.
- */
-test.describe('public provenance row, seen by a visitor who is not logged in', () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test.afterEach(async () => {
-    restore();
-  });
-
-  test('the row is visible without logging in', async ({ page }) => {
-    const fixture = seed('photo-provenance');
-    expect(fixture.photo.values.provenance_owner).toBeTruthy();
-
-    const picture = new PicturePage(page);
-    await picture.goto(fixture.photo.id, fixture.album_id);
-
-    // Proves the browser really arrived as a guest; without it this spec would
-    // pass on a leaked session and assert nothing about the public page.
-    await expect(picture.adminLink).toHaveCount(0);
-
-    await expect(picture.row).toBeVisible();
-    await expect(picture.value).toContainText(fixture.photo.values.provenance_owner);
-  });
-});

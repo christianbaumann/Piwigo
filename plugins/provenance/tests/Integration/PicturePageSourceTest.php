@@ -132,28 +132,6 @@ final class PicturePageSourceTest extends TestCase
     }
 
     /**
-     * [HAPPY] A logged-out visitor gets the row too.
-     *
-     * The whole point of this row is that it is public, and every other case
-     * here runs as the webmaster. The handler carries no is_a_guest() guard -
-     * unlike the Colored Tags one on the same page - so nothing but this test
-     * says the public half of "public row" actually works.
-     */
-    public function testGuestGetsTheRow(): void
-    {
-        $this->seedPhoto(self::SEEDED);
-
-        $res = $this->ws->fetchPage($this->picturePath, false);
-        $this->assertSame(200, $res['http_code'], 'the picture page is not reachable without logging in');
-
-        $markup = $this->markup((string)$res['body']);
-
-        $this->assertStringContainsString('<dl id="standard"', $markup, 'anti-vacuity: stripping left no markup to search');
-        $this->assertStringContainsString('id="' . $this->rowId() . '"', $markup);
-        $this->assertStringContainsString(self::SEEDED['provenance_owner'], $markup);
-    }
-
-    /**
      * [NEG] Markup in a provenance value is rendered as text, never as markup.
      *
      * Decision 0009 strips tags on every write path the plugin owns, so this

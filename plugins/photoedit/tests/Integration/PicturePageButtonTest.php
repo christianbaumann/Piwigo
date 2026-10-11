@@ -41,14 +41,11 @@ final class PicturePageButtonTest extends TestCase
         $this->fixture->destroyTestAlbums();
     }
 
-    private function pageAs(?string $role): string
+    private function pageAs(string $role): string
     {
         $client = new WsClient();
-        if ($role !== null)
-        {
-            list($username, $password) = Config::credentials($role);
-            $client->login($username, $password);
-        }
+        list($username, $password) = Config::credentials($role);
+        $client->login($username, $password);
 
         $page = $client->fetchPage($this->picturePath);
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($page), 'anti-vacuity: not a picture page');
@@ -71,13 +68,12 @@ final class PicturePageButtonTest extends TestCase
         return array(
             'administrator, not webmaster' => array(TestUsers::ADMIN),
             'normal user' => array(TestUsers::NORMAL),
-            'guest' => array(null),
             );
     }
 
     /** [NEG] Nobody else gets the button or the controls. */
     #[DataProvider('accountsWithoutTheButton')]
-    public function testNobodyElseGetsTheButton(?string $role): void
+    public function testNobodyElseGetsTheButton(string $role): void
     {
         $page = $this->pageAs($role);
 

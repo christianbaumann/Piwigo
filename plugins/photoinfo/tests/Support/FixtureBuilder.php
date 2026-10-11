@@ -511,7 +511,7 @@ class FixtureBuilder
         return implode("\n", $output);
     }
 
-    /** A public top-level album of this suite's own, visible to guests too. */
+    /** A public top-level album of this suite's own, visible to every logged-in user. */
     public function createTestAlbum(string $name): int
     {
         $this->db->query(

@@ -185,6 +185,14 @@ def test_generated_config_carries_the_three_settings(cfg):
     assert "$conf['persons_exiftool_path'] = '';" in php
 
 
+def test_generated_config_locks_guests_out():
+    """[HAPPY] Guests reach no gallery page on the remote: core sends them to the login
+    page when this is off (include/functions_user.inc.php:1484)."""
+    php = bootstrap.config_php(config(site={"assume_https": False}).site)
+
+    assert "$conf['guest_access'] = false;" in php
+
+
 def test_generated_config_reflects_assume_https_false():
     """[ECP] The other side of the boolean partition — PHP has no `False`."""
     php = bootstrap.config_php(config(site={"assume_https": False}).site)

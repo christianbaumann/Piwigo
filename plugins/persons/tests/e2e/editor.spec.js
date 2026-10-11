@@ -1168,38 +1168,3 @@ test.describe('an install without exiftool', () => {
     await expect(picture.tagToggle).toHaveAttribute('title', /.+/);
   });
 });
-
-/**
- * A visitor who is not logged in.
- *
- * Faces are personal data and decision 0019 keeps every read of them behind a
- * login, so the editor must not even be offered. Asserted with a context that
- * carries no session at all, rather than by logging out.
- */
-test.describe('a guest on the picture page', () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  /** @type {ReturnType<typeof seed>} */
-  let seeded;
-
-  test.beforeEach(() => {
-    seeded = seed('overlay');
-  });
-
-  test.afterEach(() => {
-    restore();
-  });
-
-  test('is offered no way to tag anybody', async ({ page }) => {
-    const picture = new PicturePage(page);
-    await picture.goto(seeded.picture_path);
-
-    // Anti-vacuity: this is the photo page, and it does carry regions - they are
-    // simply not shown to a visitor without a login.
-    await expect(picture.image).toHaveCount(1);
-    expect(seeded.regions.length).toBeGreaterThan(0);
-
-    await expect(picture.tagToggle).toHaveCount(0);
-    await expect(picture.stage).toHaveCount(0);
-  });
-});

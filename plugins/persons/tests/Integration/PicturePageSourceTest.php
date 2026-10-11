@@ -198,30 +198,6 @@ final class PicturePageSourceTest extends TestCase
         );
     }
 
-    /** [NEG] A guest gets no stage, no boxes and no names - regions stay behind the login. */
-    public function testAGuestSeesNoOverlay(): void
-    {
-        $this->seed($this->twoFaces());
-
-        $res = $this->ws->fetchPage($this->picturePath, false);
-        $this->assertSame(200, $res['http_code'], 'the picture page is not reachable without logging in');
-
-        $html = (string)$res['body'];
-        $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($html), 'the guest page did not render');
-        $this->assertStringContainsString('id="theMainImage"', $html, 'anti-vacuity: this is not the photo page');
-
-        $this->assertStringNotContainsString('persons-stage', $html);
-        $this->assertStringNotContainsString('person-box', $html);
-        $this->assertStringNotContainsString('id="Persons"', $html);
-        $this->assertStringNotContainsString('persons-tag-toggle', $html);
-
-        // The *names* are a different matter and are deliberately not asserted
-        // absent: every person is mirrored as an ordinary Piwigo tag, which is
-        // what makes browsing work with no new code, and core renders its own
-        // related-tags row on this page for guests. Hiding that would mean
-        // changing core's row, not this plugin's.
-    }
-
     /**
      * [BVA] A photo with no regions still gets the stage, and no boxes.
      *

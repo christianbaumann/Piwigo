@@ -87,9 +87,11 @@ class WsClient
         curl_setopt_array($ch, $opts);
         $body = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         curl_close($ch);
 
-        return array('http_code' => $httpCode, 'body' => $body);
+        // url: where the redirects ended, so a test can tell the login page apart.
+        return array('http_code' => $httpCode, 'body' => $body, 'url' => $url);
     }
 
     /**

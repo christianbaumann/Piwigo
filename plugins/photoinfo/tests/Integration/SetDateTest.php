@@ -242,11 +242,13 @@ final class SetDateTest extends TestCase
         $this->setDate($this->ws, '1965', '3', '');
 
         $link = 'picture.php?/' . $this->image['id'] . '/';
-        $guest = new WsClient();
-        $startDay = $guest->fetchPage('/index.php?/created-monthly-list-1965-03-01');
+        $reader = new WsClient();
+        list($username, $password) = Config::credentials(TestUsers::NORMAL);
+        $reader->login($username, $password);
+        $startDay = $reader->fetchPage('/index.php?/created-monthly-list-1965-03-01');
         $this->assertStringContainsString('id="thumbnails"', $startDay, 'anti-vacuity: not a calendar list');
         $this->assertStringContainsString($link, $startDay);
-        $this->assertStringNotContainsString($link, $guest->fetchPage('/index.php?/created-monthly-list-1965-03-02'));
+        $this->assertStringNotContainsString($link, $reader->fetchPage('/index.php?/created-monthly-list-1965-03-02'));
     }
 
     public static function refusedDates(): array

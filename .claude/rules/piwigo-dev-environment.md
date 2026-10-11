@@ -83,6 +83,10 @@ All three are covered by the root `.gitignore`'s `_data` entry and never reach t
 `.gitignore` excludes `plugins/*`, `themes/*`, `local/*`, `_data`, `upload`, `galleries/*`, then re-includes the tracked ones with `!` (`themes/default`, `themes/modus`, `themes/standard_pages`, `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit`, `plugins/photoinfo`). A newly tracked theme or plugin needs its own `!` entry or it stays invisible to git.
 
 `local/config/config.inc.php` and `local/config/database.inc.php` are git-ignored and hold the install's overrides and DB credentials.
+A fresh clone must add `$conf['guest_access'] = false;` to `config.inc.php` by hand: guests are
+locked out ([decision 0055](../../docs/agents/decisions/0055-guests-are-locked-out.md)), the deploy
+writes the line into the remote's generated config, and without it the local gallery pages and
+API stay open to guests. Provenance's `GuestLockoutTest` fails naming the setting when it is missing.
 
 `.rodney/` (Chrome profile) and `.agent-tests/` (browser verification output) are ignored as local agent working state.
 

@@ -20,8 +20,6 @@ class PicturePage {
     this.value = this.row.locator('dd');
     /** The row wherever it may be, for the specs that assert it is nowhere. */
     this.rowAnywhere = page.locator('#Provenance');
-    /** Rendered only for an authenticated administrator; the guest spec's proof it really is a guest. */
-    this.adminLink = page.locator('a[href*="admin.php"]');
   }
 
   /**

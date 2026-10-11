@@ -51,7 +51,6 @@ final class PicturePageSourceTest extends TestCase
             'webmaster' => array(TestUsers::WEBMASTER, true),
             'administrator' => array(TestUsers::ADMIN, true),
             'normal user' => array(TestUsers::NORMAL, false),
-            'guest' => array(null, false),
             );
     }
 
@@ -60,7 +59,7 @@ final class PicturePageSourceTest extends TestCase
      * only administrators get the editor.
      */
     #[DataProvider('allAccounts')]
-    public function testTheDescriptionShowsInTheRowOnly(?string $role, bool $editable): void
+    public function testTheDescriptionShowsInTheRowOnly(string $role, bool $editable): void
     {
         $this->fixture->setComment($this->image['id'], self::COMMENT);
 
@@ -76,13 +75,12 @@ final class PicturePageSourceTest extends TestCase
     {
         return array(
             'normal user' => array(TestUsers::NORMAL),
-            'guest' => array(null),
             );
     }
 
     /** [ECP] With no description, a reader gets no row at all. */
     #[DataProvider('readers')]
-    public function testNoDescriptionNoRowForAReader(?string $role): void
+    public function testNoDescriptionNoRowForAReader(string $role): void
     {
         $this->assertSame(0, substr_count($this->pageAs($role), self::ROW));
     }
@@ -92,7 +90,7 @@ final class PicturePageSourceTest extends TestCase
     {
         $this->fixture->setComment($this->image['id'], '0');
 
-        $this->assertSame(0, substr_count($this->pageAs(null), self::ROW));
+        $this->assertSame(0, substr_count($this->pageAs(TestUsers::NORMAL), self::ROW));
     }
 
     /** [ECP] With no description, an administrator gets the row to add one. */
@@ -109,7 +107,7 @@ final class PicturePageSourceTest extends TestCase
     {
         $this->fixture->setComment($this->image['id'], 'Oma <b>und</b> Opa');
 
-        $this->assertStringContainsString('Oma <b>und</b> Opa', $this->rowOf($this->pageAs(null)));
+        $this->assertStringContainsString('Oma <b>und</b> Opa', $this->rowOf($this->pageAs(TestUsers::NORMAL)));
     }
 
     /** [HAPPY] The editor's textarea holds the raw text, escaped. */
@@ -129,7 +127,7 @@ final class PicturePageSourceTest extends TestCase
         $this->fixture->setComment($this->image['id'], self::COMMENT);
         $this->fixture->setProvenance($this->image['id'], array('provenance_owner' => 'Anna Mueller'));
 
-        $page = $this->pageAs(null);
+        $page = $this->pageAs(TestUsers::NORMAL);
         $this->assertSame(1, preg_match('~<div id="Provenance" class="imageInfo">(.*?)</div>~s', $page, $m), 'anti-vacuity: no provenance row');
         $this->assertStringContainsString('Anna Mueller', $m[1]);
         $this->assertStringNotContainsString(self::COMMENT, $m[1]);
@@ -140,7 +138,7 @@ final class PicturePageSourceTest extends TestCase
      * on" row is gone, and only administrators get the editor.
      */
     #[DataProvider('allAccounts')]
-    public function testTheDateShowsInTheDatumRow(?string $role, bool $editable): void
+    public function testTheDateShowsInTheDatumRow(string $role, bool $editable): void
     {
         $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
 
@@ -156,12 +154,12 @@ final class PicturePageSourceTest extends TestCase
     {
         $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
 
-        $this->assertMatchesRegularExpression('~href="[^"]*created-monthly-list-1965-03"~', $this->dateRowOf($this->pageAs(null)));
+        $this->assertMatchesRegularExpression('~href="[^"]*created-monthly-list-1965-03"~', $this->dateRowOf($this->pageAs(TestUsers::NORMAL)));
     }
 
     /** [ECP] With no date, a reader gets no Datum row - and no core row either. */
     #[DataProvider('readers')]
-    public function testNoDateNoRowForAReader(?string $role): void
+    public function testNoDateNoRowForAReader(string $role): void
     {
         $page = $this->pageAs($role);
 
@@ -196,7 +194,7 @@ final class PicturePageSourceTest extends TestCase
         $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
         $this->fixture->setQualifier($this->image['id'], 'between', '1970-01-01', 'year');
 
-        $row = $this->dateRowOf($this->pageAs(null));
+        $row = $this->dateRowOf($this->pageAs(TestUsers::NORMAL));
 
         $this->assertStringContainsString("März 1965\u{2013}1970</a>", $row);
         $this->assertMatchesRegularExpression('~href="[^"]*created-monthly-list-1965-03"~', $row);
@@ -217,14 +215,11 @@ final class PicturePageSourceTest extends TestCase
         $this->assertStringContainsString('data-day="2"', $row);
     }
 
-    private function pageAs(?string $role): string
+    private function pageAs(string $role): string
     {
         $client = new WsClient();
-        if ($role !== null)
-        {
-            list($username, $password) = Config::credentials($role);
-            $client->login($username, $password);
-        }
+        list($username, $password) = Config::credentials($role);
+        $client->login($username, $password);
 
         $page = $client->fetchPage($this->picturePath);
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($page), 'anti-vacuity: not a picture page');
