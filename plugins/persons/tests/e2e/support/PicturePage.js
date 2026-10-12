@@ -579,9 +579,10 @@ class PicturePage {
       };
       return {
         zoom: ['zoomFit', 'zoomNatural'].map((id) => textLeft(document.getElementById(id))),
+        // Rendered entries only: a hidden one (photoedit's edit-mode controls) measures at 0.
         others: Array.from(
           document.querySelectorAll('#imageToolBar .actionButtons .pwg-button:not(.zoomButton) .pwg-button-text')
-        ).map(textLeft),
+        ).filter((el) => el.getClientRects().length > 0).map(textLeft),
       };
     });
   }
