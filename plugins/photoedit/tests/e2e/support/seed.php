@@ -251,6 +251,18 @@ if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir))
 }
 file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
 
+/** The German the page shows for a key, read from the plugin's language file. */
+function photoedit_german_label(string $key): string
+{
+    $lang = array();
+    include PIWIGO_ROOT . 'plugins/photoedit/language/de_DE/plugin.lang.php';
+    if (!isset($lang[$key]))
+    {
+        fail("no German for '$key' in photoedit's language file");
+    }
+    return $lang[$key];
+}
+
 echo json_encode(array(
     'photo_id' => (int)$image['id'],
     'album_id' => $catId,
@@ -259,6 +271,7 @@ echo json_encode(array(
     'kept_name' => FixtureBuilder::REGION_KEPT['name'],
     'cut_name' => FixtureBuilder::REGION_CUT['name'],
     'picture_path' => '/picture.php?/' . (int)$image['id'] . '/category/' . $catId,
+    'edit_label' => photoedit_german_label('Turn/crop'),
     'album_path' => '/index.php?/category/' . $catId,
     'previous_path' => $neighbours === null ? null : '/picture.php?/' . $neighbours['previous'] . '/category/' . $catId,
     'next_path' => $neighbours === null ? null : '/picture.php?/' . $neighbours['next'] . '/category/' . $catId,

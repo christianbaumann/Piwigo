@@ -23,9 +23,9 @@ test.afterEach(() => {
 
 for (const [role, tags] of /** @type {const} */ ([
   ['WEBMASTER', '[HAPPY]'],
-  ['ADMIN', '[HAPPY][ECP]'],
-  ['NORMAL', '[HAPPY][BVA]'],
-  ['GENERIC', '[ECP][BVA]'],
+  ['ADMIN', '[HAPPY]'],
+  ['NORMAL', '[HAPPY]'],
+  ['GENERIC', '[ECP]'],
 ])) {
   test(`${tags} ${role.toLowerCase()}: the save asks with the lost-region warning and the re-encode note`, async ({ browser }) => {
     restore();
@@ -36,7 +36,7 @@ for (const [role, tags] of /** @type {const} */ ([
       await picture.goto(fixture.picture_path);
       await expect(picture.editButton).toBeVisible();
       // Not "Bearbeiten": core's own edit button already carries that name.
-      await expect(picture.editButton).toHaveText('Drehen/Zuschneiden');
+      await expect(picture.editButton).toHaveText(fixture.edit_label);
       const texts = await picture.confirmTexts();
       expect(texts.lost, 'anti-vacuity: no warning text on the button').not.toBe('');
       expect(texts.lossy, 'anti-vacuity: no note text on the button').not.toBe('');
@@ -58,7 +58,7 @@ for (const [role, tags] of /** @type {const} */ ([
   });
 }
 
-test('[NEG][BVA] guest: gets the login page, no editor and so no warning', async ({ browser }) => {
+test('[NEG] guest: gets the login page, no editor and so no warning', async ({ browser }) => {
   restore();
   const fixture = seed('warnings');
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });

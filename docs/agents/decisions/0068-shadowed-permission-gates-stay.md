@@ -17,6 +17,11 @@ nothing red, because a second check refuses the same roles with the same answer 
   behind core's own admin page check
 - provenance: the `is_a_guest()` checks in the four write handlers of `include/ws_functions.inc.php`,
   behind `admin_only` and core's guest lockout ([0055](0055-guests-are-locked-out.md))
+- typetags: the guest checks of `typetags.image.addTag`, `addNewTag` and `removeTag`, behind core's
+  `ws_isInvokeAllowed()` (0055)
+- core: `check_status(ACCESS_ADMINISTRATOR)` in `admin.php`, repeated by every admin page the matrix
+  requests (`admin/tags.php`, `album.php`, `photo.php`, `batch_manager.php`, `cat_modify.php`,
+  `picture_modify.php`)
 
 ## Decision
 
