@@ -39,8 +39,8 @@ The German handbook is served only to logged-in users, through `handbuch.php`, l
   **Note:** `test_the_handbook_login_entry_and_its_rewrite_ship` in `tools/deploy/tests/test_fileset.py`; test count in README and deployment.md now 596
 * [x] Run the guest / logged-in / traversal cases against both the nginx URL and the Apache URL (task 11)
   **Note:** `HandbookAccessTest`, every case per server (`http://localhost`, `http://apache`); 23 tests green. Watched fail: guard removed -> 8 failures, `.htaccess` removed -> 6, nginx rule removed -> 6; reverted -> green
-* [ ] (manual testing required) After the first deploy, check once by hand on the remote that a guest gets no handbook page and a logged-in user does; record it in the ledger in `docs/agents/TESTING.md` (covers the FPM/CGI difference task 11 cannot)
-  **Note:** ledger row added to `docs/agents/TESTING.md` as *Pending*; needs a deploy
+* [x] After the first deploy, check once by hand on the remote that a guest gets no handbook page and a logged-in user does; record it in the ledger in `docs/agents/TESTING.md` (covers the FPM/CGI difference task 11 cannot)
+  **Note:** checked 2026-10-12 with curl after the deploy of 4b68f5e16, guest-then-login flow included; ledger row in `docs/agents/TESTING.md`. Remote compiled templates purged through the maintenance action the same day
 * [x] Update `handbuch/tools/shoot.js` / `check.php` only if they reach pages over HTTP and break
   **Note:** no change needed: `check.php` reads files on disk, `shoot.js` only photographs gallery pages
 * [x] Decision file: handbook entry
