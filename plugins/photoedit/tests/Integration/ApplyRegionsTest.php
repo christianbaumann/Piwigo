@@ -43,6 +43,7 @@ final class ApplyRegionsTest extends TestCase
         $this->fixture->assertPluginActive('persons');
 
         $this->image = $this->fixture->createMarkedImage();
+        $this->fixture->showInTestAlbum($this->image);
         $this->client = new WsClient();
         list($username, $password) = Config::credentials(TestUsers::WEBMASTER);
         $this->client->login($username, $password);
@@ -55,6 +56,7 @@ final class ApplyRegionsTest extends TestCase
             $this->plugin('activate');
         }
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
         $this->fixture->destroyPersons(array(self::INSIDE['name'], self::PARTLY['name'], self::OUTSIDE['name']));
     }
 
@@ -192,6 +194,35 @@ final class ApplyRegionsTest extends TestCase
 
         $this->apply(array('turns' => 0, 'crop' => self::LEFT_HALF));
         $this->assertSame($preview['lost_regions'], array_values(array_diff($before, $this->indexedNames())));
+    }
+
+    public static function otherLoggedInAccounts(): array
+    {
+        return array(
+            'administrator, not webmaster' => array(TestUsers::ADMIN),
+            'normal user' => array(TestUsers::NORMAL),
+            );
+    }
+
+    /** [ECP] Another logged-in account's dry run names the region the crop cuts away too: the warning is not the webmaster's alone (decision 0059). */
+    #[DataProvider('otherLoggedInAccounts')]
+    public function testAnotherAccountsDryRunNamesTheLostRegion(string $role): void
+    {
+        $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
+        $other = new WsClient();
+        list($username, $password) = Config::credentials($role);
+        $other->login($username, $password);
+
+        $res = $other->call(self::METHOD, array(
+            'image_id' => $this->image['id'],
+            'turns' => 0,
+            'crop' => self::LEFT_HALF,
+            'dry_run' => 'true',
+            'pwg_token' => $other->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame(array(self::OUTSIDE['name']), $res['json']['result']['lost_regions']);
     }
 
     /** [ECP] A turn alone loses nobody, so the dry run names nobody. */

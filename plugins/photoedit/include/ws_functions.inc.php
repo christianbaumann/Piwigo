@@ -6,8 +6,8 @@ include_once(PHOTOEDIT_PATH.'include/pipeline.inc.php');
 /**
  * API method pwg.photoedit.apply: turns and crops a photo and writes it into its file.
  *
- * Registered admin_only and post_only; the webmaster check is here, since
- * core's options have no webmaster level (decision 0034).
+ * Registered post_only. Open to every logged-in account that may see the
+ * photo (decision 0059); a photo it may not see is answered like a missing one.
  *
  * @param mixed[] $params
  *    @option int image_id
@@ -18,14 +18,19 @@ include_once(PHOTOEDIT_PATH.'include/pipeline.inc.php');
  */
 function ws_photoedit_apply($params, &$service)
 {
-  if (!is_webmaster())
+  if (is_a_guest())
   {
-    return new PwgError(403, 'Only a webmaster may edit a photo');
+    return new PwgError(401, 'Access denied');
   }
 
   if (get_pwg_token() != $params['pwg_token'])
   {
     return new PwgError(403, 'Invalid security token');
+  }
+
+  if (!photoedit_user_may_edit($params['image_id']))
+  {
+    return new PwgError(404, PHOTOEDIT_NOT_FOUND_MESSAGE);
   }
 
   $request = photoedit_validate_request($params['turns'], $params['crop']);

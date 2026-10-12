@@ -166,6 +166,38 @@ function photoedit_image_row($image_id)
 }
 
 /**
+ * Whether the calling account may edit this photo: any logged-in account that
+ * may see it, by core's own rule for showing a photo (decisions 0044, 0059).
+ *
+ * @param int $image_id
+ * @return bool
+ */
+function photoedit_user_may_edit($image_id)
+{
+  if (is_a_guest())
+  {
+    return false;
+  }
+
+  $query = '
+SELECT COUNT(*)
+  FROM '.IMAGE_CATEGORY_TABLE.' AS ic
+  WHERE ic.image_id = '.(int)$image_id.'
+    '.get_sql_condition_FandF(
+        array(
+          'forbidden_categories' => 'ic.category_id',
+          'visible_categories'   => 'ic.category_id',
+          'forbidden_images'     => 'ic.image_id',
+          ),
+        'AND'
+        ).'
+;';
+  list($count) = pwg_db_fetch_row(pwg_query($query));
+
+  return $count > 0;
+}
+
+/**
  * What an edit does to the raw file, as the events describe it.
  *
  * @param array $image the image row
@@ -283,7 +315,7 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
 
   if (!$image)
   {
-    return photoedit_failure('not_found', 'No photo with this id');
+    return photoedit_failure('not_found', PHOTOEDIT_NOT_FOUND_MESSAGE);
   }
 
   $file = photoedit_image_file_path($image['path']);
@@ -332,7 +364,7 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
   if (!$image)
   {
     photoedit_lock_release($lock);
-    return photoedit_failure('not_found', 'No photo with this id');
+    return photoedit_failure('not_found', PHOTOEDIT_NOT_FOUND_MESSAGE);
   }
   $transform = photoedit_transform($image, $turns, $box);
   if (!$transform['ok'])

@@ -249,23 +249,60 @@ final class ApplyTurnTest extends TestCase
         $this->assertSame(array(), glob(PIWIGO_ROOT . '_data/photoedit/originals/' . $this->image['id'] . '-*'));
     }
 
-    public static function refusedCallers(): array
+    public static function otherLoggedInAccounts(): array
     {
         return array(
-            // the handler's is_webmaster() check
-            '[NEG] administrator, not webmaster' => array(TestUsers::ADMIN, 403),
-            // core's admin_only, before the handler runs
-            '[NEG] normal user' => array(TestUsers::NORMAL, 401),
+            'administrator, not webmaster' => array(TestUsers::ADMIN),
+            'normal user' => array(TestUsers::NORMAL),
             );
     }
 
-    /** [NEG] Only a webmaster may write. */
-    #[DataProvider('refusedCallers')]
-    public function testOtherAccountsAreRefused(string $role, int $code): void
+    /** [HAPPY][ECP] Every logged-in account that sees the photo may turn it, not only the webmaster (decision 0059). */
+    #[DataProvider('otherLoggedInAccounts')]
+    public function testOtherLoggedInAccountsMayTurn(string $role): void
     {
-        $this->assertRefused($this->apply($this->client($role), array('turns' => 1)), $code);
+        $this->assertSame(array(FixtureBuilder::MARKED_WIDTH, FixtureBuilder::MARKED_HEIGHT), $this->identify(),
+            'anti-vacuity: the fixture is not landscape');
+
+        $this->assertOk($this->apply($this->client($role), array('turns' => 1)));
+
+        $this->assertSame(array(FixtureBuilder::MARKED_HEIGHT, FixtureBuilder::MARKED_WIDTH), $this->identify());
+    }
+
+    /** [NEG] A guest is refused; core's guest lockout answers first (decision 0055). */
+    public function testAGuestIsRefused(): void
+    {
+        $guest = new WsClient();
+
+        $this->assertRefused($this->apply($guest, array('turns' => 1)), 401);
 
         $this->assertSame($this->image['md5'], md5_file($this->image['file']));
+    }
+
+    /**
+     * [NEG] A photo in a private album the account was not granted is answered
+     * like a missing one, and the file stays as it was (decision 0044's rule).
+     */
+    public function testAPhotoInAPrivateAlbumIsNotFound(): void
+    {
+        $this->fixture->makeAlbumPrivate($this->album);
+
+        $res = $this->apply($this->client(TestUsers::NORMAL), array('turns' => 1));
+
+        $this->assertRefused($res, 404);
+        $this->assertSame(PHOTOEDIT_NOT_FOUND_MESSAGE, $res['json']['message']);
+        $this->assertSame($this->image['md5'], md5_file($this->image['file']));
+    }
+
+    /** [ECP] Granted that album, the same account may turn the photo: the gate is the album, not the role. */
+    public function testAGrantedPrivateAlbumMayBeEdited(): void
+    {
+        $this->fixture->makeAlbumPrivate($this->album);
+        $this->fixture->grantAlbumTo($this->album, Config::credentials(TestUsers::NORMAL)[0]);
+
+        $this->assertOk($this->apply($this->client(TestUsers::NORMAL), array('turns' => 1)));
+
+        $this->assertNotSame($this->image['md5'], md5_file($this->image['file']), 'the file did not change');
     }
 
     /** [NEG] A GET request is refused, even from the webmaster with a valid token. */

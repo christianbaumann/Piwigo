@@ -4,9 +4,8 @@ defined('PHOTOEDIT_PATH') or die('Hacking attempt!');
 /**
  * Adds the edit button and its controls to the picture page's toolbar.
  *
- * Webmaster only: an edit rewrites the image file, which is the source of truth
- * for every other plugin and the only thing a deploy carries (decision 0034).
- * An administrator who is not a webmaster does not get it either.
+ * For every logged-in account that may see the photo (decision 0059), the
+ * same gate pwg.photoedit.apply applies.
  *
  * @return void
  */
@@ -14,13 +13,14 @@ function photoedit_picture_button()
 {
   global $template, $picture;
 
-  if (!is_webmaster())
+  include_once(PHOTOEDIT_PATH.'include/pipeline.inc.php');
+
+  if (!photoedit_user_may_edit($picture['current']['id']))
   {
     return;
   }
 
   load_language('plugin.lang', PHOTOEDIT_PATH);
-  include_once(PHOTOEDIT_PATH.'include/pipeline.inc.php');
 
   // The editor stays on the page when it cannot save, disabled and saying why,
   // rather than vanishing without explanation.

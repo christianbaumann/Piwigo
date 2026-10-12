@@ -27,6 +27,7 @@ final class ApplyCropTest extends TestCase
         $this->fixture->assertPluginActive();
 
         $this->image = $this->fixture->createMarkedImage();
+        $this->fixture->showInTestAlbum($this->image);
     }
 
     protected function tearDown(): void
@@ -37,6 +38,7 @@ final class ApplyCropTest extends TestCase
         }
         $this->fixture->restoreConfig();
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
     }
 
     private function apply(array $params): array

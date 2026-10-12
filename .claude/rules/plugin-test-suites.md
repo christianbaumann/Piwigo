@@ -248,8 +248,11 @@ ddev exec bash -c 'set -a; . local/config/photoedit-test.env; set +a; \
 
 It writes the git-ignored `local/config/photoedit-test.env` and creates **three** accounts:
 `photoedit_webmaster`, `photoedit_admin` (an administrator who is not a webmaster) and
-`photoedit_normal`. The admin account exists because the edit button is gated by `is_webmaster()`,
-and only an authenticated administrator failing to get it proves the gate is not `is_admin()`. It
+`photoedit_normal`. Since decision 0059 all three get the edit button for a photo they can see;
+the negative cases are a guest and a private album without a grant
+(`FixtureBuilder::makeAlbumPrivate()`, `grantAlbumTo()`). Every photo sent to `pwg.photoedit.apply`
+must be in an album the caller sees (`FixtureBuilder::showInTestAlbum()`): a photo in no album is
+refused. It
 marks the install with `photoedit_throwaway_install`, which its `FixtureBuilder` refuses to run
 without. Both suites need the plugin active (Administration > Plugins, or
 `pwg.plugins.performAction`) and fail naming it otherwise, through `FixtureBuilder::assertPluginActive()`;

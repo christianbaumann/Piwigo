@@ -5,8 +5,9 @@ const { statePath } = require('./support/accounts');
 const { seed, restore } = require('./support/seed');
 
 /**
- * Who sees the edit button in the rendered page. The integration suite proves
- * the same from the page source; this proves no script adds it afterwards.
+ * Who sees the edit button in the rendered page: every logged-in account that
+ * may see the photo (decision 0059). The integration suite proves the same, and
+ * the refusals, from the page source; this proves no script hides it afterwards.
  */
 
 /** @type {ReturnType<typeof seed>} */
@@ -21,27 +22,20 @@ test.afterEach(() => {
   restore();
 });
 
-test('[HAPPY] the webmaster sees the edit button', async ({ page }) => {
-  const picture = new PicturePage(page);
-  await picture.goto(fixture.picture_path);
-
-  await expect(picture.editButton).toBeVisible();
-  // Not "Bearbeiten": core's own edit button already carries that name.
-  await expect(picture.editButton).toHaveText('Drehen/Zuschneiden');
-});
-
 for (const [label, state] of [
+  ['the webmaster', statePath('WEBMASTER')],
   ['an administrator who is not a webmaster', statePath('ADMIN')],
   ['a normal user', statePath('NORMAL')],
 ]) {
-  test(`[NEG] ${label} has no edit button`, async ({ browser }) => {
+  test(`[HAPPY] ${label} sees the edit button`, async ({ browser }) => {
     const context = await browser.newContext({ storageState: state });
     try {
       const picture = new PicturePage(await context.newPage());
       await picture.goto(fixture.picture_path);
 
-      await expect(picture.editButton).toHaveCount(0);
-      await expect(picture.controls).toHaveCount(0);
+      await expect(picture.editButton).toBeVisible();
+      // Not "Bearbeiten": core's own edit button already carries that name.
+      await expect(picture.editButton).toHaveText('Drehen/Zuschneiden');
     } finally {
       await context.close();
     }

@@ -41,6 +41,7 @@ final class ApplyJpegTest extends TestCase
     {
         $this->fixture->restoreConfig();
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
         $this->fixture->destroyPersons(array(FixtureBuilder::REGION_KEPT['name']));
     }
 
@@ -67,6 +68,7 @@ final class ApplyJpegTest extends TestCase
     public function testAnOrientation6JpegIsStoredUpright(): void
     {
         $this->image = $this->fixture->createMarkedJpeg(6);
+        $this->fixture->showInTestAlbum($this->image);
         $this->assertSame('RightTop', $this->orientation(), 'anti-vacuity: the fixture is not Orientation 6');
         $this->assertSame(3, $this->image['rotation']);
 
@@ -124,6 +126,7 @@ final class ApplyJpegTest extends TestCase
     {
         $this->fixture->setConfig('graphics_library', $library);
         $this->image = $this->fixture->createMarkedJpeg($orientation);
+        $this->fixture->showInTestAlbum($this->image);
 
         $this->assertOk($this->apply(array('turns' => $turns, 'crop' => $crop)));
 
@@ -138,6 +141,31 @@ final class ApplyJpegTest extends TestCase
     public function testADryRunReportsTheReencode(): void
     {
         $this->image = $this->fixture->createMarkedJpeg(1);
+        $this->fixture->showInTestAlbum($this->image);
+
+        $result = $this->assertOk($this->apply(array('turns' => 1, 'dry_run' => 'true')));
+
+        $this->assertTrue($result['lossy']);
+        $this->assertSame($this->image['md5'], md5_file($this->image['file']));
+    }
+
+    public static function otherLoggedInAccounts(): array
+    {
+        return array(
+            'administrator, not webmaster' => array(TestUsers::ADMIN),
+            'normal user' => array(TestUsers::NORMAL),
+            );
+    }
+
+    /** [ECP] Another logged-in account's dry run reports the re-encode too, so the page asks it first (decision 0059). */
+    #[DataProvider('otherLoggedInAccounts')]
+    public function testAnotherAccountsDryRunReportsTheReencode(string $role): void
+    {
+        $this->image = $this->fixture->createMarkedJpeg(1);
+        $this->fixture->showInTestAlbum($this->image);
+        $this->client = new WsClient();
+        list($username, $password) = Config::credentials($role);
+        $this->client->login($username, $password);
 
         $result = $this->assertOk($this->apply(array('turns' => 1, 'dry_run' => 'true')));
 
@@ -156,6 +184,7 @@ final class ApplyJpegTest extends TestCase
     {
         $this->fixture->assertPluginActive('persons');
         $this->image = $this->fixture->createMarkedJpeg(6);
+        $this->fixture->showInTestAlbum($this->image);
         $this->fixture->writeRegions($this->image, array(FixtureBuilder::REGION_KEPT));
         $this->assertOk($this->client->call('pwg.persons.rescan', array(
             'image_ids' => (string)$this->image['id'],

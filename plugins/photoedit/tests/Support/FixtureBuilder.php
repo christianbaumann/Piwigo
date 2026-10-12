@@ -406,6 +406,19 @@ class FixtureBuilder
         return $id;
     }
 
+    /**
+     * Puts one photo in a public album of its own: pwg.photoedit.apply edits
+     * only a photo the caller may see, and a photo in no album nobody sees.
+     */
+    public function showInTestAlbum(array $image): int
+    {
+        $album = $this->createTestAlbum('Photoedit album ' . bin2hex(random_bytes(4)));
+        $this->attachImage((int)$image['id'], $album);
+        $this->invalidateUserCache();
+
+        return $album;
+    }
+
     /** Puts one photo in one album, asserting the link took effect. */
     public function attachImage(int $imageId, int $catId): void
     {
@@ -418,6 +431,33 @@ class FixtureBuilder
         {
             throw new RuntimeException("photo $imageId was not linked to album $catId");
         }
+    }
+
+    /** Makes one of this suite's albums private, granted to nobody. */
+    public function makeAlbumPrivate(int $albumId): void
+    {
+        $this->db->query("UPDATE `piwigo_categories` SET status = 'private' WHERE id = $albumId");
+        $this->db->query("DELETE FROM `piwigo_user_access` WHERE cat_id = $albumId");
+        $this->db->query("DELETE FROM `piwigo_group_access` WHERE cat_id = $albumId");
+        $this->invalidateUserCache();
+        if ($this->db->scalar("SELECT status FROM `piwigo_categories` WHERE id = $albumId") !== 'private')
+        {
+            throw new RuntimeException("album $albumId did not become private");
+        }
+    }
+
+    /** Grants one account a private album of this suite's. */
+    public function grantAlbumTo(int $albumId, string $username): void
+    {
+        $userId = (int)$this->db->scalar(
+            "SELECT id FROM `piwigo_users` WHERE username = '" . $this->db->escape($username) . "'"
+        );
+        if ($userId <= 0)
+        {
+            throw new RuntimeException("no account named $username");
+        }
+        $this->db->query("INSERT IGNORE INTO `piwigo_user_access` (user_id, cat_id) VALUES ($userId, $albumId)");
+        $this->invalidateUserCache();
     }
 
     /**
@@ -570,6 +610,7 @@ class FixtureBuilder
         foreach ($this->testAlbums as $id)
         {
             $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_user_access` WHERE cat_id = ' . (int)$id);
             $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
         }
         $this->testAlbums = array();

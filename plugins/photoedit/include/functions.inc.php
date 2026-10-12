@@ -19,6 +19,9 @@ define('PHOTOEDIT_MIN_CROP_PX', 16);
 /** JPEG quality for a re-encode when the source's own cannot be read. */
 define('PHOTOEDIT_DEFAULT_JPEG_QUALITY', 95);
 
+/** The answer for a photo that is missing or that the caller may not see: the two are not told apart. */
+define('PHOTOEDIT_NOT_FOUND_MESSAGE', 'No photo with this id');
+
 /**
  * Checks the edit a request asks for.
  *

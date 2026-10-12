@@ -58,6 +58,7 @@ final class ExclusionTest extends TestCase
         $this->fixture->assertPluginActive('provenance');
 
         $this->image = $this->fixture->createMarkedImage();
+        $this->fixture->showInTestAlbum($this->image);
     }
 
     protected function tearDown(): void
@@ -67,6 +68,7 @@ final class ExclusionTest extends TestCase
             @unlink($this->marker);
         }
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
     }
 
     /** The row fields the handlers read. */
