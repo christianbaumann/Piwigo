@@ -507,33 +507,6 @@ final class WriteBackTest extends TestCase
 
     // ── the gate ──────────────────────────────────────────────────────────
 
-    /** [NEG] A guest is refused. */
-    public function testAGuestIsRefused(): void
-    {
-        $this->ws->logout();
-        $res = $this->ws->call(self::METHOD, array(
-            'image_ids' => (string)$this->image['id'],
-            'pwg_token' => 'whatever',
-        ));
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertSame(401, $res['json']['err']);
-    }
-
-    /** [NEG] An authenticated non-admin is refused by the method's own gate. */
-    public function testANonAdminIsRefused(): void
-    {
-        $this->ws->logout();
-        $this->ws->login(Config::normalUsername(), Config::normalPassword());
-
-        $res = $this->ws->call(self::METHOD, array(
-            'image_ids' => (string)$this->image['id'],
-            'pwg_token' => $this->ws->token(),
-        ));
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-    }
-
     /** [NEG] A wrong CSRF token is refused. */
     public function testABadTokenIsRefused(): void
     {

@@ -318,38 +318,6 @@ final class ApplyTest extends TestCase
 
     // ── the guards ────────────────────────────────────────────────────────
 
-    /** [NEG] A guest cannot apply. */
-    public function testGuestIsRefused(): void
-    {
-        $guest = new WsClient();
-        $res = $guest->call(self::METHOD, array(
-            'cat_id' => $this->catId,
-            'image_ids' => implode(',', $this->chunk()),
-            'pwg_token' => 'irrelevant',
-        ));
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertSame(401, $res['json']['err']);
-        $this->assertNull($this->fixture->readImageProvenance($this->photoIds[0])['provenance_owner']);
-    }
-
-    /** [NEG] An authenticated non-admin is refused too - the only proof the admin gate exists. */
-    public function testAuthenticatedNonAdminIsRefused(): void
-    {
-        $normal = new WsClient();
-        $normal->login(Config::normalUsername(), Config::normalPassword());
-
-        $res = $normal->call(self::METHOD, array(
-            'cat_id' => $this->catId,
-            'image_ids' => implode(',', $this->chunk()),
-            'pwg_token' => $normal->token(),
-        ));
-        $normal->logout();
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertNull($this->fixture->readImageProvenance($this->photoIds[0])['provenance_owner']);
-    }
-
     /** [NEG] A wrong CSRF token is refused with 403. */
     public function testBadTokenIsRefused(): void
     {

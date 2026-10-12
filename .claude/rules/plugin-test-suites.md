@@ -39,7 +39,7 @@ No plugin's suite takes a human's login. Each creates its own accounts with gene
 ddev exec php plugins/typetags/tests/Support/create-test-users.php
 ```
 
-That writes the git-ignored `local/config/typetags-test.env` and creates `typetags_webmaster` and `typetags_normal`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `git submodule update --init --recursive` **first** - `plugins/typetags` is a submodule, so a plain clone leaves that directory empty and every typetags command fails on a missing `composer.json` (measured 2026-08-31 against a real clone). Then `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'`, and the same two for `plugins/provenance`, `plugins/persons`, `plugins/photoedit` and `plugins/photoinfo` (none is a submodule, so all four arrive with the clone). Dependency and run output (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by each plugin's own `.gitignore`.
+That writes the git-ignored `local/config/typetags-test.env` and creates four accounts: `typetags_webmaster`, `typetags_admin` (an administrator who is not a webmaster, level 8), `typetags_normal` and `typetags_generic` (core's `generic` status, which passes `ACCESS_GUEST` only). The script asserts each account's status and level. An install set up before 2026-10-12 must re-run it, or `Config::account()` and `auth.setup.js` fail naming the missing `TYPETAGS_TEST_ADMIN_*` / `TYPETAGS_TEST_GENERIC_*`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `git submodule update --init --recursive` **first** - `plugins/typetags` is a submodule, so a plain clone leaves that directory empty and every typetags command fails on a missing `composer.json` (measured 2026-08-31 against a real clone). Then `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'`, and the same two for `plugins/provenance`, `plugins/persons`, `plugins/photoedit` and `plugins/photoinfo` (none is a submodule, so all four arrive with the clone). Dependency and run output (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by each plugin's own `.gitignore`.
 
 typetags' fixtures never tag a real photo: with photoinfo active every tag change rewrites the
 photo's file. `FixtureBuilder::testImageId()` copies the first gallery PNG into
@@ -52,6 +52,23 @@ read-only group page (`index.php?/taggroups`), which lists only tags on photos t
 allowance with `seedTypedTagCreations()`, which writes `piwigo_activity` rows under a marker
 `session_idx` that `restore()` deletes. `seed.php --track-tag=<name>` records a tag a spec created
 through the picture page's field, so `--restore` deletes it as well.
+
+`tests/Integration/RoleMatrixTest.php` is the executable role matrix of typetags: one row per function
+(`typetags.badges`, `assign-remove`, `type-new-tag`, `write-warning`, `groups`, `admin-chips`) and role
+(guest, generic, normal, admin, webmaster), 30 rows, each asserting the level the matrix of change
+`2026-10-12-role-test-coverage` gives that role. A probe requests the function's page(s) and calls its
+ws methods as the role and reports `none`, `see`, `edit` or `INCONSISTENT` (a part whose checks
+disagree, e.g. a refused call that changed the database). Each role logs in once per run.
+`write-warning` forces photoinfo's tag write to fail with a read-only file
+(`FixtureBuilder::makeTestImageReadOnly()`) and needs photoinfo active; it fails naming it otherwise.
+The guard case `testEveryPluginMethodHasAMatrixRow` lists the `typetags.` methods through
+`reflection.getMethodList` (at least 7, measured 2026-10-12) and fails naming any method no row declares.
+`VisibilityTest` runs its private / granted cases once per logged-in role; the public case is the matrix's.
+The E2E `roles.spec.js` runs `assign-remove` (the + badge and the x) and the `write-warning` display once
+per role, with the sessions `auth.setup.js` saves for all four accounts (`auth.json`, `auth-admin.json`,
+`auth-normal.json`, `auth-generic.json`) and an empty one for the guest. `seed.php --read-only` makes the
+throwaway photo's file read-only for it. `normal-account.spec.js` is gone; its case is the normal row of
+`roles.spec.js`.
 
 The provenance suite does not take a human's login. It creates its own accounts — see
 *Test accounts* in `.claude/rules/testing.md`:
@@ -72,9 +89,30 @@ ddev exec bash -c 'set -a; . local/config/provenance-test.env; set +a; \
 All five plugins share one pinned browser cache: `PLAYWRIGHT_BROWSERS_PATH` in `.ddev/config.yaml`
 points at `plugins/typetags/.playwright-browsers`, so a fresh clone installs browsers once.
 
-That script writes the git-ignored `local/config/provenance-test.env` and creates
-`provenance_webmaster` and `provenance_normal`. It writes users directly and is never safe
-against a production database.
+That script writes the git-ignored `local/config/provenance-test.env` and creates four accounts:
+`provenance_webmaster`, `provenance_admin` (an administrator who is not a webmaster, level 8),
+`provenance_normal` and `provenance_generic` (core's `generic` status), and asserts each status.
+An install set up before 2026-10-12 must re-run it, or `Config` fails naming the missing
+`PROVENANCE_TEST_ADMIN_*` / `PROVENANCE_TEST_GENERIC_*`. `auth.setup.js` saves a session for each
+(`auth.json`, `auth-admin.json`, `auth-normal.json`, `auth-generic.json`). It writes users directly
+and is never safe against a production database.
+
+`tests/Integration/RoleMatrixTest.php` is provenance's executable role matrix (decision 0066): one
+row per function (`provenance.public-row`, `album`, `apply`, `writeback`, `photo-note`,
+`move-prompt`, `inherit`, `history`) and role (guest, generic, normal, admin, webmaster), 40 rows,
+each asserting the level the matrix of change `2026-10-12-role-test-coverage` gives that role. A
+probe per function requests the function's own pages (the read-only page, the album page's link,
+`admin.php?page=album|photo&...&tab=properties`, the Batch Manager) and calls its ws method as the
+role, and reports `none`, `see`, `see*` (seen only on the read-only page, decision 0064), `edit`
+or `INCONSISTENT: <what was seen>` when the parts disagree (a control shown but the call refused,
+a refused call that changed the row). Each role logs in once per run. The `inherit` rows of guest,
+generic and normal empty a forced lounge with a page view as that role, like `InheritTest`'s lounge
+case, and expect keep with no history row (decision 0060); a killed run leaves `lounge_active` on.
+Core rows (task 02) go into the same `MATRIX` constant with a probe of their own. The guard case
+`testEveryPluginMethodIsDeclaredByAMatrixRow` lists the `pwg.provenance.` methods through
+`reflection.getMethodList` (at least 5, measured 2026-10-12) and fails naming any method no row
+declares. `FixtureBuilder::grantAlbumTo()` grants a private fixture album to one account, for
+`ReadOnlyPageTest`'s visibility cases; `destroyTestAlbums()` removes the grant with the album.
 
 **`plugins/provenance` is also where Piwigo *core* is characterized.** Core carries no suite of
 its own and this repository deliberately does not stand one up, so nine

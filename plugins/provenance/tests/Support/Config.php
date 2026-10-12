@@ -58,6 +58,28 @@ class Config
         return self::required(TestUsers::envVars('provenance_normal')[1]);
     }
 
+    /** An administrator who is not a webmaster (decision 0066). */
+    public static function adminUsername(): string
+    {
+        return self::required(TestUsers::envVars('provenance_admin')[0]);
+    }
+
+    public static function adminPassword(): string
+    {
+        return self::required(TestUsers::envVars('provenance_admin')[1]);
+    }
+
+    /** A logged-in account of status generic, which every !is_a_guest() gate admits. */
+    public static function genericUsername(): string
+    {
+        return self::required(TestUsers::envVars('provenance_generic')[0]);
+    }
+
+    public static function genericPassword(): string
+    {
+        return self::required(TestUsers::envVars('provenance_generic')[1]);
+    }
+
     private static function required(string $envVar): string
     {
         $value = getenv($envVar);

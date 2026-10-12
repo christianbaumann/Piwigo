@@ -252,44 +252,6 @@ final class HistoryTest extends TestCase
         $this->assertSame(WS_ERR_INVALID_PARAM, (int)$res['json']['err']);
     }
 
-    /** [NEG] An authenticated non-admin cannot read the trail. */
-    public function testNormalUserCannotReadTheHistory(): void
-    {
-        provenance_record_change(self::OBJECT, $this->objectId, 'provenance_owner', null, 'Anna', 'photo_edit');
-
-        $this->ws->logout();
-        $this->ws->login(Config::normalUsername(), Config::normalPassword());
-
-        $res = $this->ws->call('pwg.provenance.getHistory', array(
-            'object' => self::OBJECT,
-            'object_id' => $this->objectId,
-        ));
-
-        $this->ws->logout();
-        $this->ws->login(Config::username(), Config::password());
-
-        $this->assertSame('fail', $res['json']['stat'], 'Got: ' . $res['body']);
-        $this->assertSame(401, (int)$res['json']['err']);
-        $this->assertStringNotContainsString('Anna', $res['body'], 'the refusal must not leak the row it refused');
-    }
-
-    /** [NEG] Nor can a guest. */
-    public function testGuestCannotReadTheHistory(): void
-    {
-        provenance_record_change(self::OBJECT, $this->objectId, 'provenance_owner', null, 'Anna', 'photo_edit');
-
-        $this->ws->logout();
-        $res = $this->ws->call('pwg.provenance.getHistory', array(
-            'object' => self::OBJECT,
-            'object_id' => $this->objectId,
-        ));
-        $this->ws->login(Config::username(), Config::password());
-
-        $this->assertSame('fail', $res['json']['stat'], 'Got: ' . $res['body']);
-        $this->assertSame(401, (int)$res['json']['err']);
-        $this->assertStringNotContainsString('Anna', $res['body']);
-    }
-
     /**
      * [HAPPY] The enum the recorder validates against is the enum the column
      * accepts. A source in the shared list but missing from the column would be

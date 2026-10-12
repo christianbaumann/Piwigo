@@ -2,8 +2,9 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * The read-only provenance page, index.php?/provenance/album|photo/<id>, as the
- * normal test account and as a guest.
+ * The read-only provenance page, index.php?/provenance/album|photo/<id>, and how
+ * the visibility of an album combines with the role. Which role sees the page at
+ * all is a RoleMatrixTest row.
  *
  * Page source only. That the picture page's link opens it in a browser is
  * provenance-page.spec.js.
@@ -150,6 +151,70 @@ final class ReadOnlyPageTest extends TestCase
         $this->assertStringNotContainsString(htmlspecialchars(self::PHOTO_NOTE), (string)$photo['body']);
     }
 
+    /** [BVA] A private album granted to the normal account, and its photo, are found. */
+    public function testAPrivateAlbumGrantedToTheAccountIsFound(): void
+    {
+        $this->fixture->makeAlbumPrivate($this->catId);
+        $this->fixture->grantAlbumTo($this->catId, 'provenance_normal');
+
+        $album = $this->pageContent($this->normal->fetchPage('/index.php?/provenance/album/' . $this->catId));
+        $photo = $this->pageContent($this->normal->fetchPage('/index.php?/provenance/photo/' . $this->imageId));
+
+        $this->assertStringContainsString(htmlspecialchars(self::ALBUM_VALUES['owner']), $album);
+        $this->assertStringContainsString(htmlspecialchars(self::PHOTO_NOTE), $photo);
+    }
+
+    /** [BVA] [ECP] A generic account is refused a private album without a grant, like a normal one. */
+    public function testAPrivateAlbumIsNotFoundForAGenericAccount(): void
+    {
+        $generic = $this->loggedIn(Config::genericUsername(), Config::genericPassword());
+        // Public first, so the 404 below is the permission, not a broken page.
+        $this->assertSame(200, $generic->fetchPage('/index.php?/provenance/album/' . $this->catId)['http_code']);
+
+        $this->fixture->makeAlbumPrivate($this->catId);
+
+        $this->assertSame(404, $generic->fetchPage('/index.php?/provenance/album/' . $this->catId)['http_code']);
+        $this->assertSame(404, $generic->fetchPage('/index.php?/provenance/photo/' . $this->imageId)['http_code']);
+        $generic->logout();
+    }
+
+    /**
+     * [BVA] An administrator is refused a private album without a grant as well:
+     * core forbids an ungranted private album to every status on gallery pages,
+     * and the page asks only what the account can see (decision 0064).
+     */
+    public function testAPrivateAlbumIsNotFoundForAnAdministratorEither(): void
+    {
+        $admin = $this->loggedIn(Config::adminUsername(), Config::adminPassword());
+        $this->assertSame(200, $admin->fetchPage('/index.php?/provenance/album/' . $this->catId)['http_code']);
+
+        $this->fixture->makeAlbumPrivate($this->catId);
+
+        $this->assertSame(404, $admin->fetchPage('/index.php?/provenance/album/' . $this->catId)['http_code']);
+        $this->assertSame(404, $admin->fetchPage('/index.php?/provenance/photo/' . $this->imageId)['http_code']);
+        $admin->logout();
+    }
+
+    /**
+     * [BVA] The server detail of a failed write reaches an administrator who is not
+     * the webmaster: the gate is is_admin(), not is_webmaster().
+     */
+    public function testAFileErrorShowsTheServerDetailToAnAdministrator(): void
+    {
+        $message = 'Error opening file - /var/www/html/galleries/private/scan-0002.jpg';
+        $this->db->query(sprintf(
+            "INSERT INTO %s (object, object_id, field, old_value, new_value, source) VALUES ('photo', %d, 'file_error', NULL, '%s', 'writeback')",
+            self::HISTORY_TABLE, $this->imageId, $message
+        ));
+        $admin = $this->loggedIn(Config::adminUsername(), Config::adminPassword());
+
+        $page = $this->pageContent($admin->fetchPage('/index.php?/provenance/photo/' . $this->imageId));
+        $admin->logout();
+
+        $this->assertSame(count(self::ALBUM_VALUES) + 2, $this->historyRowCount($page));
+        $this->assertStringContainsString($message, $page);
+    }
+
     /** [NEG] An id that names nothing, and an unknown object, are not found. */
     public function testUnknownObjectsAreNotFound(): void
     {
@@ -157,15 +222,6 @@ final class ReadOnlyPageTest extends TestCase
 
         $this->assertSame(404, $this->normal->fetchPage('/index.php?/provenance/album/' . $missing)['http_code']);
         $this->assertSame(404, $this->normal->fetchPage('/index.php?/provenance/tag/' . $this->catId)['http_code']);
-    }
-
-    /** [NEG] A guest is sent to the login page. */
-    public function testAGuestIsSentToTheLoginPage(): void
-    {
-        $res = $this->normal->fetchPage('/index.php?/provenance/album/' . $this->catId, false);
-
-        $this->assertStringContainsString('identification.php', (string)$res['url']);
-        $this->assertStringNotContainsString(htmlspecialchars(self::ALBUM_VALUES['owner']), (string)$res['body']);
     }
 
     /** [HAPPY] The album page links to the album's provenance page. */
@@ -178,6 +234,13 @@ final class ReadOnlyPageTest extends TestCase
             '#id="provenancePageLink" href="[^"]*index\.php\?/provenance/album/' . $this->catId . '"#',
             (string)$res['body']
         );
+    }
+
+    private function loggedIn(string $username, string $password): WsClient
+    {
+        $client = new WsClient();
+        $client->login($username, $password);
+        return $client;
     }
 
     private function assertOk(array $res): void

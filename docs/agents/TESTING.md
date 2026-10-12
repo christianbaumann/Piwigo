@@ -1255,6 +1255,72 @@ behind it that refuses the same roles with the same answer (the handlers' `is_we
 401; core's `admin.php`/`admin/plugin.php` access check). Flipping one alone turns nothing red.
 Recorded as a finding, not a gap to close: a test cannot tell two equal refusals apart.
 
+### provenance
+
+Each flip applied inside the web container under `/tmp/pwg-suite.lock`, 3 s wait (opcache), the whole
+provenance integration suite run (296 tests), file restored from a backup, host `git diff` empty
+afterwards. Pattern checked to occur on exactly that line before each flip. Matrix rows are
+`RoleMatrixTest::testTheRoleGetsItsLevel` data sets.
+
+| Date | Gate (file:line) | Flip | Expected red rows | Result |
+|---|---|---|---|---|
+| 2026-10-12 | `plugins/provenance/main.inc.php:114` (`pwg.provenance.getHistory`) | `'admin_only' => true` → `false` | `provenance.history` as generic, as normal (`see*` becomes `see`) | exactly those 2 red, 294 green |
+| 2026-10-12 | `main.inc.php:130` (`setAlbumInfo`) | `admin_only` → `false` | `provenance.album` as generic, as normal (call accepted, control absent: INCONSISTENT) | exactly those 2 red |
+| 2026-10-12 | `main.inc.php:143` (`applyToPhotos`) | `admin_only` → `false` | `provenance.apply` as generic, as normal | exactly those 2 red |
+| 2026-10-12 | `main.inc.php:156` (`setPhotoInfo`) | `admin_only` → `false` | `provenance.photo-note` as generic, as normal | exactly those 2 red |
+| 2026-10-12 | `main.inc.php:168` (`writeBack`) | `admin_only` → `false` | `provenance.writeback` as generic, as normal | exactly those 2 red |
+| 2026-10-12 | `include/ws_functions.inc.php:74,182,307,366` (guest checks in the four write handlers) | `if (is_a_guest())` → `if (false)`, all four at once | none: shadowed by `admin_only` and core's guest lockout (0055); defence in depth, no row can reach it | none red, 296 green |
+| 2026-10-12 | `include/events_page.inc.php:29` (read-only page) | `if (is_a_guest())` → `if (!is_classic_user())` | `album`, `photo-note`, `history` as generic; `ReadOnlyPageTest::testAPrivateAlbumIsNotFoundForAGenericAccount` | exactly those 4 red |
+| 2026-10-12 | `include/events_page.inc.php:211` (file-error detail) | `!is_admin()` → `!is_webmaster()` | `ReadOnlyPageTest::testAFileErrorShowsTheServerDetailToAnAdministrator` | exactly that 1 red |
+| 2026-10-12 | `include/events_page.inc.php:242` (album page link) | `!is_a_guest()` → `is_classic_user()` | `provenance.album` as generic | exactly that 1 red |
+| 2026-10-12 | `include/functions.inc.php:185` (`provenance_inherit_policy()`) | `if (!isset($user['id']))` → `if (false)` | `provenance.inherit` as guest, generic, normal; `InheritTest::testAPageViewThatEmptiesTheLoungeOnlyFillsPhotosWithoutProvenance` (replace, clear) | exactly those 5 red |
+| 2026-10-12 | guard: `pwg.provenance.flipDummy` registered in `provenance_add_methods()` | added | `RoleMatrixTest::testEveryPluginMethodIsDeclaredByAMatrixRow`, naming the method | red, names `pwg.provenance.flipDummy` |
+
+Core `admin.php:27` is task 02's flip and was not run here.
+
+### typetags
+
+Each flip ran the whole typetags integration suite (155 tests), under the suite lock, opcache wait 3 s.
+Expected red = the matrix rows the gate decides plus the `VisibilityTest` rows of the same role. `RoleMatrixTest`
+rows are named `<function> as <role>`.
+
+| Date | Gate (file:line) | Flip | Expected red rows | Result |
+|---|---|---|---|---|
+| 2026-10-12 | `plugins/typetags/main.inc.php:85` (`typetags.tags.setType`) | `admin_only` removed | `groups` as generic, normal | killed: exactly those 2 |
+| 2026-10-12 | `plugins/typetags/main.inc.php:99` (`typetags.type.add`) | `admin_only` removed | `groups` as generic, normal | killed: those 2; also `SchemaUpgradeTest` errored ("Row size too large", unrelated: instant DROP COLUMN history, fixed in the test with `ALGORITHM=COPY`) |
+| 2026-10-12 | `plugins/typetags/main.inc.php:108` (`typetags.type.list`) | `admin_only` removed | `groups` as generic, normal | killed: exactly those 2 |
+| 2026-10-12 | `plugins/typetags/main.inc.php:123` (`typetags.type.update`) | `admin_only` removed | `groups` as generic, normal | killed: exactly those 2 |
+| 2026-10-12 | `plugins/typetags/main.inc.php:329` (addTag guest check) | `is_a_guest()` -> `!is_classic_user()` | `assign-remove`, `write-warning` as generic; `VisibilityTest` addTag private + granted, generic | killed: exactly those 4 |
+| 2026-10-12 | `plugins/typetags/main.inc.php:384` (addNewTag guest check) | `is_a_guest()` -> `!is_classic_user()` | `type-new-tag` as generic; `VisibilityTest` addNewTag private + granted, generic | killed: exactly those 3 |
+| 2026-10-12 | `plugins/typetags/main.inc.php:566` (removeTag guest check) | `is_a_guest()` -> `!is_classic_user()` | `assign-remove` as generic; `VisibilityTest` removeTag private + granted, generic | killed: exactly those 3 |
+| 2026-10-12 | `plugins/typetags/main.inc.php:513` (`typetags_image_visible()`) | returns `true` | `VisibilityTest` private cases, all 4 roles x 3 methods; the nonexistent-image cases of AddTag/AddNewTag | killed: those 12 + 3; no matrix row (its photo is public) |
+| 2026-10-12 | `plugins/typetags/include/events_public.inc.php:140` (picture page UI) | `is_a_guest()` -> `!is_classic_user()` | `assign-remove`, `type-new-tag`, `write-warning` as generic | first run also killed `badges` as generic: its marker was the `data-tag-id` the UI prefilter adds; the probe now matches the painted badge itself. Re-run: killed exactly those 3 |
+| 2026-10-12 | `plugins/typetags/include/taggroups.inc.php:22` (read-only group page) | `is_a_guest()` -> `is_classic_user()` gate | `groups` as generic | killed: exactly that 1 |
+
+Not flipped, and why:
+- `typetags.badges` has no gate of its own: `render_tag_name` paints for anyone who reaches a page; the guest row
+  rests on core's page lockout (decision 0055).
+- `typetags.admin-chips` and the admin half of `groups` sit behind core's `admin.php:27` (task 02's flip).
+- Removing a plugin guest check outright was not flipped: core's `ws_isInvokeAllowed()` refuses a guest every
+  non-session method first (decision 0055), so no guest row could go red (reasoned, not run). The flips above
+  replace the check with `!is_classic_user()` instead, which the generic rows witness.
+
+### Shared-install findings from the parallel runs
+
+- Fixture albums pushed `piwigo_categories`' AUTO_INCREMENT past 32767 (33271 measured). Core's
+  `piwigo_history.category_id` is a **signed** `smallint(5)` (`install/piwigo_structure-mysql.sql:148`),
+  so every page view of a newer album died in `pwg_log()` with "Out of range value for column
+  'category_id'" and turned unrelated rows red. Reset under the suite lock with
+  `ALTER TABLE piwigo_categories AUTO_INCREMENT = 1` (MariaDB takes max(id)+1). It comes back after
+  about 32k more fixture albums; it was 7364 again at the end of the day.
+- A flip script that backed up to a fixed `/tmp/flip-backup` in the container shared that name with
+  another agent's script. The backup vanished, the restore failed, and `typetags.type.list` ran without
+  `admin_only` for about 20-30 minutes while other suites ran. It was reverted and both affected flips
+  were re-run. A flip script's backup name must be unique to it, with an EXIT trap restoring the file.
+- `plugins/typetags/tests/e2e/normal-account.spec.js`, named above as the killer of the `is_admin()`
+  mutant on `ws_typetags_image_addTag()`, is deleted. Its successor is the normal row of typetags'
+  `roles.spec.js` and the `assign-remove as normal` row of its `RoleMatrixTest`.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,

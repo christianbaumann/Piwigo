@@ -158,43 +158,6 @@ final class SetAlbumInfoTest extends TestCase
 
     // ── the guards ────────────────────────────────────────────────────────
 
-    /** [NEG] A guest cannot save. */
-    public function testGuestIsRefused(): void
-    {
-        $guest = new WsClient();
-        $res = $guest->call(self::METHOD, array(
-            'cat_id' => $this->catId,
-            'physical_album' => 'sneaked in',
-            'pwg_token' => 'irrelevant',
-        ));
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertSame(401, $res['json']['err']);
-        $this->assertNull($this->album()['provenance_physical_album']);
-    }
-
-    /**
-     * [NEG] An authenticated non-admin cannot save either.
-     *
-     * The admin gate is only proven by an account that is logged in and still
-     * refused; the guest case alone would pass on a method with no gate at all.
-     */
-    public function testAuthenticatedNonAdminIsRefused(): void
-    {
-        $normal = new WsClient();
-        $normal->login(Config::normalUsername(), Config::normalPassword());
-
-        $res = $normal->call(self::METHOD, array(
-            'cat_id' => $this->catId,
-            'physical_album' => 'sneaked in',
-            'pwg_token' => $normal->token(),
-        ));
-        $normal->logout();
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertNull($this->album()['provenance_physical_album']);
-    }
-
     /** [NEG] A wrong CSRF token is refused with 403. */
     public function testBadTokenIsRefused(): void
     {

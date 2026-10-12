@@ -75,7 +75,7 @@ foreach (TestUsers::ROLES as $username => $status)
         $db->query("UPDATE piwigo_users SET password = '" . $db->escape($hash) . "' WHERE id = $userId");
     }
 
-    $level = $status === 'webmaster' ? 8 : 0;
+    $level = in_array($status, array('webmaster', 'admin'), true) ? 8 : 0;
 
     $hasInfos = $db->scalar("SELECT user_id FROM piwigo_user_infos WHERE user_id = $userId");
     if ($hasInfos === null)

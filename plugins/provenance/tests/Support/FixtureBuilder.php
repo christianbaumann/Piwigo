@@ -492,6 +492,28 @@ class FixtureBuilder
     }
 
     /**
+     * Grants one account access to a private album of this suite's. The row goes
+     * with the album: destroyTestAlbums() deletes the album's user_access rows.
+     */
+    public function grantAlbumTo(int $albumId, string $username): void
+    {
+        $userId = (int)$this->db->scalar(
+            "SELECT id FROM `piwigo_users` WHERE username = '" . $this->db->escape($username) . "'"
+        );
+        if ($userId <= 0)
+        {
+            throw new RuntimeException("no account $username to grant album $albumId to");
+        }
+
+        $this->db->query("INSERT IGNORE INTO `piwigo_user_access` (user_id, cat_id) VALUES ($userId, $albumId)");
+        $this->invalidateUserCache();
+        if ((int)$this->db->scalar("SELECT COUNT(*) FROM `piwigo_user_access` WHERE user_id = $userId AND cat_id = $albumId") !== 1)
+        {
+            throw new RuntimeException("album $albumId was not granted to $username");
+        }
+    }
+
+    /**
      * Discards every user's cached permission summary, so an album changed after
      * it was computed is seen as it now is. Core rebuilds the rows on the next
      * request.
@@ -637,6 +659,7 @@ class FixtureBuilder
         foreach ($this->testAlbums as $id)
         {
             $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_user_access` WHERE cat_id = ' . (int)$id);
             $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
         }
         $this->testAlbums = array();

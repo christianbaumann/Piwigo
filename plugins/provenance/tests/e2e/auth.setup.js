@@ -5,6 +5,8 @@ const path = require('path');
 
 const AUTH_FILE = path.join(__dirname, '.state', 'auth.json');
 const NORMAL_AUTH_FILE = path.join(__dirname, '.state', 'auth-normal.json');
+const ADMIN_AUTH_FILE = path.join(__dirname, '.state', 'auth-admin.json');
+const GENERIC_AUTH_FILE = path.join(__dirname, '.state', 'auth-generic.json');
 
 /**
  * Logs in once as the plugin's own webmaster account and saves the session.
@@ -68,4 +70,44 @@ setup('authenticate as a normal account', async ({ page }) => {
 
   fs.mkdirSync(path.dirname(NORMAL_AUTH_FILE), { recursive: true });
   await page.context().storageState({ path: NORMAL_AUTH_FILE });
+});
+
+/**
+ * Logs in as one more of the plugin's accounts and saves the session to `file`.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} role the env var infix, e.g. ADMIN for PROVENANCE_TEST_ADMIN_*
+ * @param {string} file
+ */
+async function saveSession(page, role, file) {
+  const username = process.env[`PROVENANCE_TEST_${role}_USERNAME`];
+  const password = process.env[`PROVENANCE_TEST_${role}_PASSWORD`];
+
+  if (!username || !password) {
+    throw new Error(
+      `Missing PROVENANCE_TEST_${role}_USERNAME / PROVENANCE_TEST_${role}_PASSWORD. ` +
+        'Run `ddev exec php plugins/provenance/tests/Support/create-test-users.php`, then source ' +
+        'local/config/provenance-test.env before running the E2E suite.'
+    );
+  }
+
+  await page.goto('/identification.php');
+  await page.fill('input[name="username"]', username);
+  await page.fill('input[name="password"]', password);
+  await page.click('input[name="login"]');
+
+  await expect(page.locator('input[name="username"]')).toHaveCount(0);
+
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  await page.context().storageState({ path: file });
+}
+
+/** An administrator who is not a webmaster (decision 0066). */
+setup('authenticate as an administrator', async ({ page }) => {
+  await saveSession(page, 'ADMIN', ADMIN_AUTH_FILE);
+});
+
+/** A generic account, which every gate admitting all logged-in accounts must admit. */
+setup('authenticate as a generic account', async ({ page }) => {
+  await saveSession(page, 'GENERIC', GENERIC_AUTH_FILE);
 });
