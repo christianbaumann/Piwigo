@@ -40,6 +40,9 @@ final class InheritTest extends TestCase
     private FixtureBuilder $fixture;
     private int $baselineHistoryId;
 
+    /** lounge_active as found, when a case forced it; restored in tearDown. */
+    private ?string $originalLoungeActive = null;
+
     protected function setUp(): void
     {
         $this->db = new Db();
@@ -55,6 +58,9 @@ final class InheritTest extends TestCase
     protected function tearDown(): void
     {
         $this->fixture->destroyTestImages();
+        // A failed lounge case can leave its photos waiting; their rows are gone now.
+        $this->db->query('DELETE FROM piwigo_lounge WHERE image_id NOT IN (SELECT id FROM piwigo_images)');
+        $this->restoreLounge();
         $this->fixture->destroyTestAlbums();
         $this->fixture->destroyPhysicalAlbums();
         $this->fixture->restore();
@@ -353,7 +359,166 @@ final class InheritTest extends TestCase
         );
     }
 
+    /**
+     * [NEG] [ST] A page view that empties the lounge runs in keep (decision 0060).
+     *
+     * check_lounge() releases a lounge older than lounge_max_duration on any
+     * request, before $user is loaded. The mode the request carries is ignored:
+     * the photo that already has provenance keeps it, the fresh one is filled,
+     * and no history row is written for either.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('destructiveModes')]
+    public function testAPageViewThatEmptiesTheLoungeOnlyFillsPhotosWithoutProvenance(string $mode): void
+    {
+        $this->forceLounge();
+        $album = $this->fixture->createTestAlbum('provenance-inherit-lounge-page');
+        $this->fixture->albumProvenance($album, self::ALBUM);
+
+        $fresh = $this->upload($album);
+        // A second upload of the same bytes would return the same photo, so the
+        // second one is put into the lounge the way core's upload puts it there.
+        $carrying = $this->fixture->createTestImage()['id'];
+        $this->db->query("INSERT INTO piwigo_lounge (image_id, category_id) VALUES ($carrying, $album)");
+        $own = array(
+            'provenance_physical_album' => self::SECOND_ALBUM['provenance_physical_album'],
+            'provenance_owner' => self::SECOND_ALBUM['provenance_owner'],
+            'provenance_scanned_on' => self::SECOND_ALBUM['provenance_scanned_on'],
+            'provenance_album_note' => self::SECOND_ALBUM['provenance_note'],
+            );
+        $this->fixture->imageProvenance($carrying, $own);
+
+        $this->assertSame(
+            array($fresh, $carrying),
+            $this->loungeImageIds(),
+            'precondition: the lounge holds exactly this case\'s two photos, so the oldest one decides'
+        );
+
+        // Older than lounge_max_duration (core default 5 minutes, not overridden locally).
+        $this->db->query(
+            "UPDATE piwigo_images SET date_available = NOW() - INTERVAL 1 DAY WHERE id IN ($fresh, $carrying)"
+        );
+
+        $res = $this->ws->postPage('/index.php', array(PROVENANCE_MOVE_MODE_PARAM => $mode));
+        $this->assertSame(200, $res['http_code'], 'the gallery page did not answer');
+
+        $this->assertSame(array(), $this->loungeImageIds(), 'anti-vacuity: the page view must have emptied the lounge');
+
+        $filled = $this->fixture->readImageProvenance($fresh);
+        $this->assertSame(self::ALBUM['provenance_physical_album'], $filled['provenance_physical_album']);
+        $this->assertSame(self::ALBUM['provenance_owner'], $filled['provenance_owner']);
+        $this->assertSame(self::ALBUM['provenance_scanned_on'], $filled['provenance_scanned_on']);
+        $this->assertSame(self::ALBUM['provenance_note'], $filled['provenance_album_note']);
+
+        $kept = $this->fixture->readImageProvenance($carrying);
+        foreach ($own as $column => $value)
+        {
+            $this->assertSame($value, $kept[$column], "the photo's own $column survives a requested $mode");
+        }
+
+        $this->assertSame(
+            0,
+            (int)$this->db->scalar(
+                'SELECT COUNT(*) FROM ' . self::HISTORY_TABLE .
+                " WHERE id > {$this->baselineHistoryId} AND object = 'photo' AND object_id IN ($fresh, $carrying)"
+            ),
+            'a page view writes no history row'
+        );
+    }
+
+    public static function destructiveModes(): array
+    {
+        return array(
+            'replace' => array(PROVENANCE_MODE_REPLACE),
+            'clear' => array(PROVENANCE_MODE_CLEAR),
+            );
+    }
+
+    /**
+     * [HAPPY] The admin's own emptying, at the end of an upload, still writes
+     * history attributed to them: $user is loaded by then (decision 0060).
+     */
+    public function testUploadCompletedStillRecordsTheInheritanceAgainstTheAdministrator(): void
+    {
+        $this->forceLounge();
+        $album = $this->fixture->createTestAlbum('provenance-inherit-lounge-admin');
+        $this->fixture->albumProvenance($album, self::ALBUM);
+
+        $id = $this->upload($album);
+        $this->assertSame(array($id), $this->loungeImageIds(), 'precondition: the upload waits in the lounge');
+
+        $this->uploadCompleted($id, $album);
+
+        $this->assertSame(self::ALBUM['provenance_owner'], $this->fixture->readImageProvenance($id)['provenance_owner']);
+        $this->assertSame(
+            array('provenance_album_note', 'provenance_owner', 'provenance_physical_album', 'provenance_scanned_on'),
+            $this->newHistoryFields($id, 'inherit')
+        );
+
+        $adminId = (int)$this->db->scalar(
+            "SELECT id FROM piwigo_users WHERE username = '" . $this->db->escape(Config::username()) . "'"
+        );
+        $this->assertGreaterThan(0, $adminId);
+        $this->assertSame(
+            array((string)$adminId),
+            array_values(array_unique(array_column(
+                $this->db->query(
+                    'SELECT performed_by FROM ' . self::HISTORY_TABLE .
+                    " WHERE id > {$this->baselineHistoryId} AND object = 'photo' AND object_id = $id"
+                )->fetch_all(MYSQLI_ASSOC),
+                'performed_by'
+            ))),
+            'every row names the administrator who completed the upload'
+        );
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
+
+    /** Turns the lounge on for this case; tearDown puts the install's value back. */
+    private function forceLounge(): void
+    {
+        $found = $this->db->scalar("SELECT value FROM piwigo_config WHERE param = 'lounge_active'");
+        $this->originalLoungeActive = $found === null ? '' : (string)$found;
+
+        $this->db->query(
+            "INSERT INTO piwigo_config (param, value) VALUES ('lounge_active', 'true')" .
+            " ON DUPLICATE KEY UPDATE value = 'true'"
+        );
+        $this->assertSame('true', (string)$this->db->scalar("SELECT value FROM piwigo_config WHERE param = 'lounge_active'"));
+    }
+
+    private function restoreLounge(): void
+    {
+        if ($this->originalLoungeActive === null)
+        {
+            return;
+        }
+
+        if ($this->originalLoungeActive === '')
+        {
+            $this->db->query("DELETE FROM piwigo_config WHERE param = 'lounge_active'");
+        }
+        else
+        {
+            $this->db->query(
+                "UPDATE piwigo_config SET value = '" . $this->db->escape($this->originalLoungeActive) .
+                "' WHERE param = 'lounge_active'"
+            );
+        }
+        $this->originalLoungeActive = null;
+    }
+
+    /** @return int[] the photos waiting in the lounge, ascending */
+    private function loungeImageIds(): array
+    {
+        return array_map(
+            'intval',
+            array_column(
+                $this->db->query('SELECT image_id FROM piwigo_lounge ORDER BY image_id')->fetch_all(MYSQLI_ASSOC),
+                'image_id'
+            )
+        );
+    }
+
 
     /**
      * The arrangement every move case shares: a photo carrying the first

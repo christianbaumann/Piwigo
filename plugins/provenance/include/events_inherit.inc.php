@@ -74,10 +74,14 @@ function provenance_inherit_site_update($links)
  * an album that has none must not quietly erase what a photo already carries
  * from somewhere else. Clear is the mode that says to erase it, and says so.
  *
+ * A call that names no mode takes it from provenance_inherit_policy(): the
+ * request's choice, or keep without history rows when no user is loaded yet,
+ * which is a lounge emptied by a page view (decision 0060).
+ *
  * @param int $category_id
  * @param array $image_ids
- * @param string|null $mode one of provenance_move_modes(); read from the
- *        request when omitted
+ * @param string|null $mode one of provenance_move_modes(); decided by
+ *        provenance_inherit_policy() when omitted
  * @return int history rows written
  */
 function provenance_inherit_into($category_id, $image_ids, $mode = null)
@@ -99,9 +103,13 @@ function provenance_inherit_into($category_id, $image_ids, $mode = null)
     return 0;
   }
 
+  $history = true;
   if ($mode === null)
   {
-    $mode = provenance_resolve_mode($_POST, PROVENANCE_MOVE_MODE_PARAM, provenance_move_modes());
+    global $user;
+    $policy = provenance_inherit_policy($user, $_POST);
+    $mode = $policy['mode'];
+    $history = $policy['history'];
   }
 
   if ($mode == PROVENANCE_MODE_CLEAR)
@@ -109,7 +117,8 @@ function provenance_inherit_into($category_id, $image_ids, $mode = null)
     return provenance_write_inherited(
       $ids,
       array_fill_keys(array_values(provenance_copy_down_map()), ''),
-      PROVENANCE_HISTORY_SOURCE_MOVE
+      PROVENANCE_HISTORY_SOURCE_MOVE,
+      $history
       );
   }
 
@@ -151,7 +160,8 @@ SELECT '.implode(', ', array_keys(provenance_album_columns())).'
   return provenance_write_inherited(
     $ids,
     $values,
-    $mode == PROVENANCE_MODE_KEEP ? 'inherit' : PROVENANCE_HISTORY_SOURCE_MOVE
+    $mode == PROVENANCE_MODE_KEEP ? 'inherit' : PROVENANCE_HISTORY_SOURCE_MOVE,
+    $history
     );
 }
 
@@ -196,14 +206,16 @@ SELECT id
  * Writes one set of values onto a set of photos and records what changed.
  *
  * The single write path behind every mode, so a mode can change what is written
- * but never whether it is logged.
+ * but never whether it is logged. Only a lounge emptied by a page view writes
+ * without history rows (decision 0060).
  *
  * @param array $ids image id => image id
  * @param array $values image column => value ('' clears)
  * @param string $source history source
+ * @param bool $history false writes the values without history rows
  * @return int history rows written
  */
-function provenance_write_inherited($ids, $values, $source)
+function provenance_write_inherited($ids, $values, $source, $history = true)
 {
   // Read before the update, so the history rows say what really changed.
   $before = query2array('
@@ -232,6 +244,11 @@ SELECT id, '.implode(', ', array_keys($values)).'
     array('primary' => array('id'), 'update' => array_keys($values)),
     $datas
     );
+
+  if (!$history)
+  {
+    return 0;
+  }
 
   $changes = array();
   foreach ($ids as $image_id)

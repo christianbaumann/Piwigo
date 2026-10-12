@@ -168,6 +168,32 @@ function provenance_resolve_mode($request, $param, $allowed)
 }
 
 /**
+ * How an inheritance runs: its mode, and whether it writes history rows.
+ *
+ * Core empties a lounge that has waited too long from check_lounge(), which
+ * include/common.inc.php calls before include/user.inc.php loads $user. An
+ * inheritance arriving with no user loaded therefore came from a page view, any
+ * visitor's, not from an administrator's choice: it runs in keep whatever the
+ * request carries, and writes no history row (decision 0060).
+ *
+ * @param array $user the global $user as it stands
+ * @param array $request typically $_POST
+ * @return array mode (one of provenance_move_modes()), history (bool)
+ */
+function provenance_inherit_policy($user, $request)
+{
+  if (!isset($user['id']))
+  {
+    return array('mode' => PROVENANCE_MODE_KEEP, 'history' => false);
+  }
+
+  return array(
+    'mode'    => provenance_resolve_mode($request, PROVENANCE_MOVE_MODE_PARAM, provenance_move_modes()),
+    'history' => true,
+    );
+}
+
+/**
  * The photo columns an album operation writes: everything except the photo's own
  * note. Keyed album column => image column, because the album stores its free
  * text in provenance_note while the photo keeps that name for its own.

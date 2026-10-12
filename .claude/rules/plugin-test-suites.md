@@ -226,6 +226,11 @@ Two provenance E2E scenarios seed throwaway albums of their own rather than touc
 sidecars. `seed.php --read-photo=<id>` reads one photo's provenance columns back, for outcomes
 the browser cannot show.
 
+`InheritTest`'s lounge cases set the `lounge_active` config row to `true` and put the install's
+value back in `tearDown`; a run killed in between leaves the lounge on. One case backdates its own
+photos' `date_available` and POSTs to `index.php`, which empties the whole lounge, so it first
+asserts the lounge holds only its own photos.
+
 The photoedit suite works the same way:
 
 ```bash
