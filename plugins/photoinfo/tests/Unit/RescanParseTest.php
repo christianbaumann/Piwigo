@@ -151,6 +151,21 @@ final class RescanParseTest extends TestCase
         $this->assertSame(array('Feste|Kirmes', 'Häuser|Zug|Mehr'), $many['hierarchy']);
     }
 
+    /**
+     * [NEG] A keyword carries no HTML into a tag name: stripped as core's create_tag() does
+     * for a typed tag, and one that is only markup is no keyword. A file is outside input;
+     * the names end up unescaped in every badge.
+     */
+    public function testKeywordsLoseTheirMarkup(): void
+    {
+        $tags = photoinfo_parse_rescan_xml(self::exiftoolXml(
+            " <XMP-dc:Subject>\n  <rdf:Bag>\n   <rdf:li>&lt;img src=x onerror=alert(1)&gt;Anna</rdf:li>\n   <rdf:li>&lt;b&gt;&lt;/b&gt;</rdf:li>\n   <rdf:li>Bräuche &amp; Feste</rdf:li>\n  </rdf:Bag>\n </XMP-dc:Subject>\n"
+            . " <XMP-lr:HierarchicalSubject>&lt;i&gt;Feste&lt;/i&gt;|Kirmes</XMP-lr:HierarchicalSubject>\n"));
+
+        $this->assertSame(array('Anna', 'Bräuche & Feste'), $tags['subject']);
+        $this->assertSame(array('Feste|Kirmes'), $tags['hierarchy']);
+    }
+
     /** [ECP] The marker says the tags were written, even when there are none. */
     public function testTheMarkerIsReadPresentOrAbsent(): void
     {

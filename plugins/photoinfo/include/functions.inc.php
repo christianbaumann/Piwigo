@@ -389,8 +389,8 @@ function photoinfo_parse_rescan_xml($xml)
     $values[$key] = $value === '' ? null : $value;
   }
 
-  $values['subject'] = photoinfo_xml_list($document, PHOTOINFO_XMP_DC_URI, 'Subject');
-  $values['hierarchy'] = photoinfo_xml_list($document, PHOTOINFO_XMP_LR_URI, 'HierarchicalSubject');
+  $values['subject'] = photoinfo_keyword_names(photoinfo_xml_list($document, PHOTOINFO_XMP_DC_URI, 'Subject'));
+  $values['hierarchy'] = photoinfo_keyword_names(photoinfo_xml_list($document, PHOTOINFO_XMP_LR_URI, 'HierarchicalSubject'));
   $values['tags_marker'] = $document->getElementsByTagNameNS(PHOTOINFO_RDF_GROUP_URI, 'TagsWritten')->length > 0;
 
   return $values;
@@ -431,6 +431,27 @@ function photoinfo_xml_list($document, $namespace, $tag)
     $values[] = $item->textContent;
   }
   return $values;
+}
+
+/**
+ * A file's keywords as tag names: without markup, as core's create_tag() cleans
+ * a typed tag, and without the ones that were only markup.
+ *
+ * @param string[] $keywords
+ * @return string[]
+ */
+function photoinfo_keyword_names($keywords)
+{
+  $names = array();
+  foreach ($keywords as $keyword)
+  {
+    $name = strip_tags($keyword);
+    if (trim($name) !== '')
+    {
+      $names[] = $name;
+    }
+  }
+  return $names;
 }
 
 /**
