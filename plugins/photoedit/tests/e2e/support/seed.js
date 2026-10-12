@@ -11,13 +11,21 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * whose pages are returned as previous_path and next_path (null for every
  * other scenario).
  *
- * @param {'photo'|'marked'|'regions'|'jpeg'|'neighbours'} scenario
+ * 'warnings' is 'jpeg' with the two regions of 'regions', indexed and drawn by
+ * drawnBy (a TestUsers role; nobody when omitted).
+ *
+ * @param {'photo'|'marked'|'regions'|'jpeg'|'neighbours'|'warnings'} scenario
+ * @param {string} [drawnBy]
  * @returns {{photo_id: number, album_id: number, width: number, height: number,
  *   kept_name: string, cut_name: string, picture_path: string, album_path: string,
  *   previous_path: string|null, next_path: string|null}}
  */
-function seed(scenario) {
-  return JSON.parse(execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`], { encoding: 'utf8' }));
+function seed(scenario, drawnBy) {
+  const args = [SEED_SCRIPT, `--scenario=${scenario}`];
+  if (drawnBy) {
+    args.push(`--drawn-by=${drawnBy}`);
+  }
+  return JSON.parse(execFileSync('php', args, { encoding: 'utf8' }));
 }
 
 /** Backdates the seeded photo's derivatives, so the browser may cache them. */

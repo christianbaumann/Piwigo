@@ -9,7 +9,7 @@ const { statePath } = require('./support/accounts');
  * The credentials are the generated ones from local/config/photoedit-test.env -
  * never a human's login, and never a literal in this file.
  */
-for (const role of ['WEBMASTER', 'ADMIN', 'NORMAL']) {
+for (const role of ['WEBMASTER', 'ADMIN', 'NORMAL', 'GENERIC']) {
   setup(`authenticate ${role.toLowerCase()}`, async ({ page }) => {
     const username = process.env[`PHOTOEDIT_TEST_${role}_USERNAME`];
     const password = process.env[`PHOTOEDIT_TEST_${role}_PASSWORD`];

@@ -255,9 +255,11 @@ ddev exec bash -c 'set -a; . local/config/photoedit-test.env; set +a; \
   cd plugins/photoedit && npx playwright test'
 ```
 
-It writes the git-ignored `local/config/photoedit-test.env` and creates **three** accounts:
-`photoedit_webmaster`, `photoedit_admin` (an administrator who is not a webmaster) and
-`photoedit_normal`. Since decision 0059 all three get the edit button for a photo they can see;
+It writes the git-ignored `local/config/photoedit-test.env` and creates **four** accounts:
+`photoedit_webmaster`, `photoedit_admin` (an administrator who is not a webmaster),
+`photoedit_normal` and `photoedit_generic` (core's `generic` status, level 0 like normal; an install
+set up before it must re-run the script, or `auth.setup.js` fails on the missing
+`PHOTOEDIT_TEST_GENERIC_*`). Since decision 0059 all four get the edit button for a photo they can see;
 the negative cases are a guest and a private album without a grant
 (`FixtureBuilder::makeAlbumPrivate()`, `grantAlbumTo()`). Every photo sent to `pwg.photoedit.apply`
 must be in an album the caller sees (`FixtureBuilder::showInTestAlbum()`): a photo in no album is
@@ -270,13 +272,15 @@ without. Both suites need the plugin active (Administration > Plugins, or
 both check that through the same method. `ApplyRegionsTest` deactivates persons for one case and
 reactivates it in `tearDown`. If a run is killed in between, persons stays off; reactivate it by hand.
 `ExclusionTest` loads both plugins' `events_photoedit.inc.php` in-process and asks `flock(1)` from a
-child process whether their lock is held. The E2E specs run as the webmaster; `auth.setup.js` saves all three sessions and the
-visibility spec opens its own context per role. `tests/e2e/support/seed.php --scenario=photo`
+child process whether their lock is held. The E2E specs run as the webmaster; `auth.setup.js` saves all four sessions and `roles.spec.js`
+opens its own context per role. `tests/e2e/support/seed.php --scenario=photo`
 creates a throwaway album with one photo copied into `upload/photoedit-test/`, never a real scan;
 `--scenario=marked` generates a 300x200 palette PNG there instead (red corner marker, XMP caption,
 centre of interest), for the specs that save; `--scenario=regions` is `marked` plus two MWG regions
 written into the file (`FixtureBuilder::REGION_KEPT`, `REGION_CUT`), for the lost-region warning;
 `--scenario=jpeg` is `marked` as an upright JPEG, for the re-encode note;
+`--scenario=warnings` is `jpeg` plus the two regions, indexed and drawn by `--drawn-by=<ROLE>`, for
+`roles.spec.js`;
 `--scenario=neighbours` is `photo` plus a previous and a next photo in the same album (dates forced
 so the seeded photo is the middle one, order asserted), printed as `previous_path` and `next_path`,
 so both toolbar arrows are links;
@@ -294,6 +298,19 @@ the stale-photo case the plugin's `?v=` URLs exist for. An edit records each pho
 `photoedit_versions` config row; `destroyTestImages()` removes the suite's ids from it, since it
 deletes rows directly rather than through `delete_elements`. Its `package-lock.json` pins the same Playwright as persons, because
 the shared browser cache holds that version's Chromium only.
+
+`tests/Integration/RoleMatrixTest.php` is photoedit's executable role matrix: one row per function
+(`photoedit.turn-crop`, `photoedit.warnings`) and role (guest, generic, normal, admin, webmaster), its
+expected levels typed from the target matrix. The `edit` probe uses `pwg.photoedit.apply`'s dry run,
+which passes the same gate as the write (guest, token, `photoedit_user_may_edit()` run before
+`dry_run` is looked at) and writes nothing. The warnings rows need persons active; their regions are
+indexed through `pwg.persons.rescan` and drawn by the calling account, because a normal account's crop
+of somebody else's region is refused (decision 0065). Its guard case asks `reflection.getMethodList` for
+every `pwg.photoedit.` method (lower bound 1, measured 2026-10-12) and fails naming any that no row
+declares. The private / granted `[BVA]` cases stay in `PicturePageButtonTest` and `ApplyTurnTest`,
+for normal and generic. `tests/e2e/roles.spec.js` shows the lost-region warning and the re-encode note
+in the editor's confirm, one test per role; its seed (`--scenario=warnings`) indexes the regions as the
+webmaster, reading `PHOTOEDIT_TEST_WEBMASTER_*` from the environment.
 
 The photoinfo suite works the same way:
 

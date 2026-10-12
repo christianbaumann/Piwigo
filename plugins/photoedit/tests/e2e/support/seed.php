@@ -12,6 +12,9 @@
  *   php tests/e2e/support/seed.php --scenario=marked   a generated 300x200 PNG, for specs that save
  *   php tests/e2e/support/seed.php --scenario=regions  marked, plus two person regions in the file
  *   php tests/e2e/support/seed.php --scenario=jpeg     marked, as an upright JPEG
+ *   php tests/e2e/support/seed.php --scenario=warnings --drawn-by=NORMAL
+ *                                   jpeg plus the two regions, indexed by persons
+ *                                   and drawn by that TestUsers role (none for a guest)
  *   php tests/e2e/support/seed.php --scenario=neighbours photo, plus a previous and a next photo in the same album
  *   php tests/e2e/support/seed.php --age-derivatives   backdate the seeded photo's derivatives
  *   php tests/e2e/support/seed.php --restore
@@ -30,7 +33,7 @@ function fail(string $message): void
     exit(1);
 }
 
-$args = getopt('', array('scenario::', 'restore', 'age-derivatives'));
+$args = getopt('', array('scenario::', 'restore', 'age-derivatives', 'drawn-by::'));
 
 /** How far apart the neighbours' upload dates are put, so the album order is not left to a tie. */
 const NEIGHBOUR_DATE_STEP = '1 DAY';
@@ -83,6 +86,41 @@ function seed_neighbours(Db $db, FixtureBuilder $builder, int $mainId, int $catI
     }
 
     return array('previous' => (int)$previous['id'], 'next' => (int)$next['id']);
+}
+
+/**
+ * Has persons index the seeded regions, as the webmaster over ws.php, and
+ * records the account of one TestUsers role (WEBMASTER, ADMIN, NORMAL, GENERIC)
+ * as their drawer, so a normal account may cut them away (persons decision
+ * 0065). Asserts both took effect.
+ */
+function index_regions_drawn_by(Db $db, array $image, ?string $role): void
+{
+    $client = new WsClient();
+    list($username, $password) = Config::credentials(TestUsers::WEBMASTER);
+    $client->login($username, $password);
+    $res = $client->call('pwg.persons.rescan', array('image_ids' => (string)$image['id'], 'pwg_token' => $client->token()));
+    $count = (int)$db->scalar('SELECT COUNT(*) FROM piwigo_person_region WHERE image_id = ' . (int)$image['id']);
+    if (($res['json']['stat'] ?? null) !== 'ok' || $count !== 2)
+    {
+        throw new RuntimeException("persons indexed $count of 2 regions: " . $res['body']);
+    }
+    if ($role === null)
+    {
+        return;
+    }
+
+    $constant = 'TestUsers::' . strtoupper($role);
+    if (!defined($constant))
+    {
+        throw new RuntimeException("--drawn-by: no role $role in TestUsers");
+    }
+    $drawer = (int)$db->scalar("SELECT id FROM piwigo_users WHERE username = '" . $db->escape(constant($constant)) . "'");
+    $db->query("UPDATE piwigo_person_region SET drawn_by = $drawer WHERE image_id = " . (int)$image['id']);
+    if ($drawer <= 0 || (int)$db->scalar('SELECT COUNT(*) FROM piwigo_person_region WHERE image_id = ' . (int)$image['id'] . " AND drawn_by = $drawer") !== 2)
+    {
+        throw new RuntimeException("--drawn-by=$role did not take: run create-test-users.php");
+    }
 }
 
 /** How far back --age-derivatives sets the derivatives' mtime: old enough for a browser to cache them for hours. */
@@ -148,9 +186,9 @@ if (isset($args['restore']))
 }
 
 $scenario = $args['scenario'] ?? '';
-if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg', 'neighbours'), true))
+if (!in_array($scenario, array('photo', 'marked', 'regions', 'jpeg', 'neighbours', 'warnings'), true))
 {
-    fail('--scenario must be: photo, marked, regions, jpeg, neighbours');
+    fail('--scenario must be: photo, marked, regions, jpeg, neighbours, warnings');
 }
 
 if (is_file(SNAPSHOT_FILE))
@@ -172,7 +210,7 @@ if ($scenario === 'photo' or $scenario === 'neighbours')
 {
     $image = $builder->createTestImage();
 }
-elseif ($scenario === 'jpeg')
+elseif ($scenario === 'jpeg' or $scenario === 'warnings')
 {
     $image = $builder->createMarkedJpeg(1);
 }
@@ -180,7 +218,7 @@ else
 {
     $image = $builder->createMarkedImage();
 }
-if ($scenario === 'regions')
+if ($scenario === 'regions' or $scenario === 'warnings')
 {
     // Only the file: the editor's warning reads the regions from there.
     $builder->writeRegions($image, array(FixtureBuilder::REGION_KEPT, FixtureBuilder::REGION_CUT));
@@ -189,6 +227,22 @@ $catId = $builder->createTestAlbum('Photoedit E2E ' . bin2hex(random_bytes(4)));
 $builder->attachImage((int)$image['id'], $catId);
 $neighbours = $scenario === 'neighbours' ? seed_neighbours($db, $builder, (int)$image['id'], $catId) : null;
 $builder->invalidateUserCache();
+if ($scenario === 'warnings')
+{
+    // A normal account's crop of a region somebody else drew is refused, so
+    // the regions are the viewer's own; persons must index them first.
+    try
+    {
+        index_regions_drawn_by($db, $image, $args['drawn-by'] ?? null);
+    }
+    catch (RuntimeException $e)
+    {
+        $builder->destroyTestImages();
+        $builder->destroyTestAlbums();
+        $builder->destroyPersons(array(FixtureBuilder::REGION_KEPT['name'], FixtureBuilder::REGION_CUT['name']));
+        fail($e->getMessage());
+    }
+}
 
 $dir = dirname(SNAPSHOT_FILE);
 if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir))

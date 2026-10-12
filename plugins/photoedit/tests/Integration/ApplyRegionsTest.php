@@ -236,32 +236,6 @@ final class ApplyRegionsTest extends TestCase
         $this->assertSame($preview['lost_regions'], array_values(array_diff($before, $this->indexedNames())));
     }
 
-    public static function otherLoggedInAccounts(): array
-    {
-        return array(
-            'administrator, not webmaster' => array(TestUsers::ADMIN),
-            'normal user' => array(TestUsers::NORMAL),
-            );
-    }
-
-    /**
-     * [ECP] Another logged-in account's dry run names the region the crop cuts
-     * away too: the warning is not the webmaster's alone (decision 0059). The
-     * cut region is the caller's own, so a normal account may cut it away
-     * (persons decision 0065).
-     */
-    #[DataProvider('otherLoggedInAccounts')]
-    public function testAnotherAccountsDryRunNamesTheLostRegion(string $role): void
-    {
-        $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
-        $this->setDrawer(self::OUTSIDE['name'], $role);
-
-        $res = $this->callAs($role, array('turns' => 0, 'crop' => self::LEFT_HALF, 'dry_run' => 'true'));
-
-        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
-        $this->assertSame(array(self::OUTSIDE['name']), $res['json']['result']['lost_regions']);
-    }
-
     /** [HAPPY] A normal account crops away a region it drew itself. */
     public function testANormalAccountCropsAwayItsOwnRegion(): void
     {

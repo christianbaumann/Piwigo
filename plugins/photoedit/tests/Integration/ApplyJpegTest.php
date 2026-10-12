@@ -149,30 +149,6 @@ final class ApplyJpegTest extends TestCase
         $this->assertSame($this->image['md5'], md5_file($this->image['file']));
     }
 
-    public static function otherLoggedInAccounts(): array
-    {
-        return array(
-            'administrator, not webmaster' => array(TestUsers::ADMIN),
-            'normal user' => array(TestUsers::NORMAL),
-            );
-    }
-
-    /** [ECP] Another logged-in account's dry run reports the re-encode too, so the page asks it first (decision 0059). */
-    #[DataProvider('otherLoggedInAccounts')]
-    public function testAnotherAccountsDryRunReportsTheReencode(string $role): void
-    {
-        $this->image = $this->fixture->createMarkedJpeg(1);
-        $this->fixture->showInTestAlbum($this->image);
-        $this->client = new WsClient();
-        list($username, $password) = Config::credentials($role);
-        $this->client->login($username, $password);
-
-        $result = $this->assertOk($this->apply(array('turns' => 1, 'dry_run' => 'true')));
-
-        $this->assertTrue($result['lossy']);
-        $this->assertSame($this->image['md5'], md5_file($this->image['file']));
-    }
-
     /**
      * A region on an Orientation-6 JPEG stays on the same spot of the shown
      * photo. Stored in raw coordinates: x 45..105, y 70..130 px of 300x200.

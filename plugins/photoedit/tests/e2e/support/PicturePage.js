@@ -46,6 +46,22 @@ class PicturePage {
     this.actionMenuSwitch = page.locator('#imageActionsSwitch');
     /** The page header, far from the action menu; hovering it closes that menu. */
     this.header = page.locator('#imageHeaderBar');
+
+    /** Core's login form, where a guest lands instead of the picture page. */
+    this.loginPassword = page.locator('input[name="password"]');
+  }
+
+  /**
+   * The lost-region warning and the re-encode note, as the server hands them to
+   * the editor on the button, so a spec need not copy the translated strings.
+   *
+   * @returns {Promise<{lost: string, lossy: string}>}
+   */
+  async confirmTexts() {
+    return this.editButton.evaluate((button) => {
+      const data = /** @type {HTMLElement} */ (button).dataset;
+      return { lost: data.confirmLost || '', lossy: data.confirmLossy || '' };
+    });
   }
 
   /** @param {string} path the picture_path the seed printed */

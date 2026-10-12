@@ -3,12 +3,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Who gets the edit button, read from the page source the server emits.
+ * Whether the edit button follows the photo's album, read from the page source
+ * the server emits. Which role gets it on a public album is RoleMatrixTest's.
  *
  * The button is server-rendered, so its absence in the source is the whole
  * [NEG] fact: an account that never receives the markup cannot reveal it.
- * The gate is "logged in and may see the photo" (decision 0059); a role
- * decides nothing.
+ * The gate is "logged in and may see the photo" (decision 0059).
  */
 final class PicturePageButtonTest extends TestCase
 {
@@ -44,14 +44,11 @@ final class PicturePageButtonTest extends TestCase
         $this->fixture->destroyTestAlbums();
     }
 
-    private function rawPageAs(?string $role): string
+    private function rawPageAs(string $role): string
     {
         $client = new WsClient();
-        if ($role !== null)
-        {
-            list($username, $password) = Config::credentials($role);
-            $client->login($username, $password);
-        }
+        list($username, $password) = Config::credentials($role);
+        $client->login($username, $password);
 
         return $client->fetchPage($this->picturePath);
     }
@@ -65,41 +62,25 @@ final class PicturePageButtonTest extends TestCase
         return $page;
     }
 
-    public static function loggedInAccounts(): array
+    public static function nonAdminAccounts(): array
     {
         return array(
-            'webmaster' => array(TestUsers::WEBMASTER),
-            'administrator, not webmaster' => array(TestUsers::ADMIN),
             'normal user' => array(TestUsers::NORMAL),
+            'generic account' => array(TestUsers::GENERIC),
             );
     }
 
-    /** [HAPPY][ECP] Every logged-in account that sees the photo gets the button and the controls once each (decision 0059). */
-    #[DataProvider('loggedInAccounts')]
-    public function testEveryLoggedInAccountGetsTheButton(string $role): void
-    {
-        $page = $this->pageAs($role);
-
-        $this->assertSame(1, substr_count($page, self::BUTTON));
-        $this->assertSame(1, substr_count($page, self::CONTROLS));
-    }
-
-    /** [NEG] A guest gets the login page, and no button on it. */
-    public function testAGuestGetsNoButton(): void
-    {
-        $page = $this->rawPageAs(null);
-
-        $this->assertStringContainsString('name="password"', $page, 'anti-vacuity: not the login page');
-        $this->assertStringNotContainsString(self::BUTTON, $page);
-        $this->assertStringNotContainsString(self::CONTROLS, $page);
-    }
-
-    /** [NEG] A normal user without access to the photo's private album gets no picture page and no button. */
-    public function testAPhotoInAPrivateAlbumGetsNoButton(): void
+    /**
+     * [NEG][BVA] An account without access to the photo's private album gets
+     * no picture page and no button. The public side of the boundary, and every
+     * role on it, is RoleMatrixTest's photoedit.turn-crop rows.
+     */
+    #[DataProvider('nonAdminAccounts')]
+    public function testAPhotoInAPrivateAlbumGetsNoButton(string $role): void
     {
         $this->fixture->makeAlbumPrivate($this->album);
 
-        $page = $this->rawPageAs(TestUsers::NORMAL);
+        $page = $this->rawPageAs($role);
 
         $this->assertNotSame('', $page, 'anti-vacuity: no answer at all');
         $this->assertStringNotContainsString('id="theMainImage"', $page);
@@ -107,13 +88,14 @@ final class PicturePageButtonTest extends TestCase
         $this->assertStringNotContainsString(self::CONTROLS, $page);
     }
 
-    /** [ECP] Granted that album, the same account gets the button again: the gate is the album, not the role. */
-    public function testAGrantedPrivateAlbumGetsTheButton(): void
+    /** [ECP][BVA] Granted that album, the same account gets the button again: the gate is the album, not the role. */
+    #[DataProvider('nonAdminAccounts')]
+    public function testAGrantedPrivateAlbumGetsTheButton(string $role): void
     {
         $this->fixture->makeAlbumPrivate($this->album);
-        $this->fixture->grantAlbumTo($this->album, Config::credentials(TestUsers::NORMAL)[0]);
+        $this->fixture->grantAlbumTo($this->album, Config::credentials($role)[0]);
 
-        $page = $this->pageAs(TestUsers::NORMAL);
+        $page = $this->pageAs($role);
 
         $this->assertSame(1, substr_count($page, self::BUTTON));
     }

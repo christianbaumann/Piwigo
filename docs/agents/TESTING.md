@@ -1210,6 +1210,21 @@ the failure messages themselves were not kept.
 | 2026-10-12 | `plugins/photoinfo/include/events_core_edit.inc.php:142` (`photoinfo_wrap_method()` keeps `getMethodOptions()`) | options → `array()`: wrapped `pwg.images.setInfo` / `pwg.tags.rename` lose `admin_only` | `core-screens` as generic, normal | exactly those 2 red (screen refused, ws accepted: INCONSISTENT); green after revert |
 | 2026-10-12 | `plugins/photoinfo/main.inc.php:92` (guard) | a dummy `pwg.photoinfo.flipDummy` registered | `RoleMatrixTest::testEveryMethodHasARow` | exactly that 1 red; green after revert |
 
+### photoedit
+
+Each flip ran the full photoedit integration suite plus `roles.spec.js` and
+`other-accounts-save.spec.js`.
+
+| Date | Gate (file:line) | Flip | Expected red rows | Result |
+|---|---|---|---|---|
+| 2026-10-12 | `plugins/photoedit/include/pipeline.inc.php:177` `photoedit_user_may_edit()` | `if (is_a_guest())` → `if (!is_admin())` | RoleMatrixTest turn-crop + warnings as normal and generic (4); feature cases that need a non-admin edit | killed: the 4 matrix rows; ApplyTurnTest other-accounts turn (normal, generic), granted private album (normal, generic); PicturePageButtonTest granted (normal, generic); ApplyRegionsTest's 4 normal-account cases (refused 404 before the drawer check); E2E roles.spec normal + generic, other-accounts-save's 2 normal specs. Guest, admin, webmaster rows stayed green |
+| 2026-10-12 | same line | `if (is_a_guest())` → `if (!is_classic_user())` | the generic rows only | killed: RoleMatrixTest turn-crop + warnings as generic, ApplyTurnTest turn + granted (generic), PicturePageButtonTest granted (generic), E2E roles.spec generic. Nothing for normal moved |
+| 2026-10-12 | `plugins/photoedit/include/pipeline.inc.php:197` visibility count | `return $count > 0;` → `return true;` | no matrix row (all on a public album); the private-album `[NEG][BVA]` ws cases | killed: ApplyTurnTest private album not found (normal, generic). PicturePageButtonTest's private case stays green: core refuses the picture page itself, so it witnesses core's gate, not this one. E2E all green |
+| 2026-10-12 | `plugins/persons/include/events_photoedit.inc.php:76` crop refusal's drawer | `$user['id']` → `0` (every region counts as somebody else's) | warnings as normal and generic | killed: RoleMatrixTest warnings as normal + generic, ApplyRegionsTest normal crops away its own region, E2E roles.spec normal + generic. Admin and webmaster stay green (`is_admin()` short-circuits). persons' own suites not run for this flip |
+| 2026-10-12 | `plugins/photoedit/main.inc.php` (guard check, not a gate) | a second `addMethod('pwg.photoedit.dummy', ...)` | RoleMatrixTest guard | killed: `testEveryPluginMethodHasAMatrixRow` with "pwg.photoedit.dummy has no row in RoleMatrixTest::MATRIX"; nothing else |
+
+After every revert the full photoedit integration suite (104 tests) and E2E suite (34) were green.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,

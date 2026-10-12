@@ -254,6 +254,7 @@ final class ApplyTurnTest extends TestCase
         return array(
             'administrator, not webmaster' => array(TestUsers::ADMIN),
             'normal user' => array(TestUsers::NORMAL),
+            'generic account' => array(TestUsers::GENERIC),
             );
     }
 
@@ -279,28 +280,39 @@ final class ApplyTurnTest extends TestCase
         $this->assertSame($this->image['md5'], md5_file($this->image['file']));
     }
 
+    public static function nonAdminAccounts(): array
+    {
+        return array(
+            'normal user' => array(TestUsers::NORMAL),
+            'generic account' => array(TestUsers::GENERIC),
+            );
+    }
+
     /**
-     * [NEG] A photo in a private album the account was not granted is answered
+     * [NEG][BVA] A photo in a private album the account was not granted is answered
      * like a missing one, and the file stays as it was (decision 0044's rule).
+     * The public side of the boundary is RoleMatrixTest's photoedit.turn-crop rows.
      */
-    public function testAPhotoInAPrivateAlbumIsNotFound(): void
+    #[DataProvider('nonAdminAccounts')]
+    public function testAPhotoInAPrivateAlbumIsNotFound(string $role): void
     {
         $this->fixture->makeAlbumPrivate($this->album);
 
-        $res = $this->apply($this->client(TestUsers::NORMAL), array('turns' => 1));
+        $res = $this->apply($this->client($role), array('turns' => 1));
 
         $this->assertRefused($res, 404);
         $this->assertSame(PHOTOEDIT_NOT_FOUND_MESSAGE, $res['json']['message']);
         $this->assertSame($this->image['md5'], md5_file($this->image['file']));
     }
 
-    /** [ECP] Granted that album, the same account may turn the photo: the gate is the album, not the role. */
-    public function testAGrantedPrivateAlbumMayBeEdited(): void
+    /** [ECP][BVA] Granted that album, the same account may turn the photo: the gate is the album, not the role. */
+    #[DataProvider('nonAdminAccounts')]
+    public function testAGrantedPrivateAlbumMayBeEdited(string $role): void
     {
         $this->fixture->makeAlbumPrivate($this->album);
-        $this->fixture->grantAlbumTo($this->album, Config::credentials(TestUsers::NORMAL)[0]);
+        $this->fixture->grantAlbumTo($this->album, Config::credentials($role)[0]);
 
-        $this->assertOk($this->apply($this->client(TestUsers::NORMAL), array('turns' => 1)));
+        $this->assertOk($this->apply($this->client($role), array('turns' => 1)));
 
         $this->assertNotSame($this->image['md5'], md5_file($this->image['file']), 'the file did not change');
     }
