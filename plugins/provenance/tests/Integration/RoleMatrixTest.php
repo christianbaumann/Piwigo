@@ -26,7 +26,9 @@ use PHPUnit\Framework\TestCase;
  * Every guest row requests that function's own page or method: the gallery
  * lockout of decision 0055 does not count in its place.
  *
- * Core rows (task 02) go into MATRIX the same way: one entry, one probe.
+ * The core.* rows are the fork's own core changes. None has a ws method, so
+ * their probes observe pages only; zoom's buttons are its control, and what
+ * the buttons do is tests/e2e/roles.spec.js's, since JavaScript builds it.
  *
  * Technique per row: [NEG] guest; [ECP] generic, the equivalence class of
  * normal; [BVA] a role whose level differs from the role below it; [HAPPY]
@@ -93,7 +95,55 @@ final class RoleMatrixTest extends TestCase
             'methods' => array('pwg.provenance.getHistory'),
             'levels' => array('guest' => 'none', 'normal' => 'see*', 'admin' => 'see', 'webmaster' => 'see'),
             ),
+        'core.zoom' => array(
+            'probe' => 'probeZoom',
+            'methods' => array(),
+            'levels' => array('guest' => 'none', 'normal' => 'edit', 'admin' => 'edit', 'webmaster' => 'edit'),
+            ),
+        'core.subalbum-count' => array(
+            'probe' => 'probeSubalbumCount',
+            'methods' => array(),
+            'levels' => array('guest' => 'none', 'normal' => 'see', 'admin' => 'see', 'webmaster' => 'see'),
+            ),
+        'core.merge-buttons' => array(
+            'probe' => 'probeMergeButtons',
+            'methods' => array(),
+            'levels' => array('guest' => 'none', 'normal' => 'none', 'admin' => 'see', 'webmaster' => 'see'),
+            ),
+        'core.german-strings' => array(
+            'probe' => 'probeGermanStrings',
+            'methods' => array(),
+            'levels' => array('guest' => 'none', 'normal' => 'see', 'admin' => 'see', 'webmaster' => 'see'),
+            ),
+        'core.handbook' => array(
+            'probe' => 'probeHandbook',
+            'methods' => array(),
+            'levels' => array('guest' => 'none', 'normal' => 'see', 'admin' => 'see', 'webmaster' => 'see'),
+            ),
         );
+
+    /** Core's German and the fork's overrides, in the order core merges them (include/common.inc.php). */
+    private const GALLERY_LANGUAGE_FILES = array(
+        'language/de_DE/common.lang.php',
+        'local/language/de_DE.lang.php',
+        );
+    private const ADMIN_LANGUAGE_FILES = array(
+        'language/de_DE/common.lang.php',
+        'language/de_DE/admin.lang.php',
+        'local/language/de_DE.lang.php',
+        );
+
+    /** The theme's zoom script; its global's name is read from it, never typed here. */
+    private const ZOOM_SCRIPT = 'themes/modus/js/photo.zoom.js';
+
+    /** The Apache service of .ddev/docker-compose.apache.yaml, as the web container reaches it. */
+    private const APACHE_URL = 'http://apache';
+
+    /** One handbook page, requested through both servers (decision 0063). */
+    private const HANDBOOK_PAGE = 'handbuch/01-alben.html';
+
+    /** "server|role" => cookie file of a session logged in on that server. */
+    private static array $handbookCookies = array();
 
     /** What an album of this suite carries, so a probe can tell it apart on a page. */
     private const ALBUM = array(
@@ -131,6 +181,12 @@ final class RoleMatrixTest extends TestCase
             }
         }
         self::$clients = array();
+
+        foreach (self::$handbookCookies as $file)
+        {
+            @unlink($file);
+        }
+        self::$handbookCookies = array();
     }
 
     protected function setUp(): void
@@ -437,6 +493,171 @@ final class RoleMatrixTest extends TestCase
         return 'INCONSISTENT: page history ' . var_export($content, true) . ', getHistory ' . var_export($ws, true);
     }
 
+    /**
+     * Fit and zoom on the picture page (decision 0032): the photo (content), the
+     * zoom buttons and the script that drives them (control). Zoom has no ws
+     * part; that the buttons zoom is the browser's, in tests/e2e/roles.spec.js.
+     */
+    private function probeZoom(string $role): string
+    {
+        list($catId, $imageId) = $this->albumWithPhoto();
+
+        $page = $this->page($role, "/picture.php?/$imageId/category/$catId");
+        $content = $page !== null && strpos($page, 'id="theMainImage"') !== false;
+        $control = $page !== null
+            && strpos($page, 'id="zoomIn"') !== false
+            && $this->pageLoadsZoomScript($role, $page);
+
+        return $this->level($content, $control, null);
+    }
+
+    /**
+     * An album thumbnail's "N albums" (decision 0037): a parent holding one album
+     * with a photo and one without. Content = the counter on the parent's
+     * thumbnail equals the albums its own page lists; a counter that disagrees
+     * is INCONSISTENT, because the role sees the count, just a wrong one.
+     */
+    private function probeSubalbumCount(string $role): string
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $top = $this->addAlbum("subalbum-matrix-top-$suffix", null);
+        $parentName = "subalbum-matrix-parent-$suffix";
+        $parent = $this->addAlbum($parentName, $top);
+        $withPhoto = $this->addAlbum("subalbum-matrix-full-$suffix", $parent);
+        $this->addAlbum("subalbum-matrix-empty-$suffix", $parent);
+
+        $imageId = $this->fixture->createTestImage()['id'];
+        $this->fixture->attachImage($imageId, $withPhoto);
+        // The listing skips an album without a representative; the direct link sets none.
+        $this->db->query("UPDATE piwigo_categories SET representative_picture_id = $imageId WHERE id = $withPhoto");
+        $this->fixture->invalidateUserCache();
+
+        $topPage = $this->page($role, "/index.php?/category/$top");
+        $parentPage = $this->page($role, "/index.php?/category/$parent");
+        if ($topPage === null and $parentPage === null)
+        {
+            return 'none';
+        }
+        if ($topPage === null or $parentPage === null)
+        {
+            return 'INCONSISTENT: only one of the two album pages loaded';
+        }
+
+        preg_match_all('~<div class=albLegend><h4>([^<]*)</h4>~', $parentPage, $listed);
+        $pattern = '~<h4>' . preg_quote($parentName, '~') . '</h4>.*?<span title="\d+ \D+ \d+ [^"]*">(\d+) ~s';
+        if (preg_match($pattern, $topPage, $counter) !== 1)
+        {
+            return 'INCONSISTENT: no album counter on the parent\'s thumbnail';
+        }
+        if (count($listed[1]) !== 1)
+        {
+            return 'INCONSISTENT: the parent lists ' . count($listed[1]) . ' albums, expected the one with a photo';
+        }
+        if ((int)$counter[1] !== count($listed[1]))
+        {
+            return "INCONSISTENT: the thumbnail says {$counter[1]} albums, its page lists " . count($listed[1]);
+        }
+
+        return $this->level(true, null, null);
+    }
+
+    /**
+     * The tag merge panel's two buttons, translated through |@translate in the
+     * fork's tags.tpl. Content = admin.php?page=tags renders both in German; a
+     * panel that renders them untranslated is INCONSISTENT.
+     */
+    private function probeMergeButtons(string $role): string
+    {
+        $page = $this->page($role, '/admin.php?page=tags');
+        if ($page === null)
+        {
+            return 'none';
+        }
+
+        $confirmed = preg_match('~class="icon-ok ConfirmMergeButton">([^<]*)<~', $page, $confirm) === 1;
+        $cancelled = preg_match('~<a id="CancelMerge">([^<]*)<~', $page, $cancel) === 1;
+        if (!$confirmed or !$cancelled)
+        {
+            return 'INCONSISTENT: the tags page carries no merge buttons';
+        }
+
+        $expected = array(
+            $this->germanString('Confirm merge', self::ADMIN_LANGUAGE_FILES),
+            $this->germanString('Cancel', self::ADMIN_LANGUAGE_FILES),
+            );
+        if (array(trim($confirm[1]), trim($cancel[1])) !== $expected)
+        {
+            return 'INCONSISTENT: merge buttons read "' . trim($confirm[1]) . '" / "' . trim($cancel[1]) . '"';
+        }
+
+        return $this->level(true, null, null);
+    }
+
+    /**
+     * The fork's German overrides (local/language/de_DE.lang.php) reach a page
+     * every logged-in role can open. The only override a gallery page renders is
+     * the typetags field on the picture page ('Type a new tag'), so this row needs
+     * typetags active and also goes red when typetags hides that field.
+     */
+    private function probeGermanStrings(string $role): string
+    {
+        $this->assertSame(
+            'active',
+            (string)$this->db->scalar("SELECT state FROM piwigo_plugins WHERE id = 'typetags'"),
+            'core.german-strings reads an override the typetags field renders: activate typetags'
+        );
+        $key = 'Type a new tag';
+        $german = $this->germanString($key, self::GALLERY_LANGUAGE_FILES);
+        $this->assertNotSame($key, $german, 'the override file no longer translates ' . $key);
+
+        list($catId, $imageId) = $this->albumWithPhoto();
+        $page = $this->page($role, "/picture.php?/$imageId/category/$catId");
+        if ($page === null)
+        {
+            return 'none';
+        }
+
+        $shown = strpos($page, '"' . $german . '"') !== false;
+        $untranslated = strpos($page, '"' . $key . '"') !== false;
+        if ($shown and !$untranslated)
+        {
+            return $this->level(true, null, null);
+        }
+        return 'INCONSISTENT: picture page German ' . var_export($shown, true) . ', English ' . var_export($untranslated, true);
+    }
+
+    /**
+     * One handbook page through nginx and through the Apache container, which
+     * stands in for the remote (decision 0063). Content = the file, byte for
+     * byte; the two servers disagreeing is INCONSISTENT.
+     */
+    private function probeHandbook(string $role): string
+    {
+        $expected = file_get_contents(PIWIGO_ROOT . self::HANDBOOK_PAGE);
+        $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen((string)$expected), 'anti-vacuity: the handbook page is missing');
+
+        $served = array();
+        foreach (array('nginx' => Config::baseUrl(), 'apache' => self::APACHE_URL) as $server => $base)
+        {
+            $ch = curl_init($base . '/' . self::HANDBOOK_PAGE);
+            $opts = array(CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30);
+            if ($role !== 'guest')
+            {
+                $opts[CURLOPT_COOKIEFILE] = $this->handbookSession($role, $base);
+            }
+            curl_setopt_array($ch, $opts);
+            $body = curl_exec($ch);
+            $served[$server] = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200 && $body === $expected;
+            curl_close($ch);
+        }
+
+        if ($served['nginx'] !== $served['apache'])
+        {
+            return 'INCONSISTENT: nginx ' . var_export($served['nginx'], true) . ', apache ' . var_export($served['apache'], true);
+        }
+        return $this->level($served['nginx'], null, null);
+    }
+
     // ── observation helpers ───────────────────────────────────────────────
 
     /**
@@ -590,7 +811,94 @@ final class RoleMatrixTest extends TestCase
             . ', kept=' . var_export($kept, true) . ", history rows $history";
     }
 
+    /**
+     * Whether one of the page's scripts defines photo.zoom.js's global. Core
+     * combines the footer scripts into one _data/combined file, so the name
+     * photo.zoom.js never appears in the page; the global it declares survives.
+     */
+    private function pageLoadsZoomScript(string $role, string $page): bool
+    {
+        $source = (string)file_get_contents(PIWIGO_ROOT . self::ZOOM_SCRIPT);
+        $this->assertSame(1, preg_match('~^var (\w+)\s*=~m', $source, $global), 'photo.zoom.js no longer declares a global');
+
+        preg_match_all('~<script[^>]*\ssrc="([^"]+)"~', $page, $scripts);
+        foreach ($scripts[1] as $src)
+        {
+            $path = '/' . ltrim(preg_replace('~^https?://[^/]+~', '', html_entity_decode($src)), '/');
+            $body = (string)$this->client($role)->fetchPage($path)['body'];
+            if (preg_match('~\bvar\s+' . preg_quote($global[1], '~') . '\s*=~', $body) === 1)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A German string as core and the fork's overrides resolve it, read from the language files. */
+    private function germanString(string $key, array $files): string
+    {
+        $lang = array();
+        $lang_info = array();
+        foreach ($files as $file)
+        {
+            include PIWIGO_ROOT . $file;
+        }
+        $this->assertArrayHasKey($key, $lang, "no German for '$key' in " . implode(', ', $files));
+
+        return $lang[$key];
+    }
+
+    /** A cookie file holding this role's session on one server; logged in once per run. */
+    private function handbookSession(string $role, string $base): string
+    {
+        $slot = "$base|$role";
+        if (!isset(self::$handbookCookies[$slot]))
+        {
+            $credentials = array(
+                'generic' => array(Config::genericUsername(), Config::genericPassword()),
+                'normal' => array(Config::normalUsername(), Config::normalPassword()),
+                'admin' => array(Config::adminUsername(), Config::adminPassword()),
+                'webmaster' => array(Config::username(), Config::password()),
+                );
+            $cookies = tempnam(sys_get_temp_dir(), 'provenance-handbook-');
+            $ch = curl_init($base . '/ws.php?format=json');
+            curl_setopt_array($ch, array(
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => http_build_query(array(
+                    'method' => 'pwg.session.login',
+                    'username' => $credentials[$role][0],
+                    'password' => $credentials[$role][1],
+                    )),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_COOKIEJAR => $cookies,
+                CURLOPT_COOKIEFILE => $cookies,
+                CURLOPT_TIMEOUT => 30,
+                ));
+            $body = curl_exec($ch);
+            curl_close($ch);
+            $this->assertSame('ok', json_decode((string)$body, true)['stat'] ?? null, "login as $role on $base: $body");
+            self::$handbookCookies[$slot] = $cookies;
+        }
+        return self::$handbookCookies[$slot];
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────
+
+    /** A public album created through core, so core computes its uppercats. */
+    private function addAlbum(string $name, ?int $parent): int
+    {
+        $params = array('name' => $name, 'status' => 'public');
+        if ($parent !== null)
+        {
+            $params['parent'] = $parent;
+        }
+        $res = $this->client('webmaster')->call('pwg.categories.add', $params);
+        $id = (int)($res['json']['result']['id'] ?? 0);
+        $this->assertGreaterThan(0, $id, "album $name was not created: " . $res['body']);
+        $this->fixture->adoptAlbum($id);
+
+        return $id;
+    }
 
     /** A public album carrying ALBUM, with one copied photo carrying nothing. */
     private function albumWithPhoto(): array

@@ -1278,7 +1278,34 @@ afterwards. Pattern checked to occur on exactly that line before each flip. Matr
 | 2026-10-12 | `include/functions.inc.php:185` (`provenance_inherit_policy()`) | `if (!isset($user['id']))` → `if (false)` | `provenance.inherit` as guest, generic, normal; `InheritTest::testAPageViewThatEmptiesTheLoungeOnlyFillsPhotosWithoutProvenance` (replace, clear) | exactly those 5 red |
 | 2026-10-12 | guard: `pwg.provenance.flipDummy` registered in `provenance_add_methods()` | added | `RoleMatrixTest::testEveryPluginMethodIsDeclaredByAMatrixRow`, naming the method | red, names `pwg.provenance.flipDummy` |
 
-Core `admin.php:27` is task 02's flip and was not run here.
+
+### core
+
+Each flip applied inside the web container under `/tmp/pwg-suite.lock` with a backup named for the
+flip and an EXIT trap restoring it, 3 s wait (opcache), then the provenance integration suite filtered
+to `RoleMatrixTest|CoreHiddenSubalbumCountTest|HandbookAccessTest|GermanAdminScreenTest` (116 tests,
+green right before the flips); `admin.php:27` alone ran the whole provenance integration suite (323
+tests). The template revert was followed by `touch` a second later; the handbook flip polled
+`http://apache` until the bind-mounted Apache answered 200 to a guest before running, and until it
+answered 302 again after the revert. Host `git diff` of each production file empty afterwards.
+
+| Date | Gate (file:line) | Flip | Expected red rows | Result |
+|---|---|---|---|---|
+| 2026-10-12 | `include/category_cats.inc.php:94` (`discount_hidden_subalbums()` call, decision 0037) | call commented out | `core.subalbum-count` as admin, webmaster; `CoreHiddenSubalbumCountTest` webmaster, admin | exactly those 4 red; normal and generic stay green (their cache never held empty albums) |
+| 2026-10-12 | `admin/themes/default/template/tags.tpl:110` (`{'Confirm merge'\|@translate}`) | `\|@translate` removed | `core.merge-buttons` as admin, webmaster (buttons read "Confirm merge": INCONSISTENT) | exactly those 2 red; `touch` after revert |
+| 2026-10-12 | `handbuch.php:23` (`if (is_a_guest())`, decision 0063) | `if (false)` | `core.handbook` as guest; `HandbookAccessTest` guest cases on both servers | 11 red: the matrix guest row, 8 `testAGuestLandsOnTheLoginPage` (4 paths x nginx, apache), 2 `testAGuestWhoLogsInThenGetsTheHandbook`; nothing else |
+| 2026-10-12 | core `admin.php:27` (`check_status(ACCESS_ADMINISTRATOR)`) | `ACCESS_CLASSIC` | `core.merge-buttons` as normal; provenance admin-screen rows as normal | none red, 323 green (3 skipped, pre-existing): shadowed. Every admin page the matrix requests (`admin/tags.php:15`, `album.php:18`, `photo.php:18`, `batch_manager.php:27`, `cat_modify.php:105`, `picture_modify.php:19`) repeats `check_status(ACCESS_ADMINISTRATOR)` |
+| 2026-10-12 | core `admin.php:27` and `admin/tags.php:15` together | both `ACCESS_CLASSIC` | `core.merge-buttons` as normal | exactly that 1 red; generic stays none (`ACCESS_CLASSIC` still refuses `generic`) |
+
+`admin.php:27` is shadowed in the same way as persons' `admin/photo.php:22`: each admin page repeats
+the check, so flipping one of the two alone turns nothing red. Recorded as a finding, not a gap, for the reason of
+[decision 0068](decisions/0068-shadowed-permission-gates-stay.md).
+
+`core.zoom` and `core.german-strings` have no gate of their own: the photo page and its zoom
+control reach every logged-in account, and a guest is stopped by core's gallery lockout (decision
+0055), which `GuestLockoutTest` already flips. Not flipped. The zoom E2E rows were checked once by
+removing the `zoomIn()` press from `roles.spec.js`: the four logged-in rows went red, the guest row
+stayed green; restored.
 
 ### typetags
 
@@ -1302,7 +1329,7 @@ rows are named `<function> as <role>`.
 Not flipped, and why:
 - `typetags.badges` has no gate of its own: `render_tag_name` paints for anyone who reaches a page; the guest row
   rests on core's page lockout (decision 0055).
-- `typetags.admin-chips` and the admin half of `groups` sit behind core's `admin.php:27` (task 02's flip).
+- `typetags.admin-chips` and the admin half of `groups` sit behind core's `admin.php:27` (flipped under *core*: shadowed by each page's own `check_status`).
 - Removing a plugin guest check outright was not flipped: core's `ws_isInvokeAllowed()` refuses a guest every
   non-session method first (decision 0055), so no guest row could go red (reasoned, not run). The flips above
   replace the check with `!is_classic_user()` instead, which the generic rows witness.

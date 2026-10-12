@@ -74,19 +74,46 @@ final class CoreHiddenSubalbumCountTest extends TestCase
         $this->db->query("UPDATE piwigo_user_cache SET need_update = 'true'");
     }
 
-    /** [HAPPY] The case reported: an administrator, whose cache keeps the empty albums. */
-    public function testTheWebmasterSeesTheNumberOfAlbumsListedInside(): void
+    /**
+     * Every logged-in role, since the bug depends on the role: an administrator's
+     * cache keeps the empty albums, a normal or generic account's drops them.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function roles(): array
     {
-        $this->assertCountersMatchTheListing($this->ws);
+        return array(
+            // The case reported.
+            '[HAPPY] webmaster' => array('webmaster'),
+            // The other role whose cache keeps the empty albums.
+            '[BVA] admin' => array('admin'),
+            // A cache that never held them; the fix must not change that.
+            '[ECP] normal' => array('normal'),
+            '[ECP] generic' => array('generic'),
+            );
     }
 
-    /** [ECP] A normal user's cache never held the empty albums; the fix must not change that. */
-    public function testANormalUserSeesTheNumberOfAlbumsListedInside(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('roles')]
+    public function testTheRoleSeesTheNumberOfAlbumsListedInside(string $role): void
     {
-        $normal = new WsClient();
-        $normal->login(Config::normalUsername(), Config::normalPassword());
+        $this->assertCountersMatchTheListing($this->clientAs($role));
+    }
 
-        $this->assertCountersMatchTheListing($normal);
+    private function clientAs(string $role): WsClient
+    {
+        if ($role === 'webmaster')
+        {
+            return $this->ws;
+        }
+        $credentials = array(
+            'admin' => array(Config::adminUsername(), Config::adminPassword()),
+            'normal' => array(Config::normalUsername(), Config::normalPassword()),
+            'generic' => array(Config::genericUsername(), Config::genericPassword()),
+            );
+        $client = new WsClient();
+        $client->login($credentials[$role][0], $credentials[$role][1]);
+
+        return $client;
     }
 
     private function assertCountersMatchTheListing(WsClient $client): void

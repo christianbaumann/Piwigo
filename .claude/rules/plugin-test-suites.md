@@ -109,11 +109,27 @@ or `INCONSISTENT: <what was seen>` when the parts disagree (a control shown but 
 a refused call that changed the row). Each role logs in once per run. The `inherit` rows of guest,
 generic and normal empty a forced lounge with a page view as that role, like `InheritTest`'s lounge
 case, and expect keep with no history row (decision 0060); a killed run leaves `lounge_active` on.
-Core rows (task 02) go into the same `MATRIX` constant with a probe of their own. The guard case
+The same `MATRIX` holds the five fork-local core functions, 25 more rows: `core.zoom` (the picture
+page's photo, the `#zoomIn` button and a page script declaring `photo.zoom.js`'s global, whose name
+is read from the file, since core combines footer scripts into `_data/combined/`),
+`core.subalbum-count` (a parent album holding one album with a photo and one without, created
+through `pwg.categories.add`; the counter on its thumbnail must equal what its own page lists),
+`core.merge-buttons` (`admin.php?page=tags` renders both merge buttons in the German that
+`language/de_DE/{common,admin}.lang.php` and `local/language/de_DE.lang.php` give, read from those
+files), `core.german-strings` (the picture page shows the override for `Type a new tag`, the only
+override a gallery page renders, so the row needs typetags active and asserts it) and
+`core.handbook` (`handbuch/01-alben.html` byte for byte through nginx and `http://apache`, each
+role logged in once per server). None has a ws method; a counter, button or server that disagrees
+is `INCONSISTENT`, never `none`. The guard case
 `testEveryPluginMethodIsDeclaredByAMatrixRow` lists the `pwg.provenance.` methods through
 `reflection.getMethodList` (at least 5, measured 2026-10-12) and fails naming any method no row
 declares. `FixtureBuilder::grantAlbumTo()` grants a private fixture album to one account, for
 `ReadOnlyPageTest`'s visibility cases; `destroyTestAlbums()` removes the grant with the album.
+
+`tests/e2e/roles.spec.js` is the browser half of `core.zoom`: once per role through the stored
+sessions (guest: the login form, no zoom button), it opens a copied photo of the `writeback` seed's
+throwaway album and asserts one press of `+` widens the photo past fit. `PicturePage.settleImage()`
+is the same wait as persons' (`SETTLE_FRAMES` frames, loader GIF rejected).
 
 **`plugins/provenance` is also where Piwigo *core* is characterized.** Core carries no suite of
 its own and this repository deliberately does not stand one up, so nine
@@ -128,8 +144,8 @@ core characterization case there rather than inventing a root `phpunit.xml`.
 
 The fork's own core fix (decision 0037) is tested there too, against a requirement rather than as
 `[ERR]`: `tests/Unit/DiscountHiddenSubalbumsTest` (the counting function) and
-`tests/Integration/CoreHiddenSubalbumCountTest` (the rendered thumbnail, as webmaster and as a
-normal user). Test class names must be unique across both suites: a run without `--testsuite`
+`tests/Integration/CoreHiddenSubalbumCountTest` (the rendered thumbnail, as webmaster, admin,
+normal and generic). Test class names must be unique across both suites: a run without `--testsuite`
 loads both directories into one process, and a duplicate name is a fatal redeclare.
 
 The **unit** suite also guards the fork's German string overrides

@@ -370,7 +370,8 @@ test.describe('the controls the handbook tells a reader to click', () => {
 test.describe('a normal account on the core admin screens', () => {
   test.use({ storageState: path.join(__dirname, '.state', 'auth-normal.json') });
 
-  const RESERVED_SCREENS = ['albums', 'tags', 'photos_add', 'batch_manager'];
+  // page=tags is RoleMatrixTest's core.merge-buttons row, for every role.
+  const RESERVED_SCREENS = ['albums', 'photos_add', 'batch_manager'];
 
   for (const screen of RESERVED_SCREENS) {
     test(`is refused ${screen}`, async ({ page }) => {

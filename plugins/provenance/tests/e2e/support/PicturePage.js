@@ -8,6 +8,9 @@
  * bug.
  */
 class PicturePage {
+  /** Frames the photo's box must hold still before it counts as settled. */
+  static SETTLE_FRAMES = 12;
+
   /** @param {import('@playwright/test').Page} page */
   constructor(page) {
     this.page = page;
@@ -22,6 +25,12 @@ class PicturePage {
     this.pageLink = this.row.locator('#provenancePageLink');
     /** The row wherever it may be, for the specs that assert it is nowhere. */
     this.rowAnywhere = page.locator('#Provenance');
+
+    /** The photo, and the modus theme's zoom control (themes/modus/js/photo.zoom.js). */
+    this.image = page.locator('#theMainImage');
+    this.zoomInButton = page.locator('#zoomIn');
+    /** Core's login form, where a guest is sent instead of the photo page. */
+    this.loginForm = page.locator('input[name="username"]');
   }
 
   /**
@@ -31,6 +40,53 @@ class PicturePage {
   async goto(imageId, categoryId) {
     await this.page.goto(`/picture.php?/${imageId}/category/${categoryId}`);
     await this.page.waitForLoadState('domcontentloaded');
+  }
+
+  /**
+   * Waits until the photo file has loaded and its rendered box has held still
+   * for SETTLE_FRAMES animation frames. The theme first shows its loading GIF,
+   * which is complete at once, so a src equal to the loader's is rejected.
+   * The same wait as persons' PicturePage.settleImage().
+   */
+  async settleImage() {
+    await this.page.evaluate(() => {
+      window.__pictureSettle = { key: null, frames: 0 };
+    });
+    await this.page.waitForFunction(
+      (needed) => {
+        const state = window.__pictureSettle;
+        const image = document.getElementById('theMainImage');
+        if (!state || !image || !image.complete || image.naturalWidth < 2) {
+          return false;
+        }
+        const loader = document.querySelector('.img-loader-derivatives');
+        if (loader && image.currentSrc === loader.currentSrc) {
+          return false;
+        }
+        const r = image.getBoundingClientRect();
+        const key = [image.currentSrc, r.left, r.top, r.width, r.height].join('|');
+        if (r.width < 2 || state.key !== key) {
+          state.key = key;
+          state.frames = 0;
+          return false;
+        }
+        state.frames += 1;
+        return state.frames >= needed;
+      },
+      PicturePage.SETTLE_FRAMES,
+      { polling: 'raf' }
+    );
+  }
+
+  /** The photo's rendered width, in CSS pixels. */
+  async imageWidth() {
+    return this.image.evaluate((el) => el.getBoundingClientRect().width);
+  }
+
+  /** One zoom step in, through the theme's button. */
+  async zoomIn() {
+    await this.zoomInButton.click();
+    await this.settleImage();
   }
 
   /**
