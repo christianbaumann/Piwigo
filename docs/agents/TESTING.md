@@ -1177,6 +1177,39 @@ and refuses if it is missing), 24 and 25 (the O8 look). Every other re-shot file
 ids and was reverted (3038b47da). 26 shots; install back at 5 albums / 105 photos after `--restore`;
 `check.php` green after each page; `handbuch-pages.spec.js` 13 passed (all 2026-10-10).
 
+## Role matrix gate flips (2026-10-12)
+
+Each plugin's `tests/Integration/RoleMatrixTest.php` holds one row per function and role of the
+target matrix in the [role test coverage design](../../.agents/changes/2026-10-12-role-test-coverage/design.md).
+The gates already existed when the rows were written, so no row was watched failing before its gate.
+Instead each gate was flipped once by hand and the rows that went red were recorded. This is not
+mutation testing in the sense of `mutation-testing.md`: it runs against the integration layer, once.
+Every flip was applied inside the container, under `/tmp/pwg-suite.lock`, and reverted before the
+lock was released.
+
+### photoinfo
+
+Every flip was run with `tests/.flip-tmp.sh` (deleted afterwards) under `/tmp/pwg-suite.lock`, edit
+inside the container, `sleep 3` for opcache, then the photoinfo integration suite filtered to
+`RoleMatrixTest|PrivateAlbum|GrantOpens|Guest|ForAnEditor|ShowsInThe|TheEditorStarts|TextareaHolds|RendersMarkup`
+(63 tests, every role-dependent case of the suite), revert from a `cp` backup, host `git diff --stat`
+checked empty before the next flip. Baseline: the full photoinfo integration suite (211 tests) green
+right before the flips; "green after revert" is the two full runs after the last flip. The red list per
+flip was read from PHPUnit's failure list; the reasons in brackets are what the probe's parts imply,
+the failure messages themselves were not kept.
+
+| Date | Gate (file:line) | Flip | Expected red rows | Result |
+|---|---|---|---|---|
+| 2026-10-12 | `plugins/photoinfo/main.inc.php:137` (`pwg.photoinfo.rescan` `admin_only`) | `admin_only` removed | `RoleMatrixTest` `rescan-prune` as generic, normal | exactly those 2 red (rescan accepted, prune refused: INCONSISTENT); guest stays none (core refuses guests); green after revert |
+| 2026-10-12 | `plugins/photoinfo/main.inc.php:149` (`pwg.photoinfo.pruneTags` `admin_only`) | `admin_only` removed | `rescan-prune` as generic, normal | exactly those 2 red; green after revert |
+| 2026-10-12 | `plugins/photoinfo/include/ws_functions.inc.php:163` (`if (is_a_guest())` in `photoinfo_ws_image()`) | `is_a_guest()` → `!is_classic_user()` | `edit-date`, `edit-info` as generic; `SetDateTest`/`SetInfoTest` `testAPhotoInAPrivateAlbumIsRefused` and `testAGrantOpensAPrivateAlbum` for generic | exactly those 6 red (2 matrix, 4 feature); green after revert |
+| 2026-10-12 | same line | check removed (`if (false)`) | `SetInfoTest::testAGuestIsRefusedEvenWithGuestAccessOn` only; the matrix's guest rows run with `guest_access` off, where core refuses first | exactly that 1 red; green after revert |
+| 2026-10-12 | `plugins/photoinfo/include/ws_functions.inc.php:179` (`!photoinfo_image_visible()`) | visibility check removed | `SetDateTest`/`SetInfoTest` `testAPhotoInAPrivateAlbumIsRefused` for normal, generic, admin; no matrix row (its fixture album is public: visibility is the feature files' dimension) | exactly those 6 red; green after revert |
+| 2026-10-12 | `plugins/photoinfo/include/events_public.inc.php:35` (`$editable = !is_a_guest()`) | → `is_admin()` | `edit-date`, `edit-info` as generic, normal (form gone, ws still accepts: INCONSISTENT); `PicturePageSourceTest` editor/DT cases for normal | 8 red: the 4 matrix rows, and `PicturePageSourceTest` `testTheDescriptionShowsInTheRowOnly`, `testNoDescriptionStillARowForAnEditor`, `testTheDateShowsInTheDatumRow`, `testNoDateStillARowForAnEditor` for normal; green after revert |
+| 2026-10-12 | `plugins/photoinfo/include/events_tags.inc.php:300` (`photoinfo_call_and_write()`) | `if (!is_admin()) { return $result; }` inserted after the wrapped call: a non-admin's badge change no longer reaches the file | `tag-keywords` as generic, normal | exactly those 2 red (addTag/removeTag accepted without the keywords: INCONSISTENT); green after revert |
+| 2026-10-12 | `plugins/photoinfo/include/events_core_edit.inc.php:142` (`photoinfo_wrap_method()` keeps `getMethodOptions()`) | options → `array()`: wrapped `pwg.images.setInfo` / `pwg.tags.rename` lose `admin_only` | `core-screens` as generic, normal | exactly those 2 red (screen refused, ws accepted: INCONSISTENT); green after revert |
+| 2026-10-12 | `plugins/photoinfo/main.inc.php:92` (guard) | a dummy `pwg.photoinfo.flipDummy` registered | `RoleMatrixTest::testEveryMethodHasARow` | exactly that 1 red; green after revert |
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,

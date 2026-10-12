@@ -1,5 +1,4 @@
 <?php
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -146,43 +145,6 @@ final class PruneTagsTest extends TestCase
         $res = $this->prune(implode(',', range(1, PHOTOINFO_RESCAN_MAX_CHUNK + 1)));
 
         $this->assertSame(WS_ERR_INVALID_PARAM, $res['json']['err'] ?? null, $res['body']);
-    }
-
-    /** [ECP] An administrator who is not the webmaster may prune, as they may rescan. */
-    public function testAnAdministratorMayPrune(): void
-    {
-        $this->linkedTag('Zug');
-        FixtureBuilder::writeKeywords($this->image['file'], array(), array(), true);
-
-        $res = $this->prune((string)$this->image['id'], $this->clientAs(TestUsers::ADMIN));
-
-        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
-        $this->assertSame(array(), $this->fixture->tagIdsOf($this->image['id']));
-    }
-
-    public static function refusedAccounts(): array
-    {
-        return array(
-            'normal user' => array(TestUsers::NORMAL),
-            'guest' => array(null),
-            );
-    }
-
-    /** [NEG] A normal user and a guest are refused, and nothing is removed. */
-    #[DataProvider('refusedAccounts')]
-    public function testOthersAreRefused(?string $role): void
-    {
-        $tag = $this->linkedTag('Zug');
-        FixtureBuilder::writeKeywords($this->image['file'], array(), array(), true);
-        $client = $this->clientAs($role);
-
-        $res = $client->call(self::METHOD, array(
-            'image_ids' => (string)$this->image['id'],
-            'pwg_token' => $role === null ? 'none' : $client->token(),
-        ));
-
-        $this->assertSame(401, $res['json']['err'] ?? null, $res['body']);
-        $this->assertSame(array($tag), $this->fixture->tagIdsOf($this->image['id']));
     }
 
     /** [NEG] A wrong token is refused. */

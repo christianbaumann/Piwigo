@@ -4,7 +4,7 @@ const path = require('path');
 /**
  * Where auth.setup.js saves the session of one role.
  *
- * @param {'WEBMASTER'|'ADMIN'|'NORMAL'} role
+ * @param {'WEBMASTER'|'ADMIN'|'NORMAL'|'GENERIC'} role
  */
 function statePath(role) {
   return path.join(__dirname, '..', '.state', `auth-${role.toLowerCase()}.json`);

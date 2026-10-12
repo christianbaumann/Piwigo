@@ -288,28 +288,11 @@ final class SetDateTest extends TestCase
         $this->assertSame(WS_ERR_INVALID_PARAM, $res['json']['err'] ?? null, $res['body']);
     }
 
-    /** [ECP] An administrator who is not the webmaster may save too. */
-    public function testAnAdministratorMaySave(): void
-    {
-        $this->setDate($this->clientAs(TestUsers::ADMIN), '1971', '', '');
-
-        $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
-    }
-
-    /** [ECP] A normal user may save on a photo it can see, and the date reaches the file (decision 0058). */
-    public function testANormalUserMaySave(): void
-    {
-        $res = $this->setDate($this->clientAs(TestUsers::NORMAL), '1965', '3', '');
-
-        $this->assertTrue($res['json']['result']['written'], $res['body']);
-        $this->assertSame('1965-03-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
-        $this->assertSame('1965-03', FixtureBuilder::readDateTags($this->image['file'])['XMP-pwginfo:DateEDTF']);
-    }
-
     public static function accountsWithoutAGrant(): array
     {
         return array(
             'normal user' => array(TestUsers::NORMAL),
+            'generic user' => array(TestUsers::GENERIC),
             // Core's rule holds for administrators too (decision 0044).
             'administrator' => array(TestUsers::ADMIN),
             );
@@ -335,33 +318,24 @@ final class SetDateTest extends TestCase
         $this->assertSame($before, md5_file($this->image['file']), 'the file was rewritten');
     }
 
-    /** [ST] Granting the private album lets the same account save: the gate is the album, not the role. */
-    public function testAGrantOpensAPrivateAlbum(): void
+    public static function grantableAccounts(): array
     {
-        $this->fixture->makeAlbumPrivate($this->albumId);
-        $this->fixture->grantAlbumTo($this->albumId, Config::credentials(TestUsers::NORMAL)[0]);
-
-        $this->setDate($this->clientAs(TestUsers::NORMAL), '1971', '', '');
-
-        $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
+        return array(
+            'normal user' => array(TestUsers::NORMAL),
+            'generic user' => array(TestUsers::GENERIC),
+            );
     }
 
-    /** [NEG] A guest is refused, and nothing changes. */
-    public function testAGuestIsRefused(): void
+    /** [ST] Granting the private album lets the same account save: the gate is the album, not the role. */
+    #[DataProvider('grantableAccounts')]
+    public function testAGrantOpensAPrivateAlbum(string $role): void
     {
-        $client = $this->clientAs(null);
-        $before = md5_file($this->image['file']);
+        $this->fixture->makeAlbumPrivate($this->albumId);
+        $this->fixture->grantAlbumTo($this->albumId, Config::credentials($role)[0]);
 
-        $res = $client->call(self::METHOD, array(
-            'image_id' => $this->image['id'],
-            'year' => '1965',
-            'pwg_token' => 'none',
-        ));
+        $this->setDate($this->clientAs($role), '1971', '', '');
 
-        $this->assertSame(401, $res['json']['err'] ?? null, $res['body']);
-        $this->assertNull($this->fixture->imageRow($this->image['id'])['date_creation']);
-        clearstatcache();
-        $this->assertSame($before, md5_file($this->image['file']), 'the file was rewritten');
+        $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 
     /** [NEG] A wrong token is refused. */

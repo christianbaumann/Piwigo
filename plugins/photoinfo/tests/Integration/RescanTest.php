@@ -134,16 +134,6 @@ final class RescanTest extends TestCase
         $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 
-    /** [ECP] An administrator who is not the webmaster may rescan. */
-    public function testAnAdministratorMayRescan(): void
-    {
-        $this->writeTags(array('DateEDTF' => '1971'));
-
-        $res = $this->rescan((string)$this->image['id'], $this->clientAs(TestUsers::ADMIN));
-
-        $this->assertSame(1, $res['json']['result']['scanned'] ?? null, $res['body']);
-    }
-
     public static function refusedLists(): array
     {
         return array(
@@ -179,30 +169,6 @@ final class RescanTest extends TestCase
 
         $this->assertSame(1, $res['json']['result']['scanned'] ?? null, $res['body']);
         $this->assertCount(PHOTOINFO_RESCAN_MAX_CHUNK - 1, $res['json']['result']['failed']);
-    }
-
-    public static function refusedAccounts(): array
-    {
-        return array(
-            'normal user' => array(TestUsers::NORMAL),
-            'guest' => array(null),
-            );
-    }
-
-    /** [NEG] A normal user and a guest are refused, and nothing changes. */
-    #[DataProvider('refusedAccounts')]
-    public function testOthersAreRefused(?string $role): void
-    {
-        $this->writeTags(array('DateEDTF' => '1971'));
-        $client = $this->clientAs($role);
-
-        $res = $client->call(self::METHOD, array(
-            'image_ids' => (string)$this->image['id'],
-            'pwg_token' => $role === null ? 'none' : $client->token(),
-        ));
-
-        $this->assertSame(401, $res['json']['err'] ?? null, $res['body']);
-        $this->assertNull($this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 
     /** [NEG] A wrong token is refused. */

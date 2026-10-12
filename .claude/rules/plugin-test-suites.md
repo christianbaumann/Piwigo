@@ -310,9 +310,11 @@ ddev exec bash -c 'set -a; . local/config/photoinfo-test.env; set +a; \
   cd plugins/photoinfo && npx playwright test'
 ```
 
-It writes the git-ignored `local/config/photoinfo-test.env` and creates three accounts:
-`photoinfo_webmaster`, `photoinfo_admin` (an administrator who is not a webmaster) and
-`photoinfo_normal`, which saves a date and an info text like the others since decision 0058. It marks the install with
+It writes the git-ignored `local/config/photoinfo-test.env` and creates four accounts:
+`photoinfo_webmaster`, `photoinfo_admin` (an administrator who is not a webmaster),
+`photoinfo_normal`, which saves a date and an info text like the others since decision 0058, and
+`photoinfo_generic` (core's `generic` status, level 0 like normal; an install set up before it must
+re-run the script, or `auth.setup.js` fails on the missing `PHOTOINFO_TEST_GENERIC_*`). It marks the install with
 `photoinfo_throwaway_install`, which its `FixtureBuilder` refuses to run without. photoinfo requires
 provenance: both suites need photoinfo **and** provenance active (`FixtureBuilder::assertPluginActive()`).
 `TagWriteTest` and `FreitextAssignTest` also need typetags, `TagWriteTest`'s persons cases persons,
@@ -323,7 +325,7 @@ a real scan in place, and `FixtureBuilder::readFileTags()` reads the three capti
 `XMP-photoshop:DateCreated` and `XMP-pwginfo:DateEDTF` out of the raw XMP packet, because exiftool
 prints an XMP date with colons and, without photoinfo's config, reads the EDTF range `1965/1970` as
 the fraction `0.997…`. The E2E specs run as the webmaster;
-`auth.setup.js` saves all three sessions. `tests/e2e/support/seed.php --scenario=photo` creates a
+`auth.setup.js` saves all four sessions. `tests/e2e/support/seed.php --scenario=photo` creates a
 public album with one copied photo, `--read-file=<id>` and `--read-date=<id>` print the file's caption
 and date tags, `--read-row=<id>` the photo's `comment` and date columns, `--read-only=<id>` and `--writable=<id>`
 chmod the photo's file so a write fails or works again, and `--restore` removes the album, the row, the file and exiftool's
@@ -340,6 +342,23 @@ to guests until that row is deleted (`DELETE FROM piwigo_config WHERE param = 'g
 refuse to start while such a row exists. `SyncMetadataTest` runs core's metadata sync, but only over
 its own copied photos: `pwg.images.syncMetadata` with their ids, and `admin.php?page=site_update`
 limited to the fixture's album (`cat`), never the whole gallery.
+
+`tests/Integration/RoleMatrixTest.php` is photoinfo's executable role matrix: one row per function
+(`photoinfo.rows`, `edit-date`, `edit-info`, `core-screens`, `tag-keywords`, `rescan-prune`) and role
+(guest, generic, normal, admin, webmaster), its expected levels typed from the target matrix of the
+[role test coverage design](../../.agents/changes/2026-10-12-role-test-coverage/design.md). A probe
+reads the page part (content, control) and the ws part of one function as one role; a call counts as
+accepted only when its effect reached the row and the file, and as refused only when nothing changed,
+so a control shown beside a refused call (or the reverse) is `INCONSISTENT`. `core-screens` requests
+`admin.php?page=photo-<id>-properties` and calls the wrapped `pwg.images.setInfo` and `pwg.tags.rename`;
+`tag-keywords` reads typetags' badges and field on the picture page and calls the wrapped
+`typetags.image.addTag`, `removeTag` and `addNewTag`, reading the three keyword fields and the marker
+back with `readKeywords()`, so it needs typetags active. The guest rows assume `guest_access` off and
+refuse to start while a `guest_access` config row exists. Its guard case asks `reflection.getMethodList`
+for every `pwg.photoinfo.` method (lower bound 4, measured 2026-10-12) and fails naming any that no
+row declares, and any declared method the install does not offer. The wrapped core and typetags
+methods are declared but not enforced by the guard. The private / granted `[BVA]` cases stay in
+`SetDateTest` and `SetInfoTest`, for normal, generic and (private) admin.
 
 The tag cases (`TagWriteTest`, `FreitextAssignTest`, `RescanTest`, `PruneTagsTest`) never touch a
 real tag. They make their own (`createTag()`, `createGroup()`, `linkTag()`), adopt what the server

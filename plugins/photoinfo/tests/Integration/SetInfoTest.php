@@ -165,42 +165,6 @@ final class SetInfoTest extends TestCase
         $this->assertSame('bleibt', $this->fixture->imageRow($this->image['id'])['comment']);
     }
 
-    /** [ECP] An administrator who is not the webmaster may save too. */
-    public function testAnAdministratorMaySave(): void
-    {
-        $res = $this->setInfo($this->clientAs(TestUsers::ADMIN), 'vom Admin');
-
-        $this->assertSame('ok', $res['json']['stat'], $res['body']);
-        $this->assertSame('vom Admin', $this->fixture->imageRow($this->image['id'])['comment']);
-    }
-
-    /** [ECP] A normal user may save on a photo it can see, and the text reaches the file (decision 0058). */
-    public function testANormalUserMaySave(): void
-    {
-        $res = $this->setInfo($this->clientAs(TestUsers::NORMAL), 'vom Benutzer');
-
-        $this->assertTrue($res['json']['result']['written'], $res['body']);
-        $this->assertSame('vom Benutzer', $this->fixture->imageRow($this->image['id'])['comment']);
-        $this->assertSame('vom Benutzer', FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info']);
-    }
-
-    /** [NEG] A guest is refused, and nothing changes. */
-    public function testAGuestIsRefused(): void
-    {
-        $this->fixture->setComment($this->image['id'], 'bleibt');
-
-        $res = $this->clientAs(null)->call(self::METHOD, array(
-            'image_id' => $this->image['id'],
-            'info' => 'überschrieben',
-            'pwg_token' => 'none',
-        ));
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertSame(401, $res['json']['err']);
-        $this->assertSame('bleibt', $this->fixture->imageRow($this->image['id'])['comment']);
-        $this->assertNull(FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info']);
-    }
-
     /**
      * [NEG] With guest_access switched on, core lets a guest call the method;
      * the plugin still refuses it. The config row overrides local/config and is
@@ -237,6 +201,7 @@ final class SetInfoTest extends TestCase
     {
         return array(
             'normal user' => array(TestUsers::NORMAL),
+            'generic user' => array(TestUsers::GENERIC),
             // Core's rule holds for administrators too (decision 0044).
             'administrator' => array(TestUsers::ADMIN),
             );
@@ -267,13 +232,22 @@ final class SetInfoTest extends TestCase
         $this->assertSame($before, md5_file($this->image['file']), 'the file was rewritten');
     }
 
+    public static function grantableAccounts(): array
+    {
+        return array(
+            'normal user' => array(TestUsers::NORMAL),
+            'generic user' => array(TestUsers::GENERIC),
+            );
+    }
+
     /** [ST] Granting the private album lets the same account save: the gate is the album, not the role. */
-    public function testAGrantOpensAPrivateAlbum(): void
+    #[DataProvider('grantableAccounts')]
+    public function testAGrantOpensAPrivateAlbum(string $role): void
     {
         $this->fixture->makeAlbumPrivate($this->albumId);
-        $this->fixture->grantAlbumTo($this->albumId, Config::credentials(TestUsers::NORMAL)[0]);
+        $this->fixture->grantAlbumTo($this->albumId, Config::credentials($role)[0]);
 
-        $this->setInfo($this->clientAs(TestUsers::NORMAL), 'freigegeben');
+        $this->setInfo($this->clientAs($role), 'freigegeben');
 
         $this->assertSame('freigegeben', $this->fixture->imageRow($this->image['id'])['comment']);
     }

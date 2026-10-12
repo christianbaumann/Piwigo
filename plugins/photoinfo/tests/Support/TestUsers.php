@@ -4,10 +4,12 @@
  *
  * Roles, and why each exists:
  *   webmaster - the highest status, the E2E suite's default session
- *   admin     - an administrator who is not a webmaster: the info text is
- *               editable by administrators, so this proves the gate is
+ *   admin     - an administrator who is not a webmaster: proves a gate is
  *               is_admin() and not is_webmaster()
- *   normal    - an authenticated non-admin, who sees the row read-only
+ *   normal    - an authenticated non-admin, who edits a photo's date, info
+ *               text and tags but not on core's screens
+ *   generic   - the status core gives ACCESS_GUEST: the plugin admits it like
+ *               normal through !is_a_guest(), which is_classic_user() would not
  *
  * The `guest` account ships with Piwigo and is not created here.
  */
@@ -16,12 +18,14 @@ class TestUsers
     public const WEBMASTER = 'photoinfo_webmaster';
     public const ADMIN = 'photoinfo_admin';
     public const NORMAL = 'photoinfo_normal';
+    public const GENERIC = 'photoinfo_generic';
 
     /** username => Piwigo status */
     public const ROLES = array(
         self::WEBMASTER => 'webmaster',
         self::ADMIN     => 'admin',
         self::NORMAL    => 'normal',
+        self::GENERIC   => 'generic',
         );
 
     /**
