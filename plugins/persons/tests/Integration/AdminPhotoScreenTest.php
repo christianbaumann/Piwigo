@@ -109,6 +109,8 @@ final class AdminPhotoScreenTest extends TestCase
     {
         $fixture = new FixtureBuilder($this->db);
         $image = $fixture->createTestImage();
+        // The screen refuses a photo in no album the account may see (decision 0061).
+        $fixture->attachImage((int)$image['id'], $fixture->createTestAlbum('Persons admin screen fixture'));
 
         try
         {
@@ -122,6 +124,7 @@ final class AdminPhotoScreenTest extends TestCase
         finally
         {
             $fixture->destroyTestImages();
+            $fixture->destroyTestAlbums();
         }
     }
 

@@ -39,6 +39,16 @@ if (!pwg_db_num_rows($result))
   return;
 }
 
+// The region methods answer 404 for a photo the caller may not see, so a
+// screen showing its regions would offer edits that all fail on save. Core's
+// rule holds for administrators too: a private album needs a grant
+// (decisions 0044, 0061).
+if (!persons_user_can_see_image($image_id))
+{
+  $page['errors'][] = l10n('You cannot tag persons on this photo: it is in no album you have access to');
+  return;
+}
+
 $image = pwg_db_fetch_assoc($result);
 
 persons_assign_overlay($image_id, $image);

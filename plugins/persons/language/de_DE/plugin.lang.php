@@ -13,6 +13,7 @@ $lang['This server cannot write metadata into image files'] = 'Dieser Server kan
 $lang['Remove this person from the photo'] = 'Diese Person vom Foto entfernen';
 $lang['Back to the photo'] = 'Zurück zum Foto';
 $lang['This photo no longer exists'] = 'Dieses Foto existiert nicht mehr';
+$lang['You cannot tag persons on this photo: it is in no album you have access to'] = 'Auf diesem Foto können Sie keine Personen markieren: es liegt in keinem Album, auf das Sie Zugriff haben';
 
 $lang['Search'] = 'Suche';
 $lang['Name'] = 'Name';

@@ -142,6 +142,12 @@ would pass for the wrong reason. `FixtureBuilder::invalidateUserCache()` does it
 the rows on the next request, so nothing is left broken, but every user's cached tag and photo
 counts are rebuilt once after a run.
 
+`VisibilityTest` also grants an account a private fixture album (`FixtureBuilder::grantAlbumTo()`,
+removed with the album). Admin pages, and ws calls whose Referer is one, read `piwigo_user_cache`
+without rebuilding it, so after `invalidateUserCache()` an admin-screen case first makes one ordinary
+ws call as that account (`rebuildPermissions()`); without it the screen runs on the album list from
+before the fixture existed ([decision 0061](../../docs/agents/decisions/0061-persons-list-and-tagging-screen-respect-album-permissions.md)).
+
 `plugins/persons` got its first Playwright specs with the public overlay in Phase 5;
 `docs/agents/decisions/0017-no-e2e-tests-for-persons-phases-1-to-4.md` records why the four phases
 before it had none, and still holds for them. Unlike the other two suites, persons' `auth.setup.js`

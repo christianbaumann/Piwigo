@@ -506,6 +506,54 @@ function persons_person_gallery_url($row)
 }
 
 /**
+ * The condition core's gallery uses to show a photo at all, over an
+ * IMAGE_CATEGORY_TABLE aliased `ic`.
+ *
+ * Stated once so the photo-level gate and the person list cannot drift apart:
+ * the list offers no person whose every region is on a photo this condition
+ * holds back (decision 0061).
+ *
+ * @param string $prefix 'WHERE' or 'AND', as get_sql_condition_FandF() takes it
+ * @return string empty when the caller is restricted by nothing
+ */
+function persons_visible_images_sql($prefix)
+{
+  return get_sql_condition_FandF(
+    array(
+      'forbidden_categories' => 'ic.category_id',
+      'visible_categories'   => 'ic.category_id',
+      'forbidden_images'     => 'ic.image_id',
+      ),
+    $prefix
+    );
+}
+
+/**
+ * Whether the calling user is allowed to see this photo at all.
+ *
+ * Closes the question docs/agents/decisions/0005-tag-assignment-permission-model.md
+ * left open: neither typetags method checks this, so any authenticated user can
+ * tag any photo id there. The region methods and the admin tagging screen both
+ * ask it (decision 0061).
+ *
+ * @param int $image_id
+ * @return bool
+ */
+function persons_user_can_see_image($image_id)
+{
+  $query = '
+SELECT COUNT(DISTINCT ic.image_id)
+  FROM '.IMAGE_CATEGORY_TABLE.' AS ic
+  WHERE ic.image_id = '.(int)$image_id.'
+    '.persons_visible_images_sql('AND').'
+;';
+
+  list($count) = pwg_db_fetch_row(pwg_query($query));
+
+  return $count > 0;
+}
+
+/**
  * This image's indexed regions, newest person data joined in.
  *
  * The one place the region rows are read. Both the web-service payload and the

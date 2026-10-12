@@ -331,6 +331,32 @@ class FixtureBuilder
         }
     }
 
+    /**
+     * Gives one account access to one private fixture album, the way core's
+     * album permission screen does: a piwigo_user_access row. Removed with the
+     * album in destroyTestAlbums(). The caller invalidates the user cache.
+     */
+    public function grantAlbumTo(int $catId, string $username): void
+    {
+        $userId = (int)$this->db->scalar(
+            "SELECT id FROM `piwigo_users` WHERE username = '" . $this->db->escape($username) . "'"
+        );
+        if ($userId <= 0)
+        {
+            throw new RuntimeException("no account named $username; run create-test-users.php");
+        }
+
+        $this->db->query("INSERT INTO `piwigo_user_access` (user_id, cat_id) VALUES ($userId, $catId)");
+
+        $granted = (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM `piwigo_user_access` WHERE user_id = $userId AND cat_id = $catId"
+        );
+        if ($granted !== 1)
+        {
+            throw new RuntimeException("$username was not granted album $catId");
+        }
+    }
+
     /** Puts one photo in one album, asserting the link took effect. */
     public function attachImage(int $imageId, int $catId): void
     {
@@ -508,6 +534,7 @@ class FixtureBuilder
         foreach ($this->testAlbums as $id)
         {
             $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_user_access` WHERE cat_id = ' . (int)$id);
             $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
         }
         $this->testAlbums = array();

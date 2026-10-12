@@ -12,6 +12,8 @@ defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
  *   every method            not a guest
  *   every write             a matching pwg_token
  *   every photo-level call  the photo passes get_sql_condition_FandF()
+ *   the person list         no person whose every region is on a photo
+ *                           that fails it (decision 0061)
  *   rename / delete /
  *   rescan                  admin_only, because each reaches past one photo,
  *                           and is_webmaster() in the handler (decision 0057)
@@ -36,37 +38,6 @@ include_once(PERSONS_PATH.'include/rescan.inc.php');
 function persons_no_such_image()
 {
   return new PwgError(404, 'No such photo');
-}
-
-/**
- * Whether the calling user is allowed to see this photo at all.
- *
- * Closes the question docs/agents/decisions/0005-tag-assignment-permission-model.md
- * left open: neither typetags method checks this, so any authenticated user can
- * tag any photo id there.
- *
- * @param int $image_id
- * @return bool
- */
-function persons_user_can_see_image($image_id)
-{
-  $query = '
-SELECT COUNT(DISTINCT ic.image_id)
-  FROM '.IMAGE_CATEGORY_TABLE.' AS ic
-  WHERE ic.image_id = '.(int)$image_id.'
-    '.get_sql_condition_FandF(
-        array(
-          'forbidden_categories' => 'ic.category_id',
-          'visible_categories'   => 'ic.category_id',
-          'forbidden_images'     => 'ic.image_id',
-          ),
-        'AND'
-        ).'
-;';
-
-  list($count) = pwg_db_fetch_row(pwg_query($query));
-
-  return $count > 0;
 }
 
 /**
@@ -184,7 +155,19 @@ function ws_persons_getList($params, &$service)
     return new PwgError(401, 'Access denied');
   }
 
-  $where = array();
+  // Not a person whose every region is on a photo the caller may not see. With
+  // or without image_id: the picker always sends one, so a filter on the bare
+  // call alone would leave the same names one parameter away. A person with no
+  // region at all is on no hidden photo and stays offered (decision 0061).
+  $where = array('(
+    p.id NOT IN (SELECT person_id FROM '.PERSONS_REGION_TABLE.')
+    OR p.id IN (
+      SELECT r.person_id
+        FROM '.PERSONS_REGION_TABLE.' AS r
+          JOIN '.IMAGE_CATEGORY_TABLE.' AS ic ON ic.image_id = r.image_id
+        '.persons_visible_images_sql('WHERE').'
+      )
+    )');
 
   if (!empty($params['image_id']))
   {
