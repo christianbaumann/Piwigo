@@ -1253,7 +1253,9 @@ Every flip was applied inside the container under `/tmp/pwg-suite.lock`, with a 
 `admin/photo.php:22` / `admin/persons.php:19` are shadowed: each has a second gate in front of or
 behind it that refuses the same roles with the same answer (the handlers' `is_webmaster()` with a
 401; core's `admin.php`/`admin/plugin.php` access check). Flipping one alone turns nothing red.
-Recorded as a finding, not a gap to close: a test cannot tell two equal refusals apart.
+Recorded as a finding, not a gap to close: a test cannot tell two equal refusals apart
+([decision 0068](decisions/0068-shadowed-permission-gates-stay.md), which also covers provenance's
+guest checks).
 
 ### provenance
 
@@ -1307,7 +1309,8 @@ Not flipped, and why:
 
 ### Shared-install findings from the parallel runs
 
-- Fixture albums pushed `piwigo_categories`' AUTO_INCREMENT past 32767 (33271 measured). Core's
+- Fixture albums pushed `piwigo_categories`' AUTO_INCREMENT past 32767 (33271 measured); every
+  `FixtureBuilder` now resets it after its cleanup ([decision 0067](decisions/0067-test-fixtures-reset-the-album-id-counter.md)). Core's
   `piwigo_history.category_id` is a **signed** `smallint(5)` (`install/piwigo_structure-mysql.sql:148`),
   so every page view of a newer album died in `pwg_log()` with "Out of range value for column
   'category_id'" and turned unrelated rows red. Reset under the suite lock with
@@ -1316,7 +1319,7 @@ Not flipped, and why:
 - A flip script that backed up to a fixed `/tmp/flip-backup` in the container shared that name with
   another agent's script. The backup vanished, the restore failed, and `typetags.type.list` ran without
   `admin_only` for about 20-30 minutes while other suites ran. It was reverted and both affected flips
-  were re-run. A flip script's backup name must be unique to it, with an EXIT trap restoring the file.
+  were re-run. `mutation-testing.md` now requires a unique backup name and an EXIT trap.
 - `plugins/typetags/tests/e2e/normal-account.spec.js`, named above as the killer of the `is_admin()`
   mutant on `ws_typetags_image_addTag()`, is deleted. Its successor is the normal row of typetags'
   `roles.spec.js` and the `assign-remove as normal` row of its `RoleMatrixTest`.

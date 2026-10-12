@@ -57,7 +57,8 @@ through the picture page's field, so `--restore` deletes it as well.
 (`typetags.badges`, `assign-remove`, `type-new-tag`, `write-warning`, `groups`, `admin-chips`) and role
 (guest, generic, normal, admin, webmaster), 30 rows, each asserting the level the matrix of change
 `2026-10-12-role-test-coverage` gives that role. A probe requests the function's page(s) and calls its
-ws methods as the role and reports `none`, `see`, `edit` or `INCONSISTENT` (a part whose checks
+ws methods as the role and reports `none`, `see`, `see*` (the groups, seen only on the read-only page),
+`edit` or `INCONSISTENT` (a part whose checks
 disagree, e.g. a refused call that changed the database). Each role logs in once per run.
 `write-warning` forces photoinfo's tag write to fail with a read-only file
 (`FixtureBuilder::makeTestImageReadOnly()`) and needs photoinfo active; it fails naming it otherwise.

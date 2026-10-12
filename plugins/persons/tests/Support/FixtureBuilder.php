@@ -538,5 +538,16 @@ class FixtureBuilder
             $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
         }
         $this->testAlbums = array();
+        $this->resetAlbumIdCounter();
+    }
+
+    /**
+     * Fixture albums push `piwigo_categories`' AUTO_INCREMENT up for good, and core's
+     * `piwigo_history.category_id` is a signed smallint: past 32767 every page view of a newer
+     * album dies in pwg_log() (decision 0067). MariaDB clamps the value to max(id) + 1.
+     */
+    private function resetAlbumIdCounter(): void
+    {
+        $this->db->query('ALTER TABLE `piwigo_categories` AUTO_INCREMENT = 1');
     }
 }

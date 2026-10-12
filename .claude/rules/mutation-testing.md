@@ -94,6 +94,15 @@ against unmutated source. So after reverting a Python mutant, either wait out th
 `tools/deploy`, 2026-09-01: a transposed report line survived its own revert and the suite
 stayed red with the correct source on disk.
 
+## A flip script restores the file it changed, whatever happens
+
+When several agents share the install, each flip script keeps its backup under a name unique to it
+and to the flip (`/tmp/<task>-flip-<label>.bak`), and restores the file from an `EXIT` trap, so a
+failed run or a killed script cannot leave the mutant in place. Check on the host afterwards that
+`git diff` of the production file is empty. Hit 2026-10-12: two agents' scripts both used
+`/tmp/flip-backup`, one backup vanished, the restore failed, and `typetags.type.list` ran without
+`admin_only` for about half an hour while other suites ran.
+
 ## Record what did not die, honestly
 
 "Nothing else moved" is a real, useful claim: it means a mutant killed exactly the tests
