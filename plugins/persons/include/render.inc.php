@@ -39,7 +39,7 @@ include_once(PERSONS_PATH.'include/exiftool.inc.php');
  */
 function persons_assign_overlay($image_id, $image)
 {
-  global $template;
+  global $template, $user;
 
   // Not bailing on an empty region list: the first face on a photo is drawn
   // onto an empty stage, so a page without one is a photo nobody can ever tag.
@@ -66,6 +66,9 @@ function persons_assign_overlay($image_id, $image)
       );
 
     $box['URL'] = persons_person_gallery_url($row);
+
+    // Only an action the server would accept is offered (decision 0065).
+    $box['DELETABLE'] = persons_may_delete_region($row['drawn_by'], $user['id'], is_admin());
 
     $boxes[] = $box;
 

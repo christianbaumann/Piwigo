@@ -48,6 +48,7 @@ function ws_photoedit_apply($params, &$service)
       'invalid' => WS_ERR_INVALID_PARAM,
       'unsupported' => WS_ERR_INVALID_PARAM,
       'locked' => 409,
+      'refused' => 403,
       );
     $code = isset($codes[$result['code']]) ? $codes[$result['code']] : 500;
 

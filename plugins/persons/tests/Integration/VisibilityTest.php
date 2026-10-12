@@ -111,6 +111,27 @@ final class VisibilityTest extends TestCase
     }
 
     /**
+     * [NEG] Deleting a region on a hidden photo answers like an unknown region,
+     * not with the 403 of a region the caller did not draw (decision 0065):
+     * that 403 would confirm the region and its photo exist.
+     */
+    public function testDeletingARegionOnAForbiddenImageAnswersLikeAnUnknownOne(): void
+    {
+        $this->seed($this->hidden, self::JANE);
+        $regionId = (int)$this->db->scalar('SELECT id FROM piwigo_person_region WHERE image_id = ' . (int)$this->hidden['id']);
+        $this->assertGreaterThan(0, $regionId, 'anti-vacuity: the hidden photo carries no region');
+
+        $forbidden = $this->ws->call('pwg.persons.deleteRegion', array('region_id' => $regionId, 'pwg_token' => $this->ws->token()));
+        $absent = $this->ws->call('pwg.persons.deleteRegion', array(
+            'region_id' => (int)$this->db->scalar('SELECT COALESCE(MAX(id), 0) + 1000 FROM piwigo_person_region'),
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame(404, (int)($forbidden['json']['err'] ?? 0), $forbidden['body']);
+        $this->assertSame($absent['json']['message'] ?? null, $forbidden['json']['message'] ?? null);
+    }
+
+    /**
      * [NEG] The refusal says nothing about whether the photo exists.
      *
      * A 403 on a hidden photo and a 404 on an absent one would let anyone

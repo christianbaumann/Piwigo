@@ -46,6 +46,12 @@ define('PERSONS_STALE_RATIO_TOLERANCE', 0.02);
  */
 define('PERSONS_WEBMASTER_ONLY_MESSAGE', 'Only the webmaster may do this');
 
+/**
+ * Why a crop is refused, as a language key; the names it would cut away
+ * follow it (decision 0065).
+ */
+define('PERSONS_CROP_REFUSED_MESSAGE', 'This crop would cut away people another user marked:');
+
 /** The tooltip of a stale region's box, as a language key. */
 define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');
 
@@ -185,6 +191,10 @@ function persons_person_columns()
  * Every row here is derived: it is rebuilt from what the image file says, and
  * the table may be dropped and rescanned at any time without losing anything.
  *
+ * drawn_by is the one exception: the user who drew the region, which no file
+ * carries. A reindex carries it with the id, a full rebuild leaves it empty,
+ * and empty means nobody's (decision 0065).
+ *
  * area_* are the stored coordinate contract above. applied_* record the
  * AppliedToDimensions the region was written against, which is the only way to
  * tell a resized image from an untouched one. rotation_at_write records
@@ -208,6 +218,7 @@ function persons_region_columns()
     'rotation_at_write' => 'tinyint(3) unsigned DEFAULT NULL',
     'region_type'       => "enum('" . implode("','", persons_region_types()) . "') NOT NULL DEFAULT 'Face'",
     'source'            => "enum('" . implode("','", persons_region_sources()) . "') NOT NULL DEFAULT 'piwigo'",
+    'drawn_by'          => 'mediumint(8) unsigned DEFAULT NULL',
     );
 }
 
@@ -1196,19 +1207,22 @@ function persons_region_matches($region, $matcher)
 }
 
 /**
- * Gives each new index row the id its region had before the reindex.
+ * Gives each new index row the id and the drawn_by its region had before the
+ * reindex.
  *
- * The rows are still built from the file alone; only the id is carried, and
- * only for a region that is unchanged - same person, same type, every
- * coordinate within PERSONS_REGION_MATCH_EPSILON. A page that is already open
- * deletes by the ids it was rendered with, so a write must not renumber the
- * regions it did not touch. Each previous id is used at most once; a region
- * without a match gets null and the database assigns it a new id.
+ * The rows are still built from the file alone; only the id and who drew the
+ * region are carried, and only for a region that is unchanged - same person,
+ * same type, every coordinate within PERSONS_REGION_MATCH_EPSILON. A page that
+ * is already open deletes by the ids it was rendered with, so a write must not
+ * renumber the regions it did not touch (decision 0033), and drawn_by lives in
+ * no file, so the index is its only store (decision 0065). Each previous row is
+ * used at most once; a region without a match gets null for both, and the
+ * database assigns it a new id.
  *
  * @param array $previous the photo's rows before the reindex: id, person_id,
- *   region_type, area_x, area_y, area_w, area_h
+ *   region_type, area_x, area_y, area_w, area_h, drawn_by
  * @param array $rows the new rows, as persons_reindex_image() builds them
- * @return array $rows, each with an 'id' key (int or null)
+ * @return array $rows, each with an 'id' and a 'drawn_by' key (int or null)
  */
 function persons_carry_region_ids($previous, $rows)
 {
@@ -1217,30 +1231,206 @@ function persons_carry_region_ids($previous, $rows)
   foreach ($rows as $i => $row)
   {
     $rows[$i]['id'] = null;
+    $rows[$i]['drawn_by'] = null;
 
     foreach ($unused as $key => $old)
     {
-      if ((int)$old['person_id'] !== (int)$row['person_id']
-        or (string)$old['region_type'] !== (string)$row['region_type'])
+      if (!persons_same_region_row($old, $row, true))
       {
         continue;
       }
 
-      foreach (array('area_x', 'area_y', 'area_w', 'area_h') as $column)
-      {
-        if (abs((float)$old[$column] - (float)$row[$column]) > PERSONS_REGION_MATCH_EPSILON)
-        {
-          continue 2;
-        }
-      }
-
       $rows[$i]['id'] = (int)$old['id'];
+      $rows[$i]['drawn_by'] = persons_positive_int_or_null(
+        isset($old['drawn_by']) ? $old['drawn_by'] : null);
       unset($unused[$key]);
       break;
     }
   }
 
   return $rows;
+}
+
+/**
+ * Records who drew the regions a write just put into the file: the ones a
+ * user added, or the ones a photo edit moved.
+ *
+ * Only a row that is new to the index is claimed: one the carry gave no id
+ * and whose box did not exist before under any type. Adding a box that was
+ * already there, or re-adding it with another type, is not drawing it, and
+ * must not hand another user's region - or nobody's - to the caller.
+ *
+ * @param array $previous the photo's rows before the reindex
+ * @param array $rows persons_carry_region_ids()'s result
+ * @param array $drawn the regions written, row-shaped: person_id,
+ *   region_type, area_x, area_y, area_w, area_h, drawn_by
+ * @return array $rows
+ */
+function persons_claim_drawn_regions($previous, $rows, $drawn)
+{
+  foreach ($rows as $i => $row)
+  {
+    // A carried row matches a previous one by definition, so this one test
+    // also skips every region the carry already gave an id and a drawer.
+    if (persons_matches_any_row($row, $previous))
+    {
+      continue;
+    }
+
+    foreach ($drawn as $region)
+    {
+      if (persons_same_region_row($row, $region, false))
+      {
+        $rows[$i]['drawn_by'] = persons_positive_int_or_null($region['drawn_by']);
+        break;
+      }
+    }
+  }
+
+  return $rows;
+}
+
+/**
+ * Gives each region read from a file the drawn_by of its index row.
+ *
+ * A photo edit moves the regions in the file, and a moved region is a new
+ * row to the reindex. Read before the move, the drawer travels with the
+ * region through persons_transform_regions(), which keeps unknown keys.
+ * Matched like persons_carry_region_ids(), each index row at most once.
+ *
+ * @param array $regions as persons_parse_regioninfo() returns them: name,
+ *   type, x, y, w, h
+ * @param array $indexed persons_indexed_regions() rows
+ * @return array $regions, each with a 'drawn_by' key (int or null)
+ */
+function persons_attach_drawn_by($regions, $indexed)
+{
+  $unused = $indexed;
+
+  foreach ($regions as $i => $region)
+  {
+    $regions[$i]['drawn_by'] = null;
+
+    foreach ($unused as $key => $row)
+    {
+      if ((string)$row['name'] !== (string)$region['name']
+        or (string)$row['region_type'] !== (string)$region['type'])
+      {
+        continue;
+      }
+
+      foreach (array('x', 'y', 'w', 'h') as $axis)
+      {
+        if (abs((float)$row['area_'.$axis] - (float)$region[$axis]) > PERSONS_REGION_MATCH_EPSILON)
+        {
+          continue 2;
+        }
+      }
+
+      $regions[$i]['drawn_by'] = persons_positive_int_or_null($row['drawn_by']);
+      unset($unused[$key]);
+      break;
+    }
+  }
+
+  return $regions;
+}
+
+/**
+ * Whether two index rows describe the same box of the same person.
+ *
+ * @param array $a person_id, region_type, area_x, area_y, area_w, area_h
+ * @param array $b the same keys
+ * @param bool $compare_type false to treat a re-typed box as the same one
+ * @return bool
+ */
+function persons_same_region_row($a, $b, $compare_type)
+{
+  if ((int)$a['person_id'] !== (int)$b['person_id'])
+  {
+    return false;
+  }
+
+  if ($compare_type and (string)$a['region_type'] !== (string)$b['region_type'])
+  {
+    return false;
+  }
+
+  foreach (array('area_x', 'area_y', 'area_w', 'area_h') as $column)
+  {
+    if (abs((float)$a[$column] - (float)$b[$column]) > PERSONS_REGION_MATCH_EPSILON)
+    {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @param array $row
+ * @param array $others
+ * @return bool whether $row is the same box as any of $others, type aside
+ */
+function persons_matches_any_row($row, $others)
+{
+  foreach ($others as $other)
+  {
+    if (persons_same_region_row($row, $other, false))
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * The names of the regions an edit would cut away that the user may not
+ * delete - each name once, in file order.
+ *
+ * @param array $regions file regions with their drawn_by attached, see
+ *   persons_attach_drawn_by()
+ * @param array $transform see persons_transform_region()
+ * @param int $user_id
+ * @param bool $is_admin
+ * @return string[]
+ */
+function persons_regions_cut_away_from_others($regions, $transform, $user_id, $is_admin)
+{
+  $names = array();
+  foreach ($regions as $region)
+  {
+    if (persons_transform_region($region, $transform) === null
+      and !persons_may_delete_region($region['drawn_by'], $user_id, $is_admin))
+    {
+      $names[$region['name']] = true;
+    }
+  }
+
+  return array_keys($names);
+}
+
+/**
+ * Whether a user may delete a region.
+ *
+ * Administrators, webmasters among them, delete any region. Anyone else only
+ * one they drew; a region nobody is recorded as drawing - found in a file,
+ * or indexed by a full rebuild - is not theirs (decision 0065).
+ *
+ * @param int|string|null $drawn_by the region's drawn_by column
+ * @param int $user_id
+ * @param bool $is_admin is_admin() for that user
+ * @return bool
+ */
+function persons_may_delete_region($drawn_by, $user_id, $is_admin)
+{
+  if ($is_admin)
+  {
+    return true;
+  }
+
+  return persons_positive_int_or_null($drawn_by) === (int)$user_id;
 }
 
 /**

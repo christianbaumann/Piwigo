@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Persons
-Version: 1.0.0
+Version: 1.1.0
 Description: Draw a box around a person in a photo and name them. Regions are stored in the image file as MWG regions; the database holds a rebuildable index.
 Plugin URI: https://github.com/christianbaumann/Piwigo
 Author: Christian Baumann
@@ -54,6 +54,7 @@ add_event_handler('delete_elements', 'persons_delete_elements',
 // Registered everywhere: photoedit fires these from ws.php.
 $persons_photoedit_file = PERSONS_PATH . 'include/events_photoedit.inc.php';
 add_event_handler('photoedit_preview', 'persons_photoedit_preview', EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_photoedit_file);
+add_event_handler('photoedit_refusal', 'persons_photoedit_refusal', EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_photoedit_file);
 // Before provenance's: every writer holding both locks takes persons' first (photoinfo does too),
 // so two of them never wait for each other.
 add_event_handler('photoedit_begin', 'persons_photoedit_begin', EVENT_HANDLER_PRIORITY_NEUTRAL - 1, $persons_photoedit_file);

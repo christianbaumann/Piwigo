@@ -570,8 +570,9 @@ test.describe('removing a person', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
 
+  // Drawn by the account the specs run as: a normal account removes only its own faces.
   test.beforeEach(() => {
-    seeded = seed('overlay');
+    seeded = seed('overlay', { drawnByViewer: true });
   });
 
   test.afterEach(() => {
@@ -829,7 +830,7 @@ test.describe('the person row while tagging', () => {
 
   /** [ECP] the JS rule and the PHP rule agree - drift between them shows here */
   test('the row reads the same before and after a reload', async ({ page }) => {
-    seeded = seed('overlay');
+    seeded = seed('overlay', { drawnByViewer: true });
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
@@ -936,7 +937,7 @@ test.describe('leaving tagging mode', () => {
 
   /** [ST] tagging, deleted -> left -> reloaded */
   test('leaving after a delete reloads the page', async ({ page }) => {
-    seeded = seed('overlay');
+    seeded = seed('overlay', { drawnByViewer: true });
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
@@ -1132,6 +1133,40 @@ test.describe('leaving tagging mode', () => {
 
     expect(await picture.sameDocument()).toBe(false);
     await expect(picture.personRowLinks).toHaveText([ADA]);
+  });
+});
+
+/**
+ * [NEG] A normal account removes only the faces it drew (decision 0065). The
+ * seeded faces were written into the file, so nobody drew them here.
+ */
+test.describe('a face the normal account did not draw', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  test.beforeEach(() => {
+    seeded = seed('overlay');
+  });
+
+  test.afterEach(() => {
+    restore();
+  });
+
+  test('offers no delete control, while a face it draws gets one', async ({ page }) => {
+    const picture = new PicturePage(page);
+    await picture.goto(seeded.picture_path);
+    await picture.waitForPlacement();
+    expect(seeded.regions.length).toBeGreaterThan(0);
+
+    await picture.enterTaggingMode();
+    for (const region of seeded.regions) {
+      // Anti-vacuity: the box itself is there, only its control is not.
+      await expect(picture.box(region.region_id)).toHaveCount(1);
+      await expect(picture.deleteButton(region.region_id)).toHaveCount(0);
+    }
+
+    await tag(picture, CLEAR_BOX, ADA, seeded.regions.length + 1);
+    await expect(picture.deleteButtonOf(ADA)).toBeVisible();
   });
 });
 

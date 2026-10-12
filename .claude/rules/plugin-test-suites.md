@@ -188,7 +188,9 @@ removes a `persons_exiftool_path` config row pointing at a directory holding no 
 how the disabled-editor spec forces a host without exiftool rather than waiting for one.
 `seed.php --originals=allowed|denied` sets `persons_normal`'s `enabled_high`, which decides whether
 the picture page offers it the original and so what the zoom's *100 %* means
-(`picture-zoom.spec.js`). `--restore` deletes the album, the photo row and the
+(`picture-zoom.spec.js`). The seeded regions are drawn by nobody, so only an administrator may delete
+them ([decision 0065](../../docs/agents/decisions/0065-normal-users-delete-only-the-regions-they-drew.md));
+`--drawn-by-viewer` records `persons_normal` as their drawer for the specs that delete them. `--restore` deletes the album, the photo row and the
 copied file with exiftool's `_original` sidecar when it finds a snapshot, and — before it even
 looks for one — removes that config row and the persons the specs create through the UI, and puts
 `persons_normal`'s originals back to `allowed` (so it fails if that account is missing). All three

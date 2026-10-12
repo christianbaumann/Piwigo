@@ -7,8 +7,9 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
  * Every rebuild is destructive by design - this image's rows are replaced by
  * what the file holds right now. No region content is taken from the previous
  * index, so a wrong row cannot outlive one rescan - only an unchanged region's
- * id, so an open page's ids stay valid across a write (decision 0033), and the
- * stored rotation code a physical turn is detected by.
+ * id, so an open page's ids stay valid across a write (decision 0033), who drew
+ * it, which no file carries (decision 0065), and the stored rotation code a
+ * physical turn is detected by.
  *
  * No explicit transaction wraps a rebuild. Core ships no transaction helper,
  * and piwigo_image_tag is MyISAM, so the tag mirror could not join one anyway.
@@ -28,9 +29,12 @@ include_once(PERSONS_PATH.'include/exiftool.inc.php');
  *
  * @param int $image_id
  * @param string $file_path the image on disk
+ * @param array $claim the name, x, y, w, h, type, drawn_by regions this
+ *   write put into the file and who drew each, see
+ *   persons_claim_drawn_regions(); empty for a reindex that only reads
  * @return array array('ok' => bool, 'regions' => int, 'message' => string)
  */
-function persons_reindex_image($image_id, $file_path)
+function persons_reindex_image($image_id, $file_path, $claim = array())
 {
   $image_id = (int)$image_id;
 
@@ -51,7 +55,7 @@ function persons_reindex_image($image_id, $file_path)
 
   try
   {
-    return persons_reindex_image_locked($image_id, $file_path);
+    return persons_reindex_image_locked($image_id, $file_path, $claim);
   }
   finally
   {
@@ -64,9 +68,10 @@ function persons_reindex_image($image_id, $file_path)
  *
  * @param int $image_id
  * @param string $file_path
+ * @param array $claim as persons_reindex_image()
  * @return array array('ok' => bool, 'regions' => int, 'message' => string)
  */
-function persons_reindex_image_locked($image_id, $file_path)
+function persons_reindex_image_locked($image_id, $file_path, $claim)
 {
   $read = persons_read_regions($file_path);
 
@@ -111,12 +116,17 @@ function persons_reindex_image_locked($image_id, $file_path)
   }
 
   $previous = query2array('
-SELECT id, person_id, region_type, area_x, area_y, area_w, area_h
+SELECT id, person_id, region_type, area_x, area_y, area_w, area_h, drawn_by
   FROM '.PERSONS_REGION_TABLE.'
   WHERE image_id = '.$image_id.'
   ORDER BY id
 ;');
   $rows = persons_carry_region_ids($previous, $rows);
+
+  if (count($claim))
+  {
+    $rows = persons_claim_drawn_regions($previous, $rows, persons_drawn_rows($claim));
+  }
 
   pwg_query('DELETE FROM '.PERSONS_REGION_TABLE.' WHERE image_id = '.$image_id.';');
 
@@ -568,12 +578,50 @@ function persons_indexed_regions($image_id)
   return query2array('
 SELECT r.id, r.person_id, p.name, p.url_name, p.tag_id,
        r.area_x, r.area_y, r.area_w, r.area_h,
-       r.applied_w, r.applied_h, r.region_type, r.source
+       r.applied_w, r.applied_h, r.region_type, r.source, r.drawn_by
   FROM '.PERSONS_REGION_TABLE.' AS r
   JOIN '.PERSONS_TABLE.' AS p ON p.id = r.person_id
   WHERE r.image_id = '.(int)$image_id.'
   ORDER BY r.id
 ;');
+}
+
+/**
+ * Added regions in the shape of index rows, so persons_claim_drawn_regions()
+ * can compare them with what the reindex read back.
+ *
+ * Each goes through persons_prepare_region_for_write() first, the same rule
+ * the merge applied before writing it, so the box compared is the box written.
+ * Runs after the reindex resolved every name in the file, so the lookup finds
+ * the person rather than creating one.
+ *
+ * @param array $regions name, x, y, w, h, type, drawn_by
+ * @return array person_id, region_type, area_x, area_y, area_w, area_h, drawn_by
+ */
+function persons_drawn_rows($regions)
+{
+  $rows = array();
+  foreach ($regions as $region)
+  {
+    $drawn_by = $region['drawn_by'];
+    $region = persons_prepare_region_for_write($region);
+    if ($region === null)
+    {
+      continue;
+    }
+
+    $rows[] = array(
+      'drawn_by'    => $drawn_by,
+      'person_id'   => persons_person_id_from_name($region['name']),
+      'region_type' => $region['type'],
+      'area_x'      => $region['x'],
+      'area_y'      => $region['y'],
+      'area_w'      => $region['w'],
+      'area_h'      => $region['h'],
+      );
+  }
+
+  return $rows;
 }
 
 /**
@@ -615,13 +663,15 @@ function persons_image_rotation($image_id)
  * @param array $remove list of matchers, per persons_merge_regions()
  * @param bool $notify false when the caller fires the event itself, once for
  *   all the photos it changes
+ * @param int|null $drawn_by the user who drew the regions in $add, or null
+ *   when the caller only moves or renames regions that already exist
  * @return array array('ok' => bool, 'regions' => int, 'message' => string,
  *   'tag_writes' => persons_notify_tags_changed()'s answer, and
  *   'tags_changed' => bool when ok)
  */
-function persons_apply_change($image_id, $add, $remove, $notify = true)
+function persons_apply_change($image_id, $add, $remove, $notify = true, $drawn_by = null)
 {
-  $outcome = persons_apply_change_quietly($image_id, $add, $remove);
+  $outcome = persons_apply_change_quietly($image_id, $add, $remove, $drawn_by);
 
   $outcome['tag_writes'] = array();
   if ($notify and $outcome['ok'] and $outcome['tags_changed'])
@@ -638,9 +688,10 @@ function persons_apply_change($image_id, $add, $remove, $notify = true)
  * @param int $image_id
  * @param array $add
  * @param array $remove
+ * @param int|null $drawn_by
  * @return array as persons_apply_change()
  */
-function persons_apply_change_quietly($image_id, $add, $remove)
+function persons_apply_change_quietly($image_id, $add, $remove, $drawn_by = null)
 {
   $image_id = (int)$image_id;
 
@@ -684,7 +735,15 @@ function persons_apply_change_quietly($image_id, $add, $remove)
       return array('ok' => false, 'regions' => 0, 'message' => $write['message']);
     }
 
-    $outcome = persons_reindex_image($image_id, $file);
+    $claim = array();
+    if ($drawn_by !== null)
+    {
+      foreach ($add as $region)
+      {
+        $claim[] = $region + array('drawn_by' => (int)$drawn_by);
+      }
+    }
+    $outcome = persons_reindex_image($image_id, $file, $claim);
 
     // Only the names this call added, and only after the write succeeded. The
     // reindex resolves every name in the file, so touching there would count a

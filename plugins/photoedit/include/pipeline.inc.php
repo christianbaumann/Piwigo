@@ -299,6 +299,22 @@ function photoedit_delete_elements($ids)
 }
 
 /**
+ * Why another plugin refuses an edit, or '' when none does.
+ *
+ * photoedit_refusal is a filter: each handler gets the reason so far and
+ * returns it, or a reason of its own. plugins/persons refuses a crop that
+ * would cut away a region the caller may not delete (decision 0065).
+ *
+ * @param array $image the image row
+ * @param array $transform
+ * @return string
+ */
+function photoedit_refusal($image, $transform)
+{
+  return (string)trigger_change('photoedit_refusal', '', $image, $transform);
+}
+
+/**
  * Turns and crops one photo and writes the result into its file, or only
  * reports what that would do.
  *
@@ -346,6 +362,12 @@ function photoedit_apply($image_id, $turns, $box, $dry_run)
   unset($transform['ok']);
 
   $lost = trigger_change('photoedit_preview', array(), $image, $transform);
+
+  $refusal = photoedit_refusal($image, $transform);
+  if ($refusal !== '')
+  {
+    return photoedit_failure('refused', $refusal);
+  }
 
   if ($dry_run)
   {

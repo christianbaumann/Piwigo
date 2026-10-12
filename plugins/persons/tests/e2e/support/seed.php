@@ -22,6 +22,7 @@
  *   php tests/e2e/support/seed.php --scenario=empty --source=small
  *   php tests/e2e/support/seed.php --scenario=marked --rotation=3
  *   php tests/e2e/support/seed.php --scenario=marked-empty --rotation=3
+ *   php tests/e2e/support/seed.php --scenario=overlay --drawn-by-viewer
  *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
  *   php tests/e2e/support/seed.php --exiftool=missing|present
  *   php tests/e2e/support/seed.php --originals=allowed|denied
@@ -224,8 +225,31 @@ function set_exiftool_state(Db $db, string $state): array
     return array('exiftool' => $state);
 }
 
-/** The account the picture page specs run as, whose access to originals --originals sets. */
-const ORIGINALS_ACCOUNT = 'persons_normal';
+/**
+ * Records an account as the drawer of every region the seed indexed, and
+ * asserts it took.
+ */
+function mark_drawn_by(Db $db, int $imageId, string $username, int $expected): void
+{
+    $userId = $db->scalar("SELECT id FROM piwigo_users WHERE username = '" . $db->escape($username) . "'");
+    if ($userId === null)
+    {
+        fail("--drawn-by-viewer: no account $username; run create-test-users.php");
+    }
+
+    $db->query('UPDATE piwigo_person_region SET drawn_by = ' . (int)$userId . ' WHERE image_id = ' . $imageId);
+
+    $marked = (int)$db->scalar(
+        'SELECT COUNT(*) FROM piwigo_person_region WHERE image_id = ' . $imageId . ' AND drawn_by = ' . (int)$userId
+    );
+    if ($marked !== $expected)
+    {
+        fail("--drawn-by-viewer marked $marked of $expected regions");
+    }
+}
+
+/** The account the picture page specs run as: --originals sets its access to originals, --drawn-by-viewer makes it the drawer. */
+const PAGE_ACCOUNT = 'persons_normal';
 
 /**
  * Lets the normal test account see original files, or not.
@@ -245,13 +269,13 @@ function set_originals_state(Db $db, string $state): array
     }
 
     $value = $state === 'allowed' ? 'true' : 'false';
-    $user = "SELECT id FROM piwigo_users WHERE username = '" . $db->escape(ORIGINALS_ACCOUNT) . "'";
+    $user = "SELECT id FROM piwigo_users WHERE username = '" . $db->escape(PAGE_ACCOUNT) . "'";
     $db->query("UPDATE piwigo_user_infos SET enabled_high = '$value' WHERE user_id = ($user)");
 
     $stored = $db->scalar("SELECT enabled_high FROM piwigo_user_infos WHERE user_id = ($user)");
     if ($stored !== $value)
     {
-        fail('could not force ' . ORIGINALS_ACCOUNT . "'s originals to $state; run tests/Support/create-test-users.php");
+        fail('could not force ' . PAGE_ACCOUNT . "'s originals to $state; run tests/Support/create-test-users.php");
     }
 
     return array('originals' => $state);
@@ -354,7 +378,7 @@ SELECT p.name,
     return $counts;
 }
 
-$args = getopt('', array('scenario::', 'source::', 'rotation::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts'));
+$args = getopt('', array('scenario::', 'source::', 'rotation::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts', 'drawn-by-viewer'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -503,6 +527,17 @@ if (!in_array($scenario, array('empty', 'neighbours', 'marked-empty'), true))
     {
         fail('seed indexed ' . $outcome['regions'] . ' of ' . count($regions) . ' regions');
     }
+
+    // Regions written by exiftool are nobody's (decision 0065); a spec that
+    // deletes them as a normal account says who drew them.
+    if (isset($args['drawn-by-viewer']))
+    {
+        mark_drawn_by($db, (int)$image['id'], PAGE_ACCOUNT, count($regions));
+    }
+}
+elseif (isset($args['drawn-by-viewer']))
+{
+    fail("--drawn-by-viewer needs a scenario that seeds regions, not '$scenario'");
 }
 else
 {

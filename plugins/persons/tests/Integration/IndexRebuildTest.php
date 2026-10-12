@@ -27,6 +27,9 @@ final class IndexRebuildTest extends TestCase
     private const JANE = 'Persons Rebuild Jane';
     private const JOHN = 'Persons Rebuild John';
 
+    /** Any account id: the rebuild must forget it whoever it names. */
+    private const SOME_USER_ID = 1;
+
     private Db $db;
     private FixtureBuilder $fixture;
     private WsClient $ws;
@@ -129,6 +132,13 @@ final class IndexRebuildTest extends TestCase
         $this->assertGreaterThan(0, count($before['persons']));
         $this->assertGreaterThan(0, count($before['tags']));
 
+        // Who drew a region lives in no file, so a rebuild cannot know it
+        // (decision 0065). Recorded on the fixture's rows first, so the
+        // emptiness asserted afterwards is the rebuild's doing.
+        $this->db->query('UPDATE ' . self::REGION_TABLE . ' SET drawn_by = ' . self::SOME_USER_ID
+            . ' WHERE image_id IN (' . $this->fixtureImageIdList() . ')');
+        $this->assertGreaterThan(0, $this->drawnRegionCount($this->fixtureImageIdList()), 'anti-vacuity: no fixture region was recorded as drawn');
+
         $this->performAction('uninstall');
         $this->assertFalse($this->fixture->tableExists(self::PERSONS_TABLE), 'uninstall left the persons table');
         $this->assertFalse($this->fixture->tableExists(self::REGION_TABLE), 'uninstall left the region table');
@@ -156,6 +166,21 @@ final class IndexRebuildTest extends TestCase
 
         $this->assertEquals($this->onlyFixtureRows($before), $this->onlyFixtureRows($after),
             "the fixture photos' rows did not come back exactly as they were");
+
+        $this->assertSame(0, $this->drawnRegionCount(),
+            'a rebuild must leave every region drawn by nobody, so normal users lose a right rather than gain one');
+    }
+
+    /** @param string $imageIds a comma list to count on those photos only, '' for the whole index */
+    private function drawnRegionCount(string $imageIds = ''): int
+    {
+        return (int)$this->db->scalar('SELECT COUNT(*) FROM ' . self::REGION_TABLE . ' WHERE drawn_by IS NOT NULL'
+            . ($imageIds === '' ? '' : ' AND image_id IN (' . $imageIds . ')'));
+    }
+
+    private function fixtureImageIdList(): string
+    {
+        return implode(',', array_map(function ($image) { return (int)$image['id']; }, $this->images));
     }
 
     /**

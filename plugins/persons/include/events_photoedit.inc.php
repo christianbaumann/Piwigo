@@ -46,6 +46,45 @@ function persons_photoedit_preview($lost, $image, $transform)
 }
 
 /**
+ * photoedit_refusal: refuses an edit that would cut away a region the caller
+ * may not delete (decision 0065). A turn loses nobody, so only a crop can.
+ *
+ * A file whose regions cannot be read refuses nothing, as in the preview: the
+ * move after the edit fails on it too and is logged.
+ *
+ * @param string $reason what other handlers already refused for
+ * @param array $image the image row
+ * @param array $transform
+ * @return string
+ */
+function persons_photoedit_refusal($reason, $image, $transform)
+{
+  global $user;
+
+  if ($reason !== '' or is_admin())
+  {
+    return $reason;
+  }
+
+  $read = persons_read_regions(persons_image_file_path($image['path']));
+  if (!$read['ok'])
+  {
+    return $reason;
+  }
+
+  $regions = persons_attach_drawn_by($read['regions'], persons_indexed_regions($image['id']));
+  $names = persons_regions_cut_away_from_others($regions, $transform, $user['id'], false);
+  if (count($names) == 0)
+  {
+    return $reason;
+  }
+
+  load_language('plugin.lang', PERSONS_PATH);
+
+  return l10n(PERSONS_CROP_REFUSED_MESSAGE).' '.implode(', ', $names);
+}
+
+/**
  * photoedit_begin: no region write may run on the photo while it is edited.
  *
  * Throws on a timeout: photoedit fires this inside its try, so the edit is
@@ -115,13 +154,18 @@ function persons_photoedit_move_regions($image, $transform)
   $read = persons_read_regions($file);
 
   $failure = '';
+  $moved = array();
   if (!$read['ok'])
   {
     $failure = $read['message'];
   }
   elseif (count($read['regions']) > 0)
   {
-    $outcome = persons_transform_regions($read['regions'], $transform);
+    // Who drew each region lives only in the index (decision 0065); attached
+    // here, it moves with the region and the reindex records it again.
+    $regions = persons_attach_drawn_by($read['regions'], persons_indexed_regions($image['id']));
+    $outcome = persons_transform_regions($regions, $transform);
+    $moved = $outcome['kept'];
 
     $remove = array();
     foreach ($read['regions'] as $region)
@@ -139,7 +183,7 @@ function persons_photoedit_move_regions($image, $transform)
 
   if ($failure === '')
   {
-    $reindex = persons_reindex_image($image['id'], $file);
+    $reindex = persons_reindex_image($image['id'], $file, $moved);
     $failure = $reindex['ok'] ? '' : $reindex['message'];
   }
 

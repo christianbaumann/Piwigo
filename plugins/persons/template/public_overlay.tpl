@@ -10,7 +10,7 @@
 {foreach from=$PERSONS_BOXES item=box}
 	<div class="person-box{if $box.STALE} person-box-stale{/if}" data-person-region="{$box.ID}" style="left:{$box.LEFT};top:{$box.TOP};width:{$box.W};height:{$box.H}"{if $box.STALE} title="{$PERSONS_STALE_TITLE|escape}"{/if}>
 		{if $box.URL}<a class="person-box-label" href="{$box.URL}">{$box.NAME|escape}</a>{else}<span class="person-box-label">{$box.NAME|escape}</span>{/if}
-		<button type="button" class="person-box-delete" title="{'Remove this person from the photo'|@translate|escape}">&times;</button>
+		{if $box.DELETABLE}<button type="button" class="person-box-delete" title="{'Remove this person from the photo'|@translate|escape}">&times;</button>{/if}
 	</div>
 {/foreach}
 </div>

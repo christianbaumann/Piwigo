@@ -47,10 +47,20 @@ final class SchemaDefinitionTest extends TestCase
                 'id', 'image_id', 'person_id',
                 'area_x', 'area_y', 'area_w', 'area_h',
                 'applied_w', 'applied_h', 'rotation_at_write',
-                'region_type', 'source',
+                'region_type', 'source', 'drawn_by',
             ),
             array_keys(persons_region_columns())
         );
+    }
+
+    /**
+     * [HAPPY] drawn_by may be empty, which is what a full rebuild leaves and what
+     * "drawn by nobody" means (decision 0065).
+     */
+    public function testDrawnByIsNullable(): void
+    {
+        $this->assertStringContainsString('DEFAULT NULL', persons_region_columns()['drawn_by']);
+        $this->assertStringNotContainsString('NOT NULL', persons_region_columns()['drawn_by']);
     }
 
     /**

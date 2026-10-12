@@ -200,7 +200,13 @@
 				body: body
 			}).then(function (response) {
 				if (!response.ok) {
-					throw new Error('HTTP ' + response.status);
+					/* ws.php sends a refusal's code as the HTTP status too, with the
+					   reason in the body; the status alone tells the user nothing. */
+					return response.json().catch(function () {
+						return null;
+					}).then(function (json) {
+						throw new Error(json && json.message ? json.message : 'HTTP ' + response.status);
+					});
 				}
 				return response.json();
 			}).then(function (json) {

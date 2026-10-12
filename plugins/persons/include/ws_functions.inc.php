@@ -12,6 +12,8 @@ defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
  *   every method            not a guest
  *   every write             a matching pwg_token
  *   every photo-level call  the photo passes get_sql_condition_FandF()
+ *   deleting a region       an administrator, or the user who drew it
+ *                           (decision 0065)
  *   the person list         no person whose every region is on a photo
  *                           that fails it (decision 0061)
  *   rename / delete /
@@ -273,6 +275,8 @@ function ws_persons_getRegions($params, &$service)
  */
 function ws_persons_addRegion($params, &$service)
 {
+  global $user;
+
   if (($refusal = persons_check_writer($params)) !== null)
   {
     return $refusal;
@@ -319,7 +323,7 @@ function ws_persons_addRegion($params, &$service)
     return new PwgError(WS_ERR_INVALID_PARAM, 'That box is too small or outside the photo');
   }
 
-  $outcome = persons_apply_change($params['image_id'], array($region), array());
+  $outcome = persons_apply_change($params['image_id'], array($region), array(), true, $user['id']);
 
   if (!$outcome['ok'])
   {
@@ -343,13 +347,15 @@ function ws_persons_addRegion($params, &$service)
  */
 function ws_persons_deleteRegion($params, &$service)
 {
+  global $user;
+
   if (($refusal = persons_check_writer($params)) !== null)
   {
     return $refusal;
   }
 
   $region = pwg_db_fetch_assoc(pwg_query('
-SELECT r.image_id, r.area_x, r.area_y, r.area_w, r.area_h, p.name
+SELECT r.image_id, r.area_x, r.area_y, r.area_w, r.area_h, r.drawn_by, p.name
   FROM '.PERSONS_REGION_TABLE.' AS r
   JOIN '.PERSONS_TABLE.' AS p ON p.id = r.person_id
   WHERE r.id = '.(int)$params['region_id'].'
@@ -360,6 +366,11 @@ SELECT r.image_id, r.area_x, r.area_y, r.area_w, r.area_h, p.name
   if (!$region or !persons_user_can_see_image($region['image_id']))
   {
     return persons_no_such_image();
+  }
+
+  if (!persons_may_delete_region($region['drawn_by'], $user['id'], is_admin()))
+  {
+    return new PwgError(403, 'Only the person who drew this region can remove it');
   }
 
   $matcher = array(

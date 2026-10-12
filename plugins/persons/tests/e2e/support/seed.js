@@ -26,13 +26,19 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * images.rotation code `rotation`; 'marked' tags the block, and both return
  * `marker`, the block in MWG fractions of the raw file.
  *
+ * The seeded regions are drawn by nobody, so only an administrator may delete
+ * them; `drawnByViewer` records the normal account the picture page specs run
+ * as as their drawer instead.
+ *
  * @param {'overlay'|'stale'|'empty'|'neighbours'|'marked'|'marked-empty'} scenario
- * @param {{source?: 'first'|'small', rotation?: number}} [options]
+ * @param {{source?: 'first'|'small', rotation?: number, drawnByViewer?: boolean}} [options]
  */
-function seed(scenario, { source = 'first', rotation = 0 } = {}) {
-  return JSON.parse(
-    execFileSync('php', [SEED_SCRIPT, `--scenario=${scenario}`, `--source=${source}`, `--rotation=${rotation}`], { encoding: 'utf8' })
-  );
+function seed(scenario, { source = 'first', rotation = 0, drawnByViewer = false } = {}) {
+  const args = [SEED_SCRIPT, `--scenario=${scenario}`, `--source=${source}`, `--rotation=${rotation}`];
+  if (drawnByViewer) {
+    args.push('--drawn-by-viewer');
+  }
+  return JSON.parse(execFileSync('php', args, { encoding: 'utf8' }));
 }
 
 /** Remove whatever the seed created. Safe to call unseeded. */

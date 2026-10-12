@@ -33,4 +33,6 @@ $lang['Index last rebuilt %s'] = 'Index last rebuilt %s';
 $lang['Nobody is tagged yet'] = 'Nobody is tagged yet';
 $lang['No person matches that search'] = 'No person matches that search';
 
+$lang['This crop would cut away people another user marked:'] = 'This crop would cut away people another user marked:';
+
 ?>

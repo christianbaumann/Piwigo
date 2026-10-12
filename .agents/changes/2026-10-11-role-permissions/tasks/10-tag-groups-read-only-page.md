@@ -23,8 +23,8 @@ Every logged-in user can open a read-only page listing the colour groups with co
 * [x] Link from the tags page
 * [x] German strings
 * [x] Integration and E2E as `typetags_normal`, using `createStripedGroup()`
-* [-] Commit inside the submodule, push it, update the pointer in the fork
-  **Note:** committed (submodule `6c917c9`, pointer `3ce388be8`); the push from this machine was refused (403, its GitHub login has no write access to Piwigo-Colored-Tags), so the push is the owner's
+* [x] Commit inside the submodule, push it, update the pointer in the fork
+  **Note:** committed (submodule `6c917c9`, pointer `3ce388be8`); pushed by the owner 2026-10-12 (the push from this machine was refused, 403)
 
 ## Verification
 
@@ -38,8 +38,8 @@ Every logged-in user can open a read-only page listing the colour groups with co
   **Note:** Verified via `TagGroupsPageTest::testAGuestIsSentToTheLoginPage` and curl (302 to `identification.php?redirect=...taggroups`).
 * [x] Typetags unit, integration and E2E suites pass
   **Note:** unit 88 OK, integration 119 OK (1 pre-existing skip), E2E 46 passed, 2026-10-12.
-* [ ] (pending: push by the user) A fresh `git submodule update` fetches the pushed commit
-  **Note:** checked 2026-10-12 before the push: a fresh clone fails with `not our ref 6c917c9`, as expected
+* [x] A fresh `git submodule update` fetches the pushed commit
+  **Note:** before the push a fresh clone failed with `not our ref 6c917c9`; after it, a fresh clone's `git submodule update --init plugins/typetags` checked out `6c917c9` from GitHub (2026-10-12)
 
 ## Implementation notes
 

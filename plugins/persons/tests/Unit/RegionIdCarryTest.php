@@ -147,13 +147,65 @@ final class RegionIdCarryTest extends TestCase
 
         $rows = persons_carry_region_ids(array(), array($row));
 
-        $this->assertSame($row + array('id' => null), $rows[0]);
+        $this->assertSame($row + array('id' => null, 'drawn_by' => null), $rows[0]);
     }
 
-    private function previous(int $id, int $personId, float $x, float $y, float $w, float $h, string $type = 'Face'): array
+    /** [HAPPY] An unchanged region keeps who drew it, with its id (decision 0065). */
+    public function testAnUnchangedRegionKeepsWhoDrewIt(): void
     {
-        // As the database answers: every column a string.
+        $rows = persons_carry_region_ids(
+            array($this->previous(41, self::JANE, 0.3, 0.4, 0.1, 0.2, 'Face', 12)),
+            array($this->row(self::JANE, 0.3, 0.4, 0.1, 0.2))
+        );
+
+        $this->assertSame(array(12), array_column($rows, 'drawn_by'));
+    }
+
+    /** [ECP] A region drawn by nobody stays nobody's. */
+    public function testARegionDrawnByNobodyStaysNobodys(): void
+    {
+        $rows = persons_carry_region_ids(
+            array($this->previous(41, self::JANE, 0.3, 0.4, 0.1, 0.2)),
+            array($this->row(self::JANE, 0.3, 0.4, 0.1, 0.2))
+        );
+
+        $this->assertSame(array(41), array_column($rows, 'id'), 'anti-vacuity: the row must be carried');
+        $this->assertSame(array(null), array_column($rows, 'drawn_by'));
+    }
+
+    /** [ECP] A moved box is a new region: neither its id nor who drew it carries over. */
+    public function testAMovedRegionLosesWhoDrewIt(): void
+    {
+        $rows = persons_carry_region_ids(
+            array($this->previous(41, self::JANE, 0.3, 0.4, 0.1, 0.2, 'Face', 12)),
+            array($this->shifted('area_x', PERSONS_REGION_MATCH_EPSILON * 2))
+        );
+
+        $this->assertSame(array(null), array_column($rows, 'drawn_by'));
+    }
+
+    /** [ECP] Who drew a region travels with that region, not with its position in the list. */
+    public function testWhoDrewEachRegionStaysWithIt(): void
+    {
+        $rows = persons_carry_region_ids(
+            array(
+                $this->previous(41, self::JANE, 0.3, 0.4, 0.1, 0.2, 'Face', 12),
+                $this->previous(42, self::JOHN, 0.7, 0.4, 0.1, 0.2, 'Face', 13),
+            ),
+            array(
+                $this->row(self::JOHN, 0.7, 0.4, 0.1, 0.2),
+                $this->row(self::JANE, 0.3, 0.4, 0.1, 0.2),
+            )
+        );
+
+        $this->assertSame(array(13, 12), array_column($rows, 'drawn_by'));
+    }
+
+    private function previous(int $id, int $personId, float $x, float $y, float $w, float $h, string $type = 'Face', ?int $drawnBy = null): array
+    {
+        // As the database answers: every column a string, an empty one null.
         return array(
+            'drawn_by'    => $drawnBy === null ? null : (string)$drawnBy,
             'id'          => (string)$id,
             'person_id'   => (string)$personId,
             'region_type' => $type,

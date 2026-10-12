@@ -157,6 +157,46 @@ final class ApplyRegionsTest extends TestCase
     }
 
     /**
+     * [ST] A moved region keeps who drew it, and one nobody drew stays nobody's
+     * (persons decision 0065). The move gives both new index rows, so only the
+     * carry through the edit can keep the drawer.
+     */
+    public function testACropKeepsWhoDrewEachRegion(): void
+    {
+        $this->seedRegions(array(self::INSIDE, self::PARTLY));
+        $this->setDrawer(self::INSIDE['name'], TestUsers::NORMAL);
+        $drawer = $this->drawers()[self::INSIDE['name']];
+        $before = $this->regionIds();
+
+        $this->apply(array('turns' => 0, 'crop' => self::LEFT_HALF));
+
+        $this->assertEmpty(array_intersect($before, $this->regionIds()), 'anti-vacuity: the edit must have given the regions new rows');
+        $this->assertSame(array(self::INSIDE['name'] => $drawer, self::PARTLY['name'] => null), $this->drawers());
+    }
+
+    /** @return int[] the photo's region row ids */
+    private function regionIds(): array
+    {
+        $result = $this->db->query('SELECT id FROM piwigo_person_region WHERE image_id = ' . (int)$this->image['id']);
+        return array_map('intval', array_column($result->fetch_all(MYSQLI_ASSOC), 'id'));
+    }
+
+    /** @return array name => drawn_by (int or null), by name */
+    private function drawers(): array
+    {
+        $result = $this->db->query(
+            'SELECT p.name, r.drawn_by FROM piwigo_person_region r JOIN piwigo_persons p ON p.id = r.person_id WHERE r.image_id = '
+            . (int)$this->image['id'] . ' ORDER BY p.name'
+        );
+        $drawers = array();
+        foreach ($result->fetch_all(MYSQLI_ASSOC) as $row)
+        {
+            $drawers[$row['name']] = $row['drawn_by'] === null ? null : (int)$row['drawn_by'];
+        }
+        return $drawers;
+    }
+
+    /**
      * [ST] persons rewrites the file in photoedit_end, after the edit stored
      * the file's checksum and version; both still match the file afterwards.
      */
@@ -204,25 +244,103 @@ final class ApplyRegionsTest extends TestCase
             );
     }
 
-    /** [ECP] Another logged-in account's dry run names the region the crop cuts away too: the warning is not the webmaster's alone (decision 0059). */
+    /**
+     * [ECP] Another logged-in account's dry run names the region the crop cuts
+     * away too: the warning is not the webmaster's alone (decision 0059). The
+     * cut region is the caller's own, so a normal account may cut it away
+     * (persons decision 0065).
+     */
     #[DataProvider('otherLoggedInAccounts')]
     public function testAnotherAccountsDryRunNamesTheLostRegion(string $role): void
     {
         $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
-        $other = new WsClient();
-        list($username, $password) = Config::credentials($role);
-        $other->login($username, $password);
+        $this->setDrawer(self::OUTSIDE['name'], $role);
 
-        $res = $other->call(self::METHOD, array(
-            'image_id' => $this->image['id'],
-            'turns' => 0,
-            'crop' => self::LEFT_HALF,
-            'dry_run' => 'true',
-            'pwg_token' => $other->token(),
-            ));
+        $res = $this->callAs($role, array('turns' => 0, 'crop' => self::LEFT_HALF, 'dry_run' => 'true'));
 
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
         $this->assertSame(array(self::OUTSIDE['name']), $res['json']['result']['lost_regions']);
+    }
+
+    /** [HAPPY] A normal account crops away a region it drew itself. */
+    public function testANormalAccountCropsAwayItsOwnRegion(): void
+    {
+        $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
+        $this->setDrawer(self::OUTSIDE['name'], TestUsers::NORMAL);
+
+        $res = $this->callAs(TestUsers::NORMAL, array('turns' => 0, 'crop' => self::LEFT_HALF));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame(array(self::INSIDE['name']), $this->indexedNames());
+    }
+
+    /**
+     * [NEG] A normal account may not cut away a region somebody else drew, or
+     * nobody did: the dry run and the write are both refused, naming the
+     * person, and the file is untouched (persons decision 0065).
+     */
+    #[DataProvider('foreignDrawers')]
+    public function testANormalAccountsCropOfAnotherUsersRegionIsRefused(?string $drawer): void
+    {
+        $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
+        if ($drawer !== null)
+        {
+            $this->setDrawer(self::OUTSIDE['name'], $drawer);
+        }
+        $md5 = md5_file($this->image['file']);
+
+        foreach (array(array('dry_run' => 'true'), array()) as $mode)
+        {
+            $res = $this->callAs(TestUsers::NORMAL, array('turns' => 0, 'crop' => self::LEFT_HALF) + $mode);
+
+            $this->assertSame(403, (int)($res['json']['err'] ?? 0), $res['body']);
+            $this->assertStringContainsString(self::OUTSIDE['name'], (string)$res['json']['message']);
+            $this->assertStringNotContainsString(self::INSIDE['name'], (string)$res['json']['message']);
+        }
+
+        clearstatcache();
+        $this->assertSame($md5, md5_file($this->image['file']), 'a refused edit changed the file');
+        $this->assertSame(array(self::INSIDE['name'], self::OUTSIDE['name']), $this->indexedNames());
+    }
+
+    public static function foreignDrawers(): array
+    {
+        return array("nobody's" => array(null), "the webmaster's" => array(TestUsers::WEBMASTER));
+    }
+
+    /** [ECP] A turn cuts nobody away, so a normal account turns a photo of other people's regions. */
+    public function testANormalAccountTurnsAPhotoOfOtherPeoplesRegions(): void
+    {
+        $this->seedRegions(array(self::INSIDE, self::OUTSIDE));
+
+        $res = $this->callAs(TestUsers::NORMAL, array('turns' => 1));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame(array(200, 300), $this->regionsInFile()['']);
+    }
+
+    /** pwg.photoedit.apply on the fixture photo as another account. */
+    private function callAs(string $role, array $params): array
+    {
+        $client = new WsClient();
+        list($username, $password) = Config::credentials($role);
+        $client->login($username, $password);
+
+        return $client->call(self::METHOD, $params + array(
+            'image_id' => $this->image['id'],
+            'pwg_token' => $client->token(),
+            ));
+    }
+
+    /** Records an account as the drawer of one indexed region, and asserts it took. */
+    private function setDrawer(string $name, string $role): void
+    {
+        $drawer = (int)$this->db->scalar("SELECT id FROM piwigo_users WHERE username = '"
+            . $this->db->escape(Config::credentials($role)[0]) . "'");
+        $this->assertGreaterThan(0, $drawer, "anti-vacuity: no account for $role");
+        $this->db->query('UPDATE piwigo_person_region r JOIN piwigo_persons p ON p.id = r.person_id SET r.drawn_by = '
+            . $drawer . ' WHERE r.image_id = ' . (int)$this->image['id'] . " AND p.name = '" . $this->db->escape($name) . "'");
+        $this->assertSame($drawer, $this->drawers()[$name] ?? null, "precondition: $name is not drawn by $role");
     }
 
     /** [ECP] A turn alone loses nobody, so the dry run names nobody. */

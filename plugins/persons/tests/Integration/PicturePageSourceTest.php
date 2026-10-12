@@ -318,8 +318,11 @@ final class PicturePageSourceTest extends TestCase
         );
     }
 
-    /** [HAPPY] Every box offers a delete affordance the editor can bind to. */
-    public function testEachBoxCarriesADeleteControl(): void
+    /**
+     * [HAPPY] For the webmaster this suite logs in as, every box offers a delete
+     * affordance the editor can bind to. A normal account's are in RegionDrawerTest.
+     */
+    public function testEachBoxCarriesADeleteControlForAnAdministrator(): void
     {
         $this->seed($this->twoFaces());
         $markup = $this->markup($this->page());
