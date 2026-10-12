@@ -3,6 +3,34 @@
 Read when a CSS/JS/template change does not show up, when touching `_data/`, or when adding a
 plugin or theme that has to be tracked by git.
 
+## The Apache container
+
+The remote (all-inkl.com) runs Apache with `.htaccess`; DDEV's web container runs nginx. A second
+DDEV service, `apache`, serves the **same checkout and database** with `php:8.4-apache`,
+`mod_rewrite` and `AllowOverride All`, so an `.htaccess` rule is tested locally next to its nginx
+counterpart (`handbuch/.htaccess` and `.ddev/nginx/handbuch.conf`, decision 0063):
+
+- defined by `.ddev/docker-compose.apache.yaml`, built from `.ddev/apache-build/Dockerfile`; it
+  starts with `ddev start` / `ddev restart` and shows in `ddev describe`
+- from the host: https://piwigo.ddev.site:8443 (http on 8480); from inside the web container, where
+  the suites run: `http://apache`
+- the project is bind-mounted, not Mutagen-synced, so it sees a host edit before the web
+  container does, and it inherits macOS's **case-insensitive** file system: `/handbuch/Index.html`
+  answers 200 there and 404 on nginx and on the remote. A case result from this container proves
+  nothing about the remote
+- provenance's `HandbookAccessTest::testTheApacheContainerAnswers` fails naming the service when it
+  is down, so the Apache cases never pass by being skipped
+
+Known difference: all-inkl runs PHP through FPM/CGI behind Apache, the container through
+`mod_php`. Rewrite and access rules behave the same; PHP-handler directives (`php_value`,
+`php_flag`) in an `.htaccess` do not, and need a hand check on the remote.
+
+The first `ddev restart` after adding the service failed once with a container-name conflict on
+`ddev-piwigo-apache` (2026-10-12); a second `ddev restart` came up clean.
+
+`.ddev/nginx/*.conf` is included into DDEV's generated server block; after editing one,
+`ddev exec nginx -s reload` applies it without a restart.
+
 ## Caches
 
 Smarty compiles templates into `_data/templates_c/` and concatenates CSS/JS into `_data/combined/`.

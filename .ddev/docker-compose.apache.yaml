@@ -1,0 +1,21 @@
+# Apache container serving the same checkout and database as the nginx web container, so the
+# remote's .htaccess rules can be tested locally: https://piwigo.ddev.site:8443
+services:
+  apache:
+    container_name: ddev-${DDEV_SITENAME}-apache
+    build:
+      context: ./apache-build
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    expose:
+      - "80"
+    environment:
+      - VIRTUAL_HOST=${DDEV_HOSTNAME}
+      - HTTP_EXPOSE=8480:80
+      - HTTPS_EXPOSE=8443:80
+    volumes:
+      - ${DDEV_APPROOT}:/var/www/html
+      - ".:/mnt/ddev_config"
+    depends_on:
+      - db

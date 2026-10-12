@@ -14,7 +14,7 @@ uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts del
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
-uv run pytest                                    # 595 tests, measured 2026-10-11
+uv run pytest                                    # 596 tests, measured 2026-10-12
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -60,6 +60,10 @@ file names only what needs a reason:
 - **`handbuch/` ships, `handbuch/tools/` does not** — the German handbook is application content
   since [decision 0025](../../docs/agents/decisions/0025-handbuch-moves-into-the-application-tree.md);
   its generator/checker scripts are dev tooling and stay off the web space, same as `tools/`.
+- **`handbuch/.htaccess` ships with the handbook** — it is the remote's only rule sending
+  `/handbuch/*` through the login check of `handbuch.php`
+  ([decision 0063](../../docs/agents/decisions/0063-the-handbook-is-served-through-a-login-checking-entry.md));
+  without it Apache serves every page to guests. `test_fileset.py` guards it.
 - **`local/config/`, but the `index.php` inside it survives** — those are the directory-listing
   guards. Without them the server offers an index of the directory holding the DB credentials.
 - **each plugin's `vendor/`, never a bare `vendor/`** — `themes/default/vendor/fontello/` is a

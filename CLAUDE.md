@@ -15,6 +15,7 @@ Piwigo — open-source photo gallery web application. Procedural PHP, Smarty tem
   - `associate_images_to_categories` in `admin/include/functions.php`, inside the `if (count($inserts))` block — the funnel every virtual link goes through (API, Batch Manager, upload). Payload: `image_ids`, `category_ids`
   - `site_update_associate_images` in `admin/site_update.php`, after the `$insert_links` `mass_inserts()` — the filesystem sync inserts its storage links directly without calling the helper. Payload: the `$insert_links` rows. This is the **only** trigger in that file; anything claiming it fires none is out of date
 - One fork-local core fix: album thumbnails no longer count an admin's empty sub-albums, which the listing hides (`discount_hidden_subalbums()`, `include/category_cats.inc.php`), see [decision 0037](docs/agents/decisions/0037-album-thumbnails-count-only-listed-subalbums.md)
+- One fork-local root entry: `handbuch.php` serves `handbuch/` to logged-in users only, rewritten from `/handbuch/*` by `.ddev/nginx/handbuch.conf` and `handbuch/.htaccess` ([decision 0063](docs/agents/decisions/0063-the-handbook-is-served-through-a-login-checking-entry.md))
 - One fork-local core template change: the merge panel's two buttons in `admin/themes/default/template/tags.tpl` pass through `|@translate` (upstream hard-codes English `Confirm merge` / `Cancel`). It stays fork-local: nothing is ever pushed or proposed to `Piwigo/Piwigo` ([git-and-commits.md](.claude/rules/git-and-commits.md))
 - The `modus` theme carries one fork-local change: fit-to-area and zoom on the picture page (`js/photo.zoom.js`, a changed `rvas_choose()`), see [decision 0032](docs/agents/decisions/0032-modus-picture-fit-and-zoom-is-a-fork-local-theme-edit.md)
 - `plugins/persons` needed **no** core change at all — don't assume symmetry with provenance. It reaches everything it needs through existing events (`ws_add_methods`, `loc_end_picture`, `loc_begin_admin_page`, `delete_elements`), photoedit's `photoedit_preview`/`_begin`/`_end` (provenance hooks the last two for its lock) and Smarty prefilters. It fires one event of its own, `persons_tags_changed` (a `trigger_change`; listeners return a write result per photo), when a region change, rename or delete changes a photo's person tags, never from a rescan. The image file is the source of truth for regions; its two tables are a rebuildable index ([decision 0020](docs/agents/decisions/0020-persons-index-is-derived-the-file-is-the-source-of-truth.md))
@@ -23,7 +24,7 @@ Piwigo — open-source photo gallery web application. Procedural PHP, Smarty tem
 
 ## Development Environment
 
-DDEV (Docker). Site: https://piwigo.ddev.site — nginx-fpm, PHP 8.4, MariaDB 11.8.
+DDEV (Docker). Site: https://piwigo.ddev.site — nginx-fpm, PHP 8.4, MariaDB 11.8. A second service, `apache`, serves the same checkout and database at https://piwigo.ddev.site:8443 with Apache and `.htaccess`, like the remote ([piwigo-dev-environment.md](.claude/rules/piwigo-dev-environment.md)).
 
 ```bash
 ddev start                 # also: stop, restart, status, launch

@@ -1,0 +1,6 @@
+# The handbook is served to logged-in users only, through handbuch.php (decision 0063).
+# Every request below this directory goes there; nothing here is served directly.
+# The target comes from REQUEST_URI, so it holds whatever path the gallery is installed under.
+RewriteEngine On
+RewriteCond %{REQUEST_URI} ^(.*)/handbuch/(.*)$
+RewriteRule ^ %1/handbuch.php?f=%2 [END]

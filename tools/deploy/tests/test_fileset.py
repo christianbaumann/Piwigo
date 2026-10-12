@@ -164,6 +164,17 @@ def test_the_handbook_ships_with_the_application():
     assert fileset.select(kept) == kept
 
 
+def test_the_handbook_login_entry_and_its_rewrite_ship():
+    """[HAPPY] Without the .htaccess the remote's Apache serves the pages to guests;
+    without the entry and its helpers the rewrite leads nowhere (decision 0063)."""
+    kept = [
+        "handbuch.php",
+        "include/functions_handbuch.inc.php",
+        "handbuch/.htaccess",
+    ]
+    assert fileset.select(kept) == kept
+
+
 def test_the_handbook_toolchain_stays_off_the_web_space():
     """[NEG] The generator/checker scripts need DDEV, php exec and Node — dev-only,
     same posture as the top-level tools/ directory (decision 0022)."""

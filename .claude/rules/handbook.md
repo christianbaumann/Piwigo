@@ -10,6 +10,18 @@ tagging, turning or cropping a photo, and zooming on the picture page (measured 
 rewrites those files. See
 [decision 0024](../../docs/agents/decisions/0024-german-handbook-location-and-demo-content.md).
 
+## Only logged-in users read it
+
+Nothing under `handbuch/` is served directly: nginx (`.ddev/nginx/handbuch.conf`) and Apache
+(`handbuch/.htaccess`, deployed) rewrite `/handbuch/<file>` to the root `handbuch.php`, which sends
+a guest to the login page and serves only `html`, `css` and `png` outside `tools/`
+([decision 0063](../../docs/agents/decisions/0063-the-handbook-is-served-through-a-login-checking-entry.md)).
+A new file type in the handbook (an `svg`, a `js`) is refused until it is added to
+`HANDBUCH_CONTENT_TYPES` in `include/functions_handbuch.inc.php`. The pages and their relative links
+need no change for this; `check.php` reads files on disk and `shoot.js` photographs the gallery, so
+neither goes through the entry. Provenance's `HandbookAccessTest` requests every page, the stylesheet,
+every screenshot and every relative reference through both servers.
+
 ## The three commands
 
 All three are committed and reproducible. Run them in this order when a documented screen changes.
