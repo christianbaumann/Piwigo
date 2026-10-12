@@ -63,34 +63,37 @@ final class RegionDrawerTest extends TestCase
         $this->assertSame($this->userId(Config::normalUsername()), $this->drawnBy(self::JANE));
     }
 
-    /** [HAPPY] A normal user deletes a region they drew. */
-    public function testANormalUserDeletesTheirOwnRegion(): void
+    /** [HAPPY] [ECP] A normal or generic user deletes a region they drew. */
+    #[PHPUnit\Framework\Attributes\DataProvider('unprivilegedRoles')]
+    public function testAnUnprivilegedUserDeletesTheirOwnRegion(string $role): void
     {
-        $this->add('normal', self::JANE, 0.3);
+        $this->add($role, self::JANE, 0.3);
 
-        $res = $this->delete('normal', self::JANE);
+        $res = $this->delete($role, self::JANE);
 
         $this->assertSame('ok', $res['json']['stat'], $res['body']);
         $this->assertSame(array(), $this->namesInFile());
     }
 
-    /** [NEG] A normal user may not delete a region another user drew, and the file keeps it. */
-    public function testANormalUserCannotDeleteAnotherUsersRegion(): void
+    /** [NEG] [ECP] A normal or generic user may not delete a region another user drew, and the file keeps it. */
+    #[PHPUnit\Framework\Attributes\DataProvider('unprivilegedRoles')]
+    public function testAnUnprivilegedUserCannotDeleteAnotherUsersRegion(string $role): void
     {
         $this->add('webmaster', self::JANE, 0.3);
 
-        $res = $this->delete('normal', self::JANE);
+        $res = $this->delete($role, self::JANE);
 
         $this->assertSame(403, (int)($res['json']['err'] ?? 0), $res['body']);
         $this->assertSame(array(self::JANE), $this->namesInFile());
     }
 
-    /** [NEG] A region found in the file is nobody's, so a normal user may not delete it. */
-    public function testANormalUserCannotDeleteNobodysRegion(): void
+    /** [NEG] [ECP] A region found in the file is nobody's, so a normal or generic user may not delete it. */
+    #[PHPUnit\Framework\Attributes\DataProvider('unprivilegedRoles')]
+    public function testAnUnprivilegedUserCannotDeleteNobodysRegion(string $role): void
     {
         $this->seedNobodys();
 
-        $res = $this->delete('normal', self::JANE);
+        $res = $this->delete($role, self::JANE);
 
         $this->assertSame(403, (int)($res['json']['err'] ?? 0), $res['body']);
         $this->assertSame(array(self::JANE), $this->namesInFile());
@@ -98,7 +101,8 @@ final class RegionDrawerTest extends TestCase
 
     /**
      * [DT] An administrator and the webmaster delete any region: another user's
-     * and nobody's.
+     * and nobody's. With the cases above: role (generic, normal, admin,
+     * webmaster) x drawer (own, other, nobody).
      */
     #[PHPUnit\Framework\Attributes\DataProvider('privilegedRoles')]
     public function testAPrivilegedUserDeletesAnyRegion(string $role): void
@@ -119,6 +123,12 @@ final class RegionDrawerTest extends TestCase
     public static function privilegedRoles(): array
     {
         return array('administrator' => array('admin'), 'webmaster' => array('webmaster'));
+    }
+
+    /** Both statuses the plugin admits through !is_a_guest() without is_admin(). */
+    public static function unprivilegedRoles(): array
+    {
+        return array('normal' => array('normal'), 'generic' => array('generic'));
     }
 
     /** [ST] A write that reindexes the photo keeps the drawer of every region it left alone. */
@@ -144,15 +154,16 @@ final class RegionDrawerTest extends TestCase
     }
 
     /**
-     * [HAPPY]/[NEG] The picture page offers a normal user the delete control on
-     * their own region only.
+     * [HAPPY]/[NEG] [ECP] The picture page offers a normal or generic user the
+     * delete control on their own region only.
      */
-    public function testThePageOffersANormalUserDeleteOnlyOnTheirOwnRegion(): void
+    #[PHPUnit\Framework\Attributes\DataProvider('unprivilegedRoles')]
+    public function testThePageOffersAnUnprivilegedUserDeleteOnlyOnTheirOwnRegion(string $role): void
     {
         $this->seedNobodys();
-        $this->add('normal', self::JOHN, 0.7);
+        $this->add($role, self::JOHN, 0.7);
 
-        $markup = $this->pictureMarkup('normal');
+        $markup = $this->pictureMarkup($role);
 
         $this->assertTrue($this->boxHasDelete($markup, $this->regionId(self::JOHN)), 'own region');
         $this->assertFalse($this->boxHasDelete($markup, $this->regionId(self::JANE)), "nobody's region");
@@ -178,6 +189,7 @@ final class RegionDrawerTest extends TestCase
         {
             $credentials = array(
                 'normal'    => array(Config::normalUsername(), Config::normalPassword()),
+                'generic'   => array(Config::genericUsername(), Config::genericPassword()),
                 'admin'     => array(Config::adminUsername(), Config::adminPassword()),
                 'webmaster' => array(Config::username(), Config::password()),
                 );

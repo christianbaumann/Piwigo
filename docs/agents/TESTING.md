@@ -1225,6 +1225,36 @@ Each flip ran the full photoedit integration suite plus `roles.spec.js` and
 
 After every revert the full photoedit integration suite (104 tests) and E2E suite (34) were green.
 
+### persons
+
+| Date | Gate (file:line) | Flip | Expected red rows | Result |
+|---|---|---|---|---|
+| 2026-10-12 | `plugins/persons/main.inc.php:157,169,181` (`admin_only` on rename, delete, rescan) | removed, all three | none: the handlers' `is_webmaster()` refuses the same roles with the same 401 | as expected: RoleMatrixTest + AdminOnlyTest green (42 tests). Shadowed gate, recorded |
+| 2026-10-12 | `plugins/persons/include/ws_functions.inc.php:54` (`persons_check_writer()`, `is_a_guest()`) | `!is_classic_user()` | RoleMatrixTest `add-region` + `delete-region` as generic; RegionDrawerTest and VisibilityTest generic write cases | as expected: exactly those 2 matrix rows + 4 RegionDrawerTest + 2 VisibilityTest generic cases red |
+| 2026-10-12 | `ws_functions.inc.php:155` (`ws_persons_getList`, `is_a_guest()`) | `!is_classic_user()` | `name-list` as generic; VisibilityTest list case generic | as expected (2 red) |
+| 2026-10-12 | `ws_functions.inc.php:247` (`ws_persons_getRegions`, `is_a_guest()`) | `!is_classic_user()` | `overlay` as generic; VisibilityTest 404 case generic | as expected (2 red) |
+| 2026-10-12 | `ws_functions.inc.php:406` (`ws_persons_rename`, `is_webmaster()`) | `is_admin()` | `admin-screen` as admin; AdminOnlyTest admin rename | as expected (2 red) |
+| 2026-10-12 | `ws_functions.inc.php:458` (`ws_persons_delete`, `is_webmaster()`) | `is_admin()` | `admin-screen` as admin; AdminOnlyTest admin delete | as expected (2 red) |
+| 2026-10-12 | `ws_functions.inc.php:494` (`ws_persons_rescan`, `is_webmaster()`) | `is_admin()` | `admin-screen` as admin; AdminOnlyTest admin rescan | as expected (2 red) |
+| 2026-10-12 | `plugins/persons/include/functions.inc.php:1428` (`persons_may_delete_region()`, admin branch) | `if (true)` - anyone deletes any region | `delete-region` as normal and generic; RegionDrawerTest other/nobody/page cases, normal and generic | as expected: 2 matrix rows + 6 RegionDrawerTest cases red |
+| 2026-10-12 | `functions.inc.php:1433` (`persons_may_delete_region()`, drawer branch) | `return false` - a non-admin deletes nothing | `delete-region` as normal and generic; RegionDrawerTest own and page cases | as expected: 2 matrix rows + 4 RegionDrawerTest cases red |
+| 2026-10-12 | `plugins/persons/include/render.inc.php:71` (`DELETABLE`) | `true` | `delete-region` as normal and generic (control shown, write refused: INCONSISTENT); RegionDrawerTest page cases | as expected (4 red) |
+| 2026-10-12 | `plugins/persons/include/events_public.inc.php:32` (overlay, `is_a_guest()`) | `!is_classic_user()` | `overlay`, `add-region`, `delete-region` as generic | as expected (3 red) |
+| 2026-10-12 | `plugins/persons/admin/photo.php:22` (`check_status(ACCESS_ADMINISTRATOR)`) | `ACCESS_CLASSIC` | none: core's admin page check refuses the same roles first | as expected: green (39 tests). Shadowed gate, recorded |
+| 2026-10-12 | `plugins/persons/admin/persons.php:19` (`check_status(ACCESS_ADMINISTRATOR)`) | `ACCESS_CLASSIC` | none, same reason | as expected: green (41 tests). Shadowed gate, recorded |
+| 2026-10-12 | `admin/persons.php:82` (`PERSONS_CAN_EDIT`, `is_webmaster()`) | `is_admin()` | `admin-screen` as admin; AdminPersonsScreenTest admin case | as expected (2 red) |
+| 2026-10-12 | `plugins/persons/include/index.inc.php:563` (`persons_user_can_see_image()`, decisions 0019/0061) | `return true` | no matrix row (the matrix photo is public); VisibilityTest private-album cases for normal, generic, admin | as expected: RoleMatrixTest green, 11 VisibilityTest cases red |
+| 2026-10-12 | `plugins/persons/include/events_photoedit.inc.php:64` (crop refusal, `is_admin()`) | `or true` | no persons row; photoedit `ApplyRegionsTest` refused-crop cases | as expected: persons RoleMatrixTest green, photoedit ApplyRegionsTest 2 cases red |
+| 2026-10-12 | `plugins/persons/main.inc.php` (`persons_add_methods`) | an extra `pwg.persons.zzGuardProbe` registered | RoleMatrixTest guard, naming the method | as expected: "pwg.persons.zzGuardProbe has no row in the role matrix" |
+
+Every flip was applied inside the container under `/tmp/pwg-suite.lock`, with a 3 s wait for opcache, and reverted from a backup; the host `git diff` of the production files was empty after each.
+
+`admin_only` on `pwg.persons.rename|delete|rescan` and `check_status(ACCESS_ADMINISTRATOR)` in
+`admin/photo.php:22` / `admin/persons.php:19` are shadowed: each has a second gate in front of or
+behind it that refuses the same roles with the same answer (the handlers' `is_webmaster()` with a
+401; core's `admin.php`/`admin/plugin.php` access check). Flipping one alone turns nothing red.
+Recorded as a finding, not a gap to close: a test cannot tell two equal refusals apart.
+
 ## Hand-check ledger
 
 For behaviour no automated layer reaches. Each entry records the date, what was checked,

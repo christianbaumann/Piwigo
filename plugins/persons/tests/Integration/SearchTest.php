@@ -158,14 +158,6 @@ final class SearchTest extends TestCase
         $this->assertLessThanOrEqual(PERSONS_SEARCH_MAX_RESULTS, count($res['json']['result']['persons']));
     }
 
-    /** [NEG] A guest may not read the list of people in the gallery. */
-    public function testAGuestIsRejected(): void
-    {
-        $guest = new WsClient();
-        $res = $guest->call('pwg.persons.getList');
-
-        $this->assertSame(401, (int)$res['json']['err'], $res['body']);
-    }
 
     /**
      * [ECP] With image_id, the picker leaves out whoever is already on the photo.

@@ -157,32 +157,6 @@ final class AdminPersonsScreenTest extends TestCase
         }
     }
 
-    /**
-     * [NEG] A logged-in non-administrator does not reach the screen.
-     *
-     * The list names every person in the gallery and offers to delete them, so
-     * the gate is the same ACCESS_ADMINISTRATOR one the tagging screen has.
-     */
-    public function testANormalUserDoesNotReachTheScreen(): void
-    {
-        $this->addRegion();
-
-        $normal = new WsClient();
-        $normal->login(Config::normalUsername(), Config::normalPassword());
-
-        try
-        {
-            $res = $normal->fetchPage('/admin.php?page=plugin-persons');
-
-            $this->assertStringNotContainsString('id="persons-table"', $res['body']);
-            $this->assertStringNotContainsString(self::NAME, $res['body'],
-                'a normal account was shown the person list');
-        }
-        finally
-        {
-            $normal->logout();
-        }
-    }
 
     // ── helpers ───────────────────────────────────────────────────────────
 

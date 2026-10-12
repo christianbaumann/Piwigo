@@ -47,7 +47,7 @@ const SEEDED_PERSONS = array('E2E Overlay Jane', 'E2E Overlay John');
  * Removed by --restore alongside the seeded ones: they are created by the code
  * under test rather than by this script, so nothing else knows they exist.
  */
-const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace', 'E2E Admin Ada');
+const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace', 'E2E Admin Ada', 'E2E Roles Mia');
 
 /**
  * The regions written into the fixture photo.

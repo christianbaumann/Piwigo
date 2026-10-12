@@ -318,18 +318,6 @@ final class PicturePageSourceTest extends TestCase
         );
     }
 
-    /**
-     * [HAPPY] For the webmaster this suite logs in as, every box offers a delete
-     * affordance the editor can bind to. A normal account's are in RegionDrawerTest.
-     */
-    public function testEachBoxCarriesADeleteControlForAnAdministrator(): void
-    {
-        $this->seed($this->twoFaces());
-        $markup = $this->markup($this->page());
-
-        $this->assertCount(2, $this->regionIds(), 'anti-vacuity: the fixture indexed no regions');
-        $this->assertSame(2, substr_count($markup, 'class="person-box-delete"'));
-    }
 
     // ── the person row ────────────────────────────────────────────────────
 

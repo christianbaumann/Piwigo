@@ -40,6 +40,8 @@ class PicturePage {
     this.personRowLinks = page.locator('#standard #Persons dd a');
     /** Core's tag row. Every person is also a tag, so a tagged name lands here too. */
     this.tagRow = page.locator('#standard #Tags');
+    /** The login form a guest is sent to instead of the photo (decision 0055). */
+    this.loginForm = page.locator('input[name="username"]');
     /** Whatever the theme uses to go to the next photo; the click-through spec asserts against it. */
     this.nextLink = page.locator('#linkNext');
 

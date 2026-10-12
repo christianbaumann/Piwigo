@@ -84,23 +84,30 @@ final class VisibilityTest extends TestCase
         $this->assertSame((int)$this->visible['id'], (int)$res['json']['result']['image_id']);
     }
 
-    /** [NEG] A photo in a private album the user has no access to answers 404. */
-    public function testANormalUserGets404ForAnImageInAForbiddenAlbum(): void
+    /**
+     * [NEG] [ECP] A photo in a private album the account has no access to
+     * answers 404 - to a normal and a generic user, and to an administrator,
+     * whom core's album rule binds too (decision 0061).
+     */
+    #[PHPUnit\Framework\Attributes\DataProvider('ungrantedRoles')]
+    public function testAnUngrantedAccountGets404ForAnImageInAForbiddenAlbum(string $role): void
     {
-        $res = $this->ws->call('pwg.persons.getRegions', array('image_id' => $this->hidden['id']));
+        $res = $this->as($role)->call('pwg.persons.getRegions', array('image_id' => $this->hidden['id']));
 
         $this->assertSame('fail', $res['json']['stat'], $res['body']);
         $this->assertSame(404, (int)$res['json']['err']);
     }
 
-    /** [NEG] And so does a write to it - the gate is not read-only. */
-    public function testANormalUserCannotWriteARegionOnAForbiddenImage(): void
+    /** [NEG] [ECP] And so does a write to it - the gate is not read-only. */
+    #[PHPUnit\Framework\Attributes\DataProvider('ungrantedRoles')]
+    public function testAnUngrantedAccountCannotWriteARegionOnAForbiddenImage(string $role): void
     {
-        $res = $this->ws->call('pwg.persons.addRegion', array(
+        $ws = $this->as($role);
+        $res = $ws->call('pwg.persons.addRegion', array(
             'image_id' => $this->hidden['id'],
             'name' => self::JANE,
             'x' => 0.5, 'y' => 0.5, 'w' => 0.2, 'h' => 0.2,
-            'pwg_token' => $this->ws->token(),
+            'pwg_token' => $ws->token(),
             ));
 
         $this->assertSame(404, (int)$res['json']['err'], $res['body']);
@@ -111,20 +118,22 @@ final class VisibilityTest extends TestCase
     }
 
     /**
-     * [NEG] Deleting a region on a hidden photo answers like an unknown region,
+     * [NEG] [ECP] Deleting a region on a hidden photo answers like an unknown region,
      * not with the 403 of a region the caller did not draw (decision 0065):
      * that 403 would confirm the region and its photo exist.
      */
-    public function testDeletingARegionOnAForbiddenImageAnswersLikeAnUnknownOne(): void
+    #[PHPUnit\Framework\Attributes\DataProvider('ungrantedRoles')]
+    public function testDeletingARegionOnAForbiddenImageAnswersLikeAnUnknownOne(string $role): void
     {
         $this->seed($this->hidden, self::JANE);
         $regionId = (int)$this->db->scalar('SELECT id FROM piwigo_person_region WHERE image_id = ' . (int)$this->hidden['id']);
         $this->assertGreaterThan(0, $regionId, 'anti-vacuity: the hidden photo carries no region');
 
-        $forbidden = $this->ws->call('pwg.persons.deleteRegion', array('region_id' => $regionId, 'pwg_token' => $this->ws->token()));
-        $absent = $this->ws->call('pwg.persons.deleteRegion', array(
+        $ws = $this->as($role);
+        $forbidden = $ws->call('pwg.persons.deleteRegion', array('region_id' => $regionId, 'pwg_token' => $ws->token()));
+        $absent = $ws->call('pwg.persons.deleteRegion', array(
             'region_id' => (int)$this->db->scalar('SELECT COALESCE(MAX(id), 0) + 1000 FROM piwigo_person_region'),
-            'pwg_token' => $this->ws->token(),
+            'pwg_token' => $ws->token(),
             ));
 
         $this->assertSame(404, (int)($forbidden['json']['err'] ?? 0), $forbidden['body']);
@@ -159,14 +168,15 @@ final class VisibilityTest extends TestCase
     }
 
     /**
-     * [NEG] A person whose only region is on a photo the caller cannot see is
+     * [NEG] [ECP] A person whose only region is on a photo the caller cannot see is
      * not in the list. Without image_id, the call the finding was about.
      */
-    public function testAPersonOnlyOnAHiddenPhotoIsNotListed(): void
+    #[PHPUnit\Framework\Attributes\DataProvider('ungrantedRoles')]
+    public function testAPersonOnlyOnAHiddenPhotoIsNotListed(string $role): void
     {
         $this->seedJaneHiddenAndJohnVisible();
 
-        $names = $this->listedNames($this->ws, array());
+        $names = $this->listedNames($this->as($role), array());
 
         $this->assertContains(self::JOHN, $names, 'anti-vacuity: the person on the visible photo is missing too');
         $this->assertNotContains(self::JANE, $names);
@@ -262,7 +272,32 @@ final class VisibilityTest extends TestCase
         $this->assertStringNotContainsString('class="errors"', $body);
     }
 
+    /** Every logged-in status without a grant to the private album. */
+    public static function ungrantedRoles(): array
+    {
+        return array('normal' => array('normal'), 'generic' => array('generic'), 'administrator' => array('admin'));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
+
+    /** The normal client of setUp, or a freshly logged-in generic or administrator one. */
+    private function as(string $role): WsClient
+    {
+        if ($role === 'normal')
+        {
+            return $this->ws;
+        }
+
+        if ($role === 'admin')
+        {
+            return $this->administrator();
+        }
+
+        $client = new WsClient();
+        $client->login(Config::genericUsername(), Config::genericPassword());
+
+        return $client;
+    }
 
     /** JANE on the hidden photo, JOHN on the visible one, written into the files and indexed. */
     private function seedJaneHiddenAndJohnVisible(): void

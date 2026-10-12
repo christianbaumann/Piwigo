@@ -69,6 +69,17 @@ class Config
         return self::required(TestUsers::envVars('persons_normal')[1]);
     }
 
+    /** An account of status generic, which every plugin gate must treat like a normal one. */
+    public static function genericUsername(): string
+    {
+        return self::required(TestUsers::envVars('persons_generic')[0]);
+    }
+
+    public static function genericPassword(): string
+    {
+        return self::required(TestUsers::envVars('persons_generic')[1]);
+    }
+
     private static function required(string $envVar): string
     {
         $value = getenv($envVar);

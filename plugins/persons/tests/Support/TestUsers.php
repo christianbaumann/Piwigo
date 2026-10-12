@@ -11,6 +11,9 @@
  *   admin     - an administrator who is not a webmaster: the [NEG] side of the
  *               webmaster-only rename, delete and rescan (decision 0057)
  *   normal    - the [NEG] side of every admin gate: an authenticated non-admin
+ *   generic   - a shared account core gives ACCESS_GUEST; the plugin admits it
+ *               through !is_a_guest(), so its role rows equal normal's, and a
+ *               gate narrowed to is_classic_user() would refuse it
  *
  * The `guest` account ships with Piwigo and is not created here.
  */
@@ -21,6 +24,7 @@ class TestUsers
         'persons_webmaster' => 'webmaster',
         'persons_admin'     => 'admin',
         'persons_normal'    => 'normal',
+        'persons_generic'   => 'generic',
         );
 
     /** Written by create-test-users.php, read by Config, git-ignored under local/. */

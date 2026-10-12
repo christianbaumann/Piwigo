@@ -6,7 +6,9 @@ use PHPUnit\Framework\TestCase;
  *
  * admin_only keeps a normal user out; the handlers refuse an administrator who
  * is not the webmaster (decision 0057). The webmaster's own happy paths are
- * PersonAdminApiTest's.
+ * PersonAdminApiTest's. The guest's refusal is a row of RoleMatrixTest
+ * (persons.admin-screen); the two cases here also pin the refusal code and,
+ * for the administrator, that nothing was written.
  *
  * Renaming or deleting a person rewrites every file carrying them, and a rescan
  * walks whatever it is handed, so none of the three is a photo-level edit the
@@ -119,18 +121,6 @@ final class AdminOnlyTest extends TestCase
             $this->fixture->destroyTestImages();
             $this->fixture->destroyTestAlbums();
             $this->fixture->destroyPersons(array(self::ADMIN_PROBE_NAME, self::ADMIN_PROBE_NAME . ' Renamed'));
-        }
-    }
-
-    /** [NEG] Nor may a guest. */
-    public function testAGuestCannotRenameDeleteOrRescan(): void
-    {
-        $guest = new WsClient();
-
-        foreach (self::GATED as $method => $params)
-        {
-            $res = $guest->call($method, $params + array('pwg_token' => 'anything'));
-            $this->assertSame(401, (int)$res['json']['err'], "$method: " . $res['body']);
         }
     }
 

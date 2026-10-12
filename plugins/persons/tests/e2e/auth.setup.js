@@ -6,6 +6,7 @@ const path = require('path');
 const AUTH_FILE = path.join(__dirname, '.state', 'auth.json');
 const ADMIN_AUTH_FILE = path.join(__dirname, '.state', 'auth-admin.json');
 const ADMINISTRATOR_AUTH_FILE = path.join(__dirname, '.state', 'auth-administrator.json');
+const GENERIC_AUTH_FILE = path.join(__dirname, '.state', 'auth-generic.json');
 
 /**
  * Logs in and saves the session.
@@ -73,4 +74,12 @@ setup('authenticate as administrator', async ({ page }) => {
  */
 setup('authenticate as a non-webmaster administrator', async ({ page }) => {
   await login(page, 'ADMIN', ADMINISTRATOR_AUTH_FILE);
+});
+
+/**
+ * An account of status generic. The plugin admits it through !is_a_guest(), so
+ * roles.spec.js expects of it what it expects of the normal account.
+ */
+setup('authenticate as a generic account', async ({ page }) => {
+  await login(page, 'GENERIC', GENERIC_AUTH_FILE);
 });

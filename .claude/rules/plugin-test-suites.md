@@ -118,8 +118,31 @@ ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
 It writes the git-ignored `local/config/persons-test.env` and creates `persons_webmaster`,
 `persons_admin` (an administrator who is not a webmaster: rename, delete and rescan are the
 webmaster's, decision 0057; an install set up before it must re-run the script, or `auth.setup.js`
-fails on the missing `PERSONS_TEST_ADMIN_*`) and `persons_normal`, and marks the install with a `persons_throwaway_install` config row that
-`FixtureBuilder` refuses to run without. Never point it at a production database.
+fails on the missing `PERSONS_TEST_ADMIN_*`), `persons_normal` and `persons_generic` (core's
+`generic` status, level 0 like normal; an install set up before it must re-run the script, or
+`Config` and `auth.setup.js` fail on the missing `PERSONS_TEST_GENERIC_*`), and marks the install
+with a `persons_throwaway_install` config row that `FixtureBuilder` refuses to run without. Never
+point it at a production database.
+
+`tests/Integration/RoleMatrixTest.php` is persons' executable role matrix: one row per function
+(`persons.overlay`, `names-as-tags`, `add-region`, `delete-region`, `name-list`, `admin-screen`,
+`admin-tagging`) and role (guest, generic, normal, admin, webmaster), 35 rows, the expected levels
+typed from the target matrix of the role-test-coverage design. Each probe reads the function's page
+content, its control and its ws write as that role and folds them into `none`/`see`/`edit`, or
+`INCONSISTENT` when they disagree. `delete-region` reads a region the role drew and one another
+account drew (drawers set in `drawn_by` directly) and reports `own` when only the first is the
+role's (decision 0065). `admin-tagging`'s save is read only where the screen was served, because
+`addRegion` is also the picture page's method. Its guard case asks `reflection.getMethodList` for
+every `pwg.persons.` method (lower bound 7, measured 2026-10-12) and fails naming any that no row
+declares. One login per role for the whole class; the run takes about 2:40 (measured 2026-10-12),
+since every region write runs exiftool. `RegionDrawerTest`'s role x drawer `[DT]` covers generic
+beside normal, and `VisibilityTest`'s private-album `[NEG]` cases run as normal, generic and admin.
+`tests/e2e/roles.spec.js` runs the JS-built cells once per role (guest: the login form, no overlay,
+no editor; every other role: overlay, draw and save, the delete control on its own box and - for
+admin and webmaster only - on a seeded box nobody drew, and the picker offering a known name). It
+uses `auth.setup.js`'s sessions, now four: `auth.json` (normal), `auth-admin.json` (webmaster),
+`auth-administrator.json` (admin) and `auth-generic.json` (generic). The name it creates,
+`E2E Roles Mia`, is in `seed.php`'s `EDITOR_PERSONS`, so `--restore` removes it.
 
 Persons', photoedit's and typetags' `FixtureBuilder` strip every copied photo of its MWG regions,
 `XMP-iptcExt:PersonInImage`, keywords and `XMP-pwginfo` group, and assert none is left (2026-10-09,

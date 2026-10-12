@@ -47,6 +47,36 @@ class WsClient
         );
     }
 
+    /**
+     * A call sent the way a page sends it: with that page as the Referer. Core
+     * reads the user cache differently for a call whose Referer is an admin page
+     * (decision 0061), so a save "from the admin tagging screen" says so.
+     */
+    public function callFrom(string $refererPath, string $method, array $params = array()): array
+    {
+        $params['method'] = $method;
+
+        $ch = curl_init();
+        curl_setopt_array($ch, array(
+            CURLOPT_URL => Config::baseUrl() . '/ws.php?format=json',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => http_build_query($params),
+            CURLOPT_REFERER => Config::baseUrl() . $refererPath,
+            CURLOPT_COOKIEJAR => $this->cookieFile,
+            CURLOPT_COOKIEFILE => $this->cookieFile,
+        ));
+        $body = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return array(
+            'http_code' => $httpCode,
+            'body' => $body,
+            'json' => json_decode($body, true),
+        );
+    }
+
     /** Same call over GET, to characterise the absence of `post_only`. */
     public function callGet(string $method, array $params = array()): array
     {

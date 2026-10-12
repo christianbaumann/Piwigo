@@ -124,20 +124,6 @@ final class AddRegionTest extends TestCase
         $this->assertContains(self::JOHN, $names);
     }
 
-    /** [NEG] A guest may not write regions at all. */
-    public function testGuestIsRejected(): void
-    {
-        $guest = new WsClient();
-        $res = $guest->call('pwg.persons.addRegion', array(
-            'image_id' => $this->image['id'],
-            'name' => self::JANE,
-            'pwg_token' => 'anything',
-            ) + self::BOX);
-
-        $this->assertSame('fail', $res['json']['stat'], $res['body']);
-        $this->assertSame(401, (int)$res['json']['err']);
-        $this->assertNull($this->personId(self::JANE), 'a refused call still wrote a person');
-    }
 
     /** [NEG] A wrong CSRF token is refused with 403. */
     public function testBadTokenIsRejected(): void
