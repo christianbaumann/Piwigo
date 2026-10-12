@@ -39,6 +39,13 @@ define('PERSONS_MIN_BOX_FRACTION', 0.01);
  */
 define('PERSONS_STALE_RATIO_TOLERANCE', 0.02);
 
+/**
+ * The refusal of rename, delete and rescan to an administrator who is not the
+ * webmaster (decision 0057). Told apart from core's admin_only refusal, which
+ * is also a 401.
+ */
+define('PERSONS_WEBMASTER_ONLY_MESSAGE', 'Only the webmaster may do this');
+
 /** The tooltip of a stale region's box, as a language key. */
 define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');
 

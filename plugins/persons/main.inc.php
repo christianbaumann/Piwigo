@@ -141,7 +141,8 @@ function persons_add_methods($arr)
 
   // The three below reach past a single photo - a rename or a delete rewrites
   // every file carrying the person - so the per-image visibility gate cannot
-  // bound them and they are administrator-only instead.
+  // bound them. admin_only keeps normal users out; the handlers themselves
+  // refuse an administrator who is not the webmaster (decision 0057).
   $service->addMethod(
     'pwg.persons.rename',
     'ws_persons_rename',

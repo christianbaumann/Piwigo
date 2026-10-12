@@ -114,8 +114,10 @@ ddev exec bash -c 'set -a; . local/config/persons-test.env; set +a; \
   cd plugins/persons && npx playwright test'
 ```
 
-It writes the git-ignored `local/config/persons-test.env` and creates `persons_webmaster` and
-`persons_normal`, and marks the install with a `persons_throwaway_install` config row that
+It writes the git-ignored `local/config/persons-test.env` and creates `persons_webmaster`,
+`persons_admin` (an administrator who is not a webmaster: rename, delete and rescan are the
+webmaster's, decision 0057; an install set up before it must re-run the script, or `auth.setup.js`
+fails on the missing `PERSONS_TEST_ADMIN_*`) and `persons_normal`, and marks the install with a `persons_throwaway_install` config row that
 `FixtureBuilder` refuses to run without. Never point it at a production database.
 
 Persons', photoedit's and typetags' `FixtureBuilder` strip every copied photo of its MWG regions,
@@ -149,7 +151,8 @@ account can find. It saves a second, webmaster session to `tests/e2e/.state/auth
 well, because the admin tagging screen added in Phase 7 sits behind `ACCESS_ADMINISTRATOR`. The
 `chromium` project runs as the normal account every spec whose file name does **not** start with
 `admin`; `chromium-admin` runs the `admin*.spec.js` ones as the webmaster, and the one spec there
-that proves a normal account is refused overrides the storage state for itself.
+that proves a normal account is refused overrides the storage state for itself, as does the one
+that runs as `persons_admin` (`tests/e2e/.state/auth-administrator.json`).
 
 `tests/e2e/support/seed.php` creates a throwaway album and a copied photo, writes two MWG regions
 into that photo's file with a plain exiftool call, indexes them, and prints the box corners the

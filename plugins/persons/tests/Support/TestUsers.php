@@ -8,6 +8,8 @@
  *
  * Roles, and why each exists:
  *   webmaster - pwg.plugins.performAction and the plugin's admin_only methods
+ *   admin     - an administrator who is not a webmaster: the [NEG] side of the
+ *               webmaster-only rename, delete and rescan (decision 0057)
  *   normal    - the [NEG] side of every admin gate: an authenticated non-admin
  *
  * The `guest` account ships with Piwigo and is not created here.
@@ -17,6 +19,7 @@ class TestUsers
     /** username => Piwigo status */
     public const ROLES = array(
         'persons_webmaster' => 'webmaster',
+        'persons_admin'     => 'admin',
         'persons_normal'    => 'normal',
         );
 

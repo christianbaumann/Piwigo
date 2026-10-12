@@ -18,6 +18,7 @@ const persons_str_scan_failed = '{'%d could not be read'|@translate|escape:javas
 </div>
 
 <div id="persons-admin">
+	{if $PERSONS_CAN_EDIT}
 	<p id="persons-admin-actions">
 		{if !$PERSONS_EXIFTOOL}
 		<span id="persons-rescan-unavailable">{'This server cannot write metadata into image files'|@translate}</span>
@@ -29,6 +30,7 @@ const persons_str_scan_failed = '{'%d could not be read'|@translate|escape:javas
 		</span>
 		{/if}
 	</p>
+	{/if}
 
 	<form id="persons-search" method="get" action="admin.php">
 		<input type="hidden" name="page" value="plugin-persons">
@@ -44,7 +46,7 @@ const persons_str_scan_failed = '{'%d could not be read'|@translate|escape:javas
 				<th>{'Name'|@translate}</th>
 				<th class="persons-number">{'Photos'|@translate}</th>
 				<th class="persons-number">{'Regions'|@translate}</th>
-				<th></th>
+				{if $PERSONS_CAN_EDIT}<th></th>{/if}
 			</tr>
 		</thead>
 		<tbody>
@@ -53,10 +55,12 @@ const persons_str_scan_failed = '{'%d could not be read'|@translate|escape:javas
 				<td class="persons-name">{if $person.URL}<a href="{$person.URL}">{$person.NAME|escape}</a>{else}{$person.NAME|escape}{/if}</td>
 				<td class="persons-number">{$person.PHOTOS}</td>
 				<td class="persons-number">{$person.REGIONS}</td>
+				{if $PERSONS_CAN_EDIT}
 				<td class="persons-row-actions">
 					<a href="#" class="persons-rename">{'Rename'|@translate}</a>
 					<a href="#" class="persons-delete">{'Delete'|@translate}</a>
 				</td>
+				{/if}
 			</tr>
 		{/foreach}
 		</tbody>

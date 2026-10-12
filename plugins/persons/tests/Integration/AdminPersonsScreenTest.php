@@ -111,6 +111,52 @@ final class AdminPersonsScreenTest extends TestCase
         );
     }
 
+    /** [HAPPY] The webmaster gets rename and delete on every row. */
+    public function testTheWebmasterGetsRenameAndDelete(): void
+    {
+        $this->addRegion();
+
+        $row = $this->rowMarkupIn($this->fetchScreen());
+
+        $this->assertStringContainsString('class="persons-rename"', $row);
+        $this->assertStringContainsString('class="persons-delete"', $row);
+    }
+
+    /**
+     * [NEG] An administrator who is not the webmaster sees the list and the
+     * counts, but no rename, delete or rescan (decision 0057).
+     */
+    public function testAnAdministratorSeesTheListButNoControls(): void
+    {
+        $this->addRegion(0.25, 0.25);
+        $this->addRegion(0.75, 0.75);
+
+        $admin = new WsClient();
+        $admin->login(Config::adminUsername(), Config::adminPassword());
+
+        try
+        {
+            $res = $admin->fetchPage('/admin.php?page=plugin-persons');
+            $body = (string)$res['body'];
+            $this->assertSame(200, $res['http_code']);
+            $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen($body),
+                'anti-vacuity: too little was returned to have rendered an admin screen');
+
+            $row = $this->personRowIn($body);
+            $this->assertSame('1', $row['photos']);
+            $this->assertSame('2', $row['regions']);
+
+            $this->assertStringNotContainsString('persons-rename', $body);
+            $this->assertStringNotContainsString('persons-delete', $body);
+            $this->assertStringNotContainsString('id="persons-rescan"', $body);
+            $this->assertStringNotContainsString('id="persons-admin-actions"', $body);
+        }
+        finally
+        {
+            $admin->logout();
+        }
+    }
+
     /**
      * [NEG] A logged-in non-administrator does not reach the screen.
      *
@@ -164,6 +210,15 @@ final class AdminPersonsScreenTest extends TestCase
             'the fixture person has no row on the rendered screen');
 
         return array('person' => $m[1], 'photos' => $m[2], 'regions' => $m[3]);
+    }
+
+    /** The fixture person's whole table row. */
+    private function rowMarkupIn(string $body): string
+    {
+        $pattern = '~<tr data-person="\d+" data-person-name="' . preg_quote(self::NAME, '~') . '".*?</tr>~s';
+        $this->assertSame(1, preg_match($pattern, $body, $m), 'the fixture person has no row on the rendered screen');
+
+        return $m[0];
     }
 
     private function addRegion(float $x = 0.25, float $y = 0.25): void

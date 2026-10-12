@@ -182,6 +182,9 @@ only when persons is among the activated plugins, and reports one `persons` line
 code are in the [README](../../tools/deploy/README.md#the-persons-rescan). What an agent needs
 beside it:
 
+- `pwg.persons.rescan` is the webmaster's
+  ([decision 0057](../../docs/agents/decisions/0057-persons-admin-screen-admin-sees-webmaster-edits.md)),
+  so the deploy's `admin` login must be a webmaster. `install.php` makes the account it creates one.
 - `PERSONS_RESCAN_CHUNK` in `bootstrap.py` mirrors `PERSONS_WRITEBACK_MAX_CHUNK`; the tests read the
   PHP value. Same photo list, same exit-0 policy for failed photos as the photoinfo rescan below.
 - It runs **before** the photoinfo rescan, and the order matters: indexing a photo makes its

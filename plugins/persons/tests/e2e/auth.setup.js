@@ -5,6 +5,7 @@ const path = require('path');
 
 const AUTH_FILE = path.join(__dirname, '.state', 'auth.json');
 const ADMIN_AUTH_FILE = path.join(__dirname, '.state', 'auth-admin.json');
+const ADMINISTRATOR_AUTH_FILE = path.join(__dirname, '.state', 'auth-administrator.json');
 
 /**
  * Logs in and saves the session.
@@ -63,4 +64,13 @@ setup('authenticate', async ({ page }) => {
  */
 setup('authenticate as administrator', async ({ page }) => {
   await login(page, 'WEBMASTER', ADMIN_AUTH_FILE);
+});
+
+/**
+ * An administrator who is not the webmaster: sees the persons screen but may
+ * not rename, delete or rescan (decision 0057). The spec that proves it opens
+ * this session for itself.
+ */
+setup('authenticate as a non-webmaster administrator', async ({ page }) => {
+  await login(page, 'ADMIN', ADMINISTRATOR_AUTH_FILE);
 });

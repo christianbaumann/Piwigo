@@ -47,6 +47,17 @@ class Config
         return self::required(TestUsers::envVars('persons_webmaster')[1]);
     }
 
+    /** An administrator who is not the webmaster, for the [NEG] side of the webmaster gates. */
+    public static function adminUsername(): string
+    {
+        return self::required(TestUsers::envVars('persons_admin')[0]);
+    }
+
+    public static function adminPassword(): string
+    {
+        return self::required(TestUsers::envVars('persons_admin')[1]);
+    }
+
     /** An authenticated non-admin, for the [NEG] side of every admin gate. */
     public static function normalUsername(): string
     {

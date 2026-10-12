@@ -3,7 +3,8 @@ defined('PERSONS_PATH') or die('Hacking attempt!');
 
 /*
  * The persons list: who is in the index, on how many photos, and the three
- * things an administrator can do about it.
+ * things the webmaster can do about it. Any other administrator gets the list
+ * and the counts only (decision 0057).
  *
  * Rename and delete reach past a single photo - both rewrite every file the
  * person appears in - so both go through the administrator-only web-service
@@ -78,6 +79,7 @@ $template->assign(array(
   // nothing to press rather than a button that can only fail.
   'PERSONS_EXIFTOOL'      => persons_exiftool_available(),
   'PERSONS_TOKEN'         => get_pwg_token(),
+  'PERSONS_CAN_EDIT'      => is_webmaster(),
   ));
 
 $template->set_filename('persons_admin_list', realpath(PERSONS_PATH.'template/admin_persons.tpl'));

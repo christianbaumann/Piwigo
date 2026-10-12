@@ -13,7 +13,8 @@ defined('PHPWG_ROOT_PATH') or die('Hacking attempt!');
  *   every write             a matching pwg_token
  *   every photo-level call  the photo passes get_sql_condition_FandF()
  *   rename / delete /
- *   rescan                  admin_only, because each reaches past one photo
+ *   rescan                  admin_only, because each reaches past one photo,
+ *                           and is_webmaster() in the handler (decision 0057)
  *
  * The third check is the one decision 0005 left open for typetags. A photo the
  * caller may not see answers "not found", never "forbidden".
@@ -408,6 +409,11 @@ SELECT r.image_id, r.area_x, r.area_y, r.area_w, r.area_h, p.name
  */
 function ws_persons_rename($params, &$service)
 {
+  if (!is_webmaster())
+  {
+    return persons_webmaster_only_error();
+  }
+
   if (get_pwg_token() != $params['pwg_token'])
   {
     return new PwgError(403, 'Invalid security token');
@@ -433,6 +439,18 @@ function ws_persons_rename($params, &$service)
 }
 
 /**
+ * Rename, delete and rescan are the webmaster's: an administrator sees the
+ * persons screen but changes nothing there (decision 0057). The methods are
+ * admin_only as well, so a normal user is refused by core before this.
+ *
+ * @return PwgError
+ */
+function persons_webmaster_only_error()
+{
+  return new PwgError(401, PERSONS_WEBMASTER_ONLY_MESSAGE);
+}
+
+/**
  * API method: removes a person and their regions from every photo.
  *
  * @param array $params
@@ -443,6 +461,11 @@ function ws_persons_rename($params, &$service)
  */
 function ws_persons_delete($params, &$service)
 {
+  if (!is_webmaster())
+  {
+    return persons_webmaster_only_error();
+  }
+
   if (get_pwg_token() != $params['pwg_token'])
   {
     return new PwgError(403, 'Invalid security token');
@@ -474,6 +497,11 @@ function ws_persons_delete($params, &$service)
  */
 function ws_persons_rescan($params, &$service)
 {
+  if (!is_webmaster())
+  {
+    return persons_webmaster_only_error();
+  }
+
   if (get_pwg_token() != $params['pwg_token'])
   {
     return new PwgError(403, 'Invalid security token');

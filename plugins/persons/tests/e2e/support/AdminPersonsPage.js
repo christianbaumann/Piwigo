@@ -19,6 +19,10 @@ class AdminPersonsPage {
     this.search = page.locator('#persons-search-q');
 
     this.rescanButton = page.locator('#persons-rescan');
+    /** The whole rescan block, rendered (even without exiftool) only for the webmaster. */
+    this.actions = page.locator('#persons-admin-actions');
+    this.renameLinks = page.locator('#persons-table .persons-rename');
+    this.deleteLinks = page.locator('#persons-table .persons-delete');
     /* The run publishes its counters on the element as attributes as well as
        painting a bar, so a spec reads what the run really covered instead of
        measuring an animation mid-transition. */

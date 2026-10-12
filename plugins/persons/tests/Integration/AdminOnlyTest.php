@@ -2,7 +2,11 @@
 use PHPUnit\Framework\TestCase;
 
 /**
- * The three methods that reach beyond one photo are administrator-only.
+ * The three methods that reach beyond one photo are the webmaster's.
+ *
+ * admin_only keeps a normal user out; the handlers refuse an administrator who
+ * is not the webmaster (decision 0057). The webmaster's own happy paths are
+ * PersonAdminApiTest's.
  *
  * Renaming or deleting a person rewrites every file carrying them, and a rescan
  * walks whatever it is handed, so none of the three is a photo-level edit the
@@ -14,6 +18,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class AdminOnlyTest extends TestCase
 {
+    private const ADMIN_PROBE_NAME = 'Persons Admin Gate Probe';
+
+
     private FixtureBuilder $fixture;
     private WsClient $normal;
 
@@ -51,6 +58,68 @@ final class AdminOnlyTest extends TestCase
 
         $this->assertSame('fail', $res['json']['stat'], $res['body']);
         $this->assertSame(401, (int)$res['json']['err'], $res['body']);
+    }
+
+    /**
+     * [NEG] An administrator who is not the webmaster is refused by all three,
+     * with a valid token, on a real person - and the index and the file stay
+     * exactly as they were.
+     */
+    #[PHPUnit\Framework\Attributes\DataProvider('gatedMethods')]
+    public function testAnAdministratorCannotRenameDeleteOrRescan(string $method): void
+    {
+        $db = new Db();
+        $image = $this->fixture->createTestImage();
+        $album = $this->fixture->createTestAlbum('Persons admin gate fixture');
+        $this->fixture->attachImage((int)$image['id'], $album);
+        $this->fixture->invalidateUserCache();
+
+        $webmaster = new WsClient();
+        $webmaster->login(Config::username(), Config::password());
+        $seeded = $webmaster->call('pwg.persons.addRegion', array(
+            'image_id' => (int)$image['id'], 'name' => self::ADMIN_PROBE_NAME,
+            'x' => 0.25, 'y' => 0.25, 'w' => 0.2, 'h' => 0.2,
+            'pwg_token' => $webmaster->token(),
+            ));
+
+        try
+        {
+            $this->assertSame('ok', $seeded['json']['stat'] ?? null, 'could not seed a region: ' . $seeded['body']);
+            $personId = (int)$db->scalar("SELECT id FROM piwigo_persons WHERE name = '" . self::ADMIN_PROBE_NAME . "'");
+            $this->assertGreaterThan(0, $personId, 'anti-vacuity: no person to act on');
+            $regionsBefore = (int)$db->scalar("SELECT COUNT(*) FROM piwigo_person_region WHERE person_id = $personId");
+            $this->assertSame(1, $regionsBefore);
+            clearstatcache();
+            $fileBefore = md5_file($image['file']);
+
+            $params = array(
+                'pwg.persons.rename' => array('person_id' => $personId, 'name' => self::ADMIN_PROBE_NAME . ' Renamed'),
+                'pwg.persons.delete' => array('person_id' => $personId),
+                'pwg.persons.rescan' => array('image_ids' => (string)$image['id']),
+                )[$method];
+
+            $admin = new WsClient();
+            $admin->login(Config::adminUsername(), Config::adminPassword());
+            $res = $admin->call($method, $params + array('pwg_token' => $admin->token()));
+
+            $this->assertSame('fail', $res['json']['stat'], $res['body']);
+            $this->assertSame(401, (int)$res['json']['err'], $res['body']);
+            // Core's admin_only refusal is a 401 too; only this message says the
+            // caller got past it and was stopped by the webmaster check.
+            $this->assertSame(PERSONS_WEBMASTER_ONLY_MESSAGE, $res['json']['message'] ?? null, $res['body']);
+            $this->assertSame(self::ADMIN_PROBE_NAME,
+                $db->scalar("SELECT name FROM piwigo_persons WHERE id = $personId"));
+            $this->assertSame($regionsBefore,
+                (int)$db->scalar("SELECT COUNT(*) FROM piwigo_person_region WHERE person_id = $personId"));
+            clearstatcache();
+            $this->assertSame($fileBefore, md5_file($image['file']), 'the file was rewritten');
+        }
+        finally
+        {
+            $this->fixture->destroyTestImages();
+            $this->fixture->destroyTestAlbums();
+            $this->fixture->destroyPersons(array(self::ADMIN_PROBE_NAME, self::ADMIN_PROBE_NAME . ' Renamed'));
+        }
     }
 
     /** [NEG] Nor may a guest. */

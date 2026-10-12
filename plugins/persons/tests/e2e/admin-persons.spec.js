@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const path = require('path');
 const { seed, restore, personCounts } = require('./support/seed');
 const { AdminPersonsPage } = require('./support/AdminPersonsPage');
 
@@ -81,5 +82,56 @@ test.describe('the persons admin screen', () => {
       await expect(screen.row(name)).toHaveCount(1);
       expect(await screen.counts(name)).toEqual(expected);
     }
+  });
+});
+
+/**
+ * Who may change the index from this screen (decision 0057). The webmaster
+ * gets rename, delete and rescan; any other administrator gets the same list
+ * and counts and none of the three.
+ */
+test.describe('the persons admin screen by role', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  test.beforeEach(() => {
+    seeded = seed('overlay');
+  });
+
+  test.afterEach(() => {
+    restore();
+  });
+
+  test('the webmaster is offered rename, delete and rescan', async ({ page }) => {
+    const screen = new AdminPersonsPage(page);
+    await screen.open();
+
+    const name = seeded.regions[0].name;
+    await expect(screen.row(name)).toHaveCount(1);
+    await expect(screen.row(name).locator('.persons-rename')).toHaveCount(1);
+    await expect(screen.row(name).locator('.persons-delete')).toHaveCount(1);
+    await expect(screen.rescanButton).toBeVisible();
+  });
+
+  test.describe('an administrator who is not the webmaster', () => {
+    test.use({ storageState: path.join(__dirname, '.state', 'auth-administrator.json') });
+
+    test('sees the counts the database holds, and no control to change them', async ({ page }) => {
+      const screen = new AdminPersonsPage(page);
+      await screen.open();
+
+      const names = seeded.regions.map((region) => region.name);
+      expect(names.length).toBeGreaterThan(0);
+      const inDatabase = personCounts();
+
+      for (const name of names) {
+        await expect(screen.row(name)).toHaveCount(1);
+        expect(await screen.counts(name)).toEqual(inDatabase[name]);
+      }
+
+      await expect(screen.renameLinks).toHaveCount(0);
+      await expect(screen.deleteLinks).toHaveCount(0);
+      await expect(screen.actions).toHaveCount(0);
+    });
   });
 });
