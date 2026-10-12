@@ -50,7 +50,7 @@ define('PERSONS_WEBMASTER_ONLY_MESSAGE', 'Only the webmaster may do this');
  * Why a crop is refused, as a language key; the names it would cut away
  * follow it (decision 0065).
  */
-define('PERSONS_CROP_REFUSED_MESSAGE', 'This crop would cut away people another user marked:');
+define('PERSONS_CROP_REFUSED_MESSAGE', 'This crop would remove person marks only an administrator may delete:');
 
 /** The tooltip of a stale region's box, as a language key. */
 define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');

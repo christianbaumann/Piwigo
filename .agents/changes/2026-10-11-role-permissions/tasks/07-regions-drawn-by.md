@@ -46,7 +46,8 @@ Each region records who drew it; a normal user can delete only their own regions
   **Note:** 2026-10-12, after the last code change: persons unit 203 OK, integration 136 OK (1 pre-existing skip), E2E 157 passed; photoedit unit 95 OK, integration 96 OK, E2E 31 passed
 * [x] A normal user cannot crop away a region they did not draw (added 2026-10-12, user decision)
   **Note:** Verified via photoedit `ApplyRegionsTest::testANormalAccountsCropOfAnotherUsersRegionIsRefused` (nobody's and the webmaster's; dry run and write 403, file md5 unchanged), `testANormalAccountCropsAwayItsOwnRegion`, E2E `[NEG] normal: a crop that would cut away a person somebody else marked is refused by name, nothing written`
-* [ ] (manual testing required) The handbook passages in `05-personen.html` and `06-drehen.html` read naturally in German (ledger row 2026-10-12 in `docs/agents/TESTING.md`)
+* [x] The handbook passages in `05-personen.html` and `06-drehen.html` read naturally in German
+  **Note:** reviewed by a critical review agent on the user's request; its fixes applied (ledger row 2026-10-12 in `docs/agents/TESTING.md`), `check.php` OK, photoedit `ApplyRegionsTest` and `other-accounts-save.spec.js` rerun green
 
 ## Implementation notes
 

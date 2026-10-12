@@ -109,10 +109,6 @@
     wenn die Mitte eines markierten Gesichts außerhalb des Zuschnitts liegt oder nur ein kleiner
     Rest davon bleibt. Diese Markierungen werden beim Speichern gelöscht. Alle anderen
     Markierungen wandern mit und sitzen danach wieder auf denselben Gesichtern.
-    Wer kein Administrator ist, kann so nur Markierungen abschneiden, die er selbst gesetzt hat.
-    Würde der Zuschnitt eine Person abschneiden, die jemand anderes markiert hat, speichert die
-    Seite nicht und meldet <em>Dieser Zuschnitt würde Personen abschneiden, die jemand anderes
-    markiert hat:</em> mit den Namen dahinter.
   </li>
   <li>
     <em>Beim Speichern wird das JPEG neu komprimiert, dabei geht etwas Bildqualität
@@ -123,6 +119,15 @@
 
 <p>
   Kommen beide Fälle zusammen, stehen beide Hinweise in derselben Rückfrage.
+</p>
+
+<p>
+  Wer kein Administrator ist, kann per Zuschnitt nur Markierungen entfernen, die er selbst gesetzt
+  hat. Würde der Zuschnitt eine andere Markierung entfernen, eine fremde oder eine, die schon in
+  der Bilddatei stand, speichert die Seite nicht. Sie meldet stattdessen <em>Dieser Zuschnitt
+  würde Personen-Markierungen entfernen, die nur ein Administrator löschen darf:</em> mit den
+  Namen dahinter. Nach <strong>OK</strong> bleibt der Bearbeitungsmodus offen; mit einem
+  kleineren Zuschnitt lässt sich erneut speichern.
 </p>
 
 <h3>Rückgängig machen</h3>

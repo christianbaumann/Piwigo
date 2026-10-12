@@ -21,12 +21,13 @@
  * rectangle a screenshot drags over cannot drift apart.
  *
  * It signs in with the persons suite's test accounts, never a human's: the
- * webmaster for the administration screens, for the photoedit button, which
- * only a webmaster gets, and for the photoinfo editors, which only an
- * administrator gets, persons_normal for the rest of the public
- * page, because the overlay and the tag badges are shown to any logged-in
- * non-guest and shooting them as an administrator would hide a permission
- * mistake.
+ * webmaster for the administration screens and for the photoedit and
+ * photoinfo shots, persons_normal for the rest of the public page, because
+ * the overlay and the tag badges are shown to any logged-in non-guest and
+ * shooting them as an administrator would hide a permission mistake. The
+ * photoedit button and the photoinfo editors are offered to every logged-in
+ * account too (decisions 0059 and 0058); which accounts get them is
+ * photoedit's and photoinfo's own suites' to prove, not a screenshot's.
  *
  * No pixel comparison and no baseline. Rejected as flaky for a photo gallery
  * (docs/agents/TESTING.md:428). What is checked is that every declared file
@@ -406,8 +407,9 @@ async function dragCropEdge(page, edge, fraction) {
 /**
  * One entry per committed screenshot.
  *
- * `role` picks the session: WEBMASTER for administration screens, NORMAL for
- * the public page. The order is the order the handbook reads in.
+ * `role` picks the session: WEBMASTER for administration screens and the
+ * photoedit and photoinfo shots, NORMAL for the rest of the public page. The
+ * order is the order the handbook reads in.
  */
 const SHOTS = [
   {

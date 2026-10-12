@@ -33,6 +33,6 @@ $lang['Index last rebuilt %s'] = 'Index zuletzt aufgebaut am %s';
 $lang['Nobody is tagged yet'] = 'Noch ist niemand markiert';
 $lang['No person matches that search'] = 'Keine Person passt zu dieser Suche';
 
-$lang['This crop would cut away people another user marked:'] = 'Dieser Zuschnitt würde Personen abschneiden, die jemand anderes markiert hat:';
+$lang['This crop would remove person marks only an administrator may delete:'] = 'Dieser Zuschnitt würde Personen-Markierungen entfernen, die nur ein Administrator löschen darf:';
 
 ?>
