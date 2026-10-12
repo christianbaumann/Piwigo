@@ -46,7 +46,8 @@ photo's file. `FixtureBuilder::testImageId()` copies the first gallery PNG into
 `upload/typetags-test/`, in a public album of its own, and the E2E `seed.php` uses it unless given
 `--image=<id>`. `createStripedGroup()` brings a striped group with an emoji and one tag
 (`STRIPED_GROUP_COLOR`, `STRIPED_GROUP_EMOJI`), because the installed palette may hold none; the E2E
-seed takes it as `--with-striped-group`. `VisibilityTest` makes the copy's album private
+seed takes it as `--with-striped-group`, and `--assign-striped` also puts its tag on the copy, so the
+read-only group page (`index.php?/taggroups`), which lists only tags on photos the account sees, shows it. `VisibilityTest` makes the copy's album private
 (`makeTestAlbumPrivate()`, `grantTestAlbumTo()`); `CreationCapTest` starts an account at its daily
 allowance with `seedTypedTagCreations()`, which writes `piwigo_activity` rows under a marker
 `session_idx` that `restore()` deletes. `seed.php --track-tag=<name>` records a tag a spec created
