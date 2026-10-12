@@ -31,6 +31,8 @@ final class RescanTest extends TestCase
         $this->fixture->assertPluginActive('photoinfo');
 
         $this->image = $this->fixture->createTestImage();
+        // The saves refuse a photo the caller cannot see.
+        $this->fixture->placeInPublicAlbum($this->image);
         $this->ws = $this->clientAs(TestUsers::WEBMASTER);
     }
 
@@ -39,6 +41,7 @@ final class RescanTest extends TestCase
         $this->db->query("DELETE FROM piwigo_config WHERE param = '" . self::EXIFTOOL_PATH_PARAM . "'");
         $this->fixture->destroyTestTags();
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
     }
 
     public static function datings(): array

@@ -551,6 +551,53 @@ class FixtureBuilder
     }
 
     /**
+     * Puts a photo into a public album of this suite's own, so every logged-in
+     * account can see it: the save methods refuse a photo the caller cannot see.
+     *
+     * @return int the album's id
+     */
+    public function placeInPublicAlbum(array $image): int
+    {
+        $album = $this->createTestAlbum('photoinfo-test-' . bin2hex(random_bytes(4)));
+        $this->attachImage((int)$image['id'], $album);
+        $this->invalidateUserCache();
+
+        return $album;
+    }
+
+    /** Makes one of this suite's albums private, granted to nobody. */
+    public function makeAlbumPrivate(int $catId): void
+    {
+        if (!in_array($catId, $this->testAlbums, true))
+        {
+            throw new RuntimeException("album $catId is not this suite's own");
+        }
+        $this->db->query("UPDATE `piwigo_categories` SET status = 'private' WHERE id = $catId");
+        $this->db->query("DELETE FROM `piwigo_user_access` WHERE cat_id = $catId");
+        $this->db->query("DELETE FROM `piwigo_group_access` WHERE cat_id = $catId");
+        $this->invalidateUserCache();
+
+        if ($this->db->scalar("SELECT status FROM `piwigo_categories` WHERE id = $catId") !== 'private')
+        {
+            throw new RuntimeException("album $catId did not become private");
+        }
+    }
+
+    /** Grants one account one of this suite's private albums. */
+    public function grantAlbumTo(int $catId, string $username): void
+    {
+        $userId = (int)$this->db->scalar(
+            "SELECT id FROM `piwigo_users` WHERE username = '" . $this->db->escape($username) . "'"
+        );
+        if ($userId <= 0)
+        {
+            throw new RuntimeException("no account named $username");
+        }
+        $this->db->query("INSERT IGNORE INTO `piwigo_user_access` (user_id, cat_id) VALUES ($userId, $catId)");
+        $this->invalidateUserCache();
+    }
+
+    /**
      * Discards every user's cached permission summary, so an album created after
      * it was computed is visible to the accounts that may see it.
      */
@@ -965,6 +1012,7 @@ class FixtureBuilder
         foreach ($this->testAlbums as $id)
         {
             $this->db->query('DELETE FROM `piwigo_image_category` WHERE category_id = ' . (int)$id);
+            $this->db->query('DELETE FROM `piwigo_user_access` WHERE cat_id = ' . (int)$id);
             $this->db->query('DELETE FROM `piwigo_categories` WHERE id = ' . (int)$id);
             if ($this->db->scalar("SHOW TABLES LIKE 'piwigo_provenance_history'") !== null)
             {

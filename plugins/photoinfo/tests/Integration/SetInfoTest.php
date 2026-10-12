@@ -19,6 +19,7 @@ final class SetInfoTest extends TestCase
     private Db $db;
     private FixtureBuilder $fixture;
     private array $image;
+    private int $albumId;
     private WsClient $ws;
 
     protected function setUp(): void
@@ -29,12 +30,14 @@ final class SetInfoTest extends TestCase
         $this->fixture->assertPluginActive('photoinfo');
 
         $this->image = $this->fixture->createTestImage();
+        $this->albumId = $this->fixture->placeInPublicAlbum($this->image);
         $this->ws = $this->clientAs(TestUsers::WEBMASTER);
     }
 
     protected function tearDown(): void
     {
         $this->fixture->destroyTestImages();
+        $this->fixture->destroyTestAlbums();
     }
 
     /** [HAPPY] The text lands in the database and in front of provenance's caption. */
@@ -171,31 +174,108 @@ final class SetInfoTest extends TestCase
         $this->assertSame('vom Admin', $this->fixture->imageRow($this->image['id'])['comment']);
     }
 
-    public static function refusedAccounts(): array
+    /** [ECP] A normal user may save on a photo it can see, and the text reaches the file (decision 0058). */
+    public function testANormalUserMaySave(): void
     {
-        return array(
-            'normal user' => array(TestUsers::NORMAL),
-            'guest' => array(null),
-            );
+        $res = $this->setInfo($this->clientAs(TestUsers::NORMAL), 'vom Benutzer');
+
+        $this->assertTrue($res['json']['result']['written'], $res['body']);
+        $this->assertSame('vom Benutzer', $this->fixture->imageRow($this->image['id'])['comment']);
+        $this->assertSame('vom Benutzer', FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info']);
     }
 
-    /** [NEG] A normal user and a guest are refused, and nothing changes. */
-    #[DataProvider('refusedAccounts')]
-    public function testOthersAreRefused(?string $role): void
+    /** [NEG] A guest is refused, and nothing changes. */
+    public function testAGuestIsRefused(): void
     {
         $this->fixture->setComment($this->image['id'], 'bleibt');
-        $client = $this->clientAs($role);
 
-        $res = $client->call(self::METHOD, array(
+        $res = $this->clientAs(null)->call(self::METHOD, array(
             'image_id' => $this->image['id'],
             'info' => 'überschrieben',
-            'pwg_token' => $role === null ? 'none' : $client->token(),
+            'pwg_token' => 'none',
         ));
 
         $this->assertSame('fail', $res['json']['stat'], $res['body']);
         $this->assertSame(401, $res['json']['err']);
         $this->assertSame('bleibt', $this->fixture->imageRow($this->image['id'])['comment']);
         $this->assertNull(FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info']);
+    }
+
+    /**
+     * [NEG] With guest_access switched on, core lets a guest call the method;
+     * the plugin still refuses it. The config row overrides local/config and is
+     * deleted again in a finally; a run killed in between leaves the gallery
+     * open to guests, so delete the row by hand.
+     */
+    public function testAGuestIsRefusedEvenWithGuestAccessOn(): void
+    {
+        $this->assertNull($this->db->scalar("SELECT value FROM piwigo_config WHERE param = 'guest_access'"),
+            'a guest_access config row exists; delete it if a killed run left it');
+        $this->fixture->setComment($this->image['id'], 'bleibt');
+
+        $this->db->query("INSERT INTO piwigo_config (param, value) VALUES ('guest_access', 'true')");
+        try
+        {
+            $guest = $this->clientAs(null);
+            $res = $guest->call(self::METHOD, array(
+                'image_id' => $this->image['id'],
+                'info' => 'überschrieben',
+                'pwg_token' => $guest->token(),
+            ));
+        }
+        finally
+        {
+            $this->db->query("DELETE FROM piwigo_config WHERE param = 'guest_access'");
+        }
+
+        $this->assertSame(401, $res['json']['err'] ?? null, $res['body']);
+        $this->assertSame('Access denied', $res['json']['message'] ?? null, $res['body']);
+        $this->assertSame('bleibt', $this->fixture->imageRow($this->image['id'])['comment']);
+    }
+
+    public static function accountsWithoutAGrant(): array
+    {
+        return array(
+            'normal user' => array(TestUsers::NORMAL),
+            // Core's rule holds for administrators too (decision 0044).
+            'administrator' => array(TestUsers::ADMIN),
+            );
+    }
+
+    /**
+     * [NEG] A photo in a private album the account has no grant to is answered
+     * like a missing one, and neither the row nor the file changes.
+     */
+    #[DataProvider('accountsWithoutAGrant')]
+    public function testAPhotoInAPrivateAlbumIsRefused(string $role): void
+    {
+        $this->fixture->setComment($this->image['id'], 'bleibt');
+        $this->fixture->makeAlbumPrivate($this->albumId);
+        $client = $this->clientAs($role);
+        clearstatcache();
+        $before = md5_file($this->image['file']);
+
+        $res = $client->call(self::METHOD, array(
+            'image_id' => $this->image['id'],
+            'info' => 'überschrieben',
+            'pwg_token' => $client->token(),
+        ));
+
+        $this->assertSame(404, $res['json']['err'] ?? null, $res['body']);
+        $this->assertSame('bleibt', $this->fixture->imageRow($this->image['id'])['comment']);
+        clearstatcache();
+        $this->assertSame($before, md5_file($this->image['file']), 'the file was rewritten');
+    }
+
+    /** [ST] Granting the private album lets the same account save: the gate is the album, not the role. */
+    public function testAGrantOpensAPrivateAlbum(): void
+    {
+        $this->fixture->makeAlbumPrivate($this->albumId);
+        $this->fixture->grantAlbumTo($this->albumId, Config::credentials(TestUsers::NORMAL)[0]);
+
+        $this->setInfo($this->clientAs(TestUsers::NORMAL), 'freigegeben');
+
+        $this->assertSame('freigegeben', $this->fixture->imageRow($this->image['id'])['comment']);
     }
 
     /** [NEG] A wrong token is refused. */

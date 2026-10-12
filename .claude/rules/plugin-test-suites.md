@@ -302,8 +302,8 @@ ddev exec bash -c 'set -a; . local/config/photoinfo-test.env; set +a; \
 ```
 
 It writes the git-ignored `local/config/photoinfo-test.env` and creates three accounts:
-`photoinfo_webmaster`, `photoinfo_admin` (an administrator who is not a webmaster, since the info
-text is editable by administrators) and `photoinfo_normal`. It marks the install with
+`photoinfo_webmaster`, `photoinfo_admin` (an administrator who is not a webmaster) and
+`photoinfo_normal`, which saves a date and an info text like the others since decision 0058. It marks the install with
 `photoinfo_throwaway_install`, which its `FixtureBuilder` refuses to run without. photoinfo requires
 provenance: both suites need photoinfo **and** provenance active (`FixtureBuilder::assertPluginActive()`).
 `TagWriteTest` and `FreitextAssignTest` also need typetags, `TagWriteTest`'s persons cases persons,
@@ -324,7 +324,11 @@ leaves them off, so reactivate them by hand. `CoreEditWithoutProvenanceTest` doe
 and `CoreEditTest` makes its own copied photos read-only for the failed-write cases.
 `RescanTest` writes a `provenance_exiftool_path` config row pointing at no binary for its
 exiftool-missing case and deletes it in `tearDown`; a killed run leaves every exiftool write in the
-install failing until that row is deleted. `SyncMetadataTest` runs core's metadata sync, but only over
+install failing until that row is deleted. `PicturePageSourceTest`'s guest cases and
+`SetInfoTest::testAGuestIsRefusedEvenWithGuestAccessOn` write a `guest_access` config row, which
+overrides `local/config`, and delete it in `tearDown`/`finally`; a killed run leaves the gallery open
+to guests until that row is deleted (`DELETE FROM piwigo_config WHERE param = 'guest_access'`). Both
+refuse to start while such a row exists. `SyncMetadataTest` runs core's metadata sync, but only over
 its own copied photos: `pwg.images.syncMetadata` with their ids, and `admin.php?page=site_update`
 limited to the fixture's album (`cat`), never the whole gallery.
 

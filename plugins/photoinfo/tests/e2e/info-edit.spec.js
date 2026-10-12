@@ -75,21 +75,16 @@ test('[NEG] a text the file does not take is saved, and the page gives the reaso
 test.describe('as a normal user', () => {
   test.use({ storageState: statePath('NORMAL') });
 
-  test('[NEG] the row is read-only', async ({ page }) => {
-    // A saved text as the administrator, so the row is there to look at.
-    const admin = await page.context().browser().newContext({ storageState: statePath('WEBMASTER') });
-    const adminPicture = new PicturePage(await admin.newPage());
-    await adminPicture.goto(fixture.picture_path);
-    await adminPicture.infoView.click();
-    await adminPicture.infoTextarea.fill('Nur lesen');
-    await adminPicture.saveAndWaitForReload();
-    await admin.close();
-
+  test('[HAPPY] a normal user edits the text, and the file holds it', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(fixture.picture_path);
 
-    await expect(picture.infoText).toContainText('Nur lesen');
-    await expect(picture.infoView).toHaveCount(0);
-    await expect(picture.infoForm).toHaveCount(0);
+    await picture.infoView.click();
+    await picture.infoTextarea.fill('Vom Benutzer');
+    await picture.saveAndWaitForReload();
+
+    await expect(picture.infoView).toContainText('Vom Benutzer');
+    expect(readRow(fixture.image_id).comment).toBe('Vom Benutzer');
+    expect(readFile(fixture.image_id)['XMP-pwginfo:Info']).toBe('Vom Benutzer');
   });
 });

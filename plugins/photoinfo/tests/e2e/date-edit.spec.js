@@ -175,20 +175,16 @@ test('[NEG] a date the file does not take is saved, and the page gives the reaso
 test.describe('as a normal user', () => {
   test.use({ storageState: statePath('NORMAL') });
 
-  test('[NEG] the row is read-only', async ({ page }) => {
-    const admin = await page.context().browser().newContext({ storageState: statePath('WEBMASTER') });
-    const adminPicture = new PicturePage(await admin.newPage());
-    await adminPicture.goto(fixture.picture_path);
-    await adminPicture.dateView.click();
-    await adminPicture.fillDate('1965', '3', '');
-    await adminPicture.saveDateAndWaitForReload();
-    await admin.close();
-
+  test('[HAPPY] a normal user edits the date, and the file holds it', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(fixture.picture_path);
 
-    await expect(picture.dateText).toHaveText('März 1965');
-    await expect(picture.dateView).toHaveCount(0);
-    await expect(picture.dateForm).toHaveCount(0);
+    await picture.dateView.click();
+    await picture.fillDate('1965', '3', '');
+    await picture.saveDateAndWaitForReload();
+
+    await expect(picture.dateView).toHaveText('März 1965');
+    expect(readRow(fixture.image_id).date_creation).toBe('1965-03-01 00:00:00');
+    expect(readDate(fixture.image_id)['XMP-pwginfo:DateEDTF']).toBe('1965-03');
   });
 });

@@ -11,9 +11,10 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
  * core's "Created on" row and its description off the page: the rows show both
  * instead.
  *
- * Everyone reads the rows; an administrator can click one to edit it. A photo
- * with no date or no description gets that row only for an administrator, who
- * needs it to add one.
+ * Everyone reads the rows; every logged-in account can click one to edit it
+ * (decision 0058). A photo with no date or no description gets that row only
+ * for an account that may edit, which needs it to add one. Whoever reaches the
+ * page can see the photo, so the page needs no visibility check of its own.
  *
  * No query of its own: picture.php has already loaded the photo's whole row,
  * photoinfo's columns included, into $picture['current'], and rendered its
@@ -31,7 +32,7 @@ function photoinfo_picture_rows()
   }
 
   $current = $picture['current'];
-  $editable = is_admin();
+  $editable = !is_a_guest();
 
   load_language('plugin.lang', PHOTOINFO_PATH);
 

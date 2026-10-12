@@ -10,7 +10,6 @@ class PicturePage {
   constructor(page) {
     this.page = page;
     this.infoRow = page.locator('#PhotoInfo');
-    this.infoText = page.locator('#PhotoInfo dd');
     this.infoView = page.locator('#photoinfo-info-view');
     this.infoForm = page.locator('#photoinfo-info-form');
     this.infoTextarea = page.locator('#photoinfo-info-form textarea');
@@ -20,7 +19,6 @@ class PicturePage {
     this.coreDescription = page.locator('.imageComment');
 
     this.dateRow = page.locator('#PhotoDate');
-    this.dateText = page.locator('#PhotoDate dd');
     this.dateView = page.locator('#photoinfo-date-view');
     this.datePlaceholder = page.locator('#photoinfo-date-view .photoinfo-placeholder');
     this.dateForm = page.locator('#photoinfo-date-form');

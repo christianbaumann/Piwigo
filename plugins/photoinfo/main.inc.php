@@ -99,9 +99,9 @@ function photoinfo_add_methods($arr)
       'info' => array('default' => '', 'info' => 'The photo\'s description; empty to clear it'),
       'pwg_token' => array(),
       ),
-    'Saves a photo\'s description and writes it into the image file, ahead of its provenance.',
+    'Saves a photo\'s description and writes it into the image file, ahead of its provenance. Any logged-in account, on a photo it can see.',
     PHOTOINFO_PATH . 'include/ws_functions.inc.php',
-    array('admin_only' => true, 'post_only' => true)
+    array('post_only' => true)
   );
 
   // Defaults of '' rather than required: core's ws layer reads an empty string
@@ -120,9 +120,9 @@ function photoinfo_add_methods($arr)
       'end_day' => array('default' => '', 'info' => 'The range end\'s day, or empty when unknown; needs a month'),
       'pwg_token' => array(),
       ),
-    'Saves a photo\'s date - a year, a month or a day, optionally circa, before, after, or a range - and writes it into the image file.',
+    'Saves a photo\'s date - a year, a month or a day, optionally circa, before, after, or a range - and writes it into the image file. Any logged-in account, on a photo it can see.',
     PHOTOINFO_PATH . 'include/ws_functions.inc.php',
-    array('admin_only' => true, 'post_only' => true)
+    array('post_only' => true)
   );
 
   $service->addMethod(

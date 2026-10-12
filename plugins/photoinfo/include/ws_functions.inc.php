@@ -8,7 +8,7 @@ include_once(PHOTOINFO_PATH.'include/rescan.inc.php');
  * Saves one photo's info text and writes it into the image file.
  *
  * The database is written first and stays written when the file write fails:
- * the answer then says so, and the administrator's text is not lost.
+ * the answer then says so, and the text typed in is not lost.
  *
  * @param array $params image_id, info, pwg_token
  * @param object $service
@@ -147,14 +147,24 @@ function ws_photoinfo_rescan($params, &$service)
 }
 
 /**
- * Checks a save request's token and loads the photo it names, with every column
- * a file write needs.
+ * Checks a save request's account and token and loads the photo it names, with
+ * every column a file write needs.
+ *
+ * Any logged-in account may save, but only on a photo it can see (decision
+ * 0058). A photo it cannot see is answered like a missing one, so the answer
+ * does not reveal that a private photo exists (decision 0044).
  *
  * @param array $params image_id, pwg_token
  * @return array|PwgError
  */
 function photoinfo_ws_image($params)
 {
+  // Core already refuses a guest while guest_access is off; this holds when it is on.
+  if (is_a_guest())
+  {
+    return new PwgError(401, 'Access denied');
+  }
+
   if (get_pwg_token() != $params['pwg_token'])
   {
     return new PwgError(403, 'Invalid security token');
@@ -166,12 +176,39 @@ function photoinfo_ws_image($params)
   }
 
   $image = photoinfo_image_row($params['image_id']);
-  if ($image === null)
+  if ($image === null or !photoinfo_image_visible($image['id']))
   {
     return new PwgError(404, 'Invalid image_id');
   }
 
   return $image;
+}
+
+/**
+ * Whether the calling account may see a photo: core's own permission
+ * condition, the rule the gallery uses to show a photo at all. It holds for
+ * administrators too; a private album needs a grant (decision 0044).
+ *
+ * @param int $image_id
+ * @return bool
+ */
+function photoinfo_image_visible($image_id)
+{
+  $query = '
+SELECT DISTINCT image_id
+  FROM '.IMAGE_CATEGORY_TABLE.'
+    INNER JOIN '.IMAGES_TABLE.' ON id = image_id
+  WHERE image_id = '.(int)$image_id.'
+'.get_sql_condition_FandF(
+    array(
+      'forbidden_categories' => 'category_id',
+      'visible_categories' => 'category_id',
+      'visible_images' => 'id',
+      ),
+    '    AND'
+    ).'
+;';
+  return pwg_db_num_rows(pwg_query($query)) > 0;
 }
 
 /**

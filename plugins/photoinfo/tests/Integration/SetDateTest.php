@@ -18,6 +18,7 @@ final class SetDateTest extends TestCase
     private Db $db;
     private FixtureBuilder $fixture;
     private array $image;
+    private int $albumId;
     private WsClient $ws;
 
     protected function setUp(): void
@@ -28,6 +29,7 @@ final class SetDateTest extends TestCase
         $this->fixture->assertPluginActive('photoinfo');
 
         $this->image = $this->fixture->createTestImage();
+        $this->albumId = $this->fixture->placeInPublicAlbum($this->image);
         $this->ws = $this->clientAs(TestUsers::WEBMASTER);
     }
 
@@ -235,10 +237,6 @@ final class SetDateTest extends TestCase
     /** [HAPPY] The calendar lists the photo under its start date. */
     public function testTheCalendarListsThePhotoUnderTheStartDate(): void
     {
-        $album = $this->fixture->createTestAlbum('Photoinfo test ' . bin2hex(random_bytes(4)));
-        $this->fixture->attachImage((int)$this->image['id'], $album);
-        $this->fixture->invalidateUserCache();
-
         $this->setDate($this->ws, '1965', '3', '');
 
         $link = 'picture.php?/' . $this->image['id'] . '/';
@@ -298,25 +296,66 @@ final class SetDateTest extends TestCase
         $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
     }
 
-    public static function refusedAccounts(): array
+    /** [ECP] A normal user may save on a photo it can see, and the date reaches the file (decision 0058). */
+    public function testANormalUserMaySave(): void
+    {
+        $res = $this->setDate($this->clientAs(TestUsers::NORMAL), '1965', '3', '');
+
+        $this->assertTrue($res['json']['result']['written'], $res['body']);
+        $this->assertSame('1965-03-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
+        $this->assertSame('1965-03', FixtureBuilder::readDateTags($this->image['file'])['XMP-pwginfo:DateEDTF']);
+    }
+
+    public static function accountsWithoutAGrant(): array
     {
         return array(
             'normal user' => array(TestUsers::NORMAL),
-            'guest' => array(null),
+            // Core's rule holds for administrators too (decision 0044).
+            'administrator' => array(TestUsers::ADMIN),
             );
     }
 
-    /** [NEG] A normal user and a guest are refused, and nothing changes. */
-    #[DataProvider('refusedAccounts')]
-    public function testOthersAreRefused(?string $role): void
+    /**
+     * [NEG] A photo in a private album the account has no grant to is answered
+     * like a missing one, and neither the row nor the file changes.
+     */
+    #[DataProvider('accountsWithoutAGrant')]
+    public function testAPhotoInAPrivateAlbumIsRefused(string $role): void
     {
+        $this->fixture->makeAlbumPrivate($this->albumId);
         $client = $this->clientAs($role);
+        clearstatcache();
+        $before = md5_file($this->image['file']);
+
+        $res = $this->call($client, '1965', '', '');
+
+        $this->assertSame(404, $res['json']['err'] ?? null, $res['body']);
+        $this->assertNull($this->fixture->imageRow($this->image['id'])['date_creation']);
+        clearstatcache();
+        $this->assertSame($before, md5_file($this->image['file']), 'the file was rewritten');
+    }
+
+    /** [ST] Granting the private album lets the same account save: the gate is the album, not the role. */
+    public function testAGrantOpensAPrivateAlbum(): void
+    {
+        $this->fixture->makeAlbumPrivate($this->albumId);
+        $this->fixture->grantAlbumTo($this->albumId, Config::credentials(TestUsers::NORMAL)[0]);
+
+        $this->setDate($this->clientAs(TestUsers::NORMAL), '1971', '', '');
+
+        $this->assertSame('1971-01-01 00:00:00', $this->fixture->imageRow($this->image['id'])['date_creation']);
+    }
+
+    /** [NEG] A guest is refused, and nothing changes. */
+    public function testAGuestIsRefused(): void
+    {
+        $client = $this->clientAs(null);
         $before = md5_file($this->image['file']);
 
         $res = $client->call(self::METHOD, array(
             'image_id' => $this->image['id'],
             'year' => '1965',
-            'pwg_token' => $role === null ? 'none' : $client->token(),
+            'pwg_token' => 'none',
         ));
 
         $this->assertSame(401, $res['json']['err'] ?? null, $res['body']);
