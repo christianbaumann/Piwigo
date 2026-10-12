@@ -907,3 +907,86 @@ function provenance_clean_note($value)
 {
   return trim(strip_tags((string)$value));
 }
+
+/*
+ * ---------------------------------------------------------------------------
+ * The read-only provenance page: index.php?/provenance/album/<id> and
+ * index.php?/provenance/photo/<id>, open to every logged-in account for an
+ * album or photo it can see.
+ * ---------------------------------------------------------------------------
+ */
+
+/** First URL token of the page's section. */
+define('PROVENANCE_PAGE_SECTION', 'provenance');
+
+/**
+ * Reads the page's route out of the URL tokens core split the request into.
+ *
+ * @param array $tokens e.g. array('provenance', 'album', '12')
+ * @return array|null object and id, or null when the URL is not this page's
+ */
+function provenance_page_route($tokens)
+{
+  if (!isset($tokens[0]) or $tokens[0] !== PROVENANCE_PAGE_SECTION)
+  {
+    return null;
+  }
+
+  if (count($tokens) !== 3
+    or !in_array($tokens[1], provenance_history_objects(), true)
+    or !preg_match('/^[1-9][0-9]{0,9}$/', $tokens[2]))
+  {
+    return array('object' => null, 'id' => 0);
+  }
+
+  return array('object' => $tokens[1], 'id' => (int)$tokens[2]);
+}
+
+/**
+ * The section part of the page's URL, for make_index_url().
+ *
+ * @param string $object 'album' or 'photo'
+ * @param int $id
+ * @return string
+ */
+function provenance_page_section($object, $id)
+{
+  return PROVENANCE_PAGE_SECTION.'/'.$object.'/'.(int)$id;
+}
+
+/**
+ * History field => the l10n key labelling it on the page. A field not listed
+ * here is shown by its stored name.
+ *
+ * @return array
+ */
+function provenance_history_field_label_keys()
+{
+  return array_merge(
+    provenance_caption_label_keys(),
+    array(
+      PROVENANCE_HISTORY_FIELD_FILE       => 'File caption',
+      PROVENANCE_HISTORY_FIELD_FILE_ERROR => 'File error',
+      PROVENANCE_IPTC_CAPTION_TAG         => 'IPTC caption',
+      )
+    );
+}
+
+/**
+ * History source => the l10n key describing it on the page.
+ *
+ * @return array
+ */
+function provenance_history_source_label_keys()
+{
+  return array(
+    'album_edit'   => 'Album edited',
+    'photo_edit'   => 'Photo edited',
+    'apply'        => 'Applied from the album',
+    'inherit'      => 'Inherited from the album',
+    'writeback'    => 'File write-back',
+    'truncation'   => 'Shortened for IPTC',
+    PROVENANCE_HISTORY_SOURCE_MOVE         => 'Moved',
+    PROVENANCE_HISTORY_SOURCE_ALBUM_DELETE => 'Album deleted',
+    );
+}

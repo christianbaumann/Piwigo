@@ -18,6 +18,8 @@ class PicturePage {
     this.row = page.locator('#standard #Provenance');
     this.label = this.row.locator('dt');
     this.value = this.row.locator('dd');
+    /** The row's link to the read-only provenance page. */
+    this.pageLink = this.row.locator('#provenancePageLink');
     /** The row wherever it may be, for the specs that assert it is nowhere. */
     this.rowAnywhere = page.locator('#Provenance');
   }

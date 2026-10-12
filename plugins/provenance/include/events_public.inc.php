@@ -44,7 +44,12 @@ function provenance_picture_row()
     return;
   }
 
-  $template->assign('PROVENANCE_TEXT', $text);
+  $template->assign(array(
+    'PROVENANCE_TEXT' => $text,
+    'PROVENANCE_PAGE_URL' => make_index_url(array(
+      'section' => provenance_page_section('photo', $picture['current']['id']),
+      )),
+    ));
 
   $template->set_prefilter('picture', 'provenance_picture_prefilter');
 }

@@ -1,0 +1,36 @@
+#provenancePage {
+  padding: 0 16px 16px;
+  overflow-wrap: anywhere;
+}
+
+#provenancePageValues dt {
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+#provenancePageValues dd {
+  margin-left: 0;
+  white-space: pre-wrap;
+}
+
+.provenance-page-empty {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+#provenancePage table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#provenancePage th,
+#provenancePage td {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.4);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.provenance-page-text {
+  white-space: pre-wrap;
+}

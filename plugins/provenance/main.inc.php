@@ -67,6 +67,16 @@ if (script_basename() == 'picture')
     EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_public.inc.php');
 }
 
+// The read-only provenance page is a section of index.php, which also carries
+// the album page's link to it.
+if (script_basename() == 'index')
+{
+  add_event_handler('loc_end_section_init', 'provenance_page_section_init',
+    EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_page.inc.php');
+  add_event_handler('loc_end_index', 'provenance_page_end_index',
+    EVENT_HANDLER_PRIORITY_NEUTRAL, PROVENANCE_PATH . 'include/events_page.inc.php');
+}
+
 if (defined('IN_ADMIN'))
 {
   include_once(PROVENANCE_PATH . 'include/events_admin.inc.php');

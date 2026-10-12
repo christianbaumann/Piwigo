@@ -5,7 +5,7 @@ define('PROVENANCE_PATH', dirname(__DIR__) . '/');
 define('PIWIGO_ROOT', dirname(dirname(dirname(__DIR__))) . '/');
 require_once PROVENANCE_PATH . 'include/functions.inc.php';
 // history.inc.php also only declares functions; the shaping half is pure and
-// unit-tested, and the two functions that reach the database are never called
+// unit-tested, and the functions that reach the database are never called
 // unless a test boots the runtime through PiwigoRuntime.
 require_once PROVENANCE_PATH . 'include/history.inc.php';
 

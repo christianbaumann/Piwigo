@@ -24,4 +24,29 @@ $lang['Keep what each photo already has'] = 'Beibehalten, was das Foto bereits h
 $lang['Clear it'] = 'Leeren';
 $lang['Replace it with the destination album\'s'] = 'Durch die des Zielalbums ersetzen';
 
+// The read-only provenance page
+$lang['Not set'] = 'Nicht gesetzt';
+$lang['Change history'] = 'Verlauf';
+$lang['No changes recorded'] = 'Keine Änderungen aufgezeichnet';
+$lang['The newest %d of %d changes'] = 'Die neuesten %d von %d Änderungen';
+$lang['Date'] = 'Datum';
+$lang['Field'] = 'Feld';
+$lang['Before'] = 'Vorher';
+$lang['After'] = 'Nachher';
+$lang['Cause'] = 'Anlass';
+$lang['By'] = 'Von';
+$lang['Details and history'] = 'Details und Verlauf';
+$lang['File caption'] = 'Bildunterschrift in der Datei';
+$lang['File error'] = 'Fehler beim Schreiben der Datei';
+$lang['The file could not be written'] = 'Die Datei konnte nicht beschrieben werden';
+$lang['IPTC caption'] = 'IPTC-Bildunterschrift';
+$lang['Album edited'] = 'Album bearbeitet';
+$lang['Photo edited'] = 'Foto bearbeitet';
+$lang['Applied from the album'] = 'Vom Album übernommen';
+$lang['Inherited from the album'] = 'Vom Album geerbt';
+$lang['File write-back'] = 'In die Datei geschrieben';
+$lang['Shortened for IPTC'] = 'Für IPTC gekürzt';
+$lang['Moved'] = 'Verschoben';
+$lang['Album deleted'] = 'Album gelöscht';
+
 ?>

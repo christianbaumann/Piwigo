@@ -20,10 +20,7 @@ function ws_provenance_getHistory($param, &$service)
     return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid object');
   }
 
-  $where = array(
-    'object = "'.pwg_db_real_escape_string($param['object']).'"',
-    'object_id = '.(int)$param['object_id'],
-    );
+  $conditions = array();
 
   foreach (array('date_min' => '>=', 'date_max' => '<=') as $datefield => $operator)
   {
@@ -37,31 +34,12 @@ function ws_provenance_getHistory($param, &$service)
       return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid '.$datefield);
     }
 
-    $where[] = 'occured_on '.$operator.' "'.pwg_db_real_escape_string($param[$datefield]).'"';
+    $conditions[] = 'occured_on '.$operator.' "'.pwg_db_real_escape_string($param[$datefield]).'"';
   }
 
-  $where = 'WHERE '.implode("\n    AND ", $where);
-
-  list($total_count) = pwg_db_fetch_row(pwg_query('
-SELECT COUNT(*)
-  FROM '.PROVENANCE_HISTORY_TABLE.'
-  '.$where.'
-;'));
-
-  $rows = query2array('
-SELECT id, object, object_id, field, old_value, new_value, source, performed_by, occured_on
-  FROM '.PROVENANCE_HISTORY_TABLE.'
-  '.$where.'
-  ORDER BY occured_on DESC, id DESC
-  LIMIT '.(int)$param['per_page'].'
-;');
-
-  foreach ($rows as $i => $row)
-  {
-    $rows[$i]['id'] = (int)$row['id'];
-    $rows[$i]['object_id'] = (int)$row['object_id'];
-    $rows[$i]['performed_by'] = $row['performed_by'] === null ? null : (int)$row['performed_by'];
-  }
+  $history = provenance_fetch_history($param['object'], $param['object_id'], $param['per_page'], $conditions);
+  $rows = $history['rows'];
+  $total_count = $history['total_count'];
 
   return array(
     'paging' => array(

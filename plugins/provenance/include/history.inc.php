@@ -11,7 +11,8 @@ defined('PROVENANCE_PATH') or die('Hacking attempt!');
  * photos would write 380 rows saying nothing happened.
  *
  * The file declares functions and nothing else. The shaping half below is pure
- * and unit-tested; only provenance_record_changes() touches the database.
+ * and unit-tested; only provenance_record_changes() and provenance_fetch_history()
+ * touch the database.
  */
 
 /**
@@ -193,4 +194,53 @@ function provenance_record_change($object, $object_id, $field, $old, $new, $sour
     'new'       => $new,
     'source'    => $source,
     )));
+}
+
+/**
+ * Reads one object's trail, newest first. The one query behind both
+ * pwg.provenance.getHistory and the read-only provenance page.
+ *
+ * @param string $object 'album' or 'photo', already validated
+ * @param int $object_id
+ * @param int $limit
+ * @param array $conditions further SQL conditions, already escaped
+ * @return array total_count, rows
+ */
+function provenance_fetch_history($object, $object_id, $limit, $conditions = array())
+{
+  $where = array_merge(
+    array(
+      'object = "'.pwg_db_real_escape_string($object).'"',
+      'object_id = '.(int)$object_id,
+      ),
+    $conditions
+    );
+
+  $where = 'WHERE '.implode("\n    AND ", $where);
+
+  list($total_count) = pwg_db_fetch_row(pwg_query('
+SELECT COUNT(*)
+  FROM '.PROVENANCE_HISTORY_TABLE.'
+  '.$where.'
+;'));
+
+  $rows = query2array('
+SELECT id, object, object_id, field, old_value, new_value, source, performed_by, occured_on
+  FROM '.PROVENANCE_HISTORY_TABLE.'
+  '.$where.'
+  ORDER BY occured_on DESC, id DESC
+  LIMIT '.(int)$limit.'
+;');
+
+  foreach ($rows as $i => $row)
+  {
+    $rows[$i]['id'] = (int)$row['id'];
+    $rows[$i]['object_id'] = (int)$row['object_id'];
+    $rows[$i]['performed_by'] = $row['performed_by'] === null ? null : (int)$row['performed_by'];
+  }
+
+  return array(
+    'total_count' => (int)$total_count,
+    'rows' => $rows,
+    );
 }

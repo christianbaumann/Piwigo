@@ -476,6 +476,32 @@ class FixtureBuilder
     }
 
     /**
+     * Makes an album of this suite's private with no grant, so only an account
+     * with access to every album (an administrator) still sees it.
+     */
+    public function makeAlbumPrivate(int $albumId): void
+    {
+        $this->db->query("UPDATE `piwigo_categories` SET status = 'private' WHERE id = $albumId");
+        $this->db->query("DELETE FROM `piwigo_user_access` WHERE cat_id = $albumId");
+        $this->db->query("DELETE FROM `piwigo_group_access` WHERE cat_id = $albumId");
+        $this->invalidateUserCache();
+        if ($this->db->scalar("SELECT status FROM `piwigo_categories` WHERE id = $albumId") !== 'private')
+        {
+            throw new RuntimeException("album $albumId did not become private");
+        }
+    }
+
+    /**
+     * Discards every user's cached permission summary, so an album changed after
+     * it was computed is seen as it now is. Core rebuilds the rows on the next
+     * request.
+     */
+    public function invalidateUserCache(): void
+    {
+        $this->db->query("UPDATE `piwigo_user_cache` SET need_update = 'true'");
+    }
+
+    /**
      * Takes ownership of an album somebody else created, so teardown removes it.
      *
      * An album created through pwg.categories.add is a real category row this
