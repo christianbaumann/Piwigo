@@ -210,6 +210,21 @@ const DEMO_REGION_SLUG = 'sommerfest';
  */
 const DEMO_HISTORY_SLUG = 'sommerfest';
 
+/**
+ * A Colored Tags group of the seed's own, for the read-only group page.
+ *
+ * That page lists every group with every tag the account can see, and real
+ * groups such as Personen hold the names of real people, so shoot.js
+ * photographs this group alone. Unlike DEMO_PHOTO_TAGS it is invented: the
+ * page is the only screen showing a group by itself.
+ */
+const DEMO_TAG_GROUP = array('name' => 'Beispielgruppe', 'color' => '#6FA8DC');
+
+const DEMO_TAG_GROUP_TAGS = array('Beispielschlagwort Laterne', 'Beispielschlagwort Schnee');
+
+/** The photo carrying the demo group's tags; no picture page shot shows it. */
+const DEMO_TAG_GROUP_SLUG = 'winterabend';
+
 // ------------------------------------------------------------------ runtime
 
 define('PHPWG_ROOT_PATH', dirname(__DIR__, 2) . '/');
@@ -856,6 +871,105 @@ function record_demo_history(array $changes, int $ownerId): int
     }
 }
 
+/**
+ * Removes the demo tag group, its tags and their photo links, by name.
+ *
+ * By name, so a seed killed at any point is still undone without a snapshot.
+ * Another tag put into the demo group while it existed is only taken out of
+ * the group, as the plugin does when a group is deleted. Fails if anything
+ * survives.
+ */
+function destroy_demo_tag_group(): void
+{
+    global $prefixeTable;
+
+    $typetagsTable = $prefixeTable . 'typetags';
+    if (pwg_db_num_rows(pwg_query("SHOW TABLES LIKE '$typetagsTable'")) === 0)
+    {
+        return;
+    }
+
+    $group = "'" . pwg_db_real_escape_string(DEMO_TAG_GROUP['name']) . "'";
+    $names = implode(',', array_map(
+        function ($name) { return "'" . pwg_db_real_escape_string($name) . "'"; },
+        DEMO_TAG_GROUP_TAGS
+        ));
+
+    pwg_query('DELETE FROM ' . IMAGE_TAG_TABLE . ' WHERE tag_id IN (SELECT id FROM ' . TAGS_TABLE . " WHERE name IN ($names))");
+    pwg_query('DELETE FROM ' . TAGS_TABLE . " WHERE name IN ($names)");
+    pwg_query('UPDATE ' . TAGS_TABLE . " SET id_typetags = NULL WHERE id_typetags IN (SELECT id FROM $typetagsTable WHERE name = $group)");
+    pwg_query("DELETE FROM $typetagsTable WHERE name = $group");
+
+    $left = pwg_db_fetch_row(pwg_query(
+        'SELECT (SELECT COUNT(*) FROM ' . TAGS_TABLE . " WHERE name IN ($names))"
+        . " + (SELECT COUNT(*) FROM $typetagsTable WHERE name = $group)"
+        ));
+    if ((int)$left[0] !== 0)
+    {
+        fail('the demo tag group or one of its tags survived --restore');
+    }
+}
+
+/**
+ * Creates the demo tag group and its tags on the given photo.
+ *
+ * Refuses names the install already has: the group and its tags are deleted
+ * by name on --restore, so adopting an existing one would delete it.
+ *
+ * @return int the group's id
+ */
+function create_demo_tag_group(int $imageId): int
+{
+    global $prefixeTable;
+
+    $typetagsTable = $prefixeTable . 'typetags';
+    if (pwg_db_num_rows(pwg_query("SHOW TABLES LIKE '$typetagsTable'")) === 0)
+    {
+        fail('the Colored Tags plugin is not installed; 04-schlagworte.html cannot show its group page without it');
+    }
+
+    $existing = pwg_db_fetch_row(pwg_query(
+        "SELECT COUNT(*) FROM $typetagsTable WHERE name = '" . pwg_db_real_escape_string(DEMO_TAG_GROUP['name']) . "'"
+        ));
+    if ((int)$existing[0] !== 0)
+    {
+        fail("this install already has a tag group named '" . DEMO_TAG_GROUP['name'] . "'");
+    }
+    foreach (DEMO_TAG_GROUP_TAGS as $name)
+    {
+        $row = pwg_db_fetch_row(pwg_query(
+            'SELECT COUNT(*) FROM ' . TAGS_TABLE . " WHERE name = '" . pwg_db_real_escape_string($name) . "'"
+            ));
+        if ((int)$row[0] !== 0)
+        {
+            fail("this install already has a tag named '$name'");
+        }
+    }
+
+    single_insert($typetagsTable, array('name' => DEMO_TAG_GROUP['name'], 'color' => DEMO_TAG_GROUP['color']));
+    $groupId = (int)pwg_db_insert_id($typetagsTable);
+
+    $tagIds = array();
+    foreach (DEMO_TAG_GROUP_TAGS as $name)
+    {
+        single_insert(TAGS_TABLE, array('name' => $name, 'url_name' => str2url($name), 'id_typetags' => $groupId));
+        $tagIds[] = (int)pwg_db_insert_id(TAGS_TABLE);
+    }
+
+    add_tags($tagIds, array($imageId));
+
+    $linked = pwg_db_fetch_row(pwg_query(
+        'SELECT COUNT(*) FROM ' . IMAGE_TAG_TABLE . ' AS it INNER JOIN ' . TAGS_TABLE . ' AS t ON t.id = it.tag_id'
+        . ' WHERE it.image_id = ' . $imageId . ' AND t.id_typetags = ' . $groupId
+        ));
+    if ((int)$linked[0] !== count(DEMO_TAG_GROUP_TAGS))
+    {
+        fail('only ' . $linked[0] . ' of ' . count(DEMO_TAG_GROUP_TAGS) . ' demo group tags reached the demo photo');
+    }
+
+    return $groupId;
+}
+
 /** Removes the person rows and the mirrored tags for the given names. */
 function destroy_persons(array $names): void
 {
@@ -902,6 +1016,7 @@ if (isset($args['restore']))
     // screenshot run creates through the browser outlive any snapshot, and a
     // leftover one would appear in the next run's picker.
     destroy_persons(array_merge(DEMO_PERSONS, SHOOT_PERSONS));
+    destroy_demo_tag_group();
 
     // The whole directory belongs to the seed, so anything still in it is a
     // leftover - including a scene drawn by a run that died before its row was
@@ -1123,6 +1238,9 @@ foreach (DEMO_PHOTO_TAGS as $slug => $tagNames)
     }
 }
 
+// Undone by name on --restore, so it needs no snapshot entry.
+$tagGroupId = create_demo_tag_group($photos[DEMO_TAG_GROUP_SLUG]['id']);
+
 // The regions the persons overlay is photographed against.
 $regionPhoto = $photos[DEMO_REGION_SLUG];
 $regions = array();
@@ -1183,6 +1301,8 @@ $result = array(
     // directory. Handed over rather than spelled out again in JavaScript.
     'image_dir' => DEMO_IMAGE_DIR,
     'region_photo_id' => $regionPhoto['id'],
+    // shoot.js photographs this group alone on the group page.
+    'tag_group_id' => $tagGroupId,
     'persons' => DEMO_PERSONS,
     'photos' => array(),
     );

@@ -50,6 +50,11 @@ every seed, so any shot carrying an id, a URL or a sort position differs from th
 7 of the 20 did on the 2026-08-31 run. That is expected. Commit a re-shoot only when the screen it
 shows actually changed; otherwise revert the churn.
 
+The seed's own tag group (`DEMO_TAG_GROUP` in `seed.php`, for shot 28) is a coloured group. The
+picture page offers every coloured tag as a `+` badge (shots 11 and 15) and the admin tag list shows
+every tag (shot 12), so its two tags also appear in those three shots of a run. Those three were committed without them (2026-10-13). A re-shoot that changes one
+of them for another reason carries the two demo badges; that is demo content and acceptable.
+
 `seed.php` inserts and deletes rows, writes image files and rewrites their metadata. Like the
 plugin suites, it refuses to run without the install's `persons_throwaway_install` marker and is
 never safe against a production install. `shoot.js` signs in with the persons suite's test

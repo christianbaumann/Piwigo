@@ -801,6 +801,19 @@ const SHOTS = [
       await shoot(page.locator('#content'), this.file, demo.image_dir);
     },
   },
+  {
+    file: '28-schlagwort-gruppen.png',
+    role: 'NORMAL',
+    async take(page, demo) {
+      // The page lists every group, real ones with real names among them, so
+      // only the seed's own group is in frame.
+      await open(page, '/index.php?/taggroups');
+      const group = page.locator('#typetags-groups .typetags-group[data-group-id="' + demo.tag_group_id + '"]');
+      // A group the account sees no tag of says so instead of listing badges.
+      await group.locator('.typetags-group-tags li').first().waitFor({ timeout: ELEMENT_TIMEOUT });
+      await shoot(group, this.file, demo.image_dir);
+    },
+  },
 ];
 
 // ------------------------------------------------------------------- the run

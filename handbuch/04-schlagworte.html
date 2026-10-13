@@ -17,8 +17,10 @@
   (<code>admin.php?page=tags</code>) angelegt und in den Eigenschaften eines Fotos oder in der
   Stapelverarbeitung zugeordnet.
   Das ist Administratoren vorbehalten; farbige Schlagworte kann jeder angemeldete Benutzer auch
-  auf der Fotoseite setzen. Die Schlagworte eines Fotos werden außerdem in seine Bilddatei
-  geschrieben, siehe <a href="#bilddatei">Schlagworte in der Bilddatei</a>.
+  auf der Fotoseite setzen. Zu welcher Gruppe ein Schlagwort gehört, legen ebenfalls
+  Administratoren fest; ansehen kann die Gruppen jeder angemeldete Benutzer (siehe
+  <a href="#gruppen-ansehen">Schlagwort-Gruppen ansehen</a>). Die Schlagworte eines Fotos
+  werden außerdem in seine Bilddatei geschrieben, siehe <a href="#bilddatei">Schlagworte in der Bilddatei</a>.
 </p>
 
 <h3>Schlagworte anlegen, umbenennen und löschen</h3>
@@ -139,7 +141,7 @@
   </p>
 </div>
 
-<h3>Farbige Schlagworte</h3>
+<h3 id="farbige">Farbige Schlagworte</h3>
 
 <p>
   Ein Schlagwort kann einer Gruppe angehören und trägt dann deren Farbe. Farbige Schlagworte erscheinen auf der Fotoseite und
@@ -226,6 +228,40 @@
     <strong>Name ?</strong>.
   </p>
 </div>
+
+<h3 id="gruppen-ansehen">Schlagwort-Gruppen ansehen</h3>
+
+<p>
+  Welche Gruppen es gibt und welche Schlagworte zu ihnen gehören, zeigt eine eigene Seite. Sie
+  steht jedem angemeldeten Benutzer offen: im Menü der Galerie <strong>Schlagworte</strong>
+  wählen und auf der Seite, die sich öffnet, gleich unter der Kopfzeile auf
+  <strong>Schlagwort-Gruppen</strong> klicken.
+</p>
+
+<figure>
+  <img src="assets/screenshots/28-schlagwort-gruppen.png" alt="Eine Gruppe auf der Seite Schlagwort-Gruppen mit ihrer Farbe und ihren Schlagworten" />
+  <figcaption>Eine Gruppe auf der Seite Schlagwort-Gruppen.</figcaption>
+</figure>
+
+<ul>
+  <li>
+    Jede Gruppe erscheint mit einem farbigen Punkt, ihrem Namen und ihrem Farbwert; bei einer
+    gestreiften Gruppe folgt auf den Farbwert <strong>Gestreift</strong>, eine Gruppe mit Bild
+    zeigt es vor dem Namen.
+  </li>
+  <li>
+    Darunter folgen ihre Schlagworte als farbige Plaketten, aber nur die, die auf einem Foto
+    vorkommen, das der Benutzer sehen kann. Ein Klick auf eine Plakette zeigt die Fotos mit
+    diesem Schlagwort. Hat eine Gruppe kein solches Schlagwort, steht dort
+    <strong>Kein sichtbares Schlagwort</strong>.
+  </li>
+</ul>
+
+<p>
+  Auf dieser Seite lässt sich nichts ändern. Gruppen und ihre Schlagworte werden in der
+  Schlagwortverwaltung festgelegt, wie oben unter <a href="#farbige">Farbige Schlagworte</a>
+  beschrieben.
+</p>
 
 <h3>Farbige Schlagworte auf der Fotoseite setzen</h3>
 
