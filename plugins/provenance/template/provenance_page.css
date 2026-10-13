@@ -3,6 +3,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Some modus skins colour every dt and dd for their dark picture sidebar. */
+#provenancePageValues dt,
+#provenancePageValues dd {
+  color: inherit;
+}
+
 #provenancePageValues dt {
   font-weight: bold;
   margin-top: 8px;
