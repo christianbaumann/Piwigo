@@ -143,3 +143,15 @@ seed.php --scenario=demo  ->  shoot.js  ->  seed.php --restore  ->  check.php
 
 Commit a re-shot image only when its screen changed (04, 11, 27, 28); revert the churn of the
 others (`handbook.md`: a re-shoot is reproducible in content, not byte-for-byte).
+
+## Follow-ups
+
+Found while implementing tasks 01 to 03 (2026-10-13), outside their scope:
+
+| # | Finding | Source |
+|---|---|---|
+| 5 | `26-fotoseite-leiste.png` lacks the *Drehen/Zuschneiden* button a normal account has had since [decision 0059](../../../docs/agents/decisions/0059-photo-edits-are-open-to-every-logged-in-account-that-sees-the-photo.md); shot 11 (re-shot in task 01) shows it. Shots 17, 19, 20 and 22 also differed after the task 01 runs and were reverted unexamined | task 01 notes |
+| 6 | No suite case asserts that *Anlegen "..."* with the full name of a person who is only on photos the account cannot see attaches that existing person ([decision 0061](../../../docs/agents/decisions/0061-persons-list-and-tagging-screen-respect-album-permissions.md)); task 03 witnessed it once with an ad hoc copy of `VisibilityTest`, then deleted it | task 03 notes, `docs/agents/TESTING.md` ledger row of task 03 |
+
+Decision on 6: keep it as a regression test in `plugins/persons/tests/Integration/VisibilityTest.php`,
+next to the cases that leave such a person out of the list, rather than in the hand-check ledger.
