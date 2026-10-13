@@ -790,6 +790,17 @@ const SHOTS = [
       await shoot(page.locator('#imageToolBar'), this.file, demo.image_dir);
     },
   },
+  {
+    file: '27-herkunft-seite.png',
+    role: 'NORMAL',
+    async take(page, demo) {
+      // Reached the way a reader reaches it: the link in the Herkunft row.
+      await open(page, demo.photos.sommerfest.picture_path);
+      await page.click('#Provenance #provenancePageLink');
+      await page.waitForSelector('#provenancePageHistory tbody tr', { timeout: ELEMENT_TIMEOUT });
+      await shoot(page.locator('#content'), this.file, demo.image_dir);
+    },
+  },
 ];
 
 // ------------------------------------------------------------------- the run

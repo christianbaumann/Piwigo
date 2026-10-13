@@ -13,7 +13,8 @@
  * plugin's scaffolding - so it assembles the runtime the way
  * plugins/persons/tests/Support/PiwigoRuntime::boot() does. Everything it then
  * calls is production code: associate_images_to_categories(), set_tags(),
- * update_category(), delete_elements(), delete_categories().
+ * provenance_record_changes(), update_category(), delete_elements(),
+ * delete_categories().
  *
  * Usage:
  *   php handbuch/tools/seed.php --scenario=demo
@@ -196,6 +197,18 @@ const DEMO_PHOTO_TAGS = array(
 
 /** The photo the seeded regions are written into. */
 const DEMO_REGION_SLUG = 'sommerfest';
+
+/**
+ * The photo whose read-only provenance page the handbook shows.
+ *
+ * The seed inserts its rows directly, which writes no history, and an empty
+ * Verlauf would leave half of that page unexplained. So it records the changes
+ * a real inherit and edit of this photo would have recorded, through the
+ * plugin's own provenance_record_changes(), as DEMO_PHOTO_OWNER: the page
+ * names who made each change, and the install's real webmaster must not
+ * appear in a published screenshot.
+ */
+const DEMO_HISTORY_SLUG = 'sommerfest';
 
 // ------------------------------------------------------------------ runtime
 
@@ -742,6 +755,107 @@ function demo_photo_owner_id(): int
     return (int)$row['id'];
 }
 
+/** Loads the provenance plugin's history writer, which the seed calls outside a request. */
+function load_provenance_history(): void
+{
+    global $prefixeTable;
+
+    if (defined('PROVENANCE_HISTORY_TABLE'))
+    {
+        return;
+    }
+    define('PROVENANCE_PATH', PHPWG_ROOT_PATH . 'plugins/provenance/');
+    // main.inc.php defines this when the plugin loads in a request.
+    define('PROVENANCE_HISTORY_TABLE', $prefixeTable . 'provenance_history');
+    if (!is_file(PROVENANCE_PATH . 'include/history.inc.php')
+        or pwg_db_num_rows(pwg_query("SHOW TABLES LIKE '" . PROVENANCE_HISTORY_TABLE . "'")) === 0)
+    {
+        fail('the provenance plugin is not installed; the seed reads and writes its history table');
+    }
+    require_once PROVENANCE_PATH . 'include/functions.inc.php';
+    require_once PROVENANCE_PATH . 'include/history.inc.php';
+}
+
+/**
+ * The SQL condition selecting the history rows about the given album and photos.
+ *
+ * Album and photo ids are reused once the counters are reset, and nothing
+ * deletes history with its object, so rows about an object that once had a
+ * demo id can exist. They describe an object that is gone, and would show up
+ * on the demo page.
+ */
+function demo_history_condition(int $albumId, array $imageIds): string
+{
+    $where = array("(object = 'album' AND object_id = " . $albumId . ')');
+    if (count($imageIds) > 0)
+    {
+        $where[] = "(object = 'photo' AND object_id IN (" . implode(',', array_map('intval', $imageIds)) . '))';
+    }
+
+    return implode(' OR ', $where);
+}
+
+/** The number of history rows about the given album and photos. */
+function count_demo_history(int $albumId, array $imageIds): int
+{
+    $row = pwg_db_fetch_row(pwg_query(
+        'SELECT COUNT(*) FROM ' . PROVENANCE_HISTORY_TABLE . ' WHERE ' . demo_history_condition($albumId, $imageIds)
+        ));
+
+    return (int)$row[0];
+}
+
+/** Removes the history rows about the given album and photos. */
+function delete_demo_history(int $albumId, array $imageIds): void
+{
+    pwg_query('DELETE FROM ' . PROVENANCE_HISTORY_TABLE . ' WHERE ' . demo_history_condition($albumId, $imageIds));
+}
+
+/**
+ * The history the demo photo's provenance page shows: the album's values
+ * arriving by inheritance, then the photo's own note.
+ */
+function demo_history_changes(int $imageId): array
+{
+    $changes = array();
+    $inherited = array(
+        'provenance_physical_album' => DEMO_ALBUM_PROVENANCE['provenance_physical_album'],
+        'provenance_owner' => DEMO_ALBUM_PROVENANCE['provenance_owner'],
+        'provenance_scanned_on' => DEMO_ALBUM_PROVENANCE['provenance_scanned_on'],
+        'provenance_album_note' => DEMO_ALBUM_PROVENANCE['provenance_note'],
+        );
+    foreach ($inherited as $field => $value)
+    {
+        $changes[] = array(
+            'object' => 'photo', 'object_id' => $imageId, 'field' => $field,
+            'old' => null, 'new' => $value, 'source' => 'inherit',
+            );
+    }
+    $changes[] = array(
+        'object' => 'photo', 'object_id' => $imageId, 'field' => 'provenance_note',
+        'old' => null, 'new' => DEMO_PHOTO_TEXTS[DEMO_HISTORY_SLUG]['note'], 'source' => 'photo_edit',
+        );
+
+    return $changes;
+}
+
+/** Records the given changes as the given account; returns the rows written. */
+function record_demo_history(array $changes, int $ownerId): int
+{
+    global $user;
+
+    $webmaster = $user;
+    $user = array('id' => $ownerId);
+    try
+    {
+        return provenance_record_changes($changes);
+    }
+    finally
+    {
+        $user = $webmaster;
+    }
+}
+
 /** Removes the person rows and the mirrored tags for the given names. */
 function destroy_persons(array $names): void
 {
@@ -821,6 +935,16 @@ if (isset($args['restore']))
     {
         delete_categories(array($albumId));
         update_global_rank();
+
+        // Nothing in core or the plugin deletes history with its album or
+        // photo, and the ids come back on the next seed. This also removes rows
+        // left by an earlier, deleted object that had one of these ids.
+        load_provenance_history();
+        delete_demo_history($albumId, $imageIds);
+        if (count_demo_history($albumId, $imageIds) !== 0)
+        {
+            fail('provenance history of the demo album or photos survived --restore');
+        }
     }
 
     invalidate_user_cache();
@@ -963,6 +1087,26 @@ $linked = pwg_db_fetch_row(pwg_query(
 if ((int)$linked[0] !== count($imageIds))
 {
     fail('only ' . $linked[0] . ' of ' . count($imageIds) . ' photos reached the demo album');
+}
+
+// Rows left by a deleted object that had one of the new ids would appear on
+// the demo page; --restore removes them along with the demo's own.
+load_provenance_history();
+delete_demo_history($albumId, $imageIds);
+if (count_demo_history($albumId, $imageIds) !== 0)
+{
+    fail('orphaned provenance history for the demo ids could not be removed');
+}
+$historyPhotoId = $photos[DEMO_HISTORY_SLUG]['id'];
+$changes = demo_history_changes($historyPhotoId);
+$recorded = record_demo_history($changes, $ownerId);
+$stored = pwg_db_fetch_row(pwg_query(
+    'SELECT COUNT(*) FROM ' . PROVENANCE_HISTORY_TABLE . " WHERE object = 'photo' AND object_id = "
+    . $historyPhotoId . ' AND performed_by = ' . $ownerId
+    ));
+if ($recorded !== count($changes) or (int)$stored[0] !== count($changes))
+{
+    fail('only ' . $stored[0] . ' of ' . count($changes) . ' demo provenance history rows reached the database');
 }
 
 foreach (DEMO_PHOTO_TAGS as $slug => $tagNames)
