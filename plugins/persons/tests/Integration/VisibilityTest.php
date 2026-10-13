@@ -199,6 +199,41 @@ final class VisibilityTest extends TestCase
     }
 
     /**
+     * [HAPPY] [ECP] Saving a region under the full name of a person the picker
+     * leaves out attaches that existing person: the list hides them, the
+     * lookup by name does not (decision 0061). A second row would split one
+     * person in two.
+     */
+    public function testSavingTheFullNameOfAHiddenPersonAttachesTheExistingPerson(): void
+    {
+        $this->seedJaneHiddenAndJohnVisible();
+        $untagged = $this->untaggedVisibleImage();
+        $this->assertNotContains(self::JANE, $this->listedNames($this->ws, array('image_id' => $untagged)),
+            'precondition: JANE must be missing from the picker, or the case proves nothing');
+        $janeId = (int)$this->db->scalar(
+            "SELECT id FROM piwigo_persons WHERE name = '" . $this->db->escape(self::JANE) . "'");
+        $this->assertGreaterThan(0, $janeId, 'anti-vacuity: the seeded JANE has no person row');
+
+        $res = $this->ws->call('pwg.persons.addRegion', array(
+            'image_id' => $untagged,
+            'name' => self::JANE,
+            'x' => 0.5, 'y' => 0.5, 'w' => 0.2, 'h' => 0.2,
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? '', $res['body']);
+        $this->assertSame(1, (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM piwigo_persons WHERE name = '" . $this->db->escape(self::JANE) . "'"),
+            'the save created a second person of the same name');
+        $rows = $this->db->query('SELECT person_id FROM piwigo_person_region WHERE image_id = ' . $untagged)
+            ->fetch_all(MYSQLI_NUM);
+        $this->assertSame(array(array($janeId)), array_map(function ($row)
+        {
+            return array((int)$row[0]);
+        }, $rows));
+    }
+
+    /**
      * [ECP] A person with no region left is on no hidden photo, so the list
      * still offers them: the picker's "tagged elsewhere, removed again" state.
      */
