@@ -147,7 +147,7 @@ class FakeGallery:
     # What this fake's gallery is running. A test that needs a *matching* local checkout
     # builds one from this attribute rather than typing the literal a second time.
     VERSION = "17.0.0beta1"
-    ALL_PLUGINS = ("typetags", "provenance", "persons", "photoinfo")
+    ALL_PLUGINS = ("typetags", "provenance", "persons", "photoinfo", "galleryrules")
     # plugin -> the plugin its activate() refuses to run without, as photoinfo's
     # maintain.class.php does.
     REQUIRES = {"photoinfo": "provenance"}

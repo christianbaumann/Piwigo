@@ -357,13 +357,25 @@ def test_an_inactive_plugin_is_activated_while_its_neighbour_is_not(cfg):
     """[DT] The mixed row of the table: state per plugin decides per plugin."""
     gallery = FakeGallery(
         BASE_URL,
-        plugin_states={"typetags": "active", "provenance": "inactive", "persons": "uninstalled", "photoinfo": "active"},
+        plugin_states={
+            "typetags": "active",
+            "provenance": "inactive",
+            "persons": "uninstalled",
+            "photoinfo": "active",
+            "galleryrules": "active",
+        },
     )
     token = bootstrap.login(gallery, cfg)
 
     outcome = bootstrap.activate_plugins(gallery, cfg.site.base_url, token)
 
-    assert outcome == {"typetags": "active", "provenance": "activated", "persons": "activated", "photoinfo": "active"}
+    assert outcome == {
+        "typetags": "active",
+        "provenance": "activated",
+        "persons": "activated",
+        "photoinfo": "active",
+        "galleryrules": "active",
+    }
     assert sorted(call["plugin"] for call in gallery.posts_to("ws.php") if call.get("action") == "activate") == [
         "persons",
         "provenance",
@@ -380,6 +392,17 @@ def test_photoinfo_is_activated_after_provenance(cfg, gallery):
 
     assert "requires provenance" in str(raised.value)
     assert bootstrap.PLUGINS_TO_ACTIVATE.index("provenance") < bootstrap.PLUGINS_TO_ACTIVATE.index("photoinfo")
+
+
+def test_the_deploy_activates_galleryrules(cfg, gallery):
+    """[HAPPY] The fork's core behaviour changes live in plugins/galleryrules; inactive on
+    the remote, none of them would apply there."""
+    token = bootstrap.login(gallery, cfg)
+
+    outcome = bootstrap.activate_plugins(gallery, cfg.site.base_url, token)
+
+    assert outcome.get("galleryrules") == "activated"
+    assert gallery.plugin_states["galleryrules"] == "active"
 
 
 def test_activation_sends_the_token_with_every_action(cfg, gallery):

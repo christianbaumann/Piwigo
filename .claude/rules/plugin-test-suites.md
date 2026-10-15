@@ -7,17 +7,12 @@ covers only what is specific to this repository's plugins.
 
 ## The suites
 
-General test-design, layering, and quality-gate rules (stack-independent) live in
-`.claude/rules/testing.md`, `test-design.md`, `mutation-testing.md`, `e2e-tests.md`,
-`backpressure.md`, and `precommit-hooks.md` — this section covers only what's
-Piwigo/typetags-specific.
-
 `docs/agents/TESTING.md` is the project-facing record: the technique legend, the deliberate
 non-coverage table, the unit suite's mutant table, and the hand-check ledger of what has no
 oracle. Check it before adding a test — an omission there may be a recorded decision rather
 than a gap.
 
-Piwigo core has no test suite. All five plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`, `plugins/photoedit/`, `plugins/photoinfo/`), and all five carry a Playwright suite. The typetags commands:
+Piwigo core has no test suite. All six plugins carry a PHPUnit suite of their own (`plugins/typetags/`, `plugins/provenance/`, `plugins/persons/`, `plugins/photoedit/`, `plugins/photoinfo/`, `plugins/galleryrules/`), and all six carry a Playwright suite. The typetags commands:
 
 ```bash
 # Unit — pure functions, no DDEV, no DB, no HTTP
@@ -39,7 +34,7 @@ No plugin's suite takes a human's login. Each creates its own accounts with gene
 ddev exec php plugins/typetags/tests/Support/create-test-users.php
 ```
 
-That writes the git-ignored `local/config/typetags-test.env` and creates four accounts: `typetags_webmaster`, `typetags_admin` (an administrator who is not a webmaster, level 8), `typetags_normal` and `typetags_generic` (core's `generic` status, which passes `ACCESS_GUEST` only). The script asserts each account's status and level. An install set up before 2026-10-12 must re-run it, or `Config::account()` and `auth.setup.js` fail naming the missing `TYPETAGS_TEST_ADMIN_*` / `TYPETAGS_TEST_GENERIC_*`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `git submodule update --init --recursive` **first** - `plugins/typetags` is a submodule, so a plain clone leaves that directory empty and every typetags command fails on a missing `composer.json` (measured 2026-08-31 against a real clone). Then `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'`, and the same two for `plugins/provenance`, `plugins/persons`, `plugins/photoedit` and `plugins/photoinfo` (none is a submodule, so all four arrive with the clone). Dependency and run output (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by each plugin's own `.gitignore`.
+That writes the git-ignored `local/config/typetags-test.env` and creates four accounts: `typetags_webmaster`, `typetags_admin` (an administrator who is not a webmaster, level 8), `typetags_normal` and `typetags_generic` (core's `generic` status, which passes `ACCESS_GUEST` only). The script asserts each account's status and level. An install set up before 2026-10-12 must re-run it, or `Config::account()` and `auth.setup.js` fail naming the missing `TYPETAGS_TEST_ADMIN_*` / `TYPETAGS_TEST_GENERIC_*`. `tests/Support/Config.php` and `tests/e2e/auth.setup.js` each fail fast naming both the missing variable and the script that creates it. Everything else defaults to DDEV values. Like the provenance script it writes user rows directly and is never safe against a production database. A fresh clone needs `git submodule update --init --recursive` **first** - `plugins/typetags` is a submodule, so a plain clone leaves that directory empty and every typetags command fails on a missing `composer.json` (measured 2026-08-31 against a real clone). Then `ddev exec composer install -d plugins/typetags` and `ddev exec bash -c 'cd plugins/typetags && npm install'`, and the same two for `plugins/provenance`, `plugins/persons`, `plugins/photoedit`, `plugins/photoinfo` and `plugins/galleryrules` (none is a submodule, so all five arrive with the clone). Dependency and run output (`vendor/`, `node_modules/`, `test-results/`, `playwright-report/`, the pinned browser cache, the E2E suite's `tests/e2e/.state/`) is git-ignored by each plugin's own `.gitignore`.
 
 typetags' fixtures never tag a real photo: with photoinfo active every tag change rewrites the
 photo's file. `FixtureBuilder::testImageId()` copies the first gallery PNG into
@@ -473,6 +468,15 @@ prints the Freitext group's colour and emoji as the browser reports them (`freit
 `freitext_emoji`), and `--track-tag=<name>` records a tag the browser created, printing its id and
 group, so `--restore` deletes it; `tags-freitext.spec.js` uses both.
 
+The galleryrules suite (the fork's core behaviour changes) works the same way: four `galleryrules_*`
+accounts, the `galleryrules_throwaway_install` marker; `PluginActivationTest` deactivates it once.
+```bash
+ddev exec php plugins/galleryrules/tests/Support/create-test-users.php  # once; rotates passwords
+ddev exec plugins/galleryrules/vendor/bin/phpunit --testsuite unit --configuration plugins/galleryrules/phpunit.xml
+ddev exec bash -c 'set -a; . local/config/galleryrules-test.env; set +a; plugins/galleryrules/vendor/bin/phpunit --testsuite integration --configuration plugins/galleryrules/phpunit.xml'
+ddev exec bash -c 'set -a; . local/config/galleryrules-test.env; set +a; cd plugins/galleryrules && npx playwright test'
+```
+
 E2E layout: `playwright.config.js` sits at the submodule root so the command above needs no `--config`, with `testDir: './tests/e2e'`. Every locator lives in a page object under `tests/e2e/support/` (`PicturePage.js`, `AlbumPropertiesPage.js`, `PhotoPropertiesPage.js`, `BatchManagerPage.js`) — specs orchestrate and assert, and a locator in a spec file is a bug. `retries: 0`, `workers: 1`: a flaky test gets fixed, never retried into green.
 
 **Clear `_data/templates_c/` after editing a Smarty prefilter.** `Template::set_prefilter()` hashes only the filter's *callback name* into Smarty's `compile_id` (`include/template.class.php:1060-1070`), not the callback's source. Editing `typetags_picture_prefilter()` therefore leaves the previously compiled `picture.tpl` in place, and the page — and the integration suite reading it — keeps showing the old injection with no error. An edit to an *included* plugin `.tpl` needs no purge ([decision 0036](../../docs/agents/decisions/0036-prefilters-include-plugin-templates.md)).
@@ -481,7 +485,7 @@ Browser-level verification is done with `uvx rodney` (drive Chrome) and `uvx sho
 
 ## No lint, no CI
 
-Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit` and `plugins/photoinfo` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
+Piwigo core has no `composer.json`, no `package.json`, no `.github/`, no CI pipeline, and no linter or static-analysis config (no PHP_CodeSniffer, PHPStan, or Psalm). The plugins are the exception: `plugins/typetags`, `plugins/provenance`, `plugins/persons`, `plugins/photoedit`, `plugins/photoinfo` and `plugins/galleryrules` each carry their own `composer.json` (PHPUnit) and `package.json` (Playwright), all dev-only, with `vendor/` and `node_modules/` git-ignored per plugin.
 
 The mechanical checks available are:
 

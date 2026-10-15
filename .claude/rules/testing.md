@@ -66,11 +66,11 @@ is one command, and nobody has to hand their own credentials to a test run or to
 - These accounts are dev-install scaffolding. Like the suites themselves, the script is never
   safe to point at production, and that is stated where the command is documented.
 
-In this repo, all five plugins follow this: `tests/Support/TestUsers.php` declares the roles,
+In this repo, all six plugins follow this: `tests/Support/TestUsers.php` declares the roles,
 `create-test-users.php` creates them, and the credentials land in a git-ignored
 `local/config/<plugin>-test.env`. Each plugin has `<plugin>_webmaster`, `<plugin>_admin` (an
 administrator who is not a webmaster), `<plugin>_normal` and `<plugin>_generic` (core's `generic`
-status) for typetags, provenance, persons, photoedit and photoinfo (2026-10-12).
+status) for typetags, provenance, persons, photoedit, photoinfo (2026-10-12) and galleryrules (2026-10-15).
 
 ## Suite hygiene
 

@@ -7,6 +7,7 @@
 !/plugins/persons
 !/plugins/photoedit
 !/plugins/photoinfo
+!/plugins/galleryrules
 /themes/*
 !/themes/index.php
 !/themes/default
