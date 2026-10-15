@@ -14,6 +14,7 @@ not in them.
 | 05 remote hides PHP errors | `4e7917981`, ledger entry in `8ede68ae5` |
 | 06 test-user scripts CLI only | `7129dfa67` (+ typetags submodule `b0c63cc`, **not pushed**) |
 | 14 photoedit copies and sidecars | `8ee8af949` |
+| 07 typetags plain names, addNewTag refusal | see `git log` (typetags `6a5b7b4`, **not pushed**) |
 
 Task 38 (two failing baseline tests) was added in `8ede68ae5`; not started.
 
@@ -28,9 +29,8 @@ were reserved but not used; the next free number is 0070.
 
 ## Open items needing the user
 
-- **typetags push refused (403):** git used another GitHub account's credentials. Until
-  `git -C plugins/typetags push` succeeds, a fresh clone's `git submodule update` fails on
-  `b0c63cc`. Recorded in `docs/backlog.md`. Every later typetags task adds to the unpushed stack.
+- **typetags push refused (403, `dark-sith-lord`):** `b0c63cc` reached the remote, but `6a5b7b4`
+  (task 07) and later typetags commits stay unpushed until the user pushes. Recorded in `docs/backlog.md`.
 - **Remote `display_errors` re-check:** after the next deploy, the remote phpinfo should read
   `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). A deploy
   changes the live web space; ask before running it.

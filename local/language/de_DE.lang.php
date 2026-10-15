@@ -41,6 +41,7 @@ $lang['Add the tag'] = 'Hinzufügen';
 $lang['The tag was not saved'] = 'Das Schlagwort wurde nicht gespeichert';
 $lang['Invalid tag name'] = 'Ungültiger Schlagwortname';
 $lang['You have typed in too many new tags today'] = 'Heute wurden schon zu viele neue Schlagworte eingegeben';
+$lang['Photo is in no visible album'] = 'Foto ist in keinem sichtbaren Album';
 $lang['Couleur'] = 'Farbe';
 
 // Core German strings replaced on purpose (docs/agents/decisions/0052): core's own

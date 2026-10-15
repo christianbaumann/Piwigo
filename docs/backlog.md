@@ -25,7 +25,7 @@ is generated. `tools/deploy/README.md` has the full list.)*
 
 ## misc
 
-- (open) typetags submodule commit `b0c63cc` (test-user script CLI-only, change `2026-10-15-exploratory-testing-answers` task 06) is not pushed to `github.com/christianbaumann/Piwigo-Colored-Tags`: the push on 2026-10-15 was refused (credentials of another GitHub account). Until it is pushed, a fresh clone's `git submodule update` fails on the recorded pointer
+- (open) typetags submodule commits are not pushed to `github.com/christianbaumann/Piwigo-Colored-Tags` from `6a5b7b4` (task 07 of change `2026-10-15-exploratory-testing-answers`) on: the agent's push is refused with 403 (`denied to dark-sith-lord`, another GitHub account's credentials). Until pushed, a fresh clone's `git submodule update` fails on the recorded pointer. (`b0c63cc`, task 06, reached the remote 2026-10-15.)
 - (open) typetags `CreationCapTest::testTheLastTagOfTheDayIsCreated` fails on a day the `typetags_normal` account already created tags (other suites' runs): `seedTypedTagCreations()` seeds `TYPETAGS_NEW_TAGS_PER_DAY - 1` rows on top of the existing ones instead of forcing the count. Seen 2026-10-15 (3 earlier rows)
 - (open) persons `IndexRebuildTest` fails while a leftover person `D'Arcy "R" & Töchter` (seen 2026-10-15, id 157) is in `piwigo_persons`: the rescan hits a duplicate key on it. Related to task 16 of change `2026-10-15-exploratory-testing-answers` (names unslashed)
 - l10n('Invalid tag name') has no translation

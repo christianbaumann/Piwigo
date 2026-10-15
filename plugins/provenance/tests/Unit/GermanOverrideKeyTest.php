@@ -144,6 +144,11 @@ final class GermanOverrideKeyTest extends TestCase
                 "l10n('Invalid tag name')",
                 2,
             ),
+            'Photo is in no visible album' => array(
+                'plugins/typetags/main.inc.php',
+                "l10n('Photo is in no visible album')",
+                1,
+            ),
             'Create' => array(
                 'plugins/typetags/template/tags.tpl',
                 "{'Create'|translate}",
