@@ -776,6 +776,8 @@ UPDATE '.CATEGORIES_TABLE.'
   WHERE id IN ('.implode(',', $subcats).')';
     pwg_query($query);
   }
+
+  invalidate_user_cache();
 }
 
 /**
