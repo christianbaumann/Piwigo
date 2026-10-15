@@ -55,8 +55,10 @@ function provenance_page_section_init()
   $page['items'] = array();
   $page['start'] = 0;
   $page['title'] = strip_tags($title);
+  // The name is already HTML: core's render events made it, and galleryrules
+  // escapes it there (decision 0073). Escaping it again would show "&amp;".
   $page['section_title'] = '<a href="'.get_gallery_home_url().'">'.l10n('Home').'</a>'
-    .$conf['level_separator'].htmlspecialchars($title);
+    .$conf['level_separator'].$title;
   unset($page['category'], $page['is_homepage']);
 
   $template->assign('PROVENANCE_PAGE', array(

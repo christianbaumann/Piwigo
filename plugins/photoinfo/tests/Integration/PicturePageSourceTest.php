@@ -117,12 +117,15 @@ final class PicturePageSourceTest extends TestCase
         $this->assertSame(1, substr_count($page, self::FORM));
     }
 
-    /** [HAPPY] The row renders the description the way core rendered it above the photo. */
+    /**
+     * [HAPPY] The row renders the description the way core renders it above the
+     * photo: as text, markup included, since galleryrules escapes it (decision 0073).
+     */
     public function testTheRowRendersMarkupLikeCore(): void
     {
         $this->fixture->setComment($this->image['id'], 'Oma <b>und</b> Opa');
 
-        $this->assertStringContainsString('Oma <b>und</b> Opa', $this->rowOf($this->pageAs(TestUsers::NORMAL)));
+        $this->assertStringContainsString('Oma &lt;b&gt;und&lt;/b&gt; Opa', $this->rowOf($this->pageAs(TestUsers::NORMAL)));
     }
 
     /** [HAPPY] The editor's textarea holds the raw text, escaped. */

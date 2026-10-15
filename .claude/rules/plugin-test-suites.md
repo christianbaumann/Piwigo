@@ -469,7 +469,7 @@ prints the Freitext group's colour and emoji as the browser reports them (`freit
 group, so `--restore` deletes it; `tags-freitext.spec.js` uses both.
 
 The galleryrules suite (the fork's core behaviour changes) works the same way: four `galleryrules_*`
-accounts, the `galleryrules_throwaway_install` marker; `PluginActivationTest` deactivates it once.
+accounts, the `galleryrules_throwaway_install` marker; `PluginActivationTest` deactivates it once. Photos are generated PNGs in `upload/galleryrules-test/`, never scans; E2E `seed.php --scenario=payload`, `--restore`.
 ```bash
 ddev exec php plugins/galleryrules/tests/Support/create-test-users.php  # once; rotates passwords
 ddev exec plugins/galleryrules/vendor/bin/phpunit --testsuite unit --configuration plugins/galleryrules/phpunit.xml
