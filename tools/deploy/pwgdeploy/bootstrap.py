@@ -213,6 +213,7 @@ def config_php(site: SiteConfig, mail: MailConfig | None = None) -> str:
     `assume_https` is written even though nothing in core reads it — it is what the local
     install carries, and dropping it is a separate decision from this tool.
     `guest_access` is off on every target: guests are locked out (decision 0055).
+    `show_php_errors_on_frontend` is off: no stack trace reaches a visitor (decision 0069).
     """
     return (
         "<?php\n"
@@ -220,6 +221,7 @@ def config_php(site: SiteConfig, mail: MailConfig | None = None) -> str:
         "it is overwritten on deploy.\n"
         f"$conf['assume_https'] = {'true' if site.assume_https else 'false'};\n"
         "$conf['guest_access'] = false;\n"
+        "$conf['show_php_errors_on_frontend'] = false;\n"
         f"$conf['provenance_exiftool_path'] = {_php_string(site.exiftool_path)};\n"
         f"$conf['persons_exiftool_path'] = {_php_string(site.exiftool_path)};\n"
         + (_mail_php(mail) if mail else "")

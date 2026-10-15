@@ -193,6 +193,15 @@ def test_generated_config_locks_guests_out():
     assert "$conf['guest_access'] = false;" in php
 
 
+def test_generated_config_hides_php_errors_from_visitors():
+    """[HAPPY] Core's default is true (include/config_default.inc.php:554), which turns
+    display_errors on (include/common.inc.php:95); off, a stack trace with server paths
+    reaches only the server log (decision 0069)."""
+    php = bootstrap.config_php(config(site={"assume_https": False}).site)
+
+    assert "$conf['show_php_errors_on_frontend'] = false;" in php
+
+
 def test_generated_config_reflects_assume_https_false():
     """[ECP] The other side of the boolean partition — PHP has no `False`."""
     php = bootstrap.config_php(config(site={"assume_https": False}).site)
