@@ -129,3 +129,28 @@ test.describe('a failed tag write on the picture page', () => {
     await expect(picture.tagLink(tag.tag_id)).toHaveCount(1);
   });
 });
+
+test.describe('a tag call that changes nothing on the picture page', () => {
+  test.afterEach(async () => {
+    restore();
+  });
+
+  // photoinfo answers an unchanged photo with tags_written false and no
+  // reason (design 2026-10-15); typetags' script treats false as a failure,
+  // so the page must still show no warning text.
+  test('[NEG] typing the name of a tag the photo carries shows no warning', async ({ page }) => {
+    const photo = seed('photo');
+    const name = `Kirmes twice ${RUN}`;
+    const picture = new PicturePage(page);
+    await picture.goto(photo.picture_path);
+    expect((await picture.addNewTag(name)).tags_written).toBe(true);
+    trackTag(name);
+
+    const answer = await picture.addNewTag(name);
+
+    expect(answer.tags_written).toBe(false);
+    expect(answer.tags_message_l10n).toBeUndefined();
+    await expect(picture.tagWarning).toHaveText('');
+    await expect(picture.tagWarning).not.toBeVisible();
+  });
+});

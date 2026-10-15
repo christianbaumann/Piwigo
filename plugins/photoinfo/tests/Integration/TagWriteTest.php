@@ -207,6 +207,49 @@ final class TagWriteTest extends TestCase
         $this->assertArrayNotHasKey('tags_message_l10n', $res['json']['result']);
     }
 
+    /**
+     * [NEG] Removing a tag the photo does not carry changes nothing, so the
+     * file is not written: same bytes, no _original copy, tags_written false
+     * (design 2026-10-15 "Tags are written to the file only on a real change").
+     */
+    public function testRemovingAnAbsentTagLeavesTheFileUntouched(): void
+    {
+        $kirmes = $this->tag('Kirmes', $this->group);
+        $before = $this->fileState($this->image);
+        $this->assertFalse($before['original'], 'anti-vacuity: the copy has an _original already');
+
+        $res = $this->ws->call('typetags.image.removeTag',
+            array('image_id' => $this->image['id'], 'tag_id' => $kirmes, 'pwg_token' => $this->ws->token()));
+
+        $this->assertOk($res);
+        $this->assertTagsNotWritten($res);
+        $this->assertSame($before, $this->fileState($this->image), 'the file was written');
+    }
+
+    /**
+     * [NEG] Adding a tag the photo carries already, by badge and by typed name,
+     * changes nothing either.
+     */
+    public function testAddingAPresentTagLeavesTheFileUntouched(): void
+    {
+        $kirmes = $this->tag('Kirmes', $this->group);
+        $params = array('image_id' => $this->image['id'], 'tag_id' => $kirmes, 'pwg_token' => $this->ws->token());
+        $this->assertTagsWritten($this->ws->call('typetags.image.addTag', $params));
+        @unlink($this->image['file'] . '_original');
+        $before = $this->fileState($this->image);
+
+        $res = $this->ws->call('typetags.image.addTag', $params);
+        $this->assertOk($res);
+        $this->assertTagsNotWritten($res);
+
+        $res = $this->ws->call('typetags.image.addNewTag', array('image_id' => $this->image['id'],
+            'tag_name' => $this->tagName('Kirmes'), 'pwg_token' => $this->ws->token()));
+        $this->assertOk($res);
+        $this->assertTagsNotWritten($res);
+
+        $this->assertSame($before, $this->fileState($this->image), 'the file was written');
+    }
+
     // ── the admin tags page ───────────────────────────────────────────────
 
     /** [HAPPY] A rename rewrites every photo with the tag. */
@@ -646,6 +689,22 @@ final class TagWriteTest extends TestCase
     {
         $this->assertTrue($res['json']['result']['tags_written'] ?? null, $res['body']);
         $this->assertSame('', $res['json']['result']['tags_message']);
+    }
+
+    /** An unchanged photo: not written, and no failure to show. */
+    private function assertTagsNotWritten(array $res): void
+    {
+        $this->assertFalse($res['json']['result']['tags_written'] ?? null, $res['body']);
+        $this->assertSame('', $res['json']['result']['tags_message'] ?? null, $res['body']);
+        $this->assertArrayNotHasKey('tags_message_l10n', $res['json']['result']);
+    }
+
+    /** The file's checksum and whether exiftool left an _original copy beside it. */
+    private function fileState(array $photo): array
+    {
+        clearstatcache();
+        $this->assertGreaterThan(0, (int)@filesize($photo['file']), 'anti-vacuity: the photo file is missing');
+        return array('md5' => md5_file($photo['file']), 'original' => is_file($photo['file'] . '_original'));
     }
 
     private function personId(string $name): int

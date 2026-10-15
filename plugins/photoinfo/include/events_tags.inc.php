@@ -224,13 +224,13 @@ function photoinfo_wrap_tag_methods($arr)
 /** typetags' + badge on the picture page. */
 function ws_photoinfo_typetags_addTag($params, &$service)
 {
-  return photoinfo_call_and_write('typetags.image.addTag', $params, $service, null, array($params['image_id']));
+  return photoinfo_call_and_write_photo('typetags.image.addTag', $params, $service);
 }
 
 /** typetags' x on a badge on the picture page. */
 function ws_photoinfo_typetags_removeTag($params, &$service)
 {
-  return photoinfo_call_and_write('typetags.image.removeTag', $params, $service, null, array($params['image_id']));
+  return photoinfo_call_and_write_photo('typetags.image.removeTag', $params, $service);
 }
 
 /**
@@ -240,6 +240,7 @@ function ws_photoinfo_typetags_removeTag($params, &$service)
 function ws_photoinfo_typetags_addNewTag($params, &$service)
 {
   $max_tag_id = photoinfo_max_tag_id();
+  $tags_before = photoinfo_tag_ids_of($params['image_id']);
 
   $result = photoinfo_call_wrapped('typetags.image.addNewTag', $params, $service);
   if ($result instanceof PwgError)
@@ -252,7 +253,7 @@ function ws_photoinfo_typetags_addNewTag($params, &$service)
   return array_merge(
     $result,
     typetags_tag_badge($result['tag_id']),
-    photoinfo_tag_write_answer(photoinfo_write_tags(array($params['image_id'])))
+    photoinfo_photo_tag_write_answer($params['image_id'], $tags_before)
     );
 }
 
@@ -281,6 +282,50 @@ function ws_photoinfo_tags_delete($params, &$service)
 {
   return photoinfo_call_and_write('pwg.tags.delete', $params, $service, null,
     photoinfo_images_with_tags($params['tag_id']));
+}
+
+/**
+ * Calls one of typetags' methods on one photo, then writes the photo's tags
+ * into its file, but only when the call changed them.
+ *
+ * @param string $method
+ * @param array $params with image_id
+ * @param object $service
+ * @return mixed the method's answer, with tags_written and tags_message
+ */
+function photoinfo_call_and_write_photo($method, $params, &$service)
+{
+  $tags_before = photoinfo_tag_ids_of($params['image_id']);
+
+  $result = photoinfo_call_wrapped($method, $params, $service);
+  if ($result instanceof PwgError)
+  {
+    return $result;
+  }
+
+  $answer = photoinfo_photo_tag_write_answer($params['image_id'], $tags_before);
+
+  return is_array($result) ? array_merge($result, $answer) : $answer;
+}
+
+/**
+ * Writes one photo's tags into its file when they differ from before. An
+ * unchanged photo is not written: a write would change the file's bytes and
+ * leave an _original copy for nothing.
+ *
+ * @param int $image_id
+ * @param int[] $tags_before photoinfo_tag_ids_of() before the change
+ * @return array photoinfo_tag_write_answer()'s answer; for an unchanged photo
+ *   tags_written false with no message, so the picture page shows no reason
+ */
+function photoinfo_photo_tag_write_answer($image_id, $tags_before)
+{
+  if (photoinfo_tag_ids_of($image_id) === $tags_before)
+  {
+    return array('tags_written' => false, 'tags_message' => '');
+  }
+
+  return photoinfo_tag_write_answer(photoinfo_write_tags(array($image_id)));
 }
 
 /**
