@@ -11,6 +11,8 @@ git remote add upstream https://github.com/Piwigo/Piwigo.git
 git remote set-url --push upstream DISABLED
 ```
 
+Before and after a pull, check every edit in [fork-local-core-edits.md](fork-local-core-edits.md): a merge conflict in one of those files is a fork-local edit meeting an upstream change, and each must still hold after the merge.
+
 **Nothing ever goes to `Piwigo/Piwigo`**: no push, no branch, no pull request, no issue. All work happens on `christianbaumann/*`. Upstream is a read-only source to pull from. A fork-local change that upstream could use stays fork-local; it is not a PR candidate.
 
 Trunk is `master`. Working branches so far are named `fix/<topic>` (`fix/css-not-loading`, `fix/colored-tag-badge-on-picture`) and branch off `master`. There is no `development` branch.
