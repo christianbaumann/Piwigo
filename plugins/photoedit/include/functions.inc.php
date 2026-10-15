@@ -370,3 +370,59 @@ function photoedit_decode_versions($json)
 
   return is_array($versions) ? $versions : array();
 }
+
+/** What exiftool appends to an image's name for the backup it leaves beside it. */
+define('PHOTOEDIT_SIDECAR_SUFFIX', '_original');
+
+/**
+ * The name of one copy under _data/photoedit/originals/. Microseconds in the
+ * name: two copies of one photo within a second must not share a name, or the
+ * second would overwrite the first.
+ *
+ * @param int $image_id
+ * @param string $extension
+ * @param int $time unix time of the copy
+ * @param int $microseconds 0 to 999999
+ * @return string
+ */
+function photoedit_copy_name($image_id, $extension, $time, $microseconds)
+{
+  return (int)$image_id.'-'.date('YmdHis', $time).'-'.sprintf('%06d', $microseconds).'.'.$extension;
+}
+
+/**
+ * Whether a name under _data/photoedit/originals/ is a copy of this photo.
+ *
+ * @param string $name
+ * @param int $image_id
+ * @return bool
+ */
+function photoedit_is_copy_of($name, $image_id)
+{
+  return preg_match('/^'.(int)$image_id.'-\d{14}-\d{6}\.[a-z0-9]+$/i', $name) === 1;
+}
+
+/**
+ * The folder, relative to _data/photoedit/originals/, that a deleted photo's
+ * copies and sidecar move to: the id alone could name a later photo.
+ *
+ * @param int $image_id
+ * @param int $time unix time of the deletion
+ * @return string with its trailing slash
+ */
+function photoedit_deleted_dir_name($image_id, $time)
+{
+  return 'deleted/'.(int)$image_id.'-'.date('YmdHis', $time).'/';
+}
+
+/**
+ * Where exiftool leaves its backup of an image it wrote without
+ * -overwrite_original.
+ *
+ * @param string $file
+ * @return string
+ */
+function photoedit_sidecar_path($file)
+{
+  return $file.PHOTOEDIT_SIDECAR_SUFFIX;
+}

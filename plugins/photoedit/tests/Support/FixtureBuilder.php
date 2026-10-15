@@ -164,6 +164,7 @@ class FixtureBuilder
 
         $this->testImages[] = array(
             'id' => $id,
+            'created' => time(),
             'db_path' => $dbPath,
             'file' => $dir . $name,
             'width' => (int)$dimensions[0],
@@ -303,6 +304,7 @@ class FixtureBuilder
 
         $this->testImages[] = array(
             'id' => $id,
+            'created' => time(),
             'db_path' => $dbPath,
             'file' => $file,
             'width' => self::MARKED_WIDTH,
@@ -506,6 +508,18 @@ class FixtureBuilder
             foreach (glob(PIWIGO_ROOT . '_data/photoedit/originals/' . $id . '-*') as $backup)
             {
                 @unlink($backup);
+            }
+
+            // Where a delete moved its copies and sidecar: only folders named after a
+            // deletion since the photo was created, so a real photo's of the same id stay.
+            foreach (glob(PIWIGO_ROOT . '_data/photoedit/originals/deleted/' . $id . '-*', GLOB_ONLYDIR) as $folder)
+            {
+                $stamp = DateTime::createFromFormat('YmdHis', substr(basename($folder), strlen($id . '-')));
+                if ($stamp !== false && $stamp->getTimestamp() >= ($image['created'] ?? PHP_INT_MAX))
+                {
+                    array_map('unlink', glob($folder . '/*'));
+                    rmdir($folder);
+                }
             }
 
             // The derivatives i.php generated while a spec looked at the photo.

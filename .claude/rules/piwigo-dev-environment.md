@@ -92,7 +92,7 @@ Measured 2026-08-30 against exiftool 13.25: `[]` deletes, `""` writes an empty s
 
 ## `_data/photoedit/` — the photo edit working area
 
-`plugins/photoedit` keeps three directories, defined once in
+`plugins/photoedit` keeps three directories (plus `originals/deleted/`), defined once in
 `plugins/photoedit/include/pipeline.inc.php`:
 
 - `_data/photoedit/locks/` — one `<sha1(image path)>.lock` per photo, held across one edit.
@@ -100,9 +100,17 @@ Measured 2026-08-30 against exiftool 13.25: `[]` deletes, `""` writes an empty s
   image only once its metadata is copied back; removed in a `finally`. A directory left behind
   means the PHP process died mid-edit (the original is untouched then). Safe to delete when
   nothing is writing.
-- `_data/photoedit/originals/<image id>-<timestamp>.<ext>` — the bytes of the file before each
-  edit. **Not** scratch: it is the only local backup of an edited photo outside `galleries/`, and
-  there is no undo button. Restoring is copying one back by hand.
+- `_data/photoedit/originals/<image id>-<timestamp>-<microseconds>.<ext>` — the bytes of the file
+  before each edit, and before each replace through upload (core's fork-local
+  `add_uploaded_file_before_replace` trigger, decision 0072). **Not** scratch: it is the only local
+  backup of an edited photo outside `galleries/`, and there is no undo button. Restoring is copying
+  one back by hand.
+- `_data/photoedit/originals/deleted/<image id>-<deletion time>/` — where a deleted photo's copies
+  move (`delete_elements`), with exiftool's `<file>_original` sidecar once the photo's file is gone:
+  ids are reused, so copies left under the id could name a later photo. Never pruned; no size limit.
+
+`galleries/**/*_original` is git-ignored: provenance, persons and photoinfo keep exiftool's backup
+beside a scan on purpose, and it is the only copy of the pre-write bytes. Do not delete one.
 
 All three are covered by the root `.gitignore`'s `_data` entry and never reach the remote.
 

@@ -206,6 +206,8 @@ SELECT
       die('['.__FUNCTION__.'] this photo does not exist in the database');
     }
 
+    trigger_notify('add_uploaded_file_before_replace', $image_id, $file_path);
+
     // delete all physical files related to the photo (thumbnail, web site, HD)
     delete_element_files(array($image_id));
   }

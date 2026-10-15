@@ -279,13 +279,179 @@ function photoedit_store_versions($versions)
 }
 
 /**
- * delete_elements: forgets the versions of deleted photos.
+ * Copies one photo's file to _data/photoedit/originals/ and checks the copy.
+ *
+ * @param int $image_id
+ * @param string $file
+ * @param string $extension
+ * @return string|null the copy, or null when it could not be made
+ */
+function photoedit_copy_file($image_id, $file, $extension)
+{
+  photoedit_make_dir(PHOTOEDIT_ORIGINALS_DIR);
+
+  $now = microtime(true);
+  $copy = PHOTOEDIT_ORIGINALS_DIR.photoedit_copy_name($image_id, $extension, (int)$now, (int)(($now - floor($now)) * 1000000));
+  if (file_exists($copy) or !@copy($file, $copy) or md5_file($copy) !== md5_file($file))
+  {
+    return null;
+  }
+
+  return $copy;
+}
+
+/**
+ * add_uploaded_file_before_replace: copies the file a replace is about to
+ * overwrite, so a wrong restore can be undone. A failed copy is logged and
+ * the replace goes on: core's upload has no way to be refused here.
+ *
+ * @param int $image_id
+ * @param string $db_path the photo's path column
+ * @return void
+ */
+function photoedit_before_replace($image_id, $db_path)
+{
+  global $logger;
+
+  $file = photoedit_image_file_path($db_path);
+  if (!is_file($file))
+  {
+    return;
+  }
+
+  try
+  {
+    $copy = photoedit_copy_file($image_id, $file, strtolower(get_extension($file)));
+  }
+  catch (RuntimeException $e)
+  {
+    $copy = null;
+  }
+
+  if ($copy === null and is_object($logger))
+  {
+    $logger->error('photoedit: could not copy photo '.(int)$image_id.' before its replace');
+  }
+}
+
+/**
+ * The path of each photo about to be deleted, kept from begin_delete_elements
+ * to delete_elements: the rows are gone by then.
+ *
+ * @param array|null $paths id => path column to remember; null to only read
+ * @return array
+ */
+function photoedit_deleting_paths($paths = null)
+{
+  static $remembered = array();
+
+  if ($paths !== null)
+  {
+    $remembered = $paths + $remembered;
+  }
+
+  return $remembered;
+}
+
+/**
+ * begin_delete_elements: remembers where the photos' files are.
+ *
+ * @param int[] $ids
+ * @return void
+ */
+function photoedit_begin_delete_elements($ids)
+{
+  $ids = array_map('intval', (array)$ids);
+  if (count($ids) == 0)
+  {
+    return;
+  }
+
+  $paths = array();
+  $result = pwg_query('SELECT id, path FROM '.IMAGES_TABLE.' WHERE id IN ('.implode(',', $ids).');');
+  while ($row = pwg_db_fetch_assoc($result))
+  {
+    $paths[(int)$row['id']] = $row['path'];
+  }
+
+  photoedit_deleting_paths($paths);
+}
+
+/**
+ * Moves a deleted photo's copies, and exiftool's sidecar once the photo's
+ * file is gone, to originals/deleted/<id>-<deletion time>/. A photo deleted
+ * without its file keeps the sidecar beside the file it belongs to.
+ *
+ * @param int $image_id
+ * @param string|null $db_path null when begin_delete_elements did not see the row
+ * @return void
+ */
+function photoedit_move_aside($image_id, $db_path)
+{
+  global $logger;
+
+  $files = array();
+  foreach ((array)@scandir(PHOTOEDIT_ORIGINALS_DIR) as $name)
+  {
+    if (photoedit_is_copy_of($name, $image_id))
+    {
+      $files[] = PHOTOEDIT_ORIGINALS_DIR.$name;
+    }
+  }
+
+  if ($db_path !== null)
+  {
+    $file = photoedit_image_file_path($db_path);
+    $sidecar = photoedit_sidecar_path($file);
+    if (!file_exists($file) and is_file($sidecar))
+    {
+      $files[] = $sidecar;
+    }
+  }
+
+  if (count($files) == 0)
+  {
+    return;
+  }
+
+  $dir = PHOTOEDIT_ORIGINALS_DIR.photoedit_deleted_dir_name($image_id, time());
+  photoedit_make_dir($dir);
+  foreach ($files as $source)
+  {
+    if (!@rename($source, $dir.basename($source)) and is_object($logger))
+    {
+      $logger->error('photoedit: could not move '.basename($source).' of deleted photo '.(int)$image_id);
+    }
+  }
+}
+
+/**
+ * delete_elements: forgets the versions of deleted photos and moves their
+ * copies and sidecars aside.
  *
  * @param int[] $ids
  * @return void
  */
 function photoedit_delete_elements($ids)
 {
+  global $logger;
+
+  $paths = photoedit_deleting_paths();
+  foreach (array_map('intval', (array)$ids) as $id)
+  {
+    try
+    {
+      photoedit_move_aside($id, isset($paths[$id]) ? $paths[$id] : null);
+    }
+    catch (RuntimeException $e)
+    {
+      if (is_object($logger))
+      {
+        $logger->error('photoedit: '.$e->getMessage());
+      }
+    }
+  }
+
   $row = pwg_db_fetch_row(pwg_query(
     'SELECT value FROM '.CONFIG_TABLE.' WHERE param = \'photoedit_versions\';'
     ));
@@ -456,16 +622,12 @@ function photoedit_write($image, $file, $extension, $transform, $work_dir)
     return photoedit_failure('unavailable', 'No image library is available on this server');
   }
 
-  photoedit_make_dir(PHOTOEDIT_ORIGINALS_DIR);
   photoedit_make_dir($work_dir);
 
-  // Microseconds in the name: two edits of one photo within a second must not
-  // share a backup, or the second would overwrite the true original.
-  list($micro) = explode(' ', microtime());
-  $backup = PHOTOEDIT_ORIGINALS_DIR.$image['id'].'-'.date('YmdHis').'-'.substr($micro, 2, 6).'.'.$extension;
-  if (file_exists($backup) or !@copy($file, $backup) or md5_file($backup) !== md5_file($file))
+  $backup = photoedit_copy_file($image['id'], $file, $extension);
+  if ($backup === null)
   {
-    return photoedit_write_failure('Could not back up the original file', $backup);
+    return photoedit_write_failure('Could not back up the original file', $file);
   }
 
   // pwg_image picks the format from the extension, so the temp file keeps it.

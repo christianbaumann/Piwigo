@@ -369,7 +369,7 @@ calls the pipeline in-process (`tests/Support/PiwigoRuntime.php`) to listen to i
 the copy's derivatives: only an old `Last-Modified` makes the browser reuse a cached photo, which is
 the stale-photo case the plugin's `?v=` URLs exist for. An edit records each photo's version in the
 `photoedit_versions` config row; `destroyTestImages()` removes the suite's ids from it, since it
-deletes rows directly rather than through `delete_elements`. Its `package-lock.json` pins the same Playwright as persons, because
+deletes rows directly rather than through `delete_elements`, and the `originals/deleted/<id>-<time>/` folders newer than the photo. Its `package-lock.json` pins the same Playwright as persons, because
 the shared browser cache holds that version's Chromium only.
 
 `tests/Integration/RoleMatrixTest.php` is photoedit's executable role matrix: one row per function

@@ -22,6 +22,8 @@
 !/galleries/PHOTO_ALBUM
 !/galleries/Sefferweich_Allgemein_Fotos
 !/galleries/Verschiedenes
+# exiftool's backup beside a written scan; moved to _data/photoedit/originals/deleted/ on delete.
+/galleries/**/*_original
 # Staging area for the recovery; its contents live in galleries/ now.
 /_temp
 /local/*

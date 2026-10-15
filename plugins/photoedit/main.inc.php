@@ -45,7 +45,14 @@ add_event_handler('get_src_image_url', 'photoedit_src_image_url');
 
 // Registered everywhere rather than under IN_ADMIN: core's delete_elements()
 // also runs from ws.php.
+add_event_handler('begin_delete_elements', 'photoedit_begin_delete_elements',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOEDIT_PATH . 'include/pipeline.inc.php');
 add_event_handler('delete_elements', 'photoedit_delete_elements',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOEDIT_PATH . 'include/pipeline.inc.php');
+
+// A replace through upload overwrites the file; its current state is kept
+// first. The event is a fork-local core trigger in add_uploaded_file().
+add_event_handler('add_uploaded_file_before_replace', 'photoedit_before_replace',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOEDIT_PATH . 'include/pipeline.inc.php');
 
 // The edit button. Registered only on the picture page, and the file behind it

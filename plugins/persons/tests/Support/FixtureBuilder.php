@@ -523,6 +523,13 @@ class FixtureBuilder
             {
                 @unlink($leftover);
             }
+            // photoedit moves the sidecar of a photo deleted through pwg.images.delete
+            // here; the file name is this fixture's own, so nothing else matches.
+            foreach (glob(PIWIGO_ROOT . '_data/photoedit/originals/deleted/' . $id . '-*/' . basename($image['file']) . '*') as $moved)
+            {
+                @unlink($moved);
+                @rmdir(dirname($moved));
+            }
             @unlink(persons_lock_path($image['db_path']));
         }
         $this->testImages = array();
