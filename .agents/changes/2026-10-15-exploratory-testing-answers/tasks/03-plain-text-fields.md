@@ -19,6 +19,7 @@ No stored markup runs on any gallery page; descriptions keep their line breaks.
 * [x] In `galleryrules`, escape Titel, Autor, Info, album name and description completely on output through core's render events (`render_element_name`, `render_element_description`, `render_category_name`, `render_category_description`, and what the picture page uses for Autor)
 * [x] Album description: escape, then `nl2br`
 * [x] Check every page that shows these fields: album list, album page, picture page, menu, breadcrumbs, admin screens that render them unescaped
+  **Note (admin screens, 2026-10-15):** Verified in the browser with playwright-cli as `galleryrules_webmaster` over `seed.php --scenario=payload` (each field an `<img onerror>` that sets a body marker): album tree (parent expanded), album properties of both albums, Batch Manager global (thumbnail tooltip shows the Titel as text, `&lt;img…&gt;` in its HTML) and unit mode, photo properties. No payload ran on any screen; edit forms hold the raw text in their inputs; names show as text. Screenshots in `.agent-tests/2026-10-15-plain-text-admin/`. `--restore` left no fixture rows
 
 ## Verification
 
