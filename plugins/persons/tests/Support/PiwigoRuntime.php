@@ -61,6 +61,12 @@ class PiwigoRuntime
         // WS_ERR_INVALID_PARAM instead of transcribing 1003.
         require_once PHPWG_ROOT_PATH . 'include/ws_core.inc.php';
 
+        // invalidate_user_cache(), which every tag write calls, purges it;
+        // common.inc.php creates it in a request
+        global $persistent_cache;
+        require_once PHPWG_ROOT_PATH . 'include/cache.class.php';
+        $persistent_cache = new PersistentFileCache();
+
         if (!defined('PERSONS_TABLE'))
         {
             define('PERSONS_TABLE', $prefixeTable . 'persons');

@@ -526,19 +526,17 @@ DELETE FROM '.IMAGE_TAG_TABLE.'
 }
 
 /**
- * Discards every user's cached count of available tags.
- *
- * Unscoped on purpose - which users a tag became visible to depends on album
- * permissions this function would have to recompute. Over-invalidation costs one
- * recount per user and is always safe; under-invalidation shows a wrong count
- * with no way to notice. See
- * docs/agents/decisions/0004-unscoped-tag-cache-invalidation-accepted.md.
+ * Discards every user's cache, so the tag list, a tag's page and the tag count
+ * are current at once. Nulling the count alone left the list: core keys it by
+ * the user cache's update time. See
+ * docs/agents/decisions/0071-tag-writes-clear-the-whole-user-cache.md.
  *
  * @return void
  */
 function persons_invalidate_tag_cache()
 {
-  pwg_query('UPDATE '.USER_CACHE_TABLE.' SET nb_available_tags = NULL;');
+  include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
+  invalidate_user_cache();
 }
 
 /**
