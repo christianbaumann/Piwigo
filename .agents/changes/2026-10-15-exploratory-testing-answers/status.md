@@ -19,7 +19,7 @@ not in them.
 | 12 replace refuses ambiguous name | `aca49d9a7` |
 | 13 addSimple identical / completes | `31d0a3aa8` |
 | 15 photoinfo writes tags only on change | `97aff1970` |
-| 16 persons names unslashed | `a0b72636f` (repair of photos 100, 103-105 waits for the user, see `docs/backlog.md`) |
+| 16 persons names unslashed | `a0b72636f` (repair of photos 100, 103-105 run by the user 2026-10-16) |
 
 Task 38 (two failing baseline tests) was added in `8ede68ae5`; not started.
 
@@ -38,14 +38,13 @@ were reserved but not used; the next free number is 0070.
   `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). A deploy
   changes the live web space; ask before running it.
 
-- **Task 16 repair:** photos 100, 103-105 hold slashed person names; run `.agent-tests/2026-10-16-task16-repair/repair.php` after the user's go-ahead, then re-run persons integration (`IndexRebuildTest`).
 
 ## Known failures (not caused by this change; task 38)
 
 - typetags `CreationCapTest::testTheLastTagOfTheDayIsCreated` — fixture adds cap−1 rows on top of
   the account's real creations of the day.
-- persons `IndexRebuildTest` — leftover person `D'Arcy "R" & Töchter` (id 157) gives a duplicate
-  key in the rescan; likely the task 16 escaping defect.
+- persons `IndexRebuildTest` — since task 16 and the repair: region-less leftover person 146 `Name`
+  (linked to marker tag `Name ?`) does not come back; see task 38's findings.
 
 ## Working rules learned this session
 

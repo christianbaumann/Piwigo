@@ -27,7 +27,7 @@ is generated. `tools/deploy/README.md` has the full list.)*
 
 - (done 2026-10-16) typetags submodule commits `6a5b7b4`, `486722d` pushed by the user; remote `master` at `486722d`
 - (open) typetags `CreationCapTest::testTheLastTagOfTheDayIsCreated` fails on a day the `typetags_normal` account already created tags (other suites' runs): `seedTypedTagCreations()` seeds `TYPETAGS_NEW_TAGS_PER_DAY - 1` rows on top of the existing ones instead of forcing the count. Seen 2026-10-15 (3 earlier rows)
-- (open) persons `IndexRebuildTest` fails until photos 100, 103, 104, 105 are repaired: their files carry person names with core's backslashes, written before task 16 of change `2026-10-15-exploratory-testing-answers`; the rescan now indexes those as separate persons beside 157 (`D'Arcy "R" & Töchter`) and 152. Repair script (local, git-ignored): `.agent-tests/2026-10-16-task16-repair/repair.php`, backups beside it; needs the user's go-ahead
+- (open) persons `IndexRebuildTest` fails on person 146 `Name` (created 2026-10-13): a `piwigo_persons` row with no region in any file, linked to the marker tag 13835 `Name ?` through its `url_name`. A rescan cannot bring back a person no file names. The slashed names of photos 100, 103-105 were repaired 2026-10-16 (task 16 repair script, run by the user). Task 38 of change `2026-10-15-exploratory-testing-answers`; the `url_name` link is task 17's defect
 - (open) persons search still uses core's slashed value: the picker's `pwg.persons.getList` `q` and `admin/persons.php`'s `$_GET['q']` (plugin file). A search for `D'Arcy` finds nothing. Found in task 16, out of its scope
 - l10n('Invalid tag name') has no translation
 - search function by: tag, person
