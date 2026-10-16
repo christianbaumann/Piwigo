@@ -47,3 +47,13 @@ add_event_handler('ws_add_methods', 'galleryrules_wrap_upload',
 // addSimple refuses a file identical to an existing photo and puts a new one in its album at once.
 add_event_handler('ws_add_methods', 'galleryrules_wrap_addsimple',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 10, GALLERYRULES_PATH . 'include/events_addsimple.inc.php');
+
+// A photo's last album cannot be removed: the Batch Manager, the properties page and the API.
+$galleryrules_last_album_file = GALLERYRULES_PATH . 'include/events_last_album.inc.php';
+add_event_handler('loc_begin_element_set_global', 'galleryrules_batch_dissociate',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $galleryrules_last_album_file);
+add_event_handler('picture_modify_before_update', 'galleryrules_properties_keep_last_album',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $galleryrules_last_album_file);
+// After photoinfo's wrapper of pwg.images.setInfo (neutral + 10), so a refused call reaches it not at all.
+add_event_handler('ws_add_methods', 'galleryrules_wrap_album_methods',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 20, $galleryrules_last_album_file);

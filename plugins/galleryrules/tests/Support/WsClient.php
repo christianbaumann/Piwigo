@@ -74,6 +74,19 @@ class WsClient
         return $this->request($path, array());
     }
 
+    /**
+     * POST a form to a path with this client's session, as a browser sends it.
+     *
+     * @return array status (HTTP code), body
+     */
+    public function post(string $path, array $fields): array
+    {
+        return $this->request($path, array(
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+        ));
+    }
+
     public function login(string $username, string $password): void
     {
         $res = $this->call('pwg.session.login', array('username' => $username, 'password' => $password));
