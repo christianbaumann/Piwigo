@@ -14,8 +14,8 @@ not in them.
 | 05 remote hides PHP errors | `4e7917981`, ledger entry in `8ede68ae5` |
 | 06 test-user scripts CLI only | `7129dfa67` (+ typetags submodule `b0c63cc`, **not pushed**) |
 | 14 photoedit copies and sidecars | `8ee8af949` |
-| 07 typetags plain names, addNewTag refusal | `64827edba` (typetags `6a5b7b4`, **not pushed**) |
-| 08 typed tag names NFC, name match | see `git log` (typetags `486722d`, **not pushed**) |
+| 07 typetags plain names, addNewTag refusal | `64827edba` (typetags `6a5b7b4`, pushed) |
+| 08 typed tag names NFC, name match | `8ebf0e7b5`, `50b483e33` (typetags `486722d`, pushed; remote intl checked) |
 | 12 replace refuses ambiguous name | `aca49d9a7` |
 | 13 addSimple identical / completes | `31d0a3aa8` |
 | 15 photoinfo writes tags only on change | `97aff1970` |
@@ -34,13 +34,10 @@ were reserved but not used; the next free number is 0070.
 
 ## Open items needing the user
 
-- **typetags push refused (403, `dark-sith-lord`):** `b0c63cc` reached the remote, but `6a5b7b4`
-  (task 07), `486722d` (task 08) and later typetags commits stay unpushed until the user pushes. Recorded in `docs/backlog.md`.
 - **Remote `display_errors` re-check:** after the next deploy, the remote phpinfo should read
   `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). A deploy
   changes the live web space; ask before running it.
 
-- **Remote `intl` check (task 08):** see `docs/backlog.md`.
 - **Task 16 repair:** photos 100, 103-105 hold slashed person names; run `.agent-tests/2026-10-16-task16-repair/repair.php` after the user's go-ahead, then re-run persons integration (`IndexRebuildTest`).
 
 ## Known failures (not caused by this change; task 38)

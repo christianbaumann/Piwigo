@@ -36,4 +36,5 @@ Typing a tag never makes an invisible duplicate or assigns a marker tag, and the
   **Note:** Verified via `TypedNameMatchTest::testAtTheCapAVariantOfAnExistingTagIsLinkedAndNotCounted` and `testAtTheCapANameMatchingOnlyAUrlNameIsRefused`.
 * [x] typetags and provenance suites pass
   **Note:** Verified 2026-10-16 under the suite lock: typetags unit 91 OK, integration 164 OK, E2E 57 passed; provenance unit 276 OK, integration 343 OK (3 skipped, pre-existing). The first typetags integration run failed `CreationCapTest::testTheLastTagOfTheDayIsCreated`: `TypedNameMatchTest` deleted its tags without their activity rows, which then counted against the normal account's cap. Fixed in its tearDown; the leaked rows of deleted tags were removed.
-* [ ] (manual testing required) The remote host has PHP's intl extension (`Normalizer`); without it neither typetags nor core normalizes, and NFD input still makes a second tag there. The deploy probes did not ask for it.
+* [x] The remote host has PHP's intl extension (`Normalizer`); without it neither typetags nor core normalizes, and NFD input still makes a second tag there. The deploy probes did not ask for it.
+  **Note:** Verified 2026-10-16 via the remote's phpinfo (read-only, deploy login): intl enabled, ICU 74.2; ledger row in `docs/agents/TESTING.md`
