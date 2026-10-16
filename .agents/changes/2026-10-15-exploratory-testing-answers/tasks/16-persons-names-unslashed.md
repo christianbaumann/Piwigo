@@ -21,8 +21,9 @@ Any person name, quotes included, saves once and never blocks a photo.
   **Note:** the copied `url_name` is escaped for `single_insert()` as well: in-process, with no `render_tag_url` handler, it is the raw name and broke the insert.
 * [x] A reindex error becomes a ws error, not a fatal
   **Note:** `persons_reindex_image()` catches `Exception`, logs it through core's `$logger` and returns `ok => false` with `PERSONS_REINDEX_FAILED_MESSAGE`; addRegion turns that into its 500 ws error, rescan lists the photo under `failed`.
-* [ ] Repair photos 100, 103, 104, 105 once through the fixed `pwg.persons.rename`; record the step (needs the user's approval)
+* [x] Repair photos 100, 103, 104, 105 once through the fixed `pwg.persons.rename`; record the step (needs the user's approval)
   **Note:** not run: the agent's permission check refused writing the real gallery photos. Ready script: `.agent-tests/2026-10-16-task16-repair/repair.php` (git-ignored; backups of the four files beside it in `backup/`). Run with `ddev exec flock /tmp/pwg-suite.lock bash -c 'set -a; . local/config/persons-test.env; set +a; php .agent-tests/2026-10-16-task16-repair/repair.php'`. Steps: `pwg.persons.delete` the unslashed persons 157 and 152 (they hold no region the files name; the tag rows stay), `pwg.persons.rescan` 100,103,104,105 (creates the slashed-name persons, which reuse the old tags by `url_name`), then `pwg.persons.rename` each slashed person to its typed name, which rewrites the four files. A rename alone cannot do it: the unslashed name is already taken by 157/152.
+  **Note:** run by the user 2026-10-16 (status.md, commit `6c7becc97`).
 
 ## Verification
 
