@@ -25,6 +25,34 @@ class WsClient
         return array('body' => $body, 'json' => json_decode($body, true));
     }
 
+    /** A ws.php call as multipart form data, with one file in $_FILES[$field]. */
+    public function upload(string $method, array $params, string $field, string $filePath): array
+    {
+        $fields = array('method' => $method);
+        foreach ($params as $name => $value)
+        {
+            if (is_array($value))
+            {
+                foreach (array_values($value) as $i => $item)
+                {
+                    $fields[$name . '[' . $i . ']'] = (string)$item;
+                }
+            }
+            else
+            {
+                $fields[$name] = (string)$value;
+            }
+        }
+        $fields[$field] = new CURLFile($filePath, mime_content_type($filePath) ?: 'application/octet-stream', basename($filePath));
+
+        $body = $this->request('/ws.php?format=json', array(
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => $fields,
+        ))['body'];
+
+        return array('body' => $body, 'json' => json_decode($body, true));
+    }
+
     /** This session's pwg_token. */
     public function token(): string
     {

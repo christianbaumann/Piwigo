@@ -39,3 +39,7 @@ add_event_handler('render_category_name', 'galleryrules_render_plain_text', GALL
 add_event_handler('render_category_description', 'galleryrules_render_album_description', GALLERYRULES_PLAIN_TEXT_PRIORITY);
 add_event_handler('loc_end_index_thumbnails', 'galleryrules_thumbnails_escaped_once');
 add_event_handler('loc_end_picture', 'galleryrules_picture_author_escaped');
+
+// addSimple refuses a file identical to an existing photo and puts a new one in its album at once.
+add_event_handler('ws_add_methods', 'galleryrules_wrap_addsimple',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, GALLERYRULES_PATH . 'include/events_addsimple.inc.php');
