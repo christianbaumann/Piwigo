@@ -2889,6 +2889,15 @@ function get_tag_ids($raw_tags, $allow_create=true)
     }
     elseif ($allow_create)
     {
+      // fork-local: a name typed decomposed (a + U+0308) finds the tag stored composed
+      if (class_exists('Normalizer'))
+      {
+        $nfc = Normalizer::normalize($raw_tag, Normalizer::FORM_C);
+        if ($nfc !== false)
+        {
+          $raw_tag = $nfc;
+        }
+      }
       // we have to create a new tag
       $tag_ids[] = tag_id_from_tag_name(strip_tags($raw_tag));
     }

@@ -25,7 +25,7 @@ is generated. `tools/deploy/README.md` has the full list.)*
 
 ## misc
 
-- (open) typetags submodule commits are not pushed to `github.com/christianbaumann/Piwigo-Colored-Tags` from `6a5b7b4` (task 07 of change `2026-10-15-exploratory-testing-answers`) on: the agent's push is refused with 403 (`denied to dark-sith-lord`, another GitHub account's credentials). Until pushed, a fresh clone's `git submodule update` fails on the recorded pointer. (`b0c63cc`, task 06, reached the remote 2026-10-15.)
+- (open) typetags submodule commits are not pushed to `github.com/christianbaumann/Piwigo-Colored-Tags` from `6a5b7b4` (task 07 of change `2026-10-15-exploratory-testing-answers`) on (`6a5b7b4` task 07, `486722d` task 08): the agent's push is refused with 403 (`denied to dark-sith-lord`, another GitHub account's credentials). Until pushed, a fresh clone's `git submodule update` fails on the recorded pointer. (`b0c63cc`, task 06, reached the remote 2026-10-15.)
 - (open) typetags `CreationCapTest::testTheLastTagOfTheDayIsCreated` fails on a day the `typetags_normal` account already created tags (other suites' runs): `seedTypedTagCreations()` seeds `TYPETAGS_NEW_TAGS_PER_DAY - 1` rows on top of the existing ones instead of forcing the count. Seen 2026-10-15 (3 earlier rows)
 - (open) persons `IndexRebuildTest` fails until photos 100, 103, 104, 105 are repaired: their files carry person names with core's backslashes, written before task 16 of change `2026-10-15-exploratory-testing-answers`; the rescan now indexes those as separate persons beside 157 (`D'Arcy "R" & Töchter`) and 152. Repair script (local, git-ignored): `.agent-tests/2026-10-16-task16-repair/repair.php`, backups beside it; needs the user's go-ahead
 - (open) persons search still uses core's slashed value: the picker's `pwg.persons.getList` `q` and `admin/persons.php`'s `$_GET['q']` (plugin file). A search for `D'Arcy` finds nothing. Found in task 16, out of its scope
@@ -57,3 +57,4 @@ now also a stated consequence of
 [decision 0015](agents/decisions/0015-provenance-columns-stay-out-of-the-metadata-mappings.md):
 because no provenance column is a key in `use_iptc_mapping` / `use_exif_mapping`, no
 synchronisation reads those columns back, so nothing notices a third-party edit.
+- (open) check whether the remote PHP has the `intl` extension (`Normalizer`): without it neither core's fork-local `get_tag_ids()` nor typetags normalizes a typed tag name to NFC, and a name typed decomposed creates a second tag there. The deploy probes never asked. Task 08 of change `2026-10-15-exploratory-testing-answers`

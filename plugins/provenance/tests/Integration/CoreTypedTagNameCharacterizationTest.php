@@ -7,9 +7,10 @@ use PHPUnit\Framework\TestCase;
  * (the Batch Manager's unit mode). It looks by name under the column's
  * utf8mb3_general_ci collation, then by url_name, then creates the tag.
  *
- * Every case is [ERR]: the oracle is the current implementation. No
- * requirement says a typed name may land on a tag of another spelling; these
- * record what core does today, so a change to it shows up here.
+ * The case and url_name cases are [ERR]: the oracle is the current
+ * implementation. No requirement says a typed name may land on a tag of
+ * another spelling; they record what core does today, so a change to it shows
+ * up here. The decomposed-name case is the fork's requirement (NFC).
  */
 final class CoreTypedTagNameCharacterizationTest extends TestCase
 {
@@ -72,10 +73,13 @@ final class CoreTypedTagNameCharacterizationTest extends TestCase
     }
 
     /**
-     * [ERR] A name typed in decomposed form (a + U+0308) does not match the
-     * composed tag of the same visible name: a second tag is created.
+     * [ECP] A name typed in decomposed form (a + U+0308) links the composed
+     * tag of the same visible name; no second tag. Not [ERR]: requirement of
+     * change 2026-10-15-exploratory-testing-answers, "Typed tag names are NFC"
+     * (fork-local get_tag_ids()). It replaced the [ERR] case that recorded a
+     * second tag being created.
      */
-    public function testADecomposedNameCreatesASecondTag(): void
+    public function testADecomposedNameLinksTheComposedTag(): void
     {
         $composed = "H\u{00E4}user " . $this->suffix;
         $decomposed = "Ha\u{0308}user " . $this->suffix;
@@ -85,10 +89,8 @@ final class CoreTypedTagNameCharacterizationTest extends TestCase
 
         $this->typeTags($image, array($decomposed));
 
-        $created = $this->tagIdsByName($decomposed);
-        $this->assertCount(1, $created, 'the decomposed name became its own tag');
-        $this->assertNotSame($existing, $created[0]);
-        $this->assertSame($created, $this->tagsOfPhoto($image));
+        $this->assertSame(array(), $this->tagIdsByName($decomposed), 'a second tag of the same visible name was created');
+        $this->assertSame(array($existing), $this->tagsOfPhoto($image));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────
