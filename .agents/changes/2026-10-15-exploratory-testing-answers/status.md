@@ -19,27 +19,55 @@ not in them.
 | 12 replace refuses ambiguous name | `aca49d9a7` |
 | 13 addSimple identical / completes | `31d0a3aa8` |
 | 15 photoinfo writes tags only on change | `97aff1970` |
-| 16 persons names unslashed | `a0b72636f` (repair of photos 100, 103-105 run by the user 2026-10-16) |
+| 16 persons names unslashed | `a0b72636f` (repair of photos 100, 103-105 run by the user 2026-10-16). **Not fully ticked:** "suites pass" waits for 38 |
+| 20 Herkunft inheritance | `b00f0b6b7` (characterization), `1c9214ebc` |
+| 19 last album kept | `06e568968` |
+| 17 person tag identity | `660ea947f`. **Not fully ticked:** "suites pass" waits for 38 (person 146) |
+| 09 typetags CSRF | `bc0e86a6d` (typetags `16f50cc`, **not pushed**) |
+| 10 typetags failures reported | `1c17ee1a6` (typetags `ac55c5b`, **not pushed**) |
+| 11 tag writes clear user cache | `06ba59ce2` (typetags `18549d1`, **not pushed**; decision 0071) |
 
 Nothing is in progress: no agent running, working tree clean except the four
 `galleries/Verschiedenes/*.png` that were modified before this change started (not ours; leave them).
 
 ## Next
 
-Open tasks whose dependencies are done: 09, 10, 11 (typetags submodule — one after another or one
-agent; two agents committing in the same submodule race), 17, 19, 20, 21, 38, and onwards
-(check each task's `dependencies`). 18 needs 17. 06's last item closes with 38.
+Open tasks whose dependencies are done: 18, 21, 22, 23, 24, 25, 26, 27, 38 and onwards (check each
+task's `dependencies`). 06's, 16's and 17's last items close with 38.
 
-Task 38 has a new finding (2026-10-16) in its file: `IndexRebuildTest` now fails on region-less
-person 146 `Name`, linked to the marker tag `Name ?` by `url_name` (the defect task 17 removes).
-Doing 17 before 38 is sensible.
+**typetags `16f50cc`, `ac55c5b`, `18549d1` are not pushed** (403, git used account
+`dark-sith-lord`). The main repo's submodule pointer references them: push
+`plugins/typetags` with the right account before pushing the main repo.
 
-Decision numbers used so far: 0069 (task 05), 0070 (task 07), 0072 (task 14), 0073 (task 03).
-Next free: 0071, then 0074.
+Task 38: `IndexRebuildTest` fails only on region-less leftover person 146 `Name`; task 17 cannot
+bring it back (no region, no rescan finds it). Prepared repair, not run (real data, question 1
+below): `ddev mysql -e "DELETE FROM piwigo_persons WHERE id = 146 AND name = 'Name' AND NOT EXISTS
+(SELECT 1 FROM piwigo_person_region WHERE person_id = 146);"`
 
-Task 15 left a typetags script quirk for task 10: the picture page script treats
-`tags_written: false` (now also "nothing changed") as a failure and unhides the warning span,
-which shows a stale message after an earlier failed write (see task 15's Deviations).
+Decision numbers used so far: 0069 (05), 0070 (07), 0071 (11), 0072 (14), 0073 (03).
+Next free: 0074.
+
+## Open questions to the user (asked 2026-10-16, unanswered; default is `a`)
+
+1. Person 146: a) run the prepared DELETE under the suite lock, re-run `IndexRebuildTest`;
+   b) leave to task 38; c) make the test skip region-less persons.
+2. Task 20 — sub-albums inherit only on a new link (photos already in a sub-album, and
+   *Auf N Fotos anwenden* on a sub-album without own values, do not use the parent's):
+   a) keep, handbook says so; b) new task: apply uses the nearest parent, dialog shows it;
+   c) one-time backfill.
+3. Task 19 — deleting an album with "keep photos" can leave photos in no album:
+   a) new task (refuse, or link to parent); b) backlog entry only; c) accept, decision file.
+4. Task 20 — hand check of the two new paragraphs in `handbuch/03-fototexte.html`:
+   a) user reads them; b) open row in the `docs/agents/TESTING.md` ledger; c) accept unchecked.
+5. Next batch: a) wait for the user; b) 21, 38, 22, 23; c) only 38.
+
+## Incidents in the 2026-10-16 batch (all repaired, recorded so a later failure can be traced)
+
+- Task 09's flip script briefly copied typetags' `admin.php` over core's root `admin.php` and
+  created a stray root `main.inc.php` (relative paths in an EXIT trap after `cd`); restored, checked
+  clean. Use absolute paths in flip traps.
+- typetags' `TypeTags show_all` was off for 15-30 minutes after `CsrfTest` ran against old code;
+  reset to `b:1`, the test now restores the config.
 
 Task 16 found, out of its scope: the persons picker search (`pwg.persons.getList` `q`) and
 `admin/persons.php`'s `$_GET['q']` still use core's slashed value (`docs/backlog.md`).
