@@ -131,8 +131,13 @@ final class GermanOverrideKeyTest extends TestCase
             ),
             'The tag was not saved' => array(
                 'plugins/typetags/include/events_public.inc.php',
-                "{\'The tag was not saved\'|@translate|escape:javascript}",
-                2,
+                "{\'The tag was not saved\'|@translate|escape:html}",
+                1,
+            ),
+            'Session expired - please sign in again' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Session expired - please sign in again\'|@translate|escape:html}",
+                1,
             ),
             'You have typed in too many new tags today' => array(
                 'plugins/typetags/main.inc.php',
