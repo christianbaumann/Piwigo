@@ -136,6 +136,154 @@ final class InheritTest extends TestCase
         $this->assertSame(array(), $this->newHistoryFields($image, 'inherit'));
     }
 
+    // ── only new links inherit, first album wins ──────────────────────────
+
+    /**
+     * [NEG] A photo named in an association but already in the album inherits
+     * nothing from it; only the newly linked photo does.
+     *
+     * Successor of CoreAssociationTriggerCharacterizationTest::
+     * testEveryNamedPhotoIsPassedWhenOneOfThemIsNew, which recorded the opposite.
+     */
+    public function testOnlyThePhotoNewToTheAlbumInherits(): void
+    {
+        $album = $this->fixture->createTestAlbum('provenance-inherit-new-photo');
+        $linked = $this->fixture->createTestImage()['id'];
+        $new = $this->fixture->createTestImage()['id'];
+        $this->fixture->attachImage($linked, $album);
+        $this->fixture->albumProvenance($album, self::ALBUM);
+
+        $this->associate(array($linked, $new), $album);
+
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readImageProvenance($new)['provenance_owner'],
+            'anti-vacuity: the new link must have inherited'
+        );
+        $this->assertNull($this->fixture->readImageProvenance($linked)['provenance_owner']);
+    }
+
+    /**
+     * [HAPPY] A photo without Herkunft linked to a second album takes the new
+     * album's values, not those of the album it was already in (15-16 F1).
+     *
+     * Successor of CoreAssociationTriggerCharacterizationTest::
+     * testEveryNamedAlbumIsPassedWhenOneOfThemIsNew, which recorded the opposite.
+     */
+    public function testAPhotoWithoutHerkunftTakesTheNewlyLinkedAlbumsValues(): void
+    {
+        $first = $this->fixture->createTestAlbum('provenance-inherit-old-link');
+        $second = $this->fixture->createTestAlbum('provenance-inherit-new-link');
+        $image = $this->fixture->createTestImage()['id'];
+        $this->fixture->attachImage($image, $first);
+        $this->fixture->albumProvenance($first, self::ALBUM);
+        $this->fixture->albumProvenance($second, self::SECOND_ALBUM);
+
+        $this->savePhotoAlbums($image, array($first, $second));
+
+        $actual = $this->fixture->readImageProvenance($image);
+        $this->assertSame(self::SECOND_ALBUM['provenance_physical_album'], $actual['provenance_physical_album']);
+        $this->assertSame(self::SECOND_ALBUM['provenance_owner'], $actual['provenance_owner']);
+        $this->assertSame(self::SECOND_ALBUM['provenance_scanned_on'], $actual['provenance_scanned_on']);
+        $this->assertSame(self::SECOND_ALBUM['provenance_note'], $actual['provenance_album_note']);
+    }
+
+    /** [ST] First album wins: a photo with Herkunft keeps it when linked to a second album. */
+    public function testAPhotoWithHerkunftKeepsItWhenLinkedToASecondAlbum(): void
+    {
+        $first = $this->fixture->createTestAlbum('provenance-inherit-first-wins');
+        $this->fixture->albumProvenance($first, self::ALBUM);
+        $second = $this->fixture->createTestAlbum('provenance-inherit-second-loses');
+        $this->fixture->albumProvenance($second, self::SECOND_ALBUM);
+        $image = $this->fixture->createTestImage()['id'];
+        $this->associate(array($image), $first);
+        $this->assertSame(
+            self::ALBUM['provenance_owner'],
+            $this->fixture->readImageProvenance($image)['provenance_owner'],
+            'anti-vacuity: the photo must carry the first album\'s Herkunft before the second link'
+        );
+
+        $this->savePhotoAlbums($image, array($first, $second));
+
+        $actual = $this->fixture->readImageProvenance($image);
+        $this->assertSame(self::ALBUM['provenance_physical_album'], $actual['provenance_physical_album']);
+        $this->assertSame(self::ALBUM['provenance_owner'], $actual['provenance_owner']);
+        $this->assertSame(self::ALBUM['provenance_scanned_on'], $actual['provenance_scanned_on']);
+        $this->assertSame(self::ALBUM['provenance_note'], $actual['provenance_album_note']);
+    }
+
+    // ── sub-albums ────────────────────────────────────────────────────────
+
+    /** [HAPPY] A photo joining a sub-album without Herkunft takes its parent's values. */
+    public function testASubAlbumPhotoTakesTheParentsValues(): void
+    {
+        $parent = $this->fixture->createTestAlbum('provenance-inherit-parent');
+        $this->fixture->albumProvenance($parent, self::ALBUM);
+        $child = $this->fixture->createTestSubAlbum('provenance-inherit-child', $parent);
+        $this->fixture->albumProvenance($child, array());
+        $image = $this->fixture->createTestImage()['id'];
+
+        $this->associate(array($image), $child);
+
+        $actual = $this->fixture->readImageProvenance($image);
+        $this->assertSame(self::ALBUM['provenance_physical_album'], $actual['provenance_physical_album']);
+        $this->assertSame(self::ALBUM['provenance_owner'], $actual['provenance_owner']);
+        $this->assertSame(self::ALBUM['provenance_scanned_on'], $actual['provenance_scanned_on']);
+        $this->assertSame(self::ALBUM['provenance_note'], $actual['provenance_album_note']);
+        $this->assertSame(
+            array('provenance_album_note', 'provenance_owner', 'provenance_physical_album', 'provenance_scanned_on'),
+            $this->newHistoryFields($image, 'inherit')
+        );
+    }
+
+    /** [ECP] The nearest ancestor with Herkunft wins over one further up. */
+    public function testTheNearestAncestorWithHerkunftWins(): void
+    {
+        $top = $this->fixture->createTestAlbum('provenance-inherit-top');
+        $this->fixture->albumProvenance($top, self::ALBUM);
+        $middle = $this->fixture->createTestSubAlbum('provenance-inherit-middle', $top);
+        $this->fixture->albumProvenance($middle, self::SECOND_ALBUM);
+        $bottom = $this->fixture->createTestSubAlbum('provenance-inherit-bottom', $middle);
+        $this->fixture->albumProvenance($bottom, array());
+        $image = $this->fixture->createTestImage()['id'];
+
+        $this->associate(array($image), $bottom);
+
+        $this->assertSame(self::SECOND_ALBUM['provenance_owner'], $this->fixture->readImageProvenance($image)['provenance_owner']);
+    }
+
+    /** [ECP] A sub-album with Herkunft of its own hands down its own values. */
+    public function testASubAlbumWithItsOwnHerkunftUsesIt(): void
+    {
+        $parent = $this->fixture->createTestAlbum('provenance-inherit-parent-own');
+        $this->fixture->albumProvenance($parent, self::ALBUM);
+        $child = $this->fixture->createTestSubAlbum('provenance-inherit-child-own', $parent);
+        $this->fixture->albumProvenance($child, self::SECOND_ALBUM);
+        $image = $this->fixture->createTestImage()['id'];
+
+        $this->associate(array($image), $child);
+
+        $this->assertSame(self::SECOND_ALBUM['provenance_owner'], $this->fixture->readImageProvenance($image)['provenance_owner']);
+    }
+
+    /** [NEG] A sub-album whose ancestors carry no Herkunft either writes nothing. */
+    public function testASubAlbumWithoutHerkunftAnywhereAboveWritesNothing(): void
+    {
+        $parent = $this->fixture->createTestAlbum('provenance-inherit-parent-empty');
+        $this->fixture->albumProvenance($parent, array());
+        $child = $this->fixture->createTestSubAlbum('provenance-inherit-child-empty', $parent);
+        $this->fixture->albumProvenance($child, array());
+        $image = $this->fixture->createTestImage()['id'];
+
+        $this->associate(array($image), $child);
+
+        foreach (FixtureBuilder::imageColumns() as $column)
+        {
+            $this->assertNull($this->fixture->readImageProvenance($image)[$column], "$column must stay empty");
+        }
+        $this->assertSame(array(), $this->newHistoryFields($image, 'inherit'));
+    }
+
     /**
      * [ST] [DT] An unattended move leaves the provenance the photo already has.
      *
@@ -582,6 +730,29 @@ final class InheritTest extends TestCase
         $res = $this->ws->call('pwg.images.setCategory', $params);
 
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+    }
+
+    /**
+     * Posts the photo properties form with the given album selection; its
+     * "Linked albums" control hands the whole selection to
+     * move_images_to_categories().
+     */
+    private function savePhotoAlbums(int $imageId, array $albumIds): void
+    {
+        $res = $this->ws->postPage('/admin.php?page=photo-' . $imageId . '-properties', array(
+            'level' => 0,
+            'submit' => 1,
+            'pwg_token' => $this->ws->token(),
+            'associate' => $albumIds,
+            ));
+
+        $this->assertSame(200, $res['http_code'], 'the properties screen did not answer');
+
+        $linked = (int)$this->db->scalar(
+            'SELECT COUNT(*) FROM `piwigo_image_category` WHERE image_id = ' . $imageId .
+            ' AND category_id IN (' . implode(',', $albumIds) . ')'
+        );
+        $this->assertSame(count($albumIds), $linked, 'anti-vacuity: the save must have linked every selected album');
     }
 
     /** Drives admin/site_update.php over one album only, never the whole gallery. */

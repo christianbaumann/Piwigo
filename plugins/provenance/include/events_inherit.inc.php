@@ -24,8 +24,8 @@ defined('PROVENANCE_PATH') or die('Hacking attempt!');
 /**
  * Handles the virtual-link funnel.
  *
- * Every named photo is now in every named album, so the pairs are the full
- * cross product.
+ * Core names only the pairs it inserted, one album per notification, so a
+ * photo already in an album never takes that album's values again.
  *
  * @param array $data image_ids, category_ids
  */
@@ -69,10 +69,13 @@ function provenance_inherit_site_update($links)
  *  - replace: every named photo takes the album's values.
  *  - clear: every named photo has the four emptied, whatever the album holds.
  *
- * Under keep and replace an album with nothing recorded is skipped outright
- * rather than writing four blanks: inheritance exists to carry a fact down, and
- * an album that has none must not quietly erase what a photo already carries
- * from somewhere else. Clear is the mode that says to erase it, and says so.
+ * The values are the album's own, else those of its nearest ancestor carrying
+ * any (provenance_inherited_album_values()), so a sub-album without its own
+ * hands down its parent's. Under keep and replace an album with nothing recorded
+ * there or above is skipped outright rather than writing four blanks:
+ * inheritance exists to carry a fact down, and an album that has none must not
+ * quietly erase what a photo already carries from somewhere else. Clear is the
+ * mode that says to erase it, and says so.
  *
  * A call that names no mode takes it from provenance_inherit_policy(): the
  * request's choice, or keep without history rows when no user is loaded yet,
@@ -122,20 +125,9 @@ function provenance_inherit_into($category_id, $image_ids, $mode = null)
       );
   }
 
-  $result = pwg_query('
-SELECT '.implode(', ', array_keys(provenance_album_columns())).'
-  FROM '.CATEGORIES_TABLE.'
-  WHERE id = '.$category_id.'
-;');
+  $album = provenance_inherited_album_values($category_id);
 
-  if (!pwg_db_num_rows($result))
-  {
-    return 0;
-  }
-
-  $album = pwg_db_fetch_assoc($result);
-
-  if (!provenance_album_has_values($album))
+  if ($album === null)
   {
     return 0;
   }
@@ -270,20 +262,31 @@ SELECT id, '.implode(', ', array_keys($values)).'
 }
 
 /**
- * Whether an album has any provenance worth handing down.
+ * The provenance an album hands down: its own, else that of its nearest
+ * ancestor carrying any.
  *
- * @param array $album album column => value
- * @return bool
+ * @param int $category_id
+ * @return array|null album column => value, null when neither the album nor an
+ *         ancestor has any, or the album does not exist
  */
-function provenance_album_has_values($album)
+function provenance_inherited_album_values($category_id)
 {
-  foreach (array_keys(provenance_album_columns()) as $column)
+  $uppercats = query2array('
+SELECT uppercats
+  FROM '.CATEGORIES_TABLE.'
+  WHERE id = '.(int)$category_id.'
+;', null, 'uppercats');
+
+  if (empty($uppercats))
   {
-    if (isset($album[$column]) and trim((string)$album[$column]) !== '')
-    {
-      return true;
-    }
+    return null;
   }
 
-  return false;
+  $albums = query2array('
+SELECT id, '.implode(', ', array_keys(provenance_album_columns())).'
+  FROM '.CATEGORIES_TABLE.'
+  WHERE id IN ('.implode(',', array_map('intval', explode(',', $uppercats[0]))).')
+;', 'id');
+
+  return provenance_nearest_album_with_values($uppercats[0], $albums);
 }

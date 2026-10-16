@@ -210,6 +210,48 @@ function provenance_copy_down_map()
     );
 }
 
+/**
+ * Whether an album has any provenance worth handing down.
+ *
+ * @param array $album album column => value
+ * @return bool
+ */
+function provenance_album_has_values($album)
+{
+  foreach (array_keys(provenance_album_columns()) as $column)
+  {
+    if (isset($album[$column]) and trim((string)$album[$column]) !== '')
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * The album whose provenance a photo joining an album inherits: the album's
+ * own, else the nearest ancestor's that has any. All four values come from that
+ * one album, never field by field from several.
+ *
+ * @param string $uppercats core's uppercats, top album first, the album last
+ * @param array $albums album id => album column => value
+ * @return array|null that album's columns, null when no album in the chain has any
+ */
+function provenance_nearest_album_with_values($uppercats, $albums)
+{
+  foreach (array_reverse(explode(',', $uppercats)) as $id)
+  {
+    $id = (int)$id;
+    if (isset($albums[$id]) and provenance_album_has_values($albums[$id]))
+    {
+      return $albums[$id];
+    }
+  }
+
+  return null;
+}
+
 /*
  * ---------------------------------------------------------------------------
  * Composition layer: what text goes into a file.

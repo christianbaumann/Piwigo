@@ -2103,8 +2103,18 @@ SELECT
 
     update_category($categories);
 
-    trigger_notify('associate_images_to_categories',
-      array('image_ids' => $images, 'category_ids' => $categories));
+    // only the pairs inserted here, one notification per album
+    $inserted_images_of = array();
+    foreach ($inserts as $insert)
+    {
+      $inserted_images_of[ $insert['category_id'] ][] = $insert['image_id'];
+    }
+
+    foreach ($inserted_images_of as $category_id => $inserted_images)
+    {
+      trigger_notify('associate_images_to_categories',
+        array('image_ids' => $inserted_images, 'category_ids' => array($category_id)));
+    }
   }
 }
 

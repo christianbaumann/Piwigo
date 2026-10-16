@@ -459,6 +459,35 @@ class FixtureBuilder
         return $id;
     }
 
+    /**
+     * An album of this suite's own inside another, with core's id_uppercat and
+     * uppercats chain filled in and asserted.
+     *
+     * @return int the new album's id
+     */
+    public function createTestSubAlbum(string $name, int $parentId): int
+    {
+        $parentUppercats = (string)$this->db->scalar("SELECT uppercats FROM `piwigo_categories` WHERE id = $parentId");
+        if ($parentUppercats === '')
+        {
+            throw new RuntimeException("no parent album $parentId to create $name in");
+        }
+
+        $id = $this->createTestAlbum($name);
+        $uppercats = $parentUppercats . ',' . $id;
+        $this->db->query(
+            "UPDATE `piwigo_categories` SET id_uppercat = $parentId, uppercats = '$uppercats' WHERE id = $id"
+        );
+
+        $actual = (string)$this->db->scalar("SELECT uppercats FROM `piwigo_categories` WHERE id = $id");
+        if ($actual !== $uppercats)
+        {
+            throw new RuntimeException("fixture sub-album $id did not take its uppercats: '$actual'");
+        }
+
+        return $id;
+    }
+
     /** Puts one photo in one album, asserting the link took effect. */
     public function attachImage(int $imageId, int $catId): void
     {
