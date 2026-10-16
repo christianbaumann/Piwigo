@@ -301,6 +301,15 @@ def test_the_update_carries_the_token():
     assert [f["pwg_token"] for f in gallery.posts_to("ws.php") if f.get("method") == "typetags.type.update"] == [FakeGallery.TOKEN]
 
 
+def test_every_group_write_carries_the_token():
+    """[NEG] typetags.type.add and typetags.tags.setType refuse a call without it, like type.update."""
+    gallery = empty_gallery()
+    seed.seed_tags(gallery, BASE_URL, FakeGallery.TOKEN, wanted())
+    writes = [f for f in gallery.posts_to("ws.php") if f.get("method") in ("typetags.type.add", "typetags.tags.setType")]
+    assert {f["method"] for f in writes} == {"typetags.type.add", "typetags.tags.setType"}
+    assert {f.get("pwg_token") for f in writes} == {FakeGallery.TOKEN}
+
+
 @pytest.mark.parametrize(
     "lost", ["typetags.type.add", "typetags.type.update", "pwg.tags.add", "typetags.tags.setType"]
 )

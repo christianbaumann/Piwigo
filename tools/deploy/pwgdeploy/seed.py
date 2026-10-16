@@ -245,7 +245,7 @@ def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResul
             client,
             base_url,
             "typetags.type.add",
-            {"typetag_name": group.name, **_group_fields(group)},
+            {"typetag_name": group.name, "pwg_token": token, **_group_fields(group)},
         )
         group_ids[collated(group.name)] = _answer_id(added, "typetags.type.add")
     for group_id, group in plan.update_groups:
@@ -265,7 +265,11 @@ def seed_tags(client, base_url: str, token: str, wanted: TagGroups) -> SeedResul
             client,
             base_url,
             "typetags.tags.setType",
-            {"tag_id": str(tag_id), "typetag_id": str(group_ids[collated(group)])},
+            {
+                "tag_id": str(tag_id),
+                "typetag_id": str(group_ids[collated(group)]),
+                "pwg_token": token,
+            },
         )
 
     left = plan_seed(wanted, *read_remote(client, base_url))

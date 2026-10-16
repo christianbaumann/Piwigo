@@ -354,6 +354,8 @@ class FakeGallery:
         inert = method in self.inert_methods
         if method == "typetags.type.list":
             return _ok([dict(group) for group in self.tag_groups])
+        if method in ("typetags.type.add", "typetags.tags.setType") and fields.get("pwg_token") != self.TOKEN:
+            return _fail(403, "Invalid security token")
         if method == "typetags.type.add":
             if any(
                 _collated(g["name"]) == _collated(fields["typetag_name"])
