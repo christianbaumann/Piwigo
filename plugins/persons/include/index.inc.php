@@ -57,6 +57,19 @@ function persons_reindex_image($image_id, $file_path, $claim = array())
   {
     return persons_reindex_image_locked($image_id, $file_path, $claim);
   }
+  catch (Exception $e)
+  {
+    global $logger;
+
+    // A name the index cannot take, or a failed query: the photo is reported
+    // as not indexed rather than ending the request. The file was already
+    // written by then; the next rescan reads it again.
+    if (is_object($logger))
+    {
+      $logger->error('persons: reindex of photo '.$image_id.' failed: '.$e->getMessage());
+    }
+    return array('ok' => false, 'regions' => 0, 'message' => PERSONS_REINDEX_FAILED_MESSAGE);
+  }
   finally
   {
     persons_lock_release($lock);
@@ -351,15 +364,17 @@ function persons_person_id_from_name($name)
   // itself rather than assuming the caller did.
   include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
 
-  $tag_id = (int)tag_id_from_tag_name($name);
+  // Core's helper and single_insert() put the value into SQL as given, the
+  // way request input arrives in core: escaped.
+  $tag_id = (int)tag_id_from_tag_name($escaped);
 
   $url_name = pwg_db_fetch_assoc(pwg_query(
     'SELECT url_name FROM '.TAGS_TABLE.' WHERE id = '.$tag_id.';'
     ));
 
   single_insert(PERSONS_TABLE, array(
-    'name'     => $name,
-    'url_name' => $url_name ? $url_name['url_name'] : null,
+    'name'     => $escaped,
+    'url_name' => $url_name ? pwg_db_real_escape_string($url_name['url_name']) : null,
     'tag_id'   => $tag_id,
     ));
 

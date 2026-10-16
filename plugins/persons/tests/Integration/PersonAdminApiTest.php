@@ -14,6 +14,7 @@ final class PersonAdminApiTest extends TestCase
     private const OLD_NAME = 'Persons Admin Jane Before';
     private const NEW_NAME = 'Persons Admin Jane After';
     private const OTHER = 'Persons Admin John';
+    private const QUOTED = 'Persons Admin D\'Arcy "R" & Töchter';
 
     private Db $db;
     private FixtureBuilder $fixture;
@@ -44,7 +45,7 @@ final class PersonAdminApiTest extends TestCase
     {
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
-        $this->fixture->destroyPersons(array(self::OLD_NAME, self::NEW_NAME, self::OTHER));
+        $this->fixture->destroyPersons(array(self::OLD_NAME, self::NEW_NAME, self::OTHER, self::QUOTED, addslashes(self::QUOTED)));
     }
 
     /** [HAPPY] A rename reaches the person row, the mirrored tag and the file. */
@@ -69,6 +70,29 @@ final class PersonAdminApiTest extends TestCase
 
         $this->assertSame(self::NEW_NAME, $this->tagName($personId));
         $this->assertSame(array(self::NEW_NAME), $this->namesInFile());
+    }
+
+    /**
+     * [HAPPY] A rename to a name with quotes reaches the row, the tag and the
+     * file as typed, without the slashes core adds to every request value.
+     */
+    public function testRenamingToANameWithQuotesKeepsItAsTyped(): void
+    {
+        $this->add(self::OLD_NAME);
+        $personId = $this->personId(self::OLD_NAME);
+        $this->assertNotNull($personId, 'anti-vacuity: nothing was created to rename');
+
+        $res = $this->admin->call('pwg.persons.rename', array(
+            'person_id' => $personId,
+            'name' => self::QUOTED,
+            'pwg_token' => $this->admin->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        $this->assertSame(self::QUOTED, $res['json']['result']['name']);
+        $this->assertSame($personId, $this->personId(self::QUOTED));
+        $this->assertSame(self::QUOTED, $this->tagName($personId));
+        $this->assertSame(array(self::QUOTED), $this->namesInFile());
     }
 
     /** [BVA] A rename to the name the person already has, once trimmed, changes nothing and answers ok. */

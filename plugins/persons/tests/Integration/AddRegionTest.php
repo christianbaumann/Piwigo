@@ -14,6 +14,8 @@ final class AddRegionTest extends TestCase
     /** Names this test writes. Distinctive, so a leftover row is obvious. */
     private const JANE = 'Persons Api Jane Doe';
     private const JOHN = 'Persons Api John Smith';
+    /** Quotes, an ampersand and an umlaut: everything core's addslashes() touches or a file mangles. */
+    private const QUOTED = 'Persons Api D\'Arcy "R" & Töchter';
 
     /** A box comfortably above PERSONS_MIN_BOX_FRACTION. */
     private const BOX = array('x' => 0.5, 'y' => 0.4, 'w' => 0.2, 'h' => 0.3);
@@ -51,7 +53,7 @@ final class AddRegionTest extends TestCase
     {
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
-        $this->fixture->destroyPersons(array(self::JANE, self::JOHN));
+        $this->fixture->destroyPersons(array(self::JANE, self::JOHN, self::QUOTED, addslashes(self::QUOTED)));
     }
 
     /**
@@ -122,6 +124,27 @@ final class AddRegionTest extends TestCase
         $names = $this->namesInFile();
         $this->assertContains(self::JANE, $names);
         $this->assertContains(self::JOHN, $names);
+    }
+
+    /**
+     * [HAPPY] A name with quotes saves twice as one person, and the file holds
+     * it as typed. Core slashes every request value; a name stored slashed in
+     * the file was resolved again on the next save and inserted a second time.
+     */
+    public function testANameWithQuotesSavesTwiceAsOnePerson(): void
+    {
+        $first = $this->addRegion(self::QUOTED);
+        $this->assertSame('ok', $first['json']['stat'], $first['body']);
+
+        $second = $this->addRegion(self::QUOTED, array('x' => 0.2, 'y' => 0.2, 'w' => 0.1, 'h' => 0.1));
+        $this->assertSame('ok', $second['json']['stat'], $second['body']);
+
+        $this->assertSame(1, (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM piwigo_persons WHERE name LIKE 'Persons Api D%'"
+            ), 'the name must resolve to one person row');
+        $this->assertNotNull($this->personId(self::QUOTED), 'the person row holds the name slashed');
+
+        $this->assertSame(array(self::QUOTED, self::QUOTED), $this->namesInFile());
     }
 
 

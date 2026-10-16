@@ -102,4 +102,32 @@ final class PersonNameTest extends TestCase
     {
         $this->assertSame('Zoë Müller', persons_clean_name('Zoë Müller'));
     }
+
+    /**
+     * [HAPPY] Core addslashes() every request value (include/common.inc.php);
+     * the name a request carries comes out as the user typed it, quotes and
+     * all, so the file and the person row hold the same string.
+     */
+    public function testANameFromARequestLosesCoresSlashes(): void
+    {
+        $typed = 'D\'Arcy "R" & Töchter';
+
+        $this->assertSame($typed, persons_name_from_request(addslashes($typed)));
+    }
+
+    /** [ECP] It is cleaned like any other name. */
+    public function testANameFromARequestIsCleaned(): void
+    {
+        $this->assertSame('O\'Brien', persons_name_from_request('  <b>O\\\'Brien</b> '));
+    }
+
+    /**
+     * [ERR] The design's trade-off: a backslash the user
+     * really typed is lost with the slashes. No requirement wants this; it
+     * records the cost.
+     */
+    public function testARealBackslashIsLost(): void
+    {
+        $this->assertSame('AB', persons_name_from_request('A\\B'));
+    }
 }

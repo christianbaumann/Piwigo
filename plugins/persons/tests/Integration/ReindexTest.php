@@ -19,6 +19,8 @@ final class ReindexTest extends TestCase
     private const JANE = 'Persons Test Jane Doe';
     private const JOHN = 'Persons Test John Smith';
     private const REX = 'Persons Test Rex';
+    /** Quotes, an ampersand and an umlaut: everything an unescaped query breaks on. */
+    private const QUOTED = 'Persons Test D\'Arcy "R" & Töchter';
 
     /** The AppliedToDimensions the seeded regions are written against. */
     private const APPLIED_W = 4000;
@@ -48,7 +50,7 @@ final class ReindexTest extends TestCase
     protected function tearDown(): void
     {
         $this->fixture->destroyTestImages();
-        $this->fixture->destroyPersons(array(self::JANE, self::JOHN, self::REX));
+        $this->fixture->destroyPersons(array(self::JANE, self::JOHN, self::REX, self::QUOTED, addslashes(self::QUOTED)));
     }
 
     /**
@@ -244,6 +246,51 @@ final class ReindexTest extends TestCase
         $this->assertSame(1, (int)$this->db->scalar(
             "SELECT COUNT(*) FROM piwigo_persons WHERE name = '" . $this->db->escape(self::JANE) . "'"
         ));
+    }
+
+    /**
+     * [HAPPY] A name with quotes on two photos is one person row: the lookup,
+     * core's tag_id_from_tag_name() and the insert see the same escaped name.
+     */
+    public function testANameWithQuotesOnTwoPhotosIsOnePersonRow(): void
+    {
+        $second = $this->fixture->createTestImage();
+
+        foreach (array($this->image, $second) as $image)
+        {
+            $this->fixture->writeRegionsWithExiftool(
+                $image,
+                array(array('name' => self::QUOTED, 'x' => 0.5, 'y' => 0.4, 'w' => 0.1, 'h' => 0.2)),
+                self::APPLIED_W,
+                self::APPLIED_H
+            );
+            $result = persons_reindex_image($image['id'], $image['file']);
+            $this->assertTrue($result['ok'], 'reindex failed: ' . $result['message']);
+        }
+
+        $this->assertSame(1, (int)$this->db->scalar(
+            "SELECT COUNT(*) FROM piwigo_persons WHERE name = '" . $this->db->escape(self::QUOTED) . "'"
+        ));
+        $this->assertTrue($this->photoCarriesTag(self::QUOTED));
+        $this->assertTrue($this->photoCarriesTag(self::QUOTED, $second['id']));
+    }
+
+    /**
+     * [NEG] A reindex that cannot resolve a name is reported, not fatal. A
+     * region named only with markup cleans to no name at all, which
+     * persons_person_id_from_name() refuses by throwing.
+     */
+    public function testANameThatCannotBeResolvedIsReportedNotFatal(): void
+    {
+        $this->seed(array(
+            array('name' => '<b></b>', 'x' => 0.5, 'y' => 0.4, 'w' => 0.1, 'h' => 0.2),
+        ));
+
+        $result = persons_reindex_image($this->image['id'], $this->image['file']);
+
+        $this->assertFalse($result['ok']);
+        $this->assertNotSame('', $result['message']);
+        $this->assertSame(0, $this->regionCount());
     }
 
     /**

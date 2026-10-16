@@ -78,6 +78,9 @@ define('PERSONS_LOCK_TIMEOUT_SECONDS', 30);
 /** What a writer reports when another one held the image's lock past the timeout. */
 define('PERSONS_LOCK_TIMEOUT_MESSAGE', 'Timed out waiting for another change to this photo');
 
+/** What a reindex reports when the index could not take what the file holds. */
+define('PERSONS_REINDEX_FAILED_MESSAGE', 'The person marks of this photo could not be indexed');
+
 /** How often a waiting writer retries the lock it could not take. */
 define('PERSONS_LOCK_RETRY_MICROSECONDS', 50000);
 
@@ -616,6 +619,21 @@ function persons_clean_name($raw)
   }
 
   return $name;
+}
+
+/**
+ * A person's name as a request carried it, cleaned.
+ *
+ * include/common.inc.php addslashes() every request value. The slashes are
+ * taken off here, once, so the file, the person row and the tag hold the name
+ * as typed; every SQL use escapes it again itself.
+ *
+ * @param string $raw a $params value of a ws method
+ * @return string the cleaned name, or '' when nothing usable is left
+ */
+function persons_name_from_request($raw)
+{
+  return persons_clean_name(stripslashes((string)$raw));
 }
 
 /**

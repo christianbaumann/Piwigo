@@ -287,7 +287,7 @@ function ws_persons_addRegion($params, &$service)
     return persons_no_such_image();
   }
 
-  $name = persons_clean_name($params['name']);
+  $name = persons_name_from_request($params['name']);
   if ($name === '')
   {
     return new PwgError(WS_ERR_INVALID_PARAM, 'A person needs a name');
@@ -413,7 +413,7 @@ function ws_persons_rename($params, &$service)
     return new PwgError(403, 'Invalid security token');
   }
 
-  $outcome = persons_rename_person($params['person_id'], $params['name']);
+  $outcome = persons_rename_person($params['person_id'], persons_name_from_request($params['name']));
 
   if (!$outcome['ok'])
   {

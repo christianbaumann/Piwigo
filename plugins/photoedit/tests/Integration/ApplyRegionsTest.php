@@ -25,6 +25,9 @@ final class ApplyRegionsTest extends TestCase
     /** x 225..255 px: wholly in the right half. */
     private const OUTSIDE = array('name' => 'Photoedit Outside', 'x' => 0.8, 'y' => 0.5, 'w' => 0.1, 'h' => 0.2);
 
+    /** OUTSIDE's box under a name with quotes, saved through pwg.persons.addRegion. */
+    private const QUOTED = array('name' => 'Photoedit D\'Arcy "R" & Töchter', 'x' => 0.8, 'y' => 0.5, 'w' => 0.1, 'h' => 0.2);
+
     private const LEFT_HALF = '0,0,0.5,1';
 
     private const DELTA = 1e-6;
@@ -57,7 +60,8 @@ final class ApplyRegionsTest extends TestCase
         }
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
-        $this->fixture->destroyPersons(array(self::INSIDE['name'], self::PARTLY['name'], self::OUTSIDE['name']));
+        $this->fixture->destroyPersons(array(self::INSIDE['name'], self::PARTLY['name'], self::OUTSIDE['name'],
+            self::QUOTED['name'], addslashes(self::QUOTED['name'])));
     }
 
     private function call(string $method, array $params): mixed
@@ -275,6 +279,22 @@ final class ApplyRegionsTest extends TestCase
         clearstatcache();
         $this->assertSame($md5, md5_file($this->image['file']), 'a refused edit changed the file');
         $this->assertSame(array(self::INSIDE['name'], self::OUTSIDE['name']), $this->indexedNames());
+    }
+
+    /**
+     * [NEG] The refusal names a person saved with quotes as it was typed. The
+     * name comes from the file, so a name persons wrote there slashed showed
+     * its backslashes here.
+     */
+    public function testTheRefusalNamesAPersonWithQuotesAsTyped(): void
+    {
+        $this->call('pwg.persons.addRegion', array('image_id' => $this->image['id'], 'type' => 'Face') + self::QUOTED);
+
+        $res = $this->callAs(TestUsers::NORMAL, array('turns' => 0, 'crop' => self::LEFT_HALF, 'dry_run' => 'true'));
+
+        $this->assertSame(403, (int)($res['json']['err'] ?? 0), $res['body']);
+        $this->assertStringContainsString(self::QUOTED['name'], (string)$res['json']['message']);
+        $this->assertStringNotContainsString('\\', (string)$res['json']['message']);
     }
 
     public static function foreignDrawers(): array
