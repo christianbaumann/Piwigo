@@ -11,6 +11,8 @@
  *   php tests/e2e/support/seed.php --scenario=payload   a parent album, an album and a photo whose
  *                                                        Titel, Autor, Info, album name and description
  *                                                        each hold an <img onerror> naming its field
+ *   php tests/e2e/support/seed.php --scenario=same-name an album with two photos of one file name, for the
+ *                                                        replace option's refusal
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -71,9 +73,9 @@ if (isset($args['restore']))
     exit(0);
 }
 
-if (($args['scenario'] ?? '') !== 'payload')
+if (!in_array($args['scenario'] ?? '', array('payload', 'same-name'), true))
 {
-    fail('--scenario must be: payload');
+    fail('--scenario must be one of: payload, same-name');
 }
 if (is_file(SNAPSHOT_FILE))
 {
@@ -84,6 +86,12 @@ $dir = dirname(SNAPSHOT_FILE);
 if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir))
 {
     fail("could not create $dir");
+}
+
+if ($args['scenario'] === 'same-name')
+{
+    seedSameName($db, $builder);
+    exit(0);
 }
 
 try
@@ -122,3 +130,37 @@ echo json_encode(array(
         'album_description' => payload('album-description'),
         ),
     )), "\n";
+
+/** An album holding two photos whose rows share one file name. */
+function seedSameName(Db $db, FixtureBuilder $builder): void
+{
+    $file = 'galleryrules-same-name.png';
+    try
+    {
+        $albumId = $builder->createTestAlbum('galleryrules-e2e-same-name-' . bin2hex(random_bytes(4)));
+        file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+        $imageIds = array();
+        for ($i = 0; $i < 2; $i++)
+        {
+            $imageIds[] = $id = $builder->createTestImage();
+            file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+            $builder->attachImage($id, $albumId);
+            $db->query("UPDATE piwigo_images SET file = '" . $db->escape($file) . "' WHERE id = $id");
+        }
+        $shared = (int)$db->scalar(
+            "SELECT COUNT(*) FROM piwigo_images i JOIN piwigo_image_category ic ON ic.image_id = i.id " .
+            "WHERE ic.category_id = $albumId AND i.file = '" . $db->escape($file) . "'"
+        );
+        if ($shared !== 2)
+        {
+            throw new RuntimeException("expected 2 photos named $file in album $albumId, found $shared");
+        }
+        $builder->invalidateUserCache();
+    }
+    catch (RuntimeException $e)
+    {
+        fail($e->getMessage());
+    }
+
+    echo json_encode(array('album_id' => $albumId, 'image_ids' => $imageIds, 'file' => $file)), "\n";
+}

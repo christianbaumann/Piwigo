@@ -20,9 +20,18 @@ function seedPayload() {
   return run('--scenario=payload');
 }
 
+/**
+ * Creates an album with two photos whose rows share one file name.
+ *
+ * @returns {{album_id: number, image_ids: number[], file: string}}
+ */
+function seedSameName() {
+  return run('--scenario=same-name');
+}
+
 /** Removes whatever the seed created. Safe to call unseeded. */
 function restore() {
   run('--restore');
 }
 
-module.exports = { seedPayload, restore };
+module.exports = { seedPayload, seedSameName, restore };

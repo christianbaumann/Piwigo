@@ -40,6 +40,10 @@ add_event_handler('render_category_description', 'galleryrules_render_album_desc
 add_event_handler('loc_end_index_thumbnails', 'galleryrules_thumbnails_escaped_once');
 add_event_handler('loc_end_picture', 'galleryrules_picture_author_escaped');
 
+// The replace option refuses a file name several photos of the album share; wrapped after core registers it.
+add_event_handler('ws_add_methods', 'galleryrules_wrap_upload',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, GALLERYRULES_PATH . 'include/events_replace.inc.php');
+
 // addSimple refuses a file identical to an existing photo and puts a new one in its album at once.
 add_event_handler('ws_add_methods', 'galleryrules_wrap_addsimple',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 10, GALLERYRULES_PATH . 'include/events_addsimple.inc.php');
