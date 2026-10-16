@@ -542,14 +542,17 @@ final class TagWriteTest extends TestCase
         }
     }
 
-    /** [HAPPY] Deleting a person takes the name out of every photo of theirs. */
+    /** [HAPPY] Deleting a person takes the name out of every photo of theirs, and the tag out of the list. */
     public function testAPersonsDeleteRemovesTheName(): void
     {
         $this->fixture->assertPluginActive('persons');
+        $other = $this->newPhoto();
         $this->addRegion($this->tagName('Anna'), 0.15);
         $this->addRegion($this->tagName('Bert'), 0.85);
-        // persons leaves a deleted person's tag to core's orphan-tag cleanup; teardown removes it
-        $this->fixture->tagIdNamed($this->tagName('Anna'));
+        $this->addRegion($this->tagName('Anna'), 0.5, $other);
+        $tag = $this->fixture->tagIdNamed($this->tagName('Anna'));
+        $this->assertSame(array($this->tagName('Anna')),
+            FixtureBuilder::readKeywords($other['file'])['XMP-dc:Subject'], 'anti-vacuity: the name never reached the file');
 
         $res = $this->ws->call('pwg.persons.delete', array(
             'person_id' => $this->personId($this->tagName('Anna')), 'pwg_token' => $this->ws->token(),
@@ -558,6 +561,8 @@ final class TagWriteTest extends TestCase
         $this->assertTagsWritten($res);
 
         $this->assertFileTags($this->image, array($this->tagName('Bert')), array());
+        $this->assertFileTags($other, array(), array());
+        $this->assertSame(0, (int)$this->db->scalar('SELECT COUNT(*) FROM piwigo_tags WHERE id = ' . $tag));
     }
 
     /**

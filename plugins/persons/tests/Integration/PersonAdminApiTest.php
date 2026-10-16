@@ -175,10 +175,8 @@ final class PersonAdminApiTest extends TestCase
             'SELECT COUNT(*) FROM piwigo_person_region WHERE person_id = ' . $personId
             ));
 
-        // The mirrored tag row itself is left for core's orphan-tag mechanism -
-        // an administrator may have applied it by hand - but the assignments
-        // this plugin made must go, or the photo keeps a tag naming somebody
-        // the gallery no longer knows.
+        // The photo must not keep a tag naming somebody the gallery no longer
+        // knows; PersonTagTest covers the tag row itself.
         $this->assertSame(0, (int)$this->db->scalar(
             'SELECT COUNT(*) FROM piwigo_image_tag WHERE tag_id = ' . $tagId
             ), 'the deleted person is still tagged on their photos');

@@ -8,7 +8,7 @@
  * session_start(), which dies without $_SERVER['REMOTE_ADDR']), so a test that
  * wants to run the indexer for real has to assemble a smaller runtime. What it
  * assembles is production code, not a copy of it: pwg_query(), mass_inserts(),
- * tag_id_from_tag_name() and pwg_db_real_escape_string() are the same functions
+ * trigger_change() and pwg_db_real_escape_string() are the same functions
  * the plugin calls in a request, running against the same MariaDB.
  */
 class PiwigoRuntime
@@ -76,9 +76,9 @@ class PiwigoRuntime
     /**
      * Loads the plugin's server-side includes on top of a booted runtime.
      *
-     * include/index.inc.php pulls in admin/include/functions.php itself, exactly
-     * as it does inside ws.php, so this loads no core file the plugin would not
-     * load in a request.
+     * include/index.inc.php pulls in admin/include/functions.php itself where it
+     * needs it, exactly as it does inside ws.php, so this loads no core file the
+     * plugin would not load in a request.
      */
     public static function loadPlugin(): void
     {

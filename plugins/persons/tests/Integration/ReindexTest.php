@@ -3,7 +3,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * The index rebuild across its real boundaries: a real PNG on disk, a real
- * exiftool, the real MariaDB and core's own tag_id_from_tag_name().
+ * exiftool, the real MariaDB and the real tags table.
  *
  * Read-only against the image: nothing here writes a region with the plugin -
  * that is Phase 3. The regions are seeded with a plain exiftool call, so what is
@@ -250,7 +250,7 @@ final class ReindexTest extends TestCase
 
     /**
      * [HAPPY] A name with quotes on two photos is one person row: the lookup,
-     * core's tag_id_from_tag_name() and the insert see the same escaped name.
+     * the tag lookup and the insert see the same escaped name.
      */
     public function testANameWithQuotesOnTwoPhotosIsOnePersonRow(): void
     {

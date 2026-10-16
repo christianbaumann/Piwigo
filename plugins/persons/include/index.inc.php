@@ -354,28 +354,102 @@ function persons_person_id_from_name($name)
 
   $escaped = pwg_db_real_escape_string($name);
 
-  $result = pwg_query('SELECT id FROM '.PERSONS_TABLE." WHERE name = '".$escaped."';");
+  $result = pwg_query('SELECT id, name, tag_id FROM '.PERSONS_TABLE." WHERE name = '".$escaped."';");
   if ($row = pwg_db_fetch_assoc($result))
+  {
+    persons_ensure_own_tag($row);
+    return (int)$row['id'];
+  }
+
+  // single_insert() puts the value into SQL as given.
+  single_insert(PERSONS_TABLE, array('name' => $escaped));
+  $person_id = (int)pwg_db_insert_id();
+
+  persons_ensure_own_tag(array('id' => $person_id, 'name' => $name, 'tag_id' => null));
+
+  return $person_id;
+}
+
+/**
+ * The tag a person's tag_id points at, when that tag still exists and carries
+ * the person's name (compared as the tags table's collation compares it).
+ *
+ * @param array $person id, name, tag_id
+ * @return int|null null for a deleted tag, or one of another name
+ */
+function persons_own_tag_id($person)
+{
+  if (empty($person['tag_id']))
+  {
+    return null;
+  }
+
+  $row = pwg_db_fetch_assoc(pwg_query(
+    'SELECT id FROM '.TAGS_TABLE
+    .' WHERE id = '.(int)$person['tag_id']
+    ." AND name = '".pwg_db_real_escape_string($person['name'])."';"
+    ));
+
+  return $row ? (int)$row['id'] : null;
+}
+
+/**
+ * Points a person at its own tag: the tag of exactly its name, created when
+ * there is none. Repairs a tag deleted by hand, and a link core's URL-name
+ * fallback made to another tag (`Name` to the marker tag `Name ?`).
+ *
+ * @param array $person id, name, tag_id
+ * @return int the tag id
+ */
+function persons_ensure_own_tag($person)
+{
+  $own = persons_own_tag_id($person);
+  if ($own !== null)
+  {
+    return $own;
+  }
+
+  $tag_id = persons_tag_id_named($person['name']);
+
+  $tag = pwg_db_fetch_assoc(pwg_query(
+    'SELECT url_name FROM '.TAGS_TABLE.' WHERE id = '.$tag_id.';'
+    ));
+
+  pwg_query(
+    'UPDATE '.PERSONS_TABLE
+    .' SET tag_id = '.$tag_id.","
+    ." url_name = '".pwg_db_real_escape_string($tag['url_name'])."',"
+    // a repair is no use of the person; the picker orders by this column
+    .' lastmodified = lastmodified'
+    .' WHERE id = '.(int)$person['id'].';'
+    );
+
+  return $tag_id;
+}
+
+/**
+ * The tag of exactly this name, created when there is none. Not core's
+ * tag_id_from_tag_name(), which falls back to the URL name and so gives the
+ * marker tag `Name ?` for `Name`.
+ *
+ * @param string $name cleaned, not escaped
+ * @return int
+ */
+function persons_tag_id_named($name)
+{
+  $escaped = pwg_db_real_escape_string($name);
+
+  $row = pwg_db_fetch_assoc(pwg_query(
+    'SELECT id FROM '.TAGS_TABLE." WHERE name = '".$escaped."' ORDER BY id LIMIT 1;"
+    ));
+  if ($row)
   {
     return (int)$row['id'];
   }
 
-  // ws.php does not include the admin helpers, so this file pulls them in
-  // itself rather than assuming the caller did.
-  include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
-
-  // Core's helper and single_insert() put the value into SQL as given, the
-  // way request input arrives in core: escaped.
-  $tag_id = (int)tag_id_from_tag_name($escaped);
-
-  $url_name = pwg_db_fetch_assoc(pwg_query(
-    'SELECT url_name FROM '.TAGS_TABLE.' WHERE id = '.$tag_id.';'
-    ));
-
-  single_insert(PERSONS_TABLE, array(
+  single_insert(TAGS_TABLE, array(
     'name'     => $escaped,
-    'url_name' => $url_name ? pwg_db_real_escape_string($url_name['url_name']) : null,
-    'tag_id'   => $tag_id,
+    'url_name' => pwg_db_real_escape_string(trigger_change('render_tag_url', $name)),
     ));
 
   return (int)pwg_db_insert_id();
@@ -520,11 +594,19 @@ function persons_person_gallery_url($row)
     return '';
   }
 
+  $tag = pwg_db_fetch_assoc(pwg_query(
+    'SELECT url_name FROM '.TAGS_TABLE.' WHERE id = '.(int)$row['tag_id'].';'
+    ));
+  if (!$tag)
+  {
+    return '';
+  }
+
   return make_index_url(array(
     'tags' => array(
       array(
         'id'       => (int)$row['tag_id'],
-        'url_name' => $row['url_name'],
+        'url_name' => $tag['url_name'],
         ),
       ),
     ));
@@ -868,6 +950,10 @@ function persons_rename_person($person_id, $new_name)
     return $failure('Another person already has that name');
   }
 
+  // Before the name changes: a tag of another name is not the person's to
+  // rename, so the person is pointed at its own first.
+  $own_tag = persons_ensure_own_tag($person);
+
   $url_name = trigger_change('render_tag_url', $new_name);
 
   pwg_query(
@@ -877,15 +963,12 @@ function persons_rename_person($person_id, $new_name)
     .' WHERE id = '.$person_id.';'
     );
 
-  if ($person['tag_id'] !== null)
-  {
-    pwg_query(
-      'UPDATE '.TAGS_TABLE
-      ." SET name = '".pwg_db_real_escape_string($new_name)."',"
-      ." url_name = '".pwg_db_real_escape_string($url_name)."'"
-      .' WHERE id = '.(int)$person['tag_id'].';'
-      );
-  }
+  pwg_query(
+    'UPDATE '.TAGS_TABLE
+    ." SET name = '".pwg_db_real_escape_string($new_name)."',"
+    ." url_name = '".pwg_db_real_escape_string($url_name)."'"
+    .' WHERE id = '.$own_tag.';'
+    );
 
   persons_invalidate_tag_cache();
 
@@ -926,20 +1009,18 @@ SELECT area_x, area_y, area_w, area_h, region_type
   }
 
   // The tag's name changed on every photo carrying it, also where it was applied by hand.
-  $tag_writes = persons_notify_tags_changed(array_merge($images, persons_tag_images($person['tag_id'])));
+  $tag_writes = persons_notify_tags_changed(array_merge($images, persons_tag_images($own_tag)));
 
   return array('ok' => true, 'message' => '', 'photos' => $photos, 'failed' => $failed,
     'tag_writes' => $tag_writes);
 }
 
 /**
- * Removes a person: their regions leave every file, then the index rows and the
- * person row go.
- *
- * The mirrored tag is left behind for core's orphan-tag mechanism
- * (get_orphan_tags(), admin/include/functions.php:430) rather than dropped here:
- * an administrator may have applied that tag by hand to photos that never
- * carried a region, and those assignments are not this plugin's to delete.
+ * Removes a person: their regions leave every file, then the index rows, the
+ * person row and the person's own tag go - from every photo carrying it, also
+ * where it was applied by hand, and from the tag list. The keywords follow
+ * through persons_tags_changed. A tag of another name the person was linked to
+ * is not the person's and stays: the person is pointed at its own first.
  *
  * @param int $person_id
  * @return array array('ok' => bool, 'message' => string, 'photos' => int,
@@ -958,7 +1039,8 @@ function persons_delete_person($person_id)
   $failed = array();
   $photos = 0;
   $images = persons_person_images($person_id);
-  $tagged = persons_tag_images($person['tag_id']);
+  $own_tag = persons_ensure_own_tag($person);
+  $tagged = persons_tag_images($own_tag);
 
   foreach ($images as $image_id)
   {
@@ -981,12 +1063,9 @@ function persons_delete_person($person_id)
   pwg_query('DELETE FROM '.PERSONS_REGION_TABLE.' WHERE person_id = '.$person_id.';');
   pwg_query('DELETE FROM '.PERSONS_TABLE.' WHERE id = '.$person_id.';');
 
-  if ($person['tag_id'] !== null)
-  {
-    pwg_query(
-      'DELETE FROM '.IMAGE_TAG_TABLE.' WHERE tag_id = '.(int)$person['tag_id'].';'
-      );
-  }
+  // ws.php does not include the admin helpers.
+  include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
+  delete_tags(array($own_tag));
 
   persons_invalidate_tag_cache();
   $tag_writes = persons_notify_tags_changed(array_merge($images, $tagged));
