@@ -40,7 +40,7 @@ Nothing is in progress: no agent running, working tree clean except the four
 
 ## Next
 
-Open tasks: 26-37 and 39 (check each task's `dependencies`; 26 and 27 touch core tag admin /
+Open tasks: 26-37, 39, 40, 41 (check each task's `dependencies`; 26 and 27 touch core tag admin /
 upload, 26 overlaps 18's `admin/themes/default/js/tags.js` edit).
 
 **typetags `843065a` (task 38) and `5d5e65d` (task 18) are not pushed** (403, git used account
@@ -50,21 +50,23 @@ the right account before pushing the main repo.
 Decision numbers used so far: 0069 (05), 0070 (07), 0071 (11), 0072 (14), 0073 (03), 0074 (23),
 0075 (21). Next free: 0076.
 
-Open decisions for the user from this batch (in the task files' Deviations):
+Answered 2026-10-17 ("all a"): task 18's unguarded paths and the Batch Manager message become
+task 40; task 25's other dialog becomes task 41; the five dead `image_category` rows are deleted
+(guarded, under the suite lock) and the counts re-checked; a subagent reviews task 18's German text
+and a Playwright run opens task 24's group-merge modal; `plugin-test-suites.md` names the
+characterization file pattern instead of a count (done). Done 2026-10-17 after DDEV came back: the five
+dead rows deleted (0 left; `CoreMenuPhotoCount*` and `CoreHiddenSubalbumCount` 14 OK), the
+group-merge modal opened (task 24 note), `check.php` OK after the task 18 rewording.
+
+Decisions the answers above cover (in the task files' Deviations):
 
 - Task 18: not guarded, outside the design's list: `pwg.tags.rename` of a person's tag,
   `pwg.images.add` / `uploadAsync` with `tag_ids` on an existing photo, `pwg.photoinfo.pruneTags`.
   The Batch Manager's JS unit mode shows core's generic error badge, not the refusal message.
 - Task 25: the add-album dialog of Fotos hinzufügen / Batch Manager (`include/add_album.inc.tpl`)
   has no hint; not examined.
-- Task 23: five dead `image_category` rows stay in the local DB (images 55910, 55917, 55950, 55989,
-  37388); the count no longer sees them.
 
-Hand checks still open: the German paragraphs and messages task 18 added (`handbuch/04-schlagworte.html`,
-`05-personen.html`, persons' de_DE strings); task 24's group-merge modal (unit row only).
-
-Stale doc, not fixed (file at its line cap): `.claude/rules/plugin-test-suites.md` says nine
-`Core*CharacterizationTest.php` files; there are 14 (2026-10-17). New seed options of tasks 18
+New seed options of tasks 18
 (`--coloured-tags`), 22 (`--scenario=empty`) and 25 are documented only in the seeds' headers.
 
 ## Questions to the user (asked 2026-10-16; unanswered, so 2026-10-17 the defaults `a` apply)

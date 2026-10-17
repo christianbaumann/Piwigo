@@ -35,7 +35,7 @@ $lang['No person matches that search'] = 'Keine Person passt zu dieser Suche';
 
 $lang['This crop would remove person marks only an administrator may delete:'] = 'Dieser Zuschnitt würde Personen-Markierungen entfernen, die nur ein Administrator löschen darf:';
 
-$lang['A person tag stays on a photo while the person is marked there: %s. Remove the mark on the photo to remove the tag.'] = 'Ein Personen-Schlagwort bleibt am Foto, solange die Person dort markiert ist: %s. Entfernen Sie die Markierung auf dem Foto, um das Schlagwort zu entfernen.';
-$lang['A person tag is deleted only with its person: %s. Delete the person under Persons.'] = 'Ein Personen-Schlagwort wird nur mit seiner Person gelöscht: %s. Löschen Sie die Person unter Personen.';
+$lang['A person tag stays on a photo while the person is marked there: %s. Remove the mark on the photo to remove the tag.'] = 'Personen-Schlagworte bleiben am Foto, solange die Person dort markiert ist: %s. Um ein solches Schlagwort zu entfernen, löschen Sie die Markierung auf dem Foto; eine Markierung, die jemand anderes gesetzt hat, löscht ein Administrator.';
+$lang['A person tag is deleted only with its person: %s. Delete the person under Persons.'] = 'Personen-Schlagworte werden nur zusammen mit der Person gelöscht: %s. Die Person löscht der Webmaster auf der Seite Personen.';
 
 ?>

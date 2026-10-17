@@ -127,12 +127,9 @@ throwaway album and asserts one press of `+` widens the photo past fit. `Picture
 is the same wait as persons' (`SETTLE_FRAMES` frames, loader GIF rejected).
 
 **`plugins/provenance` is also where Piwigo *core* is characterized.** Core carries no suite of
-its own and this repository deliberately does not stand one up, so nine
-`Core*CharacterizationTest.php` files in `plugins/provenance/tests/Integration/` cover core
-behaviour the fork depends on: `CoreAlbumCharacterizationTest`, `CorePhotoTextCharacterizationTest`,
-`CoreTagCrudCharacterizationTest`, `CoreTagAssignmentCharacterizationTest`, `CoreUploadCharacterizationTest`,
-`CoreAssociationCharacterizationTest`, `CoreDeleteCategoriesCharacterizationTest`,
-`CoreMetadataSyncCharacterizationTest` and `CoreDateAndCommentSaveCharacterizationTest`. Every case is
+its own and this repository deliberately does not stand one up, so the
+`plugins/provenance/tests/Integration/Core*CharacterizationTest.php` files cover core behaviour the
+fork depends on (list them with that pattern; no copy of the list is kept here). Every case is
 `[ERR]`: the oracle is the current implementation, so they report a *change* and prove nothing
 correct. They run inside the provenance integration suite — there is no separate command. Put a new
 core characterization case there rather than inventing a root `phpunit.xml`.

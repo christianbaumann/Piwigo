@@ -39,7 +39,7 @@ Named messages read in clean German.
   | `ws_functions.inc.php` `l10n()` removed | `AddRegionTest::testANamelessRegionIsRefusedInTheAccountsLanguage` |
   | `index.inc.php` `l10n()` removed | `PersonAdminApiTest::testRenamingToAWhitespaceOnlyNameIsRefused` |
 * [x] Spot check in the browser for the merge modal
-  **Note:** Verified via `.agent-tests/2026-10-17-german-overrides/merge-modal.js` (Playwright in the container, `typetags_webmaster`, three throwaway tags merged through the page's `mergeGroups()`, deleted afterwards). Title: "Schlagwort(e) Task24 Merge A, Task24 Merge B wurde(n) erfolgreich in »Task24 Merge Ziel« zusammengeführt" - no braces. The group merge modal was not opened in a browser; its key is guarded by the unit row only.
+  **Note:** Verified via `.agent-tests/2026-10-17-german-overrides/merge-modal.js` (Playwright in the container, `typetags_webmaster`, three throwaway tags merged through the page's `mergeGroups()`, deleted afterwards). Title: "Schlagwort(e) Task24 Merge A, Task24 Merge B wurde(n) erfolgreich in »Task24 Merge Ziel« zusammengeführt" - no braces. 2026-10-17 (user's answer 6a): the group merge modal too, via `.agent-tests/2026-10-17-german-overrides/group-merge-modal.js` (three throwaway groups, the page's own `.ConfirmMergeButton`, groups deleted, 0 left). Title: "Gruppe(n) Task24 Gruppe A,Task24 Gruppe B erfolgreich in "Task24 Gruppe Ziel" zusammengeführt" - no braces. The missing space after the comma is core's `name_merge.toString()` in `group_list.js`, not the override.
 
 ## Deviations from the design
 
