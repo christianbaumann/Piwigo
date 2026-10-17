@@ -124,6 +124,32 @@ final class RegionGeometryTest extends TestCase
         $this->assertEqualsWithDelta(0.3, $clipped['w'], self::EPSILON, 'the overrunning tenth is cut, the rest kept');
     }
 
+    /**
+     * [BVA] SES-2026-10-15-03: y 0.1, h 0.3 (centre origin) puts the top edge at
+     * -0.05, so MWG clipping stores y 0.125, h 0.25. The rule is the clip, not a
+     * rounding step: the bottom edge (0.25) is where the sender put it.
+     */
+    public function testABoxOverrunningTheTopEdgeIsStoredAsTheClippedFrame(): void
+    {
+        $clipped = persons_clip_region(array('x' => 0.5, 'y' => 0.1, 'w' => 0.2, 'h' => 0.3));
+
+        $this->assertNotNull($clipped);
+        $this->assertEqualsWithDelta(0.125, $clipped['y'], self::EPSILON);
+        $this->assertEqualsWithDelta(0.25, $clipped['h'], self::EPSILON);
+        $this->assertSame(0.5, $clipped['x'], 'the axis that fits is untouched');
+        $this->assertSame(0.2, $clipped['w'], 'the axis that fits is untouched');
+    }
+
+    /** [BVA] The mirror of the top-edge case: a clipped x leaves the y and h that were sent exactly as sent. */
+    public function testABoxOverrunningTheLeftEdgeKeepsTheVerticalAxisAsSent(): void
+    {
+        $clipped = persons_clip_region(array('x' => 0.1, 'y' => 0.5, 'w' => 0.4, 'h' => 0.2));
+
+        $this->assertNotNull($clipped);
+        $this->assertSame(0.5, $clipped['y'], 'the axis that fits is untouched');
+        $this->assertSame(0.2, $clipped['h'], 'the axis that fits is untouched');
+    }
+
     /** [BVA] Two overrunning edges are both cut, not just the first found. */
     public function testABoxOverrunningTwoEdgesIsClippedOnBoth(): void
     {

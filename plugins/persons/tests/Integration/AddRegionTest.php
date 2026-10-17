@@ -231,6 +231,37 @@ final class AddRegionTest extends TestCase
         return array('zero' => array('0'), 'negative' => array('-1'));
     }
 
+    /**
+     * [HAPPY] SES-2026-10-15-03: a box inside the frame is read back exactly as
+     * sent, through the answer and through the index.
+     */
+    public function testABoxInsideTheFrameIsReadBackAsSent(): void
+    {
+        $res = $this->addRegion(self::JANE, self::BOX);
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        $this->assertCount(1, $res['json']['result']['regions'], 'anti-vacuity: no region came back');
+        $this->assertBoxEquals(self::BOX, $res['json']['result']['regions'][0]);
+        $this->assertBoxEquals(self::BOX, $this->indexedBox());
+    }
+
+    /**
+     * [BVA] SES-2026-10-15-03: the one rule that changes a frame is MWG clipping
+     * of a box whose centre is inside but whose edge is not (decision 0077).
+     * y 0.1 / h 0.3 overruns the top edge by 0.05 and comes back as 0.125 / 0.25,
+     * on any photo size: the frame is normalized.
+     */
+    public function testABoxOverrunningTheTopEdgeIsStoredClipped(): void
+    {
+        $res = $this->addRegion(self::JANE, array('x' => 0.5, 'y' => 0.1, 'w' => 0.2, 'h' => 0.3));
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        $this->assertCount(1, $res['json']['result']['regions'], 'anti-vacuity: no region came back');
+        $expected = array('x' => 0.5, 'y' => 0.125, 'w' => 0.2, 'h' => 0.25);
+        $this->assertBoxEquals($expected, $res['json']['result']['regions'][0]);
+        $this->assertBoxEquals($expected, $this->indexedBox());
+    }
+
     /** [BVA] [NEG] A box below the minimum is refused, and nothing is written. */
     public function testABoxBelowTheMinimumIsRejected(): void
     {
@@ -280,6 +311,24 @@ final class AddRegionTest extends TestCase
             'name' => $name,
             'pwg_token' => $this->ws->token(),
             ) + ($box ?? self::BOX));
+    }
+
+    private function assertBoxEquals(array $expected, array $actual): void
+    {
+        foreach (array('x', 'y', 'w', 'h') as $key)
+        {
+            $this->assertEqualsWithDelta($expected[$key], (float)$actual[$key], 1e-6, $key);
+        }
+    }
+
+    private function indexedBox(): array
+    {
+        $row = $this->db->query(
+            'SELECT area_x AS x, area_y AS y, area_w AS w, area_h AS h FROM piwigo_person_region'
+            . ' WHERE image_id = ' . (int)$this->image['id']
+        )->fetch_assoc();
+        $this->assertNotNull($row, 'anti-vacuity: the index holds no region');
+        return $row;
     }
 
     private function personId(string $name): ?int

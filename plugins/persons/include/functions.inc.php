@@ -352,6 +352,21 @@ function persons_clip_region($region)
 
   $centred = persons_corner_to_center($left, $top, $right - $left, $bottom - $top);
 
+  // An axis that fits keeps the value that was sent, for the reason above.
+  $horizontal_fits = ($left === $corner['left'] and $right === $corner['left'] + $corner['w']);
+  $vertical_fits   = ($top === $corner['top'] and $bottom === $corner['top'] + $corner['h']);
+
+  if ($horizontal_fits)
+  {
+    $centred['x'] = $x;
+    $centred['w'] = $w;
+  }
+  if ($vertical_fits)
+  {
+    $centred['y'] = $y;
+    $centred['h'] = $h;
+  }
+
   return array_merge($region, $centred);
 }
 
