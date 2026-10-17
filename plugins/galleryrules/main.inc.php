@@ -65,3 +65,7 @@ add_event_handler('loc_begin_index', 'galleryrules_empty_album_note',
 // A blank name in the create-album dialog of Alben > Verwaltung shows a hint instead of nothing.
 add_event_handler('loc_begin_admin_page', 'galleryrules_album_name_hint',
   EVENT_HANDLER_PRIORITY_NEUTRAL, GALLERYRULES_PATH . 'include/events_album_name.inc.php');
+
+// The unused-tag cleanup and its confirm list leave coloured-group and person tags out.
+add_event_handler('get_orphan_tags', 'galleryrules_orphan_tags_without_kept',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, GALLERYRULES_PATH . 'include/events_orphan_tags.inc.php');

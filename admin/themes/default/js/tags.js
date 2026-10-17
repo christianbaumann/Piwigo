@@ -8,7 +8,7 @@ $('#select-100').prop('checked', true)
 $('.info-warning p a').on('click', () => {
   let url = $('.info-warning p a').data('url');
   let tags = orphan_tag_names;
-  let str_orphans = str_orphan_tags.replace('%s1', tags.length).replace('%s2', tags.join(', '));
+  let str_orphans = str_orphan_tags.replace('%s1', tags.length).replace('%s2', '<br>' + tags.join('<br>'));
   $.confirm({
     content : str_orphans,
     title : str_delete_orphan_tags,
@@ -62,11 +62,15 @@ function createTagBox(id, name, url_name, count, raw_name = null) {
   }
   if (count > 0) {
     newTag.find('.dropdown-option.view, .dropdown-option.manage').css('display', 'block');
-    newTag.find('.tag-dropdown-header i').html(str_number_photos.replace('%d', count));
+    newTag.find('.tag-dropdown-header i').html(photoCountText(count));
   } else {
     newTag.find('.tag-dropdown-header i').html(str_no_photos);
   }
   return newTag;
+}
+
+function photoCountText(count) {
+  return (count == 1 ? str_number_photo : str_number_photos).replace('%d', count);
 }
 
 function recycleTagBox(tagBox, id, name, url_name, count, raw_name = null) {
@@ -88,7 +92,7 @@ function recycleTagBox(tagBox, id, name, url_name, count, raw_name = null) {
   
   if (count > 0) {
     tagBox.find('.dropdown-option.view, .dropdown-option.manage').css('display', 'block');
-    tagBox.find('.tag-dropdown-header i').html(str_number_photos.replace('%d', count));
+    tagBox.find('.tag-dropdown-header i').html(photoCountText(count));
   } else {
     tagBox.find('.tag-dropdown-header i').html(str_no_photos);
   }
@@ -137,6 +141,7 @@ $(".TagSubmit").on('click', function () {
     $('.TagSubmit').show();
     $('.TagLoading').hide();
     console.error(message)
+    showError(message)
   })
 });
 
@@ -417,6 +422,7 @@ function duplicateTag(id, name) {
             name: data.result.name,
             id: data.result.id,
             url_name: data.result.url_name,
+            raw_name: data.result.name,
             counter : data.result.count
           });
           updateBadge();
@@ -773,7 +779,7 @@ function mergeGroups(destination_id, merge_ids) {
               tagBox.find('.dropdown-option.view,'+ 
               '.dropdown-option.manage,'+
               '.tag-dropdown-header i').show();
-              $('.tag-dropdown-header i').html(str_number_photos.replace('%d', data.result.images_in_merged_tag.length));
+              $('.tag-dropdown-header i').html(photoCountText(data.result.images_in_merged_tag.length));
 
               // Update data
               index = dataTags.findIndex((tag) => tag.id == data.result.destination_tag);

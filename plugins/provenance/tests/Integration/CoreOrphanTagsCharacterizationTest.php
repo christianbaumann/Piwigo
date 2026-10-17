@@ -11,8 +11,9 @@ use PHPUnit\Framework\TestCase;
  * Every case is [ERR]: the oracle is the current implementation, not a
  * requirement. Nothing promises that a tag is spared for a day after its last
  * change; these record that it does today. They report a change; they prove
- * nothing right. A coloured tag and a person's tag are swept up with the plain
- * ones today.
+ * nothing right. The cases that pinned a coloured and a person's tag as swept up
+ * with the plain ones were replaced on purpose by galleryrules' OrphanTagsTest
+ * (task 26: both are now kept).
  *
  * They pass on their first run, so each was watched go red by breaking the
  * behaviour it pins (docs/agents/TESTING.md).
@@ -40,8 +41,6 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
     /** Unused tags the install held before the run, put back in tearDown. */
     private array $existingOrphans = array();
     private array $testTagIds = array();
-    private array $testPersonIds = array();
-    private array $testColorIds = array();
 
     protected function setUp(): void
     {
@@ -58,18 +57,10 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach ($this->testPersonIds as $id)
-        {
-            $this->db->query('DELETE FROM `piwigo_persons` WHERE id = ' . (int)$id);
-        }
         foreach ($this->testTagIds as $id)
         {
             $this->db->query('DELETE FROM `piwigo_image_tag` WHERE tag_id = ' . (int)$id);
             $this->db->query('DELETE FROM `piwigo_tags` WHERE id = ' . (int)$id);
-        }
-        foreach ($this->testColorIds as $id)
-        {
-            $this->db->query('DELETE FROM `piwigo_typetags` WHERE id = ' . (int)$id);
         }
         foreach ($this->existingOrphans as $row)
         {
@@ -84,7 +75,7 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
                 'INSERT IGNORE INTO `piwigo_tags` (' . implode(',', $columns) . ') VALUES (' . implode(',', $values) . ')'
             );
         }
-        $this->testTagIds = $this->testPersonIds = $this->testColorIds = $this->existingOrphans = array();
+        $this->testTagIds = $this->existingOrphans = array();
 
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
@@ -129,34 +120,6 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
         $this->assertFalse($this->tagExists($old), 'anti-vacuity: the older tag goes, so the cleanup did run');
     }
 
-    /** [ERR] An unused coloured tag is swept up with the plain ones. */
-    public function testEveryPathRemovesAnUnusedColouredTag(): void
-    {
-        foreach (self::PATHS as $path => $url)
-        {
-            $id = $this->makeColouredTag('coloured-' . bin2hex(random_bytes(3)));
-            $this->assertTrue($this->tagExists($id), 'anti-vacuity: the tag must exist before the cleanup');
-
-            $this->runCleanup($url);
-
-            $this->assertFalse($this->tagExists($id), $path . ' removes an unused coloured tag');
-        }
-    }
-
-    /** [ERR] An unused person tag is swept up with the plain ones. */
-    public function testEveryPathRemovesAnUnusedPersonTag(): void
-    {
-        foreach (self::PATHS as $path => $url)
-        {
-            $id = $this->makePersonTag('person-' . bin2hex(random_bytes(3)));
-            $this->assertTrue($this->tagExists($id), 'anti-vacuity: the tag must exist before the cleanup');
-
-            $this->runCleanup($url);
-
-            $this->assertFalse($this->tagExists($id), $path . ' removes an unused person tag');
-        }
-    }
-
     /** [ERR] The tags page offers the unused tags' names to the confirm dialog, joined by the script. */
     public function testTheTagsPageListsTheUnusedNamesForTheConfirm(): void
     {
@@ -171,15 +134,15 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
         $this->assertStringContainsString('"' . $name . '"', $m[1]);
     }
 
-    /** [ERR] The confirm and the tag menu strings as tags.tpl emits them: the count untranslated, the confirm in core's German. */
+    /** [ERR] The confirm and the tag menu strings as tags.tpl emits them, in German. */
     public function testTheTagsPageEmitsTheCountAndConfirmStrings(): void
     {
         $page = $this->ws->fetchPage('/admin.php?page=tags');
 
         $this->assertGreaterThan(self::MIN_PAGE_BYTES, strlen((string)$page['body']));
-        $this->assertStringNotContainsString('var str_number_photo =', $page['body']);
-        $this->assertStringContainsString("var str_number_photos = '%d photos'", $page['body']);
-        $this->assertStringContainsString("var str_orphan_tags = 'Sie haben %s1 verwaiste : %s2';", $page['body']);
+        $this->assertStringContainsString("var str_number_photo = '%d Foto'", $page['body']);
+        $this->assertStringContainsString("var str_number_photos = '%d Fotos'", $page['body']);
+        $this->assertStringContainsString("var str_orphan_tags = 'Nicht benutzte Schlagworte (%s1):%s2';", $page['body']);
     }
 
     private function runCleanup(string $url): void
@@ -196,31 +159,6 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
         );
         $id = $this->db->insertId();
         $this->testTagIds[] = $id;
-
-        return $id;
-    }
-
-    private function makeColouredTag(string $name): int
-    {
-        $this->db->query("INSERT INTO `piwigo_typetags` (name, color) VALUES ('" . $this->db->escape($name) . "', '#123456')");
-        $colorId = $this->db->insertId();
-        $this->testColorIds[] = $colorId;
-
-        $id = $this->makeTag($name, self::OLD_ENOUGH_DAYS);
-        $this->db->query(
-            "UPDATE `piwigo_tags` SET id_typetags = $colorId, lastmodified = NOW() - INTERVAL " . self::OLD_ENOUGH_DAYS . " DAY WHERE id = $id"
-        );
-        $this->assertSame($colorId, (int)$this->db->scalar("SELECT id_typetags FROM `piwigo_tags` WHERE id = $id"), 'fixture colour did not take');
-
-        return $id;
-    }
-
-    private function makePersonTag(string $name): int
-    {
-        $id = $this->makeTag($name, self::OLD_ENOUGH_DAYS);
-        $escaped = $this->db->escape($name);
-        $this->db->query("INSERT INTO `piwigo_persons` (name, url_name, tag_id) VALUES ('$escaped', '$escaped', $id)");
-        $this->testPersonIds[] = $this->db->insertId();
 
         return $id;
     }

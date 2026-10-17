@@ -66,3 +66,7 @@ $lang['Tag(s) \{%s1\} succesfully merged into "%s2"'] = 'Schlagwort(e) %s1 wurde
 $lang['Group(s) \{%s1\} succesfully merged into "%s2"'] = 'Gruppe(n) %s1 erfolgreich in "%s2" zusammengeführt';
 // admin/site_update.php - PWG-UPDATE-1; core's translation leaves out the digits
 $lang['The name of directories and files must be composed of letters, numbers, "-", "_" or "."'] = 'Verzeichnis- und Dateinamen müssen aus Buchstaben, Ziffern oder den Zeichen "-", "_" oder "." bestehen.';
+// admin/themes/default/template/tags.tpl and admin/tags.php - the unused-tag cleanup; core's
+// wording reads "1 nicht benutzte Schlagworte" and "11 verwaiste :"
+$lang['You have %s1 orphan : %s2'] = 'Nicht benutzte Schlagworte (%s1):%s2';
+$lang['You have %d orphan tags %s'] = 'Nicht benutzte Schlagworte (%d): %s';

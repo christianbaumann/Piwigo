@@ -21,7 +21,8 @@ var str_other_copy = '{' (copy %s)'|@translate}';
 var str_merged_into = '{'Tag(s) \{%s1\} succesfully merged into "%s2"'|@translate}';
 var str_and_others_tags = '{'and %s others'|@translate}';
 var str_others_tags_available = '{'%s other tags available...'|@translate}'
-var str_number_photos = '{'%d photos'}'
+var str_number_photo = '{'%d photo'|@translate}'
+var str_number_photos = '{'%d photos'|@translate}'
 var str_no_photos = '{'no photo'}'
 var str_select_all_tag = '{'Select all %d tags'|@translate}';
 var str_clear_selection = '{'Clear Selection'|@translate}';
@@ -62,7 +63,7 @@ if (!$.cookie("pwg_tags_per_page")) {
       <div class="dropdown-content">
         <div class='tag-dropdown-header'>
           <b>{$tag_name}</b>
-          <i>{if !$has_image}{'no photo'|@translate}{else}{'%d photos'|@translate:$tag_count}{/if}</i>
+          <i>{if !$has_image}{'no photo'|@translate}{else}{$tag_count|@translate_dec:'%d photo':'%d photos'}{/if}</i>
         </div>
         <a class='dropdown-option icon-eye view' href="{$tag_U_VIEW}" {if !$has_image} style='display:none' {/if}> {'View in gallery'|@translate}</a>
         <a class='dropdown-option icon-picture manage' href="{$tag_U_EDIT}" {if !$has_image} style='display:none' {/if}> {'Manage photos'|@translate}</a>

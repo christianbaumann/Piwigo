@@ -15,6 +15,9 @@
  *                                                        replace option's refusal
  *   php tests/e2e/support/seed.php --scenario=empty     an album holding no photo, for the note an
  *                                                        administrator sees on its page
+ *   php tests/e2e/support/seed.php --scenario=tags      three tags for the tag screen: one on one photo,
+ *                                                        one on two, one on none and unused for two days
+ *                                                        (--restore deletes them)
  *   php tests/e2e/support/seed.php --album-count       how many albums the install holds
  *   php tests/e2e/support/seed.php --album-name-hint   the German hint of the create-album dialog
  *   php tests/e2e/support/seed.php --track-album=<name> records an album a spec created through the
@@ -31,6 +34,9 @@ const SNAPSHOT_FILE = __DIR__ . '/../.state/snapshot.json';
 
 /** The attribute a payload's onerror writes; the spec reads it back. */
 const XSS_MARKER = 'galleryrulesXss';
+
+/** The start of every tag name the tags scenario creates; --restore deletes tags that begin with it. */
+const TAG_PREFIX = 'galleryrules-e2e-';
 
 function fail(string $message): void
 {
@@ -111,6 +117,18 @@ if (isset($args['restore']))
     }
 
     $builder->importTestObjects($snapshot);
+    foreach ($snapshot['tags'] ?? array() as $tagId)
+    {
+        $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$tagId);
+        $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$tagId);
+    }
+    // Tags a spec made through the browser (a Duplikat, a rename) carry the seeded prefix too.
+    $result = $db->query("SELECT id FROM piwigo_tags WHERE name LIKE '" . TAG_PREFIX . "%'");
+    while ($row = $result->fetch_assoc())
+    {
+        $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$row['id']);
+        $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$row['id']);
+    }
     $builder->destroyTestImages();
     $builder->destroyTestAlbums();
     unlink(SNAPSHOT_FILE);
@@ -119,9 +137,9 @@ if (isset($args['restore']))
     exit(0);
 }
 
-if (!in_array($args['scenario'] ?? '', array('payload', 'same-name', 'empty'), true))
+if (!in_array($args['scenario'] ?? '', array('payload', 'same-name', 'empty', 'tags'), true))
 {
-    fail('--scenario must be one of: payload, same-name, empty');
+    fail('--scenario must be one of: payload, same-name, empty, tags');
 }
 if (is_file(SNAPSHOT_FILE))
 {
@@ -142,6 +160,11 @@ if ($args['scenario'] === 'same-name')
 if ($args['scenario'] === 'empty')
 {
     seedEmpty($db, $builder);
+    exit(0);
+}
+if ($args['scenario'] === 'tags')
+{
+    seedTags($db, $builder);
     exit(0);
 }
 
@@ -239,4 +262,41 @@ function seedEmpty(Db $db, FixtureBuilder $builder): void
     include GALLERYRULES_PATH . 'language/de_DE/plugin.lang.php';
 
     echo json_encode(array('album_id' => $albumId, 'note' => $lang[GALLERYRULES_EMPTY_ALBUM_NOTE])), "\n";
+}
+
+/** Three tags of this suite's own, on one photo, on two photos and on none, for the tag screen's menu and rename. */
+function seedTags(Db $db, FixtureBuilder $builder): void
+{
+    $suffix = bin2hex(random_bytes(4));
+    $names = array(
+        'one' => TAG_PREFIX . 'one-' . $suffix,
+        'two' => TAG_PREFIX . 'two-' . $suffix,
+        'none' => TAG_PREFIX . 'none-' . $suffix,
+        );
+    $tagIds = array();
+    try
+    {
+        foreach ($names as $key => $name)
+        {
+            $escaped = $db->escape($name);
+            $db->query("INSERT INTO piwigo_tags (name, url_name) VALUES ('$escaped', '$escaped')");
+            $tagIds[$key] = $db->insertId();
+            file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects() + array('tags' => array_values($tagIds)), JSON_PRETTY_PRINT));
+        }
+        $imageIds = array();
+        foreach (array('first', 'second') as $unused)
+        {
+            $imageIds[] = $builder->createTestImage();
+            file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects() + array('tags' => array_values($tagIds)), JSON_PRETTY_PRINT));
+        }
+        $db->query("INSERT INTO piwigo_image_tag (image_id, tag_id) VALUES ($imageIds[0], $tagIds[one]), ($imageIds[0], $tagIds[two]), ($imageIds[1], $tagIds[two])");
+        // Unused for more than a day, so the tags page offers it to the cleanup.
+        $db->query("UPDATE piwigo_tags SET lastmodified = NOW() - INTERVAL 2 DAY WHERE id = $tagIds[none]");
+    }
+    catch (RuntimeException $e)
+    {
+        fail($e->getMessage());
+    }
+
+    echo json_encode(array('names' => $names, 'tag_ids' => $tagIds)), "\n";
 }

@@ -426,6 +426,9 @@ function delete_orphan_tags()
 
 /**
  * Get all tags (id + name) linked to no photo
+ *
+ * Fork-local: the rows pass through the get_orphan_tags filter, so plugins can
+ * keep tags out of the cleanup.
  */
 function get_orphan_tags()
 {
@@ -438,7 +441,7 @@ SELECT
   WHERE tag_id IS NULL
     AND lastmodified < SUBDATE(NOW(), INTERVAL 1 DAY)
 ;';
-  return query2array($query);
+  return trigger_change('get_orphan_tags', query2array($query));
 }
 
 /**

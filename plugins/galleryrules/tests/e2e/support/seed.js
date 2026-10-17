@@ -38,6 +38,15 @@ function seedEmpty() {
   return run('--scenario=empty');
 }
 
+/**
+ * Creates three tags: `one` on one photo, `two` on two, `none` on none.
+ *
+ * @returns {{names: {one: string, two: string, none: string}, tag_ids: {one: number, two: number, none: number}}}
+ */
+function seedTags() {
+  return run('--scenario=tags');
+}
+
 /** @returns {number} how many albums the install holds */
 function albumCount() {
   return run('--album-count').count;
@@ -62,4 +71,4 @@ function restore() {
   run('--restore');
 }
 
-module.exports = { seedPayload, seedSameName, seedEmpty, albumCount, albumNameHint, trackAlbum, restore };
+module.exports = { seedPayload, seedSameName, seedEmpty, seedTags, albumCount, albumNameHint, trackAlbum, restore };

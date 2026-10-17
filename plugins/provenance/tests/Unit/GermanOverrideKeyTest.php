@@ -32,6 +32,8 @@ final class GermanOverrideKeyTest extends TestCase
         'Tag(s) \{%s1\} succesfully merged into "%s2"' => 'Schlagwort(e) \{%s1\} wurde(n) erfolgreich in »%s2« zusammengeführt',
         'Group(s) \{%s1\} succesfully merged into "%s2"' => 'Gruppe(n) \{%s1\} erfolgreich in "%s2" zusammengeführt',
         'The name of directories and files must be composed of letters, numbers, "-", "_" or "."' => 'Verzeichnis- und Dateinamen müssen aus Buchstaben oder den Zeichen "-", "_" oder "." bestehen.',
+        'You have %s1 orphan : %s2' => 'Sie haben %s1 verwaiste : %s2',
+        'You have %d orphan tags %s' => 'Sie haben %d nicht benutzte Schlagworte: %s',
         );
 
     /** A file shorter than this is a stub or a failed read, on which a count assertion says nothing. */
@@ -207,6 +209,16 @@ final class GermanOverrideKeyTest extends TestCase
                 "{'Just now'|@translate|escape:javascript}",
                 1,
             ),
+            'You have %s1 orphan : %s2' => array(
+                'admin/themes/default/template/tags.tpl',
+                "{'You have %s1 orphan : %s2'|@translate}",
+                1,
+            ),
+            'You have %d orphan tags %s' => array(
+                'admin/tags.php',
+                "l10n('You have %d orphan tags %s')",
+                1,
+            ),
             'A person needs a name' => array(
                 'plugins/persons/include/functions.inc.php',
                 "define('PERSONS_NAME_REQUIRED_MESSAGE', 'A person needs a name');",
@@ -318,6 +330,8 @@ final class GermanOverrideKeyTest extends TestCase
         $this->assertSame(array('%d'), $this->placeholders($lang['%d photos updated']));
         $this->assertSame(array('%s1', '%s2'), $this->placeholders($lang['Tag(s) \{%s1\} succesfully merged into "%s2"']));
         $this->assertSame(array('%s1', '%s2'), $this->placeholders($lang['Group(s) \{%s1\} succesfully merged into "%s2"']));
+        $this->assertSame(array('%s1', '%s2'), $this->placeholders($lang['You have %s1 orphan : %s2']));
+        $this->assertSame(array('%d', '%s'), $this->placeholders($lang['You have %d orphan tags %s']));
     }
 
     /** @return string[] */
