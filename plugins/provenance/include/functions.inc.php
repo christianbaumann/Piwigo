@@ -619,6 +619,20 @@ function provenance_argfile_value_files($values, $value_prefix)
 }
 
 /**
+ * The argfile lines that make exiftool write IPTC text as UTF-8 and say so.
+ *
+ * The -charset option only encodes the bytes. Without IPTC:CodedCharacterSet
+ * a reader that trusts the file takes them for Latin-1 and shows umlauts and
+ * the en dash as garbage.
+ *
+ * @return array
+ */
+function provenance_iptc_charset_lines()
+{
+  return array('-charset', 'iptc=UTF8', '-IPTC:CodedCharacterSet=UTF8');
+}
+
+/**
  * Builds the exiftool argfile lines for one photo.
  *
  * A value never reaches a command line (decision C8): the tag and its value
@@ -656,7 +670,7 @@ function provenance_build_argfile($values, $caption, $value_prefix = '')
     return array();
   }
 
-  return array_merge(array('-charset', 'iptc=UTF8'), $lines);
+  return array_merge(provenance_iptc_charset_lines(), $lines);
 }
 
 /**

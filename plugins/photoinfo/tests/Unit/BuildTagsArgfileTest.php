@@ -14,6 +14,7 @@ final class BuildTagsArgfileTest extends TestCase
             array(
                 '-charset',
                 'iptc=UTF8',
+                '-IPTC:CodedCharacterSet=UTF8',
                 '-XMP-dc:Subject=Anna',
                 '-XMP-dc:Subject=Kirmes',
                 '-IPTC:Keywords=Anna',

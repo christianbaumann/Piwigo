@@ -29,6 +29,9 @@ final class WriteBackTest extends TestCase
     /** Lower bound on ImageMagick's verbose output, so a truncated read cannot pass. */
     private const MIN_IDENTIFY_BYTES = 500;
 
+    /** Lower bound on the IPTC caption read back, so an empty read cannot pass. */
+    private const MIN_CAPTION_BYTES = 20;
+
     /** Enough contention to reproduce the measured data-loss mode without locking. */
     private const CONCURRENT_WRITERS = 12;
 
@@ -359,6 +362,31 @@ final class WriteBackTest extends TestCase
         $this->assertSame($text, $this->tagValue($tags, '-XMP-pwgprov:Owner'));
         $this->assertStringContainsString($text, (string)$this->tagValue($tags, PROVENANCE_IPTC_CAPTION_TAG));
         $this->assertStringContainsString($text, (string)$this->tagValue($tags, 'EXIF:ImageDescription'));
+    }
+
+    /**
+     * [HAPPY] IPTC carries its character set, so a reader that follows the
+     * standard shows umlauts and the en dash, not Latin-1 garbage.
+     *
+     * Without IPTC:CodedCharacterSet the UTF-8 bytes are legal Latin-1, so a
+     * reader that trusts the file shows 'Ã„ â€“'. exiftool read with no -charset
+     * option does exactly that, and exiv2 shows the envelope field itself.
+     * ImageMagick cannot tell: it never decodes IPTC text.
+     */
+    public function testIptcDeclaresUtf8ForAReaderThatTrustsTheFile(): void
+    {
+        $text = 'Änne – Müller';
+        $this->fixture->imageProvenance($this->image['id'], array_merge(self::VALUES, array('provenance_owner' => $text)));
+
+        $this->writeBack(array($this->image['id']));
+
+        $file = escapeshellarg($this->image['file']);
+        $caption = trim((string)shell_exec('exiftool -s3 -IPTC:Caption-Abstract ' . $file . ' 2>/dev/null'));
+        $this->assertGreaterThan(self::MIN_CAPTION_BYTES, strlen($caption), 'anti-vacuity: no IPTC caption was read');
+        $this->assertStringContainsString($text, $caption);
+
+        $envelope = (string)shell_exec('exiv2 -Pkv -g Iptc.Envelope.CharacterSet ' . $file . ' 2>&1');
+        $this->assertStringContainsString('%G', $envelope, 'exiv2 finds no UTF-8 marker in the IPTC envelope');
     }
 
     /**

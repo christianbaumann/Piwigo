@@ -29,6 +29,7 @@ final class BuildArgfileTest extends TestCase
             array(
                 '-charset',
                 'iptc=UTF8',
+                '-IPTC:CodedCharacterSet=UTF8',
                 '-EXIF:ImageDescription=' . self::CAPTION,
                 '-IPTC:Caption-Abstract=' . self::CAPTION,
                 '-XMP-dc:Description=' . self::CAPTION,
@@ -44,13 +45,13 @@ final class BuildArgfileTest extends TestCase
         );
     }
 
-    /** [HAPPY] The charset declaration comes first, or every value below it is mis-encoded. */
+    /** [HAPPY] The charset declaration comes first, or every value below it is mis-encoded; the IPTC marker tells readers the packet is UTF-8. */
     public function testCharsetDeclarationComesFirst(): void
     {
         $lines = provenance_build_argfile($this->allValues(), self::CAPTION);
 
-        $this->assertGreaterThan(2, count($lines), 'anti-vacuity: a two-line result would make the slice below trivial');
-        $this->assertSame(array('-charset', 'iptc=UTF8'), array_slice($lines, 0, 2));
+        $this->assertGreaterThan(3, count($lines), 'anti-vacuity: a three-line result would make the slice below trivial');
+        $this->assertSame(array('-charset', 'iptc=UTF8', '-IPTC:CodedCharacterSet=UTF8'), array_slice($lines, 0, 3));
     }
 
     /**

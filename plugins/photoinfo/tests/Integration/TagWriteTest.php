@@ -23,6 +23,8 @@ final class TagWriteTest extends TestCase
     private const MIN_XMP_BYTES = 500;
     /** exiv2's answer for the three keyword fields of a two-tag write is longer than this. */
     private const MIN_EXIV2_BYTES = 150;
+    /** Lower bound on the IPTC keyword read back. */
+    private const MIN_KEYWORD_BYTES = 10;
     /** The keys exiv2 names the three keyword fields by. */
     private const EXIV2_SUBJECT = 'Xmp.dc.subject';
     private const EXIV2_HIERARCHY = 'Xmp.lr.hierarchicalSubject';
@@ -410,6 +412,27 @@ final class TagWriteTest extends TestCase
         $this->setInfo(array('tag_ids' => (string)$id, 'multiple_value_mode' => 'replace'));
 
         $this->assertFileTags($this->image, array($name), array($this->groupName() . '|' . $name));
+    }
+
+    /**
+     * [HAPPY] IPTC carries its character set: a reader that trusts the file,
+     * exiftool with no -charset option, reads the keyword's umlaut and en dash,
+     * and exiv2 finds the UTF-8 marker in the envelope.
+     */
+    public function testIptcKeywordsDeclareUtf8ForAReaderThatTrustsTheFile(): void
+    {
+        $name = 'Änne – Ölmühle ' . $this->suffix;
+        $id = $this->fixture->createTag($name, $this->group);
+
+        $this->setInfo(array('tag_ids' => (string)$id, 'multiple_value_mode' => 'replace'));
+
+        $file = escapeshellarg($this->image['file']);
+        $keywords = trim((string)shell_exec('exiftool -s3 -IPTC:Keywords ' . $file . ' 2>/dev/null'));
+        $this->assertGreaterThan(self::MIN_KEYWORD_BYTES, strlen($keywords), 'anti-vacuity: no IPTC keyword was read');
+        $this->assertSame($name, $keywords);
+
+        $envelope = (string)shell_exec('exiv2 -Pkv -g Iptc.Envelope.CharacterSet ' . $file . ' 2>&1');
+        $this->assertStringContainsString('%G', $envelope, 'exiv2 finds no UTF-8 marker in the IPTC envelope');
     }
 
     /**

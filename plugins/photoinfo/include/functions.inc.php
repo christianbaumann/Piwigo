@@ -155,7 +155,7 @@ function photoinfo_build_argfile($caption, $info, $value_prefix)
 {
   $values = photoinfo_argfile_values($caption, $info);
 
-  $lines = array('-charset', 'iptc=UTF8');
+  $lines = provenance_iptc_charset_lines();
   $lines = array_merge($lines, provenance_caption_argfile_lines($values['caption.txt'], $value_prefix));
   $lines[] = provenance_argfile_line(PHOTOINFO_INFO_TAG, $values[PHOTOINFO_INFO_VALUE_FILE],
     $value_prefix.PHOTOINFO_INFO_VALUE_FILE);
@@ -179,7 +179,7 @@ function photoinfo_build_argfile($caption, $info, $value_prefix)
  */
 function photoinfo_build_date_argfile($caption, $dating, $value_prefix)
 {
-  $lines = array('-charset', 'iptc=UTF8');
+  $lines = provenance_iptc_charset_lines();
   $lines = array_merge($lines,
     provenance_caption_argfile_lines(provenance_normalize_caption($caption), $value_prefix));
 
@@ -836,7 +836,7 @@ function photoinfo_build_tags_argfile($keywords)
     PHOTOINFO_HIERARCHY_TAG => $keywords['hierarchy'],
     );
 
-  $lines = array('-charset', 'iptc=UTF8');
+  $lines = provenance_iptc_charset_lines();
   foreach ($fields as $field => $values)
   {
     if (count($values) == 0)

@@ -16,6 +16,7 @@ final class BuildArgfileTest extends TestCase
             array(
                 '-charset',
                 'iptc=UTF8',
+                '-IPTC:CodedCharacterSet=UTF8',
                 '-EXIF:ImageDescription=Info | P',
                 '-IPTC:Caption-Abstract=Info | P',
                 '-XMP-dc:Description=Info | P',
@@ -62,8 +63,8 @@ final class BuildArgfileTest extends TestCase
     {
         $lines = photoinfo_build_argfile('', '  ', self::PREFIX);
 
-        $this->assertCount(8, $lines);
-        foreach (array_slice($lines, 2) as $line)
+        $this->assertCount(9, $lines);
+        foreach (array_slice($lines, 3) as $line)
         {
             $this->assertMatchesRegularExpression('/^-[A-Za-z-]+:[A-Za-z-]+=$/', $line);
         }
@@ -94,6 +95,7 @@ final class BuildArgfileTest extends TestCase
             array(
                 '-charset',
                 'iptc=UTF8',
+                '-IPTC:CodedCharacterSet=UTF8',
                 '-EXIF:ImageDescription=März 1965 | P',
                 '-IPTC:Caption-Abstract=März 1965 | P',
                 '-XMP-dc:Description=März 1965 | P',
@@ -164,6 +166,7 @@ final class BuildArgfileTest extends TestCase
             array(
                 '-charset',
                 'iptc=UTF8',
+                '-IPTC:CodedCharacterSet=UTF8',
                 '-EXIF:ImageDescription=14. März 1965 | Am See',
                 '-IPTC:Caption-Abstract=14. März 1965 | Am See',
                 '-XMP-dc:Description=14. März 1965 | Am See',
@@ -184,8 +187,8 @@ final class BuildArgfileTest extends TestCase
     {
         $lines = photoinfo_build_full_argfile('', '', null, self::PREFIX);
 
-        $this->assertCount(11, $lines);
-        foreach (array_slice($lines, 2) as $line)
+        $this->assertCount(12, $lines);
+        foreach (array_slice($lines, 3) as $line)
         {
             $this->assertMatchesRegularExpression('/^-[\w:-]+=$/', $line);
         }
