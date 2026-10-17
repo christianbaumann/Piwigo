@@ -302,7 +302,10 @@ function save_snapshot(array $snapshot): void
     {
         fail("could not create snapshot directory $dir");
     }
-    file_put_contents(SNAPSHOT_FILE, json_encode($snapshot, JSON_PRETTY_PRINT));
+    if (file_put_contents(SNAPSHOT_FILE, json_encode($snapshot, JSON_PRETTY_PRINT)) === false)
+    {
+        fail('could not write the snapshot ' . SNAPSHOT_FILE);
+    }
 }
 
 $args = parse_args($argv);
@@ -405,6 +408,23 @@ else
 // test must not remember the state the first one already changed.
 $originalDisplayInfo = $existing['display_info'] ?? read_display_info($db);
 force_display_info($db);
+
+// Written before anything is created, and again on the way out however the seed
+// ends: a seed that dies between creating an album and its final save_snapshot()
+// would otherwise leave albums no --restore knows about.
+$snapshotBase = array(
+    'state' => $builder->exportState(),
+    'album_id' => 0,
+    'display_info' => $originalDisplayInfo,
+    'history_id' => $existing['history_id'] ?? history_high_water($db),
+    );
+save_snapshot($snapshotBase + array('test_objects' => $builder->exportTestObjects()));
+register_shutdown_function(function () use ($snapshotBase, $builder)
+{
+    $last = load_snapshot() ?? $snapshotBase;
+    $last['test_objects'] = $builder->exportTestObjects();
+    save_snapshot($last);
+});
 
 $destination = null;
 if ($scenario === 'album-tree')
