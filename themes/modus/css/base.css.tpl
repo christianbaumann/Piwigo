@@ -217,6 +217,16 @@ LEGEND {
 	font-size: 110%;
 }
 
+/* Fork-local (task 37 of change 2026-10-15-exploratory-testing-answers): a word
+   longer than the window breaks instead of widening the page - an album
+   description in one piece, a 255-character tag name. anywhere, not break-word:
+   only anywhere lets a table cell shrink below the word. */
+.content .additional_info, .titrePage H2,
+.tagLetterContent a,
+#selected-tags-container .selected-related-tag {
+	overflow-wrap: anywhere;
+}
+
 .content .notification {
   padding:0 25px;
 }

@@ -56,3 +56,5 @@ now also a stated consequence of
 because no provenance column is a key in `use_iptc_mapping` / `use_exif_mapping`, no
 synchronisation reads those columns back, so nothing notices a third-party edit.
 - (done 2026-10-16: enabled, ICU 74.2; ledger in `docs/agents/TESTING.md`) check whether the remote PHP has the `intl` extension (`Normalizer`): without it neither core's fork-local `get_tag_ids()` nor typetags normalizes a typed tag name to NFC, and a name typed decomposed creates a second tag there. The deploy probes never asked. Task 08 of change `2026-10-15-exploratory-testing-answers`
+- (open) modus: the tag cloud (`tags.php`, `#fullTagCloud SPAN { white-space: nowrap }` in `themes/modus/css/tags.css`) still widens the page for a 255-character tag name that is among the top 200; found in task 37, not fixed, no test
+- (open) modus: the tag letter list (`tags.php?display_mode=letters`) is 938 px wide on a 390 px phone with or without a long tag (its column table); found in task 37, not fixed, no test

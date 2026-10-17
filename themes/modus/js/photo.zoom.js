@@ -94,8 +94,11 @@ var pwgZoom = (function($){
 			display = {w: Math.floor(o.w * scale), h: Math.floor(o.h * scale)};
 
 		zoomedIn = scale > fit;
-		/* Past fit the photo scrolls inside #theImage instead of the page. */
-		$('#theImage').css('max-height', zoomedIn ? Math.floor(a.h) : '')
+		/* Past fit the photo scrolls inside #theImage instead of the page. The
+		   max-height is the content box's, and the padding below it would put
+		   the horizontal scroll bar under the window. */
+		var $area = $('#theImage');
+		$area.css('max-height', zoomedIn ? Math.floor(a.h) - (parseFloat($area.css('padding-bottom')) || 0) : '')
 			.toggleClass('zoomPannable', zoomedIn);
 		/* A pinch-zoomed page shows the photo larger than its layout size. */
 		show(rvas_choose({w: display.w * a.zoom, h: display.h * a.zoom}), display);
