@@ -88,6 +88,7 @@ function persons_assign_overlay($image_id, $image)
     'PERSONS_BOXES'       => array_values($boxes),
     'PERSONS_NAMES'       => array_values($names),
     'PERSONS_STALE_TITLE' => l10n(PERSONS_STALE_TITLE),
+    'PERSONS_MARK_GONE'   => l10n(PERSONS_MARK_GONE),
     'PERSONS_IMAGE_ID'    => $image_id,
     'PERSONS_TOKEN'       => get_pwg_token(),
     'PERSONS_ROTATION'    => $rotation,

@@ -85,8 +85,12 @@
 	opacity: 1;
 }
 
+/*
+ * Dimmed by its border, not by opacity: an opacity below 1 makes the box its own
+ * stacking context, and a later box would then lie over this one's x.
+ */
 #persons-stage.persons-tagging .person-box-stale {
-	opacity: 0.5;
+	border-color: rgba(255, 255, 255, 0.45);
 }
 
 /* While tagging, every name: the user must see who is already tagged. */
@@ -122,6 +126,14 @@
 
 #persons-stage.persons-tagging .person-box[data-person-region] .person-box-delete {
 	display: block;
+}
+
+/*
+ * Above every box, whichever was drawn later; above the labels too, since the
+ * x sits on the box corner a neighbour's label may reach.
+ */
+#persons-stage.persons-tagging .person-box-delete {
+	z-index: 4;
 }
 
 /*

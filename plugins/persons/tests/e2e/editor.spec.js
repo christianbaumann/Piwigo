@@ -391,7 +391,10 @@ test.describe('tagging a person', () => {
     expect(entries.length).toBeGreaterThanOrEqual(2);
     expect(entries[0]).toEqual({ name: ADA, create: false });
     expect(entries[entries.length - 1]).toEqual({ name: fragment, create: true });
-    await expect(picture.highlightedPickerOption).toHaveAttribute('data-persons-name', ADA);
+    // Task 29: with text typed, Enter takes an exact match or else creates the typed name,
+    // so the highlight rests on Anlegen, not on the first partial match.
+    await expect(picture.highlightedPickerOption).toHaveAttribute('data-persons-name', fragment);
+    await expect(picture.highlightedPickerOption).toHaveClass(/persons-picker-create/);
   });
 
   /**

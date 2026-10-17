@@ -10,6 +10,7 @@
 	data-persons-str-create="{'Create'|@translate|escape}"
 	data-persons-str-hint="{'Enter commits - Esc cancels'|@translate|escape}"
 	data-persons-str-too-small="{'That box is too small - drag a larger one'|@translate|escape}"
+	data-persons-str-gone="{$PERSONS_MARK_GONE|escape}"
 	data-persons-str-failed="{'The photo could not be saved'|@translate|escape}"
 	data-persons-str-no-exiftool="{'This server cannot write metadata into image files'|@translate|escape}"
 	data-persons-str-tag="{'Tag people'|@translate|escape}"

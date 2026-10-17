@@ -35,6 +35,9 @@
 
 	var WS_URL = 'ws.php?format=json';
 
+	/* The web service's answer for a mark that is not there (pwg.persons.deleteRegion). */
+	var NOT_FOUND = 404;
+
 	function clamp(value, low, high) {
 		return Math.min(high, Math.max(low, value));
 	}
@@ -69,6 +72,11 @@
 		var draft = null;
 		var searchTimer = null;
 		var highlight = -1;
+		/* What the list on screen was searched for, the newest search sent, and
+		   how many are unanswered: Enter acts only on a list that matches the box. */
+		var listedFor = '';
+		var searchSeq = 0;
+		var searching = 0;
 		/* Whether a save or a delete went through. Never reset: on the page that
 		   reads it, leaving the mode after a change starts a fresh document. */
 		var changed = false;
@@ -118,10 +126,12 @@
 		 */
 		function renderOptions(persons, typed) {
 			list.textContent = '';
+			listedFor = typed;
 
 			var exact = false;
+			var exactIndex = -1;
 
-			persons.forEach(function (person) {
+			persons.forEach(function (person, index) {
 				var item = document.createElement('li');
 				item.className = 'persons-picker-option';
 				item.setAttribute('data-persons-name', person.name);
@@ -130,6 +140,7 @@
 
 				if (person.name.toLowerCase() === typed.toLowerCase()) {
 					exact = true;
+					exactIndex = index;
 				}
 			});
 
@@ -141,27 +152,67 @@
 				list.appendChild(create);
 			}
 
-			setHighlight(0);
+			/* With text typed, Enter takes the exact match or else creates the
+			   typed name; a partial match is taken only by moving to it. */
+			if (typed === '') {
+				setHighlight(0);
+			} else {
+				setHighlight(exact ? exactIndex : persons.length);
+			}
 		}
 
 		function search() {
 			var typed = input.value.trim();
+			var seq = ++searchSeq;
+			searching++;
 			var url = WS_URL + '&method=pwg.persons.getList&image_id=' + imageId +
 				(typed === '' ? '' : '&q=' + encodeURIComponent(typed));
 
 			return fetch(url, { credentials: 'same-origin' })
 				.then(function (response) { return response.json(); })
 				.then(function (data) {
-					renderOptions(data.stat === 'ok' ? data.result.persons : [], typed);
+					if (seq === searchSeq) {
+						renderOptions(data.stat === 'ok' ? data.result.persons : [], typed);
+					}
 				})
 				.catch(function () {
-					renderOptions([], typed);
+					if (seq === searchSeq) {
+						renderOptions([], typed);
+					}
+				})
+				.then(function () {
+					searching--;
 				});
 		}
 
 		function searchSoon() {
 			window.clearTimeout(searchTimer);
-			searchTimer = window.setTimeout(search, SEARCH_DEBOUNCE_MS);
+			searchTimer = window.setTimeout(function () {
+				searchTimer = null;
+				search();
+			}, SEARCH_DEBOUNCE_MS);
+		}
+
+		/** Runs the commit of the highlighted entry once the list is for what is typed. */
+		function commitHighlighted() {
+			var all = options();
+			if (highlight >= 0 && all[highlight]) {
+				commit(all[highlight].getAttribute('data-persons-name'));
+			}
+		}
+
+		function enterPressed() {
+			var typed = input.value.trim();
+			var stale = searchTimer !== null || searching > 0 || typed !== listedFor;
+
+			if (!stale) {
+				commitHighlighted();
+				return;
+			}
+
+			window.clearTimeout(searchTimer);
+			searchTimer = null;
+			search().then(commitHighlighted);
 		}
 
 		/**
@@ -225,6 +276,7 @@
 		function closePicker() {
 			picker.hidden = true;
 			window.clearTimeout(searchTimer);
+			searchTimer = null;
 			list.textContent = '';
 			highlight = -1;
 		}
@@ -306,11 +358,14 @@
 		 * with stat:"fail". An answer that lands after the mode was left
 		 * finishes the reload exit() had to put off.
 		 */
-		function write(method, params, onSuccess) {
+		function write(method, params, onSuccess, onRefused) {
 			pending++;
 
 			return post(method, params).then(function (data) {
 				if (data.stat !== 'ok') {
+					if (onRefused && onRefused(data)) {
+						return;
+					}
 					say(str('failed') + ' ' + (data.message || ''), true);
 					return;
 				}
@@ -374,10 +429,6 @@
 		 * elsewhere with a broken region, and only lasts until "Done".
 		 */
 		function renderPersonRow(regions) {
-			if (!personRow) {
-				return;
-			}
-
 			var names = [];
 			regions.forEach(function (region) {
 				if (region.type === 'Face' && names.indexOf(region.name) === -1) {
@@ -385,8 +436,30 @@
 				}
 			});
 
+			renderNames(names);
+		}
+
+		function renderNames(names) {
+			if (!personRow) {
+				return;
+			}
+
 			personRow.querySelector('dd').textContent = names.join(', ');
 			personRow.hidden = names.length === 0;
+		}
+
+		/** The row from the boxes still on the page, for an answer that carries no list. */
+		function renderPersonRowFromBoxes() {
+			var names = [];
+			Array.prototype.forEach.call(
+				overlay.querySelectorAll('.person-box[data-person-region] .person-box-label'),
+				function (label) {
+					if (names.indexOf(label.textContent) === -1) {
+						names.push(label.textContent);
+					}
+				}
+			);
+			renderNames(names);
 		}
 
 		/**
@@ -451,7 +524,8 @@
 		}
 
 		overlay.addEventListener('mousedown', function (event) {
-			if (!tagging || event.button !== 0 || event.target.closest('.person-box')) {
+			/* A drag inside a frame draws a new one; only the name and the x keep their click. */
+			if (!tagging || event.button !== 0 || event.target.closest('.person-box-label, .person-box-delete')) {
 				return;
 			}
 
@@ -523,6 +597,16 @@
 			write('pwg.persons.deleteRegion', { region_id: regionId, pwg_token: token }, function (data) {
 				box.remove();
 				renderPersonRow(data.result.regions);
+			}, function (data) {
+				/* 404: gone already, or no longer visible - the server answers both alike. */
+				if (Number(data.err) !== NOT_FOUND) {
+					return false;
+				}
+				box.remove();
+				renderPersonRowFromBoxes();
+				changed = true;
+				say(str('gone'), false);
+				return true;
 			});
 		});
 
@@ -578,10 +662,7 @@
 				setHighlight(highlight - 1);
 			} else if (event.key === 'Enter') {
 				event.preventDefault();
-				var all = options();
-				if (highlight >= 0 && all[highlight]) {
-					commit(all[highlight].getAttribute('data-persons-name'));
-				}
+				enterPressed();
 			}
 		});
 

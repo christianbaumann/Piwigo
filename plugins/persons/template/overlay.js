@@ -57,8 +57,33 @@
 				var label = boxes[i].querySelector('.person-box-label');
 				var inside = pointer !== null && (contains(boxes[i], pointer.x, pointer.y)
 					|| (label !== null && contains(label, pointer.x, pointer.y)));
+				var wasActive = boxes[i].classList.contains('person-box-active');
 				boxes[i].classList.toggle('person-box-active', inside);
+				if (label !== null && inside !== wasActive) {
+					keepInside(label, inside);
+				}
 			}
+		}
+
+		/* A name shown whole is centred on its box and can run past the photo's
+		   edge, where the overlay clips it: slide it back inside. Set only on the
+		   change, so a pointer moving over the box does not re-measure. */
+		function keepInside(label, shown) {
+			label.style.removeProperty('--person-label-shift');
+			if (!shown) {
+				return;
+			}
+
+			var bounds = overlay.getBoundingClientRect();
+			var rect = label.getBoundingClientRect();
+			var shift = 0;
+			if (rect.right > bounds.right) {
+				shift = bounds.right - rect.right;
+			}
+			if (rect.left + shift < bounds.left) {
+				shift = bounds.left - rect.left;
+			}
+			label.style.setProperty('--person-label-shift', shift + 'px');
 		}
 
 		function place() {

@@ -66,6 +66,9 @@ define('PERSONS_TAG_DELETE_REFUSED_MESSAGE', 'A person tag is deleted only with 
 /** The tooltip of a stale region's box, as a language key. */
 define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');
 
+/** What the editor says when a delete finds the mark already gone, as a language key. */
+define('PERSONS_MARK_GONE', 'That mark no longer exists');
+
 /** Persons offered in the picker before the user has typed anything. */
 define('PERSONS_PICKER_RECENT_LIMIT', 10);
 

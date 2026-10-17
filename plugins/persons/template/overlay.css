@@ -70,7 +70,6 @@
 	position: absolute;
 	left: 50%;
 	bottom: 0;
-	transform: translateX(-50%);
 	max-width: 100%;
 	padding: 1px 6px;
 	background: rgba(0, 0, 0, 0.65);
@@ -78,15 +77,39 @@
 	font-size: 0.8em;
 	line-height: 1.5;
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	box-sizing: border-box;
 	text-decoration: none;
 	pointer-events: auto;
 	opacity: 0;
+	/* overlay.js moves a label back inside the photo while it shows whole. */
+	transform: translateX(calc(-50% + var(--person-label-shift, 0px)));
+	z-index: 3;
 }
 
 /* A name only for the box under the pointer, so names do not cover faces. */
 .person-box-active .person-box-label,
 .person-box:focus-within .person-box-label {
 	opacity: 1;
+}
+
+/*
+ * The pointer is on the box: its name shows whole instead of cut, above every
+ * other box and label. A stale box dims through opacity and so is its own
+ * stacking context, hence the raise on the box itself - not while tagging,
+ * where the active box would otherwise lie over its neighbours' x.
+ */
+.person-box-active .person-box-label,
+.person-box:focus-within .person-box-label {
+	max-width: none;
+	overflow: visible;
+	text-overflow: clip;
+	z-index: 6;
+}
+
+#persons-stage:not(.persons-tagging) .person-box-active {
+	z-index: 6;
 }
 
 .person-box-label:hover {

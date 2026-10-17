@@ -917,6 +917,66 @@ class PicturePage {
     }
   }
 
+  /**
+   * Removes a region through the API, behind the page's back, with the page's
+   * own session and token - what another tab or another user does while this
+   * page still shows the box.
+   *
+   * @param {number} regionId
+   */
+  async deleteRegionBehindThePage(regionId) {
+    const config = this.page.locator('#persons-editor');
+    const response = await this.page.request.post('ws.php?format=json&method=pwg.persons.deleteRegion', {
+      form: {
+        region_id: String(regionId),
+        pwg_token: String(await config.getAttribute('data-persons-token')),
+      },
+    });
+    const data = await response.json();
+    if (data.stat !== 'ok') {
+      throw new Error(`deleteRegionBehindThePage: ${JSON.stringify(data)}`);
+    }
+  }
+
+  /**
+   * Whether the element at the centre of a locator is that element or one of
+   * its descendants - the causal fact behind "nothing covers it", which
+   * Playwright's own click would only report as a timeout.
+   *
+   * @param {import('@playwright/test').Locator} locator
+   */
+  async isTopmostAtCentre(locator) {
+    return locator.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit !== null && (hit === el || el.contains(hit));
+    });
+  }
+
+  /**
+   * A box's name label as the visitor sees it: its rendered rect, the rect of
+   * the overlay it must stay inside, whether its text is cut off, and whether
+   * it is the topmost thing at its own centre.
+   *
+   * @param {number} regionId
+   */
+  async labelGeometry(regionId) {
+    return this.label(regionId).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const o = document.getElementById('persons-overlay').getBoundingClientRect();
+      const b = el.closest('.person-box').getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return {
+        left: r.left, right: r.right, width: r.width,
+        overlayLeft: o.left, overlayRight: o.right,
+        boxWidth: b.width,
+        textOverflow: window.getComputedStyle(el).textOverflow,
+        truncated: el.scrollWidth > el.clientWidth,
+        topmost: hit !== null && (hit === el || el.contains(hit)),
+      };
+    });
+  }
+
   /** Turns the photo into a drawing surface, and waits until it really is one. */
   async enterTaggingMode() {
     await this.tagToggle.click();

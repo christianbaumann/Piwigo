@@ -21,14 +21,18 @@ check_status(ACCESS_ADMINISTRATOR);
 include_once(PERSONS_PATH.'include/index.inc.php');
 include_once(PERSONS_PATH.'include/exiftool.inc.php');
 
-$query = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+// common.inc.php addslashes() every request value; the slashes come off before
+// the LIKE escape, or a typed quote would search for a backslash too.
+$query = isset($_GET['q']) ? trim(stripslashes((string)$_GET['q'])) : '';
 
 // LIKE, not a full-text match: the picker searches the same way, and a list an
 // administrator filters by typing part of a name must agree with it.
 $where = '';
 if ($query !== '')
 {
-  $where = " WHERE p.name LIKE '%".pwg_db_real_escape_string($query)."%'";
+  // LIKE-escaped first, then SQL-escaped: a typed % or _ is a character of the
+  // name (pwg.persons.getList does the same).
+  $where = " WHERE p.name LIKE '%".pwg_db_real_escape_string(addcslashes($query, '%_\\'))."%'";
 }
 
 $persons = query2array('

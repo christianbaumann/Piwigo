@@ -15,6 +15,8 @@ use PHPUnit\Framework\TestCase;
 final class AdminPersonsScreenTest extends TestCase
 {
     private const NAME = 'Persons Screen Jane';
+    private const NAME_PERCENT = 'Persons Screen 100% Jane';
+    private const NAME_UNDERSCORE = 'Persons_Screen Jane';
 
     /** A rendered page shorter than this is an error page or a redirect, not an admin screen. */
     private const MIN_PAGE_BYTES = 2000;
@@ -48,7 +50,7 @@ final class AdminPersonsScreenTest extends TestCase
     {
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
-        $this->fixture->destroyPersons(array(self::NAME));
+        $this->fixture->destroyPersons(array(self::NAME, self::NAME_PERCENT, self::NAME_UNDERSCORE));
     }
 
     /**
@@ -95,6 +97,38 @@ final class AdminPersonsScreenTest extends TestCase
         $missing = $this->fetchScreen('&q=' . urlencode('Nobody By That Name At All'));
         $this->assertStringNotContainsString(self::NAME, $missing,
             'the search returned a person whose name does not contain the query');
+    }
+
+    /**
+     * [ECP] A typed % or _ is a character of the name, not a LIKE wildcard
+     * (14-06 F1). The query reaches the page addslashes()d; unescaped, either
+     * one matched every person in the list.
+     */
+    public function testAWildcardInTheSearchMatchesOnlyNamesContainingIt(): void
+    {
+        $this->addRegion(0.1, 0.1);
+        $this->addRegionFor(self::NAME_PERCENT, 0.5, 0.5);
+        $this->addRegionFor(self::NAME_UNDERSCORE, 0.8, 0.8);
+
+        $percent = $this->fetchScreen('&q=' . urlencode('%'));
+        $this->assertStringContainsString('data-person-name="' . self::NAME_PERCENT . '"', $percent,
+            'anti-vacuity: the name holding the % is not listed');
+        $this->assertStringNotContainsString('data-person-name="' . self::NAME . '"', $percent);
+        $this->assertStringNotContainsString('data-person-name="' . self::NAME_UNDERSCORE . '"', $percent);
+
+        $underscore = $this->fetchScreen('&q=' . urlencode('_'));
+        $this->assertStringContainsString('data-person-name="' . self::NAME_UNDERSCORE . '"', $underscore,
+            'anti-vacuity: the name holding the _ is not listed');
+        $this->assertStringNotContainsString('data-person-name="' . self::NAME . '"', $underscore);
+        $this->assertStringNotContainsString('data-person-name="' . self::NAME_PERCENT . '"', $underscore);
+    }
+
+    /** [ECP] A typed quote reaches the field as typed, without the request's added backslash. */
+    public function testAQuoteInTheSearchIsShownAsTyped(): void
+    {
+        $body = $this->fetchScreen('&q=' . urlencode("O'Brien"));
+
+        $this->assertStringContainsString('value="O&#039;Brien"', $body);
     }
 
     /** [HAPPY] The screen offers the rescan, with the ids it will run over. */
@@ -197,9 +231,14 @@ final class AdminPersonsScreenTest extends TestCase
 
     private function addRegion(float $x = 0.25, float $y = 0.25): void
     {
+        $this->addRegionFor(self::NAME, $x, $y);
+    }
+
+    private function addRegionFor(string $name, float $x, float $y): void
+    {
         $res = $this->admin->call('pwg.persons.addRegion', array(
             'image_id' => (int)$this->image['id'],
-            'name' => self::NAME,
+            'name' => $name,
             'x' => $x, 'y' => $y, 'w' => 0.2, 'h' => 0.2,
             'pwg_token' => $this->admin->token(),
             ));

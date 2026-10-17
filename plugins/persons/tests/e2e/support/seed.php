@@ -48,7 +48,9 @@ const SEEDED_PERSONS = array('E2E Overlay Jane', 'E2E Overlay John');
  * Removed by --restore alongside the seeded ones: they are created by the code
  * under test rather than by this script, so nothing else knows they exist.
  */
-const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace', 'E2E Admin Ada', 'E2E Roles Mia');
+const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace', 'E2E Admin Ada', 'E2E Roles Mia',
+    'E2E Marking Alma', 'E2E Marking Bruno', 'E2E Marking Known', 'E2E Marking Kno',
+    'E2E Marking Wolfeschlegelsteinhausenbergerdorf');
 
 /**
  * --coloured-tags: a typetags group holding the seeded persons' tags and an
