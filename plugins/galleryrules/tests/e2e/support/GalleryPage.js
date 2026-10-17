@@ -37,6 +37,11 @@ class GalleryPage {
     return this.page.locator('#Author dd');
   }
 
+  /** Core's info messages above the page's content. */
+  infos() {
+    return this.page.locator('.infos');
+  }
+
   /** The album description above an album's thumbnails. */
   albumDescription() {
     return this.page.locator('.additional_info');

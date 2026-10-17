@@ -57,3 +57,7 @@ add_event_handler('picture_modify_before_update', 'galleryrules_properties_keep_
 // After photoinfo's wrapper of pwg.images.setInfo (neutral + 10), so a refused call reaches it not at all.
 add_event_handler('ws_add_methods', 'galleryrules_wrap_album_methods',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 20, $galleryrules_last_album_file);
+
+// An empty album's page tells an administrator that visitors do not see it.
+add_event_handler('loc_begin_index', 'galleryrules_empty_album_note',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, GALLERYRULES_PATH . 'include/events_empty_album.inc.php');

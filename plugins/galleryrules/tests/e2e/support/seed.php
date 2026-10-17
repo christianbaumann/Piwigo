@@ -13,6 +13,8 @@
  *                                                        each hold an <img onerror> naming its field
  *   php tests/e2e/support/seed.php --scenario=same-name an album with two photos of one file name, for the
  *                                                        replace option's refusal
+ *   php tests/e2e/support/seed.php --scenario=empty     an album holding no photo, for the note an
+ *                                                        administrator sees on its page
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -73,9 +75,9 @@ if (isset($args['restore']))
     exit(0);
 }
 
-if (!in_array($args['scenario'] ?? '', array('payload', 'same-name'), true))
+if (!in_array($args['scenario'] ?? '', array('payload', 'same-name', 'empty'), true))
 {
-    fail('--scenario must be one of: payload, same-name');
+    fail('--scenario must be one of: payload, same-name, empty');
 }
 if (is_file(SNAPSHOT_FILE))
 {
@@ -91,6 +93,11 @@ if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir))
 if ($args['scenario'] === 'same-name')
 {
     seedSameName($db, $builder);
+    exit(0);
+}
+if ($args['scenario'] === 'empty')
+{
+    seedEmpty($db, $builder);
     exit(0);
 }
 
@@ -163,4 +170,29 @@ function seedSameName(Db $db, FixtureBuilder $builder): void
     }
 
     echo json_encode(array('album_id' => $albumId, 'image_ids' => $imageIds, 'file' => $file)), "\n";
+}
+
+/** An album holding no photo, its emptiness asserted, and the German note its page shows an administrator. */
+function seedEmpty(Db $db, FixtureBuilder $builder): void
+{
+    try
+    {
+        $albumId = $builder->createTestAlbum('galleryrules-e2e-empty-' . bin2hex(random_bytes(4)));
+        file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+        if ((int)$db->scalar("SELECT COUNT(*) FROM piwigo_image_category WHERE category_id = $albumId") !== 0)
+        {
+            throw new RuntimeException("album $albumId is not empty");
+        }
+        $builder->invalidateUserCache();
+    }
+    catch (RuntimeException $e)
+    {
+        fail($e->getMessage());
+    }
+
+    include_once GALLERYRULES_PATH . 'include/events_empty_album.inc.php';
+    $lang = array();
+    include GALLERYRULES_PATH . 'language/de_DE/plugin.lang.php';
+
+    echo json_encode(array('album_id' => $albumId, 'note' => $lang[GALLERYRULES_EMPTY_ALBUM_NOTE])), "\n";
 }

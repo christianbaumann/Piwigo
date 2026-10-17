@@ -29,9 +29,18 @@ function seedSameName() {
   return run('--scenario=same-name');
 }
 
+/**
+ * Creates an album holding no photo.
+ *
+ * @returns {{album_id: number, note: string}}
+ */
+function seedEmpty() {
+  return run('--scenario=empty');
+}
+
 /** Removes whatever the seed created. Safe to call unseeded. */
 function restore() {
   run('--restore');
 }
 
-module.exports = { seedPayload, seedSameName, restore };
+module.exports = { seedPayload, seedSameName, seedEmpty, restore };
