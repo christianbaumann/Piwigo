@@ -497,11 +497,14 @@ SELECT DISTINCT(id)
       $userdata['image_access_list'] = implode(',',$forbidden_ids);
 
 
+      // fork-local: only links whose photo and album still exist (decision 0074)
       $query = '
-SELECT COUNT(DISTINCT(image_id)) as total
-  FROM '.IMAGE_CATEGORY_TABLE.'
-  WHERE category_id NOT IN ('.$userdata['forbidden_categories'].')
-    AND image_id '.$userdata['image_access_type'].' ('.$userdata['image_access_list'].')';
+SELECT COUNT(DISTINCT(ic.image_id)) as total
+  FROM '.IMAGE_CATEGORY_TABLE.' AS ic
+    INNER JOIN '.IMAGES_TABLE.' AS i ON i.id = ic.image_id
+    INNER JOIN '.CATEGORIES_TABLE.' AS c ON c.id = ic.category_id
+  WHERE ic.category_id NOT IN ('.$userdata['forbidden_categories'].')
+    AND ic.image_id '.$userdata['image_access_type'].' ('.$userdata['image_access_list'].')';
       list($userdata['nb_total_images']) = pwg_db_fetch_row(pwg_query($query));
 
 
