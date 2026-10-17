@@ -46,6 +46,9 @@ define('PERSONS_STALE_RATIO_TOLERANCE', 0.02);
  */
 define('PERSONS_WEBMASTER_ONLY_MESSAGE', 'Only the webmaster may do this');
 
+/** Why a region or a rename without a name is refused, as a language key. */
+define('PERSONS_NAME_REQUIRED_MESSAGE', 'A person needs a name');
+
 /**
  * Why a crop is refused, as a language key; the names it would cut away
  * follow it (decision 0065).

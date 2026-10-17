@@ -186,6 +186,30 @@ final class AddRegionTest extends TestCase
     }
 
     /**
+     * [NEG] A name with nothing left after cleaning is refused, and a German
+     * account reads why in German: the message goes through l10n() and the
+     * fork's override translates it (design "German messages give the reason").
+     */
+    public function testANamelessRegionIsRefusedInTheAccountsLanguage(): void
+    {
+        $this->assertSame('de_DE', $this->db->scalar(
+            "SELECT ui.language FROM piwigo_user_infos ui JOIN piwigo_users u ON u.id = ui.user_id"
+            . " WHERE u.username = '" . $this->db->escape(Config::normalUsername()) . "'"
+        ), 'precondition: the test account reads the gallery in German');
+        $lang = array();
+        require PIWIGO_ROOT . 'local/language/de_DE.lang.php';
+        $this->assertArrayHasKey(PERSONS_NAME_REQUIRED_MESSAGE, $lang, 'anti-vacuity: no German text to expect');
+
+        $res = $this->addRegion('   ');
+
+        $this->assertSame(WS_ERR_INVALID_PARAM, (int)$res['json']['err'], $res['body']);
+        $this->assertSame($lang[PERSONS_NAME_REQUIRED_MESSAGE], $res['json']['message'], $res['body']);
+        $this->assertSame(0, (int)$this->db->scalar(
+            'SELECT COUNT(*) FROM piwigo_person_region WHERE image_id = ' . (int)$this->image['id']
+        ), 'the refused region was stored anyway');
+    }
+
+    /**
      * [BVA] [NEG] image_id is a WS_TYPE_ID, so the two values just outside the
      * domain are refused as invalid rather than looked up.
      *

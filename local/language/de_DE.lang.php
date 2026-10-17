@@ -18,6 +18,9 @@ $lang['No photos in the current album, no thumbnail available'] = 'Keine Fotos i
 // admin/themes/default/template/albums.tpl
 $lang['Rename album'] = 'Album umbenennen';
 
+// admin/themes/default/template/cat_modify.tpl - the album info box after a save
+$lang['Just now'] = 'Gerade eben';
+
 // admin/themes/default/template/photos_add_direct.tpl
 $lang['Album %s now contains %d photos'] = 'Album %s enthält jetzt %d Fotos';
 $lang['%d photos updated'] = '%d Fotos aktualisiert';
@@ -45,6 +48,9 @@ $lang['You have typed in too many new tags today'] = 'Heute wurden schon zu viel
 $lang['Photo is in no visible album'] = 'Foto ist in keinem sichtbaren Album';
 $lang['Couleur'] = 'Farbe';
 
+// plugins/persons/include/functions.inc.php, PERSONS_NAME_REQUIRED_MESSAGE
+$lang['A person needs a name'] = 'Eine Person braucht einen Namen';
+
 // Core German strings replaced on purpose (docs/agents/decisions/0052): core's own
 // wording is a du-imperative, English, or a verb where a noun belongs.
 // admin/themes/default/template/tags.tpl - the question about tags no photo uses, and duplicating
@@ -54,3 +60,9 @@ $lang[' (copy)'] = ' (Kopie)';
 $lang['Tag name'] = 'Name des Schlagworts';
 // admin/themes/default/template/include/batch_manager_filter.inc.tpl
 $lang['include child albums'] = 'Unteralben einbeziehen';
+// admin/themes/default/template/tags.tpl and group_list.tpl - the merge modal; core's
+// translation keeps the key's braces around the merged names
+$lang['Tag(s) \{%s1\} succesfully merged into "%s2"'] = 'Schlagwort(e) %s1 wurde(n) erfolgreich in »%s2« zusammengeführt';
+$lang['Group(s) \{%s1\} succesfully merged into "%s2"'] = 'Gruppe(n) %s1 erfolgreich in "%s2" zusammengeführt';
+// admin/site_update.php - PWG-UPDATE-1; core's translation leaves out the digits
+$lang['The name of directories and files must be composed of letters, numbers, "-", "_" or "."'] = 'Verzeichnis- und Dateinamen müssen aus Buchstaben, Ziffern oder den Zeichen "-", "_" oder "." bestehen.';

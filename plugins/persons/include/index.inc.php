@@ -921,7 +921,7 @@ function persons_rename_person($person_id, $new_name)
   $new_name = persons_clean_name($new_name);
   if ($new_name === '')
   {
-    return $failure('A person needs a name');
+    return $failure(l10n(PERSONS_NAME_REQUIRED_MESSAGE));
   }
 
   $person = persons_person_row($person_id);

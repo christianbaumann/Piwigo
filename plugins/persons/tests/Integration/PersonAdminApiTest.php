@@ -141,6 +141,10 @@ final class PersonAdminApiTest extends TestCase
             ));
 
         $this->assertSame(WS_ERR_INVALID_PARAM, (int)$res['json']['err'], $res['body']);
+        $lang = array();
+        require PIWIGO_ROOT . 'local/language/de_DE.lang.php';
+        $this->assertSame($lang[PERSONS_NAME_REQUIRED_MESSAGE], $res['json']['message'],
+            'the German account did not read the refusal in German');
         $this->assertNotNull($this->personId(self::OLD_NAME));
     }
 

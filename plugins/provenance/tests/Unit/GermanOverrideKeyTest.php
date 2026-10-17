@@ -29,6 +29,9 @@ final class GermanOverrideKeyTest extends TestCase
         ' (copy)' => '(kopieren)',
         'Tag name' => 'Tag-Name',
         'include child albums' => 'Unteralben miteinbeziehen',
+        'Tag(s) \{%s1\} succesfully merged into "%s2"' => 'Schlagwort(e) \{%s1\} wurde(n) erfolgreich in »%s2« zusammengeführt',
+        'Group(s) \{%s1\} succesfully merged into "%s2"' => 'Gruppe(n) \{%s1\} erfolgreich in "%s2" zusammengeführt',
+        'The name of directories and files must be composed of letters, numbers, "-", "_" or "."' => 'Verzeichnis- und Dateinamen müssen aus Buchstaben oder den Zeichen "-", "_" oder "." bestehen.',
         );
 
     /** A file shorter than this is a stub or a failed read, on which a count assertion says nothing. */
@@ -184,13 +187,38 @@ final class GermanOverrideKeyTest extends TestCase
                 "{'include child albums'|@translate}",
                 1,
             ),
+            'Tag(s) \{%s1\} succesfully merged into "%s2"' => array(
+                'admin/themes/default/template/tags.tpl',
+                '{\'Tag(s) \{%s1\} succesfully merged into "%s2"\'|@translate}',
+                1,
+            ),
+            'Group(s) \{%s1\} succesfully merged into "%s2"' => array(
+                'admin/themes/default/template/group_list.tpl',
+                '{\'Group(s) \{%s1\} succesfully merged into "%s2"\'|@translate}',
+                1,
+            ),
+            'The name of directories and files must be composed of letters, numbers, "-", "_" or "."' => array(
+                'admin/site_update.php',
+                'l10n(\'The name of directories and files must be composed of letters, numbers, "-", "_" or "."\')',
+                1,
+            ),
+            'Just now' => array(
+                'admin/themes/default/template/cat_modify.tpl',
+                "{'Just now'|@translate|escape:javascript}",
+                1,
+            ),
+            'A person needs a name' => array(
+                'plugins/persons/include/functions.inc.php',
+                "define('PERSONS_NAME_REQUIRED_MESSAGE', 'A person needs a name');",
+                1,
+            ),
         );
     }
 
     /**
      * Which language file carries each key's German translation.
      *
-     * Fourteen live in the fork's local override. 'Create' is the exception:
+     * All but one live in the fork's local override. 'Create' is the exception:
      * core already translates it, so wrapping the raw French literal in a
      * |translate filter was the whole fix and no fork-local entry exists or
      * should - one would shadow core's wording everywhere the plugin loads.
@@ -275,9 +303,11 @@ final class GermanOverrideKeyTest extends TestCase
     }
 
     /**
-     * [BVA] The two format strings are fed through sprintf. A translation that
-     * adds, drops or reorders a placeholder is a runtime error, not a wording
-     * problem, so the placeholder sequence is asserted rather than the text.
+     * [BVA] The two format strings are fed through sprintf, the two merge
+     * messages through tags.js's and group_list.js's replace('%s1') /
+     * replace('%s2'). A translation that adds, drops or reorders a placeholder
+     * is a runtime error or a message missing its names, not a wording problem,
+     * so the placeholder sequence is asserted rather than the text.
      */
     public function testTheFormatStringsKeepTheirPlaceholderSequence(): void
     {
@@ -286,12 +316,14 @@ final class GermanOverrideKeyTest extends TestCase
 
         $this->assertSame(array('%s', '%d'), $this->placeholders($lang['Album %s now contains %d photos']));
         $this->assertSame(array('%d'), $this->placeholders($lang['%d photos updated']));
+        $this->assertSame(array('%s1', '%s2'), $this->placeholders($lang['Tag(s) \{%s1\} succesfully merged into "%s2"']));
+        $this->assertSame(array('%s1', '%s2'), $this->placeholders($lang['Group(s) \{%s1\} succesfully merged into "%s2"']));
     }
 
     /** @return string[] */
     private function placeholders(string $format): array
     {
-        preg_match_all('/%[sd]/', $format, $matches);
+        preg_match_all('/%[sd]\d?/', $format, $matches);
 
         return $matches[0];
     }

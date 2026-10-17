@@ -290,7 +290,7 @@ function ws_persons_addRegion($params, &$service)
   $name = persons_name_from_request($params['name']);
   if ($name === '')
   {
-    return new PwgError(WS_ERR_INVALID_PARAM, 'A person needs a name');
+    return new PwgError(WS_ERR_INVALID_PARAM, l10n(PERSONS_NAME_REQUIRED_MESSAGE));
   }
 
   foreach (array('x', 'y', 'w', 'h') as $key)
