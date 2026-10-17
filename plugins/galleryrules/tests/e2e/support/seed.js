@@ -38,9 +38,28 @@ function seedEmpty() {
   return run('--scenario=empty');
 }
 
+/** @returns {number} how many albums the install holds */
+function albumCount() {
+  return run('--album-count').count;
+}
+
+/** @returns {string} the create-album dialog's German hint for a blank name */
+function albumNameHint() {
+  return run('--album-name-hint').hint;
+}
+
+/**
+ * Records an album a spec created through the browser, so restore() deletes it.
+ *
+ * @param {string} name
+ */
+function trackAlbum(name) {
+  run(`--track-album=${name}`);
+}
+
 /** Removes whatever the seed created. Safe to call unseeded. */
 function restore() {
   run('--restore');
 }
 
-module.exports = { seedPayload, seedSameName, seedEmpty, restore };
+module.exports = { seedPayload, seedSameName, seedEmpty, albumCount, albumNameHint, trackAlbum, restore };

@@ -15,6 +15,10 @@
  *                                                        replace option's refusal
  *   php tests/e2e/support/seed.php --scenario=empty     an album holding no photo, for the note an
  *                                                        administrator sees on its page
+ *   php tests/e2e/support/seed.php --album-count       how many albums the install holds
+ *   php tests/e2e/support/seed.php --album-name-hint   the German hint of the create-album dialog
+ *   php tests/e2e/support/seed.php --track-album=<name> records an album a spec created through the
+ *                                                        browser, so --restore deletes it
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -40,7 +44,7 @@ function payload(string $field): string
     return '<img src=x alt=galleryrules-' . $field . ' onerror=document.body.dataset.' . XSS_MARKER . '=this.alt>';
 }
 
-$args = getopt('', array('scenario::', 'restore'));
+$args = getopt('', array('scenario::', 'restore', 'album-count', 'album-name-hint', 'track-album:'));
 
 try
 {
@@ -50,6 +54,46 @@ try
 catch (RuntimeException $e)
 {
     fail($e->getMessage());
+}
+
+if (isset($args['album-count']))
+{
+    echo json_encode(array('count' => (int)$db->scalar('SELECT COUNT(*) FROM piwigo_categories'))), "\n";
+    exit(0);
+}
+
+if (isset($args['album-name-hint']))
+{
+    include_once GALLERYRULES_PATH . 'include/events_album_name.inc.php';
+    $lang = array();
+    include GALLERYRULES_PATH . 'language/de_DE/plugin.lang.php';
+    echo json_encode(array('hint' => $lang[GALLERYRULES_ALBUM_NAME_MISSING])), "\n";
+    exit(0);
+}
+
+if (isset($args['track-album']))
+{
+    $ids = array();
+    $result = $db->query("SELECT id FROM piwigo_categories WHERE name = '" . $db->escape($args['track-album']) . "'");
+    while ($row = $result->fetch_assoc())
+    {
+        $ids[] = (int)$row['id'];
+    }
+    if (count($ids) !== 1)
+    {
+        fail('expected one album named "' . $args['track-album'] . '", found ' . count($ids));
+    }
+    $snapshot = is_file(SNAPSHOT_FILE) ? json_decode((string)file_get_contents(SNAPSHOT_FILE), true) : array();
+    $builder->importTestObjects(is_array($snapshot) ? $snapshot : array());
+    $builder->importTestObjects(array('albums' => $ids));
+    $dir = dirname(SNAPSHOT_FILE);
+    if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir))
+    {
+        fail("could not create $dir");
+    }
+    file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+    echo json_encode(array('album_id' => $ids[0])), "\n";
+    exit(0);
 }
 
 if (isset($args['restore']))

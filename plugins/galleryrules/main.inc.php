@@ -61,3 +61,7 @@ add_event_handler('ws_add_methods', 'galleryrules_wrap_album_methods',
 // An empty album's page tells an administrator that visitors do not see it.
 add_event_handler('loc_begin_index', 'galleryrules_empty_album_note',
   EVENT_HANDLER_PRIORITY_NEUTRAL, GALLERYRULES_PATH . 'include/events_empty_album.inc.php');
+
+// A blank name in the create-album dialog of Alben > Verwaltung shows a hint instead of nothing.
+add_event_handler('loc_begin_admin_page', 'galleryrules_album_name_hint',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, GALLERYRULES_PATH . 'include/events_album_name.inc.php');
