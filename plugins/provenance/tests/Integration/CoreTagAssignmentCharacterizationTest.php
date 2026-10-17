@@ -4,7 +4,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * The regression net for the core paths that put tags on photos and that
  * photoinfo's tag write-back hooks: the Batch Manager's add_tags and del_tags
- * actions (admin/batch_manager_global.php), pwg.images.setInfo's tag_ids and
+ * actions (admin/batch_manager_global.php), its unit-mode form, pwg.images.setInfo's tag_ids and
  * tag_list parameters, pwg.tags.duplicate, and a typed name on the
  * photo-properties screen, all of which may create a tag on the fly through
  * get_tag_ids() -> tag_id_from_tag_name().
@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 final class CoreTagAssignmentCharacterizationTest extends TestCase
 {
     private const BATCH_MANAGER = '/admin.php?page=batch_manager&mode=global';
+    private const BATCH_MANAGER_UNIT = '/admin.php?page=batch_manager&mode=unit';
     private const MIN_PAGE_BYTES = 2000;
 
     private Db $db;
@@ -152,6 +153,53 @@ final class CoreTagAssignmentCharacterizationTest extends TestCase
 
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
         $this->assertSame($this->sorted(array($old, $new)), $this->tagsOfPhoto($image));
+    }
+
+    /** [ERR] tag_ids with multiple_value_mode=replace takes an unlisted tag off the photo. */
+    public function testSetInfoTagIdsReplaceModeRemovesAnUnlistedTag(): void
+    {
+        $gone = $this->addTag($this->uniqueName('replace-gone'));
+        $kept = $this->addTag($this->uniqueName('replace-kept'));
+        $image = $this->fixture->createTestImage()['id'];
+        $this->linkTag($image, $gone);
+        $this->linkTag($image, $kept);
+
+        $res = $this->ws->call('pwg.images.setInfo', array(
+            'image_id' => $image,
+            'tag_ids' => (string)$kept,
+            'multiple_value_mode' => 'replace',
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame(array($kept), $this->tagsOfPhoto($image));
+    }
+
+    /**
+     * [ERR] The Batch Manager's unit-mode form, posted without its JavaScript,
+     * replaces each photo's tag list with the one posted (set_tags()).
+     */
+    public function testBatchManagerUnitModeFormReplacesTheTagList(): void
+    {
+        $gone = $this->addTag($this->uniqueName('unit-gone'));
+        $kept = $this->addTag($this->uniqueName('unit-kept'));
+        $image = $this->fixture->createTestImage()['id'];
+        $this->linkTag($image, $gone);
+        $this->linkTag($image, $kept);
+
+        $res = $this->ws->postPage(self::BATCH_MANAGER_UNIT, array(
+            'pwg_token' => $this->ws->token(),
+            'submit' => 1,
+            'element_ids' => (string)$image,
+            "name-$image" => '',
+            "author-$image" => '',
+            "level-$image" => 0,
+            "description-$image" => '',
+            "tags-$image" => array("~~$kept~~"),
+            ));
+
+        $this->assertSame(200, $res['http_code'], 'the Batch Manager did not answer');
+        $this->assertSame(array($kept), $this->tagsOfPhoto($image));
     }
 
     // ── pwg.tags.duplicate ────────────────────────────────────────────────
