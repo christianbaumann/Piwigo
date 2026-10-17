@@ -89,6 +89,56 @@ function galleryrules_last_album_message($image_ids)
 }
 
 /**
+ * The refusal of an album delete, naming the photos.
+ *
+ * @param int[] $image_ids
+ * @return string
+ */
+function galleryrules_album_delete_message($image_ids)
+{
+  load_language('plugin.lang', GALLERYRULES_PATH);
+  $named = implode(', ', array_map(function ($id) { return '#'.$id; }, $image_ids));
+  if (count($image_ids) == 1)
+  {
+    return l10n('Nothing was deleted: photo %s would be in no album any more. Move it to another album first or delete it with the album.', $named);
+  }
+  return l10n('Nothing was deleted: photos %s would be in no album any more. Move them to another album first or delete them with the album.', $named);
+}
+
+/**
+ * The photos deleting these albums (and their sub-albums) with "keep photos"
+ * would leave in no album.
+ *
+ * @param mixed $category_id array or "1,2;3" as pwg.categories.delete takes it
+ * @return int[]
+ */
+function galleryrules_left_by_album_delete_ids($category_id)
+{
+  if (!is_array($category_id))
+  {
+    $category_id = preg_split('/[\s,;\|]/', (string)$category_id, -1, PREG_SPLIT_NO_EMPTY);
+  }
+  $ids = array_filter(array_map('intval', $category_id), function ($id) { return $id > 0; });
+  if (count($ids) == 0)
+  {
+    return array();
+  }
+
+  $deleted = get_subcat_ids(array_values($ids));
+  if (count($deleted) == 0)
+  {
+    return array();
+  }
+  $linked = query2array('
+SELECT DISTINCT image_id
+  FROM '.IMAGE_CATEGORY_TABLE.'
+  WHERE category_id IN ('.implode(',', array_map('intval', $deleted)).')
+;', null, 'image_id');
+
+  return galleryrules_left_by_album_delete(galleryrules_photo_albums($linked), $deleted);
+}
+
+/**
  * loc_begin_element_set_global: the Batch Manager's "Von Album abtrennen" is
  * refused, for the whole selection, when it would leave a photo in no album.
  * The pwg_token is checked by core before this event.
@@ -169,6 +219,7 @@ function galleryrules_wrap_album_methods($arr)
   $methods = array(
     'pwg.images.setInfo' => 'ws_galleryrules_images_setInfo',
     'pwg.images.setCategory' => 'ws_galleryrules_images_setCategory',
+    'pwg.categories.delete' => 'ws_galleryrules_categories_delete',
     );
   $wrapped = &galleryrules_wrapped_album_methods();
   foreach ($methods as $method => $callback)
@@ -282,4 +333,25 @@ function ws_galleryrules_images_setCategory($params, &$service)
     }
   }
   return galleryrules_call_wrapped_album_method('pwg.images.setCategory', $params, $service);
+}
+
+/**
+ * pwg.categories.delete: "keep photos" that would leave a photo in no album is
+ * refused and nothing is deleted. Deleting the photos with the album passes.
+ *
+ * @param array $params
+ * @param object $service
+ * @return mixed
+ */
+function ws_galleryrules_categories_delete($params, &$service)
+{
+  if ('no_delete' == $params['photo_deletion_mode'] and galleryrules_valid_token($params))
+  {
+    $left = galleryrules_left_by_album_delete_ids($params['category_id']);
+    if (count($left) > 0)
+    {
+      return new PwgError(GALLERYRULES_LAST_ALBUM_CODE, galleryrules_album_delete_message($left));
+    }
+  }
+  return galleryrules_call_wrapped_album_method('pwg.categories.delete', $params, $service);
 }

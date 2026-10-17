@@ -7,8 +7,9 @@ use PHPUnit\Framework\TestCase;
  *
  * Every case here is [ERR]: the oracle is the current implementation, not a
  * requirement. Nothing promises that a 'no_delete' album removal leaves its
- * photos behind with no album at all, or that deleting a parent takes its
- * children with it - these record that it does today, so the trigger this phase
+ * photos behind, or that deleting a parent takes its children with it - these
+ * record that it does today (core alone would also leave a photo with no album;
+ * galleryrules refuses that over ws, decision 0083), so the trigger this phase
  * inserts says so if it changes any of it. They report a change; they do not
  * prove the behaviour right.
  *
@@ -41,18 +42,25 @@ final class CoreDeleteCategoriesCharacterizationTest extends TestCase
         $this->ws->logout();
     }
 
-    /** [ERR] 'no_delete' removes the album and the link, and leaves the photo row. */
-    public function testNoDeleteLeavesThePhotoBehindWithNoAlbum(): void
+    /**
+     * [ERR] 'no_delete' removes the album and its link, and leaves the photo row.
+     * The photo has a second album: with the plugin galleryrules active, a delete
+     * that would leave a photo in no album is refused (decision 0083), so core's
+     * own orphaning can no longer be reached; AlbumDeleteKeepsPhotosTest covers the refusal.
+     */
+    public function testNoDeleteLeavesThePhotoRowAndItsOtherLink(): void
     {
         $album = $this->fixture->createTestAlbum('provenance-char-del-nodelete');
+        $keeper = $this->fixture->createTestAlbum('provenance-char-del-nodelete-keeper');
         $image = $this->fixture->createTestImage()['id'];
         $this->fixture->attachImage($image, $album);
+        $this->fixture->attachImage($image, $keeper);
 
         $this->deleteAlbum($album, 'no_delete');
 
         $this->assertFalse($this->albumExists($album), 'the album itself must be gone');
         $this->assertTrue($this->imageExists($image), 'the photo row survives the album');
-        $this->assertSame(0, $this->albumCountOf($image), 'its only link went with the album');
+        $this->assertSame(1, $this->albumCountOf($image), 'only the deleted album\'s link went');
     }
 
     /** [ERR] 'delete_orphans' deletes a photo left in no other album. */
@@ -105,14 +113,16 @@ final class CoreDeleteCategoriesCharacterizationTest extends TestCase
         $parent = $this->fixture->createTestAlbum('provenance-char-del-parent');
         $child = $this->fixture->createTestAlbum('provenance-char-del-child');
         $this->reparent($child, $parent);
+        $keeper = $this->fixture->createTestAlbum('provenance-char-del-parent-keeper');
         $image = $this->fixture->createTestImage()['id'];
         $this->fixture->attachImage($image, $child);
+        $this->fixture->attachImage($image, $keeper);
 
         $this->deleteAlbum($parent, 'no_delete');
 
         $this->assertFalse($this->albumExists($parent));
         $this->assertFalse($this->albumExists($child), 'get_subcat_ids() pulls the child in');
-        $this->assertSame(0, $this->albumCountOf($image), "the child's links went with it");
+        $this->assertSame(1, $this->albumCountOf($image), "the child's link went with it, the keeper's stayed");
     }
 
     /** [ERR] An unknown photo_deletion_mode is refused before anything is deleted. */

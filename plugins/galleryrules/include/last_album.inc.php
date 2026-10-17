@@ -89,6 +89,31 @@ function galleryrules_left_without_album($before, $after)
 }
 
 /**
+ * The photos deleting albums while keeping their photos (core's
+ * delete_categories() mode no_delete) would leave in no album. A photo stored
+ * in one of the albums is deleted by core with them, so it is not left.
+ *
+ * @param array $photos image id => array('albums' => int[], 'storage' => int|null)
+ * @param int[] $deleted the albums deleted, sub-albums included
+ * @return int[] image ids, ascending
+ */
+function galleryrules_left_by_album_delete($photos, $deleted)
+{
+  $deleted = galleryrules_unique_ids($deleted);
+  $before = $after = array();
+  foreach ($photos as $image_id => $photo)
+  {
+    if ($photo['storage'] !== null and in_array((int)$photo['storage'], $deleted, true))
+    {
+      continue;
+    }
+    $before[$image_id] = $photo['albums'];
+    $after[$image_id] = array_diff(galleryrules_unique_ids($photo['albums']), $deleted);
+  }
+  return galleryrules_left_without_album($before, $after);
+}
+
+/**
  * @param array $ids
  * @return int[] unique, ascending
  */
