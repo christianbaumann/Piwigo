@@ -23,9 +23,9 @@ not in them.
 | 20 Herkunft inheritance | `b00f0b6b7` (characterization), `1c9214ebc` |
 | 19 last album kept | `06e568968` |
 | 17 person tag identity | `660ea947f`. **Not fully ticked:** "suites pass" waits for 38 (person 146) |
-| 09 typetags CSRF | `bc0e86a6d` (typetags `16f50cc`, **not pushed**) |
-| 10 typetags failures reported | `1c17ee1a6` (typetags `ac55c5b`, **not pushed**) |
-| 11 tag writes clear user cache | `06ba59ce2` (typetags `18549d1`, **not pushed**; decision 0071) |
+| 09 typetags CSRF | `bc0e86a6d` (typetags `16f50cc`, pushed) |
+| 10 typetags failures reported | `1c17ee1a6` (typetags `ac55c5b`, pushed) |
+| 11 tag writes clear user cache | `06ba59ce2` (typetags `18549d1`, pushed; decision 0071) |
 
 Nothing is in progress: no agent running, working tree clean except the four
 `galleries/Verschiedenes/*.png` that were modified before this change started (not ours; leave them).
@@ -35,9 +35,7 @@ Nothing is in progress: no agent running, working tree clean except the four
 Open tasks whose dependencies are done: 18, 21, 22, 23, 24, 25, 26, 27, 38 and onwards (check each
 task's `dependencies`). 06's, 16's and 17's last items close with 38.
 
-**typetags `16f50cc`, `ac55c5b`, `18549d1` are not pushed** (403, git used account
-`dark-sith-lord`). The main repo's submodule pointer references them: push
-`plugins/typetags` with the right account before pushing the main repo.
+typetags `16f50cc`, `ac55c5b`, `18549d1` were pushed by the user (checked 2026-10-17).
 
 Task 38: `IndexRebuildTest` fails only on region-less leftover person 146 `Name`; task 17 cannot
 bring it back (no region, no rescan finds it). Prepared repair, not run (real data, question 1
@@ -47,7 +45,7 @@ below): `ddev mysql -e "DELETE FROM piwigo_persons WHERE id = 146 AND name = 'Na
 Decision numbers used so far: 0069 (05), 0070 (07), 0071 (11), 0072 (14), 0073 (03).
 Next free: 0074.
 
-## Open questions to the user (asked 2026-10-16, unanswered; default is `a`)
+## Questions to the user (asked 2026-10-16; unanswered, so 2026-10-17 the defaults `a` apply)
 
 1. Person 146: a) run the prepared DELETE under the suite lock, re-run `IndexRebuildTest`;
    b) leave to task 38; c) make the test skip region-less persons.
@@ -60,6 +58,8 @@ Next free: 0074.
 4. Task 20 — hand check of the two new paragraphs in `handbuch/03-fototexte.html`:
    a) user reads them; b) open row in the `docs/agents/TESTING.md` ledger; c) accept unchecked.
 5. Next batch: a) wait for the user; b) 21, 38, 22, 23; c) only 38.
+
+Applied 2026-10-17: 1a (in task 38), 2a, 3a (task 39 added), 4a (hand check still open), batch 18, 21, 22, 38. 2026-10-17: task 39 refuses the delete (default a); the handbook paragraphs of task 20 are read by a subagent (user's answer).
 
 ## Incidents in the 2026-10-16 batch (all repaired, recorded so a later failure can be traced)
 

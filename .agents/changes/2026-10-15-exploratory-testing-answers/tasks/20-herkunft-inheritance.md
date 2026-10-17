@@ -32,7 +32,7 @@ A photo's Herkunft follows one documented rule on every link path.
 * [x] Integration: sub-album photo takes the parent's values
   **Note:** Verified via `InheritTest::testASubAlbumPhotoTakesTheParentsValues`, `testTheNearestAncestorWithHerkunftWins`, `testASubAlbumWithItsOwnHerkunftUsesIt`, `testASubAlbumWithoutHerkunftAnywhereAboveWritesNothing`, and unit `NearestAlbumWithValuesTest` (7 cases)
 * [x] provenance suites pass; `ddev exec php handbuch/tools/check.php` passes
-  **Note:** Verified 2026-10-16: provenance unit 283 OK, integration 351 OK (3 skipped), E2E 62 passed, `check.php` OK. Whether the two new handbook paragraphs read naturally is a hand check (manual testing required)
+  **Note:** Verified 2026-10-16: provenance unit 283 OK, integration 351 OK (3 skipped), E2E 62 passed, `check.php` OK. The two new handbook paragraphs were read 2026-10-17 by a reviewing subagent (the user's choice): reworded for end users, the move exception (*Durch die des Zielalbums ersetzen*, `02-fotos.html`) added, and the unconditional "übernimmt sie von selbst" in `03-fototexte.html` and `01-alben.html` qualified with "sofern ... noch keine"; `check.php` OK
 
 ## Deviations
 
