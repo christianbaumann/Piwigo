@@ -151,6 +151,18 @@ class WsClient
         return array('http_code' => $httpCode, 'body' => $body);
     }
 
+    /** The photo count under the gallery menu's albums ("N Fotos"), as this client sees it. */
+    public function menuPhotoCount(): int
+    {
+        $response = $this->fetchPage('/index.php');
+        if ($response['http_code'] !== 200 or preg_match('~class="totalImages">(\d+) ~', (string)$response['body'], $m) !== 1)
+        {
+            throw new RuntimeException('no photo count in the menu (HTTP ' . $response['http_code'] . ')');
+        }
+
+        return (int)$m[1];
+    }
+
     public function login(string $username, string $password): void
     {
         $res = $this->call('pwg.session.login', array('username' => $username, 'password' => $password));
