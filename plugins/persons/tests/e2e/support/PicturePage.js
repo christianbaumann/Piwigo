@@ -123,6 +123,16 @@ class PicturePage {
     return this.page.locator(`#persons-overlay .person-box[data-person-region="${regionId}"]`);
   }
 
+  /** A tag's link in core's tag row, as typetags marks it. @param {number} tagId */
+  tagLink(tagId) {
+    return this.page.locator(`#standard #Tags a[data-tag-id="${tagId}"]`);
+  }
+
+  /** typetags' x inside a coloured tag's badge. @param {number} tagId */
+  tagRemoveButton(tagId) {
+    return this.page.locator(`#standard #Tags a[data-tag-id="${tagId}"] .typetag-remove`);
+  }
+
   /**
    * Waits until the overlay has been placed over the photo.
    *

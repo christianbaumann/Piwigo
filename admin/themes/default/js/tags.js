@@ -331,7 +331,7 @@ function removeTag(id, name) {
             updateSearchInfo();
             updatePaginationMenu();
           } else {
-            showError('A problem has occured')
+            showError(data.message || 'A problem has occured')
           }
         }
       })
@@ -701,7 +701,8 @@ function removeSelectedTags() {
         },
         success: function (raw_data) {
           raw_data = raw_data.slice(raw_data.search('{'));
-          if (JSON.parse(raw_data).stat = 'ok') {
+          data = JSON.parse(raw_data);
+          if (data.stat === 'ok') {
             selected.forEach(function(id) {
               $('.tag-box[data-id='+id+']').remove();
             })
@@ -714,7 +715,7 @@ function removeSelectedTags() {
             updateBadge();
             updateSearchInfo();
           } else {
-            return raw_data;
+            showError(data.message);
           }
         },
         error: function(message) {
@@ -784,7 +785,7 @@ function mergeGroups(destination_id, merge_ids) {
             updateBadge()
             updateSearchInfo()
           } else {
-            return raw_data;
+            showError(data.message);
           }
         }
       })

@@ -55,6 +55,14 @@ define('PERSONS_NAME_REQUIRED_MESSAGE', 'A person needs a name');
  */
 define('PERSONS_CROP_REFUSED_MESSAGE', 'This crop would remove person marks only an administrator may delete:');
 
+/**
+ * Why a tag tool may not take a person's tag off a photo or delete it, as
+ * language keys; %s is the tags' names (design "Tag tools refuse to remove or
+ * delete a person's tag").
+ */
+define('PERSONS_TAG_REMOVAL_REFUSED_MESSAGE', 'A person tag stays on a photo while the person is marked there: %s. Remove the mark on the photo to remove the tag.');
+define('PERSONS_TAG_DELETE_REFUSED_MESSAGE', 'A person tag is deleted only with its person: %s. Delete the person under Persons.');
+
 /** The tooltip of a stale region's box, as a language key. */
 define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');
 
@@ -1470,4 +1478,62 @@ function persons_region_matches_any($region, $matchers)
   }
 
   return false;
+}
+
+/**
+ * The tags a change would take off photos where their person is marked, which
+ * a tag tool refuses: the person's tag follows the mark, never the other way.
+ *
+ * @param array $marked image id => tag ids of the persons marked on it
+ * @param array $current image id => tag ids the photo carries now
+ * @param array $kept image id => tag ids the photo carries after the change
+ * @return array image id => refused tag ids (int), only photos with any
+ */
+function persons_marked_tags_removed($marked, $current, $kept)
+{
+  $refused = array();
+  foreach ($marked as $image_id => $tag_ids)
+  {
+    $removed = array_diff(
+      array_map('intval', $current[$image_id] ?? array()),
+      array_map('intval', $kept[$image_id] ?? array())
+      );
+    $hit = array_values(array_intersect(array_map('intval', $tag_ids), $removed));
+    if (count($hit) > 0)
+    {
+      $refused[$image_id] = $hit;
+    }
+  }
+
+  return $refused;
+}
+
+/**
+ * A tag field's raw values as core's get_tag_ids() reads them: `~~<id>~~` is an
+ * existing tag, anything else a typed name.
+ *
+ * @param string|string[]|null $raw an array, or a comma-separated string
+ * @return array 'ids' => int[], 'names' => string[]
+ */
+function persons_split_raw_tags($raw)
+{
+  $split = array('ids' => array(), 'names' => array());
+  if ($raw === null or $raw === '')
+  {
+    return $split;
+  }
+
+  foreach (is_array($raw) ? $raw : explode(',', $raw) as $value)
+  {
+    if (preg_match('/^~~(\d+)~~$/', (string)$value, $matches))
+    {
+      $split['ids'][] = (int)$matches[1];
+    }
+    else
+    {
+      $split['names'][] = (string)$value;
+    }
+  }
+
+  return $split;
 }

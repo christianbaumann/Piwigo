@@ -60,6 +60,20 @@ add_event_handler('photoedit_refusal', 'persons_photoedit_refusal', EVENT_HANDLE
 add_event_handler('photoedit_begin', 'persons_photoedit_begin', EVENT_HANDLER_PRIORITY_NEUTRAL - 1, $persons_photoedit_file);
 add_event_handler('photoedit_end', 'persons_photoedit_end', EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_photoedit_file);
 
+// No tag tool takes a person's tag off a photo where the person is marked, or
+// deletes it: the API (also typetags' x), the properties page, the Batch Manager.
+$persons_tag_guard_file = PERSONS_PATH . 'include/tag_guard.inc.php';
+add_event_handler('ws_invoke_allowed', 'persons_guard_ws_invoke',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $persons_tag_guard_file);
+add_event_handler('picture_modify_before_update', 'persons_properties_keep_marked_tags',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
+add_event_handler('loc_begin_element_set_unit', 'persons_batch_unit_keep_marked_tags',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
+add_event_handler('loc_begin_element_set_global', 'persons_batch_refuse_del_tags',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
+add_event_handler('typetags_fixed_tag_ids', 'persons_typetags_fixed_tag_ids',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
+
 // The public overlay and person row. Registered only on the picture page, and
 // the file behind them is pulled in only when the event actually fires.
 if (script_basename() == 'picture')

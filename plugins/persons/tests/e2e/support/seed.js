@@ -30,13 +30,20 @@ const SEED_SCRIPT = path.join(__dirname, 'seed.php');
  * them; `drawnByViewer` records the normal account the picture page specs run
  * as as their drawer instead.
  *
+ * `colouredTags` puts the seeded persons' tags and an ordinary tag on the photo
+ * into a typetags group, and also returns `person_tag_ids` (name => id) and
+ * `plain_tag_id`.
+ *
  * @param {'overlay'|'stale'|'empty'|'neighbours'|'marked'|'marked-empty'} scenario
- * @param {{source?: 'first'|'small', rotation?: number, drawnByViewer?: boolean}} [options]
+ * @param {{source?: 'first'|'small', rotation?: number, drawnByViewer?: boolean, colouredTags?: boolean}} [options]
  */
-function seed(scenario, { source = 'first', rotation = 0, drawnByViewer = false } = {}) {
+function seed(scenario, { source = 'first', rotation = 0, drawnByViewer = false, colouredTags = false } = {}) {
   const args = [SEED_SCRIPT, `--scenario=${scenario}`, `--source=${source}`, `--rotation=${rotation}`];
   if (drawnByViewer) {
     args.push('--drawn-by-viewer');
+  }
+  if (colouredTags) {
+    args.push('--coloured-tags');
   }
   return JSON.parse(execFileSync('php', args, { encoding: 'utf8' }));
 }

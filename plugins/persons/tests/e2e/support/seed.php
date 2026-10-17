@@ -23,6 +23,7 @@
  *   php tests/e2e/support/seed.php --scenario=marked --rotation=3
  *   php tests/e2e/support/seed.php --scenario=marked-empty --rotation=3
  *   php tests/e2e/support/seed.php --scenario=overlay --drawn-by-viewer
+ *   php tests/e2e/support/seed.php --scenario=overlay --coloured-tags
  *   php tests/e2e/support/seed.php --read-file-regions=<photo id>
  *   php tests/e2e/support/seed.php --exiftool=missing|present
  *   php tests/e2e/support/seed.php --originals=allowed|denied
@@ -48,6 +49,61 @@ const SEEDED_PERSONS = array('E2E Overlay Jane', 'E2E Overlay John');
  * under test rather than by this script, so nothing else knows they exist.
  */
 const EDITOR_PERSONS = array('E2E Editor Ada', 'E2E Editor Grace', 'E2E Admin Ada', 'E2E Roles Mia');
+
+/**
+ * --coloured-tags: a typetags group holding the seeded persons' tags and an
+ * ordinary tag on the photo, so the picture page decides which coloured badge
+ * gets typetags' x. --restore removes both by name.
+ */
+const GUARD_GROUP_PREFIX = 'E2E Guard group ';
+const GUARD_PLAIN_TAG = 'E2E Guard Plain';
+
+/**
+ * @return array person_tag_ids (name => id), plain_tag_id
+ */
+function colour_tags(Db $db, int $imageId): array
+{
+    if ($db->scalar("SELECT state FROM piwigo_plugins WHERE id = 'typetags'") !== 'active')
+    {
+        fail('--coloured-tags needs typetags active');
+    }
+    $db->query("INSERT INTO piwigo_typetags (name, color) VALUES ('" . GUARD_GROUP_PREFIX . bin2hex(random_bytes(4)) . "', '#3366cc')");
+    $group = $db->insertId();
+    $db->query("INSERT INTO piwigo_tags (name, url_name, id_typetags) VALUES ('" . GUARD_PLAIN_TAG . "', 'e2e_guard_plain', $group)");
+    $plain = $db->insertId();
+    $db->query("INSERT INTO piwigo_image_tag (image_id, tag_id) VALUES ($imageId, $plain)");
+
+    $persons = array();
+    foreach (SEEDED_PERSONS as $name)
+    {
+        $tag = (int)$db->scalar("SELECT tag_id FROM piwigo_persons WHERE name = '" . $db->escape($name) . "'");
+        $db->query("UPDATE piwigo_tags SET id_typetags = $group WHERE id = $tag");
+        $persons[$name] = $tag;
+    }
+    $coloured = (int)$db->scalar("SELECT COUNT(*) FROM piwigo_tags AS t JOIN piwigo_image_tag AS it ON it.tag_id = t.id"
+        . " WHERE it.image_id = $imageId AND t.id_typetags = $group");
+    if ($coloured !== count(SEEDED_PERSONS) + 1)
+    {
+        fail("--coloured-tags put $coloured coloured tags on the photo");
+    }
+    PiwigoRuntime::resetRequestCaches();
+    persons_invalidate_tag_cache();
+
+    return array('person_tag_ids' => $persons, 'plain_tag_id' => $plain);
+}
+
+function uncolour_tags(Db $db): void
+{
+    $plain = $db->scalar("SELECT id FROM piwigo_tags WHERE name = '" . GUARD_PLAIN_TAG . "'");
+    if ($plain !== null)
+    {
+        $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$plain);
+        $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$plain);
+    }
+    $groups = "SELECT id FROM piwigo_typetags WHERE name LIKE '" . GUARD_GROUP_PREFIX . "%'";
+    $db->query("UPDATE piwigo_tags SET id_typetags = NULL WHERE id_typetags IN (SELECT id FROM ($groups) AS g)");
+    $db->query("DELETE FROM piwigo_typetags WHERE name LIKE '" . GUARD_GROUP_PREFIX . "%'");
+}
 
 /**
  * The regions written into the fixture photo.
@@ -378,7 +434,7 @@ SELECT p.name,
     return $counts;
 }
 
-$args = getopt('', array('scenario::', 'source::', 'rotation::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts', 'drawn-by-viewer'));
+$args = getopt('', array('scenario::', 'source::', 'rotation::', 'restore', 'read-file-regions::', 'exiftool::', 'originals::', 'person-counts', 'drawn-by-viewer', 'coloured-tags'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -395,6 +451,7 @@ if (isset($args['restore']))
     $db->query("DELETE FROM piwigo_config WHERE param = '" . EXIFTOOL_PATH_PARAM . "'");
     set_originals_state($db, 'allowed');
     $builder->destroyPersons(array_merge(SEEDED_PERSONS, EDITOR_PERSONS));
+    uncolour_tags($db);
 
     $snapshot = load_snapshot();
     if ($snapshot === null)
@@ -535,9 +592,9 @@ if (!in_array($scenario, array('empty', 'neighbours', 'marked-empty'), true))
         mark_drawn_by($db, (int)$image['id'], PAGE_ACCOUNT, count($regions));
     }
 }
-elseif (isset($args['drawn-by-viewer']))
+elseif (isset($args['drawn-by-viewer']) or isset($args['coloured-tags']))
 {
-    fail("--drawn-by-viewer needs a scenario that seeds regions, not '$scenario'");
+    fail("--drawn-by-viewer and --coloured-tags need a scenario that seeds regions, not '$scenario'");
 }
 else
 {
@@ -598,6 +655,10 @@ if ($marked)
 {
     $output['rotation'] = $rotation;
     $output['marker'] = FixtureBuilder::MARKER;
+}
+if (isset($args['coloured-tags']))
+{
+    $output = array_merge($output, colour_tags($db, (int)$image['id']));
 }
 if ($neighbours !== null)
 {
