@@ -87,6 +87,7 @@ final class ReadOnlyPageTest extends TestCase
         }
         // One history row per field the save changed.
         $this->assertSame(count(self::ALBUM_VALUES), $this->historyRowCount($page));
+        $this->assertStringContainsString('<th>Von wem</th>', $page);
     }
 
     /** [HAPPY] The photo page shows the copied values, the photo's own note and its history. */
