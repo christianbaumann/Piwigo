@@ -1690,6 +1690,101 @@ SELECT id, name, permalink
     );
 }
 
+if (!defined('UPLOAD_PART_MAX_AGE'))
+{
+  // seconds a half-sent upload may stay in the buffer
+  define('UPLOAD_PART_MAX_AGE', 86400);
+}
+
+/**
+ * Name of an upload's buffer file: one per user and file name.
+ *
+ * @param int $user_id
+ * @param string $file_name name the browser sent
+ * @return string
+ */
+function upload_buffer_name($user_id, $file_name)
+{
+  return md5(intval($user_id).'|'.$file_name);
+}
+
+/**
+ * Removes the half-sent uploads nobody finished.
+ *
+ * @param string $upload_dir the buffer directory
+ */
+function remove_stale_upload_buffers($upload_dir)
+{
+  foreach (glob($upload_dir.DIRECTORY_SEPARATOR.'*.part') as $part)
+  {
+    if (filemtime($part) < time() - UPLOAD_PART_MAX_AGE)
+    {
+      @unlink($part);
+    }
+  }
+}
+
+/**
+ * API method
+ * Removes what a cancelled upload already sent: the chunks in the buffer and the
+ * photos of the given files still waiting in the lounge.
+ * @param mixed[] $params
+ *    @option string[] name file names, as sent to pwg.images.upload
+ *    @option string pwg_token
+ *    @option int category_id
+ */
+function ws_images_uploadCancel($params, $service)
+{
+  global $conf, $user;
+
+  if (get_pwg_token() != $params['pwg_token'])
+  {
+    return new PwgError(403, 'Invalid security token');
+  }
+
+  include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
+
+  $names = (array)$params['name'];
+  $removed_parts = 0;
+  $quoted_names = array();
+  foreach ($names as $name)
+  {
+    $part = $conf['upload_dir'].'/buffer/'.upload_buffer_name($user['id'], $name).'.part';
+    if (is_file($part) and @unlink($part))
+    {
+      $removed_parts++;
+    }
+    $quoted_names[] = '\''.pwg_db_real_escape_string($name).'\'';
+  }
+
+  $query = '
+SELECT
+    id
+  FROM '.IMAGES_TABLE.'
+    INNER JOIN '.LOUNGE_TABLE.' ON id = image_id
+  WHERE category_id = '.$params['category_id'].'
+    AND added_by = '.$user['id'].'
+    AND file IN ('.implode(',', $quoted_names).')
+;';
+  $image_ids = query2array($query, null, 'id');
+
+  if (count($image_ids))
+  {
+    $query = '
+DELETE FROM '.LOUNGE_TABLE.'
+  WHERE image_id IN ('.implode(',', $image_ids).')
+;';
+    pwg_query($query);
+
+    delete_elements($image_ids, true);
+  }
+
+  return array(
+    'removed_parts' => $removed_parts,
+    'removed_photos' => count($image_ids),
+  );
+}
+
 /**
  * API method
  * Adds a image (simple way)
@@ -1704,7 +1799,7 @@ SELECT id, name, permalink
  */
 function ws_images_upload($params, $service)
 {
-  global $conf;
+  global $conf, $user;
 
   if (get_pwg_token() != $params['pwg_token'])
   {
@@ -1768,9 +1863,13 @@ function ws_images_upload($params, $service)
 
   // change the name of the file in the buffer to avoid any unexpected
   // extension. Function add_uploaded_file will eventually clean the mess.
-  $fileName = md5($fileName);
+  // The user is part of the name: two admins uploading the same file name
+  // must not write into one buffer.
+  $fileName = upload_buffer_name($user['id'], $fileName);
 
   $filePath = $upload_dir.DIRECTORY_SEPARATOR.$fileName;
+
+  remove_stale_upload_buffers($upload_dir);
 
   // Chunking might be enabled
   $chunk = isset($_REQUEST["chunk"]) ? intval($_REQUEST["chunk"]) : 0;
@@ -1778,8 +1877,8 @@ function ws_images_upload($params, $service)
 
   // file_put_contents('/tmp/plupload.log', "[".date('c')."] ".__FUNCTION__.', '.$fileName.' '.($chunk+1).'/'.$chunks."\n", FILE_APPEND);
 
-  // Open temp file
-  if (!$out = @fopen("{$filePath}.part", $chunks ? "ab" : "wb"))
+  // Open temp file: chunk 0 starts a new buffer, whatever was left there
+  if (!$out = @fopen("{$filePath}.part", ($chunks and $chunk > 0) ? "ab" : "wb"))
   {
     die('{"jsonrpc" : "2.0", "error" : {"code": 102, "message": "Failed to open output stream."}, "id" : "id"}');
   }

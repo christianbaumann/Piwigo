@@ -66,9 +66,19 @@ function trackAlbum(name) {
   run(`--track-album=${name}`);
 }
 
+/**
+ * Records the photos a spec uploaded into an album through the browser, so restore() deletes them.
+ *
+ * @param {number} albumId
+ * @returns {number[]} the photo ids found
+ */
+function trackUploads(albumId) {
+  return run(`--track-uploads=${albumId}`).image_ids;
+}
+
 /** Removes whatever the seed created. Safe to call unseeded. */
 function restore() {
   run('--restore');
 }
 
-module.exports = { seedPayload, seedSameName, seedEmpty, seedTags, albumCount, albumNameHint, trackAlbum, restore };
+module.exports = { seedPayload, seedSameName, seedEmpty, seedTags, albumCount, albumNameHint, trackAlbum, trackUploads, restore };

@@ -849,6 +849,19 @@ function ws_addDefaultMethods( $arr )
     );
 
   $service->addMethod(
+      'pwg.images.uploadCancel',
+      'ws_images_uploadCancel',
+      array(
+        'name' => array('flags'=>WS_PARAM_ACCEPT_ARRAY),
+        'pwg_token' => array(),
+        'category_id' => array('type'=>WS_TYPE_ID),
+        ),
+      'Notify Piwigo you have cancelled an upload. It removes the chunks already sent for the given file names and the photos of those files still waiting in the lounge.',
+      $ws_functions_root . 'pwg.images.php',
+      array('admin_only'=>true, 'post_only'=>true)
+    );
+
+  $service->addMethod(
       'pwg.images.setInfo',
       'ws_images_setInfo',
       array(

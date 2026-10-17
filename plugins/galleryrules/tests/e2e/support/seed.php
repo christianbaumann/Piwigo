@@ -22,6 +22,9 @@
  *   php tests/e2e/support/seed.php --album-name-hint   the German hint of the create-album dialog
  *   php tests/e2e/support/seed.php --track-album=<name> records an album a spec created through the
  *                                                        browser, so --restore deletes it
+ *   php tests/e2e/support/seed.php --track-uploads=<album id> records the photos a spec uploaded into an
+ *                                                        album through the browser, so --restore deletes them
+ *                                                        with their files and lounge rows
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -50,7 +53,7 @@ function payload(string $field): string
     return '<img src=x alt=galleryrules-' . $field . ' onerror=document.body.dataset.' . XSS_MARKER . '=this.alt>';
 }
 
-$args = getopt('', array('scenario::', 'restore', 'album-count', 'album-name-hint', 'track-album:'));
+$args = getopt('', array('scenario::', 'restore', 'album-count', 'album-name-hint', 'track-album:', 'track-uploads:'));
 
 try
 {
@@ -102,6 +105,27 @@ if (isset($args['track-album']))
     exit(0);
 }
 
+if (isset($args['track-uploads']))
+{
+    $images = array();
+    $result = $db->query(
+        'SELECT i.id, i.path FROM piwigo_images i JOIN piwigo_image_category ic ON ic.image_id = i.id ' .
+        'WHERE ic.category_id = ' . (int)$args['track-uploads'] .
+        ' UNION SELECT i.id, i.path FROM piwigo_images i JOIN piwigo_lounge l ON l.image_id = i.id ' .
+        'WHERE l.category_id = ' . (int)$args['track-uploads']
+    );
+    while ($row = $result->fetch_assoc())
+    {
+        $images[] = array('id' => (int)$row['id'], 'file' => PIWIGO_ROOT . ltrim($row['path'], './'));
+    }
+    $snapshot = is_file(SNAPSHOT_FILE) ? json_decode((string)file_get_contents(SNAPSHOT_FILE), true) : array();
+    $builder->importTestObjects(array('images' => $images));
+    $builder->importTestObjects(is_array($snapshot) ? $snapshot : array());
+    file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+    echo json_encode(array('image_ids' => array_column($images, 'id'))), "\n";
+    exit(0);
+}
+
 if (isset($args['restore']))
 {
     if (!is_file(SNAPSHOT_FILE))
@@ -128,6 +152,10 @@ if (isset($args['restore']))
     {
         $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$row['id']);
         $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$row['id']);
+    }
+    foreach ($snapshot['images'] ?? array() as $image)
+    {
+        $db->query('DELETE FROM piwigo_lounge WHERE image_id = ' . (int)$image['id']);
     }
     $builder->destroyTestImages();
     $builder->destroyTestAlbums();

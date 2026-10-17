@@ -134,7 +134,7 @@ $(function () {
         $('#cancelUpload').on('click', function (e) {
           e.preventDefault();
           up.stop();
-          up.trigger('UploadComplete', up.files);
+          cancel_upload(up, ab.get_selected_albums()[0]);
         });
       }
     },
@@ -390,10 +390,22 @@ $(function () {
         // Called when file has finished uploading
         //console.log('[FileUploaded] File:', file, "Info:", info);
 
+        let data = null;
+        try {
+          data = JSON.parse(info.response);
+        } catch (e) {
+          show_upload_error(sprintf(str_upload_file_error, file.name, server_text(info.response)));
+          return;
+        }
+
+        if (!data || data.stat !== 'ok' || !data.result) {
+          const reason = (data && data.message) || (data && data.error && data.error.message) || str_unknown_upload_error;
+          show_upload_error(sprintf(str_upload_file_error, file.name, reason));
+          return;
+        }
+
         // hide item line
         $('#' + file.id).hide();
-
-        let data = JSON.parse(info.response);
 
         $("#uploadedPhotos").parent("fieldset").show();
 
@@ -420,10 +432,17 @@ $(function () {
       Error: function (up, error) {
         // Called when file has finished uploading
         //console.log('[Error] error: ', error);
-        var piwigoApiResponse = JSON.parse(error.response);
-
-        $(".errors ul").append('<li>' + piwigoApiResponse.message + '</li>');
-        $(".errors").show();
+        let message = error.message;
+        if (error.response) {
+          try {
+            message = JSON.parse(error.response).message || message;
+          } catch (e) {
+            message = server_text(error.response) || message;
+          }
+          show_upload_error(message);
+        } else {
+          show_upload_error(error.file ? sprintf(str_upload_file_error, error.file.name, message) : message);
+        }
       },
 
       UploadComplete: function (up, files) {
@@ -432,63 +451,45 @@ $(function () {
 
         Piecon.reset();
 
-        if (!formatMode) {
-          $.ajax({
-            url: "ws.php?format=json&method=pwg.images.uploadCompleted",
-            type: "POST",
-            data: {
-              pwg_token: pwg_token,
-              image_id: uploadedPhotos.join(","),
-              category_id: uploadCategory.id,
-            }
-          });
+        // user can safely leave page without warning
+        $(window).unbind('beforeunload');
+
+        if (!uploadedPhotos.length) {
+          // nothing was uploaded: give the page back so the user can try again
+          $('#uploadingActions').hide();
+          $('#startUpload, .selectFilesButtonBlock').show();
+          $('#selectedAlbumEdit').show();
+          $("select[name=level]").removeAttr("disabled");
+          return;
         }
 
         $("#uploadForm, #permissions, .showFieldset").hide();
-
-        const infoTextAdd = formatMode ?
-          sprintf(formatsAdded_label, addedPhotos.length, [...new Set(addedPhotos)].length)
-          : sprintf(photosAdded_label, addedPhotos.length);
-
-        const infoTextUpdate = formatMode ?
-          sprintf(formatsUpdated_label, updatedPhotos.length, [...new Set(updatedPhotos)].length)
-          : sprintf(photosUpdated_label, updatedPhotos.length);
-
-        if (addedPhotos.length && updatedPhotos.length)
-        {
-          $(".infos").append( '<ul><li><i class="eiw-icon icon-ok-circled"></i>' + infoTextAdd + ', ' + infoTextUpdate + '</li></ul>');
-        }
-        else
-        {
-          const infoText = addedPhotos.length ? infoTextAdd : infoTextUpdate;
-          $(".infos").append('<ul><li><i class="eiw-icon icon-ok-circled"></i>' + infoText + '</li></ul>');
-        }
-
-        if (!formatMode) {
-          html = sprintf(
-            albumSummary_label,
-            '<a href="admin.php?page=album-' + uploadCategory.id + '"> <i class="icon-folder-open"></i>' + uploadCategory.label + '</a>',
-            parseInt(uploadCategory.nb_photos)
-          );
-
-          $(".infos ul").append('<li><i class="eiw-icon icon-ok-circled"></i>' + html + '</li>');
-        }
-
-        $(".infos").show();
-
-        // TODO: use a new method pwg.caddie.empty +
-        // pwg.caddie.add(uploadedPhotos) instead of relying on huge GET parameter
-        // (and remove useless code from admin/photos_add_direct.php)
-
-        $(".batchLink").attr("href", "admin.php?page=photos_add&section=direct&batch=" + [...new Set(uploadedPhotos)].join(","));
-        $(".batchLink").html(sprintf(batch_Label, uploadedPhotos.length));
-
-        $(".afterUploadActions").show();
         $('#uploadingActions').hide();
         $('#selectedAlbumEdit').show();
 
-        // user can safely leave page without warning
-        $(window).unbind('beforeunload');
+        if (formatMode) {
+          show_upload_summary();
+          return;
+        }
+
+        $.ajax({
+          url: "ws.php?format=json&method=pwg.images.uploadCompleted",
+          type: "POST",
+          dataType: "json",
+          data: {
+            pwg_token: pwg_token,
+            image_id: uploadedPhotos.join(","),
+            category_id: uploadCategory.id,
+          }
+        }).done(function (res) {
+          if (res.stat === 'ok') {
+            show_upload_summary();
+          } else {
+            show_upload_error(res.message || str_unknown_upload_error);
+          }
+        }).fail(function (xhr) {
+          show_upload_error(server_text(xhr.responseText) || str_unknown_upload_error);
+        });
       }
     }
   });
@@ -497,6 +498,80 @@ $(function () {
 /*--------------
 General functions
 --------------*/
+
+function server_text(response) {
+  const text = $('<div>').html(response || '').text().trim();
+  return text.length > 300 ? text.slice(0, 300) + '...' : text;
+}
+
+function show_upload_error(message) {
+  $(".errors ul").append($('<li>').text(message));
+  $(".errors").show();
+}
+
+function cancel_upload(up, categoryId) {
+  const unfinished = up.files
+    .filter((f) => f.status !== plupload.DONE)
+    .map((f) => f.name);
+
+  const finish = () => up.trigger('UploadComplete', up.files);
+
+  if (!unfinished.length || formatMode) {
+    finish();
+    return;
+  }
+
+  $.ajax({
+    url: "ws.php?format=json&method=pwg.images.uploadCancel",
+    type: "POST",
+    data: {
+      pwg_token: pwg_token,
+      name: unfinished,
+      category_id: categoryId,
+    }
+  }).always(finish);
+}
+
+function show_upload_summary() {
+  const infoTextAdd = formatMode ?
+    sprintf(formatsAdded_label, addedPhotos.length, [...new Set(addedPhotos)].length)
+    : sprintf(photosAdded_label, addedPhotos.length);
+
+  const infoTextUpdate = formatMode ?
+    sprintf(formatsUpdated_label, updatedPhotos.length, [...new Set(updatedPhotos)].length)
+    : sprintf(photosUpdated_label, updatedPhotos.length);
+
+  if (addedPhotos.length && updatedPhotos.length)
+  {
+    $(".infos").append( '<ul><li><i class="eiw-icon icon-ok-circled"></i>' + infoTextAdd + ', ' + infoTextUpdate + '</li></ul>');
+  }
+  else
+  {
+    const infoText = addedPhotos.length ? infoTextAdd : infoTextUpdate;
+    $(".infos").append('<ul><li><i class="eiw-icon icon-ok-circled"></i>' + infoText + '</li></ul>');
+  }
+
+  if (!formatMode) {
+    html = sprintf(
+      albumSummary_label,
+      '<a href="admin.php?page=album-' + uploadCategory.id + '"> <i class="icon-folder-open"></i>' + uploadCategory.label + '</a>',
+      parseInt(uploadCategory.nb_photos)
+    );
+
+    $(".infos ul").append('<li><i class="eiw-icon icon-ok-circled"></i>' + html + '</li>');
+  }
+
+  $(".infos").show();
+
+  // TODO: use a new method pwg.caddie.empty +
+  // pwg.caddie.add(uploadedPhotos) instead of relying on huge GET parameter
+  // (and remove useless code from admin/photos_add_direct.php)
+
+  $(".batchLink").attr("href", "admin.php?page=photos_add&section=direct&batch=" + [...new Set(uploadedPhotos)].join(","));
+  $(".batchLink").html(sprintf(batch_Label, uploadedPhotos.length));
+
+  $(".afterUploadActions").show();
+}
 
 function add_related_category({ album, newSelectedAlbum }) {
   let text = '';

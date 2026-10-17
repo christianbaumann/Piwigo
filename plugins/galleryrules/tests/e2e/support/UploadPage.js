@@ -13,6 +13,10 @@ class UploadPage {
     this.uploadedThumbnails = page.locator('#uploadedPhotos img');
     this.startButton = page.locator('#startUpload');
     this.addFilesButton = page.locator('#addFiles');
+    this.cancelButton = page.locator('#cancelUpload');
+    this.uploadingActions = page.locator('#uploadingActions');
+    this.queueRows = page.locator('#uploader .plupload_filelist li.plupload_delete');
+    this.summary = page.locator('.infos');
   }
 
   /** @param {number} albumId the album the page opens with selected */
@@ -45,5 +49,16 @@ class UploadPage {
     await this.startButton.click();
   }
 }
+
+/**
+ * Adds files to the queue without starting the upload.
+ *
+ * @param {{name: string, mimeType: string, buffer: Buffer}[]} files
+ */
+UploadPage.prototype.addFiles = async function (files) {
+  const chooser = this.page.waitForEvent('filechooser');
+  await this.addFilesButton.click();
+  await (await chooser).setFiles(files);
+};
 
 module.exports = { UploadPage };
