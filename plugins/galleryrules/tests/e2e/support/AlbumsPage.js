@@ -15,6 +15,10 @@ class AlbumsPage {
     this.saveButton = page.locator('#AddAlbum .AddAlbumSubmit');
     // galleryrules' hint next to the name field.
     this.nameMissingHint = page.locator('#AddAlbum .galleryrules-album-name-missing');
+    this.deleteDialog = page.locator('#DeleteAlbum');
+    this.confirmDeleteButton = page.locator('#DeleteAlbum .DeleteAlbumSubmit');
+    this.cancelDeleteButton = page.locator('#DeleteAlbum .DeleteAlbumCancel');
+    this.deleteError = page.locator('#DeleteAlbum .DeleteAlbumErrors');
   }
 
   async goto() {
@@ -38,6 +42,16 @@ class AlbumsPage {
 
   async saveWithEnter() {
     await this.nameField.press('Enter');
+  }
+
+  /**
+   * Opens the delete dialog of an album from its row in the tree.
+   *
+   * @param {number} albumId
+   */
+  async openDeleteDialog(albumId) {
+    await this.page.locator(`.tree .move-cat-delete[data-id="${albumId}"]`).click();
+    await this.deleteDialog.waitFor({ state: 'visible' });
   }
 
   /**

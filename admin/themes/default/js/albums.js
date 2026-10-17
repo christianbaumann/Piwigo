@@ -556,6 +556,7 @@ function triggerDeleteAlbum(cat_id) {
 }
 
 function openDeleteAlbumPopIn(cat_to_delete) {
+  $(".DeleteAlbumErrors").hide();
   $("#DeleteAlbum").fadeIn();
   node = $(".tree").tree('getNodeById', cat_to_delete);
   if (node.children.length == 0) {
@@ -602,8 +603,13 @@ function openDeleteAlbumPopIn(cat_to_delete) {
         setSubcatsBadge(parentOfDeletedNode);
         closeDeleteAlbumPopIn();
       },
-      error: function(message) {
-        console.log(message);
+      error: function(xhr) {
+        console.log(xhr);
+        let message = "";
+        try {
+          message = JSON.parse(xhr.responseText).message;
+        } catch (e) {}
+        $(".DeleteAlbumErrors").text(message || xhr.statusText).show();
       }
     });
   })

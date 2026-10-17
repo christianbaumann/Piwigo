@@ -235,6 +235,7 @@ jQuery(document).ready(function() {
             .catch((err)=> {
               this.close()
               console.log(err)
+              show_save_error(err && err.message)
             })
             return false
           },
@@ -260,11 +261,19 @@ jQuery(document).ready(function() {
         success: function (raw_data) {
           res()
         },
-        error: function(message) {
-          rej(message)
+        error: function(xhr) {
+          rej(new Error(refusal_message(xhr)))
         }
       });
     })
+  }
+
+  function refusal_message(xhr) {
+    try {
+      return JSON.parse(xhr.responseText).message
+    } catch (e) {
+      return undefined
+    }
   }
 
   $('#refreshRepresentative').on('click', function(e) {
