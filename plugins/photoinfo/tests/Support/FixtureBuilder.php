@@ -482,6 +482,30 @@ class FixtureBuilder
         return html_entity_decode($m[1] !== '' ? $m[1] : ($m[2] ?? ''), ENT_QUOTES | ENT_XML1);
     }
 
+    /**
+     * Puts photoinfo's two XMP date tags into a fixture file, as the photo page
+     * writes them (null leaves a tag out), and asserts they are there.
+     */
+    public static function writeFileDate(string $file, ?string $edtf, ?string $xmpDate): void
+    {
+        $command = 'exiftool -config ' . escapeshellarg(PHOTOINFO_PATH . 'exiftool/pwginfo.config') . ' -q -overwrite_original';
+        if ($edtf !== null)
+        {
+            $command .= ' ' . escapeshellarg('-XMP-pwginfo:DateEDTF=' . $edtf);
+        }
+        if ($xmpDate !== null)
+        {
+            $command .= ' ' . escapeshellarg('-XMP-photoshop:DateCreated=' . $xmpDate);
+        }
+        self::run($command . ' ' . escapeshellarg($file));
+
+        $read = self::readDateTags($file);
+        if ($read['XMP-pwginfo:DateEDTF'] !== $edtf or $read['XMP-photoshop:DateCreated'] !== $xmpDate)
+        {
+            throw new RuntimeException("the date tags were not written into $file");
+        }
+    }
+
     /** Puts a DateTimeOriginal into a fixture file, as a camera or a scanner would, and asserts it is there. */
     public static function writeDateTimeOriginal(string $file, string $value): void
     {

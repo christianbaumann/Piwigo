@@ -94,6 +94,104 @@ final class SyncExifTest extends TestCase
         $this->assertSame(self::DATE, $result[self::FIELD]);
     }
 
+    /**
+     * [HAPPY] The date columns handed in go into the EXIF fields of the same
+     * name, which main.inc.php maps onto them, next to the date field; a NULL
+     * column stays NULL.
+     */
+    public function testTheDateColumnsTravelNextToTheDateField(): void
+    {
+        $columns = array('photoinfo_date_precision' => 'year', 'photoinfo_date_qualifier' => null);
+
+        $result = photoinfo_sync_exif(null, self::FIELD, self::STORED, $columns);
+
+        $this->assertSame(array(self::FIELD => self::STORED) + $columns, $result);
+    }
+
+    /** [NEG] Without a date to write, columns handed in are not written either. */
+    public function testWithoutADateNoColumnIsWritten(): void
+    {
+        $exif = array('Make' => 'Canon', self::FIELD => self::DATE);
+
+        $this->assertSame($exif, photoinfo_sync_exif($exif, self::FIELD, null, array('photoinfo_date_precision' => 'year')));
+    }
+
+    /** [ECP] The mapping main.inc.php adds: each of photoinfo's date columns, read from the field of its own name. */
+    public function testTheMappingNamesEachDateColumn(): void
+    {
+        $columns = array_keys(photoinfo_image_columns());
+        $this->assertGreaterThan(0, count($columns), 'anti-vacuity: photoinfo has date columns');
+
+        $this->assertSame(array_combine($columns, $columns), photoinfo_sync_mapping());
+        $this->assertArrayNotHasKey('date_creation', photoinfo_sync_mapping(), 'core already maps date_creation');
+    }
+
+    public static function fileDates(): array
+    {
+        // EDTF, DateCreated as exiftool -X prints it => date_creation, precision, qualifier, end, end precision
+        return array(
+            'EDTF range [HAPPY]' => array('1965/1970', '1965', array('1965-01-01 00:00:00', 'year', 'between', '1970-01-01', 'year')),
+            'EDTF circa month [HAPPY]' => array('1965-03~', '1965:03', array('1965-03-01 00:00:00', 'month', 'circa', null, null)),
+            'EDTF wins over DateCreated [ECP]' => array('../1950', '1965:03:12', array('1950-01-01 00:00:00', 'year', 'before', null, null)),
+            'DateCreated alone, a year [ECP]' => array(null, '1965', array('1965-01-01 00:00:00', 'year', null, null, null)),
+            'DateCreated alone, a month [ECP]' => array(null, '1965:03', array('1965-03-01 00:00:00', 'month', null, null, null)),
+            'DateCreated alone, a day [ECP]' => array(null, '1965:03:12', array('1965-03-12 00:00:00', 'day', null, null, null)),
+            'DateCreated with a time: the day [ECP]' => array(null, '2019:05:04 13:14:15+02:00', array('2019-05-04 00:00:00', 'day', null, null, null)),
+            'unreadable EDTF falls back to DateCreated [NEG]' => array('1965?', '1966', array('1966-01-01 00:00:00', 'year', null, null, null)),
+            'unreadable EDTF, no DateCreated [NEG]' => array('1965?', null, null),
+            'impossible DateCreated [BVA]' => array(null, '1965:02:29', null),
+            'DateCreated before 1800 [BVA]' => array(null, '1799', null),
+            'DateCreated as text [NEG]' => array(null, 'März 1965', null),
+            'neither tag [NEG]' => array(null, null, null),
+            );
+    }
+
+    /** What a sync takes from a file without a photoinfo date in its row: EDTF first, then DateCreated. */
+    #[DataProvider('fileDates')]
+    public function testTheFileGivesTheDateColumns(?string $edtf, ?string $dateCreated, ?array $expected): void
+    {
+        $columns = photoinfo_sync_file_columns(array('edtf' => $edtf, 'date_created' => $dateCreated), 2026, null);
+
+        $this->assertSame($expected === null ? null : array_combine(array_keys(photoinfo_dating_columns(null)), $expected), $columns);
+    }
+
+    /** [BVA] A stored date on the file's day keeps its time of day, as the rescan does; a day later does not. */
+    public function testAStoredDateOnTheSameDayKeepsItsTime(): void
+    {
+        $file = array('edtf' => '1965-03-12', 'date_created' => null);
+
+        $this->assertSame('1965-03-12 14:30:00', photoinfo_sync_file_columns($file, 2026, '1965-03-12 14:30:00')['date_creation']);
+        $this->assertSame('1965-03-12 00:00:00', photoinfo_sync_file_columns($file, 2026, '1965-03-13 14:30:00')['date_creation']);
+    }
+
+    /** [HAPPY] exiftool -X's two date tags, as exiftool 13.25 prints them (measured 2026-10-17). */
+    public function testTheXmlGivesBothDates(): void
+    {
+        $xml = "<?xml version='1.0' encoding='UTF-8'?>\n"
+            . "<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>\n\n"
+            . "<rdf:Description rdf:about='/tmp/t.png'\n"
+            . "  xmlns:et='http://ns.exiftool.org/1.0/' et:toolkit='Image::ExifTool 13.25'\n"
+            . "  xmlns:XMP-pwginfo='" . PHOTOINFO_RDF_GROUP_URI . "'\n"
+            . "  xmlns:XMP-photoshop='http://ns.exiftool.org/XMP/XMP-photoshop/1.0/'>\n"
+            . " <XMP-pwginfo:DateEDTF>1965-03~</XMP-pwginfo:DateEDTF>\n"
+            . " <XMP-photoshop:DateCreated>1965:03</XMP-photoshop:DateCreated>\n"
+            . "</rdf:Description>\n</rdf:RDF>\n";
+
+        $this->assertSame(array('edtf' => '1965-03~', 'date_created' => '1965:03'), photoinfo_parse_sync_date_xml($xml));
+    }
+
+    /** [NEG] A file with neither tag gives two nulls; output that is no XML gives null. */
+    public function testTheXmlWithoutDatesOrWithoutXml(): void
+    {
+        $xml = "<?xml version='1.0' encoding='UTF-8'?>\n"
+            . "<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>\n"
+            . "<rdf:Description rdf:about='/tmp/u.png'/>\n</rdf:RDF>\n";
+
+        $this->assertSame(array('edtf' => null, 'date_created' => null), photoinfo_parse_sync_date_xml($xml));
+        $this->assertNull(photoinfo_parse_sync_date_xml(''));
+        $this->assertNull(photoinfo_parse_sync_date_xml('Error: File not found'));
+    }
+
     public static function paths(): array
     {
         // file (as the sync builds it: root prefix + images.path), root prefix => images.path

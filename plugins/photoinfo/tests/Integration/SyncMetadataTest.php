@@ -201,6 +201,96 @@ final class SyncMetadataTest extends TestCase
         $this->assertSame($before, $this->dateColumns($image['id']));
     }
 
+    /**
+     * [HAPPY] A file the photo page dated, added again by the filesystem sync:
+     * its metadata sync (only photos never synced, as the deploy runs it) takes
+     * the whole date from XMP-pwginfo:DateEDTF, range end included. Was
+     * SES-2026-10-14-18.
+     */
+    public function testAReAddedFileGetsTheDateThePhotoPageWroteIntoIt(): void
+    {
+        $image = $this->fixture->createPhysicalTestImage('png');
+        FixtureBuilder::writeFileDate($image['file'], '1965/1970', '1965');
+        $this->assertNull($this->fixture->imageRow($image['id'])['date_creation'], 'anti-vacuity: no date before the sync');
+        $this->assertNull($this->fixture->imageRow($image['id'])['date_metadata_update'], 'anti-vacuity: never synced');
+
+        $this->siteSync($image['album'], false);
+
+        $this->assertNotNull($this->fixture->imageRow($image['id'])['date_metadata_update'], 'the filesystem sync did not run');
+        $this->assertSame(array(
+            'date_creation' => '1965-01-01 00:00:00',
+            'photoinfo_date_qualifier' => 'between',
+            'photoinfo_date_precision' => 'year',
+            'photoinfo_date_end' => '1970-01-01',
+            'photoinfo_date_end_precision' => 'year',
+            ), $this->dateColumns($image['id']));
+        $this->assertSame("1965\u{2013}1970", $this->shown($image['id']));
+    }
+
+    /**
+     * [ECP] A file with only XMP-photoshop:DateCreated, as another program
+     * writes it: the sync takes its month as an exact month, no qualifier.
+     */
+    public function testAFileWithOnlyDateCreatedGetsThatDate(): void
+    {
+        $image = $this->fixture->createTestImage();
+        FixtureBuilder::writeFileDate($image['file'], null, '1965-03');
+
+        $this->sync($image['id']);
+
+        $row = $this->fixture->imageRow($image['id']);
+        $this->assertSame('1965-03-01 00:00:00', $row['date_creation']);
+        $this->assertSame('month', $row['photoinfo_date_precision']);
+        $this->assertNull($row['photoinfo_date_qualifier']);
+        $this->assertSame("M\u{e4}rz 1965", $this->shown($image['id']));
+    }
+
+    /** [ECP] EDTF wins over DateCreated, and a camera date, when they disagree. */
+    public function testTheEdtfWinsOverDateCreatedAndTheCameraDate(): void
+    {
+        $image = $this->fixture->createTestImageAs('jpg');
+        FixtureBuilder::writeExifDate($image['file'], self::CAMERA_DATE, true);
+        FixtureBuilder::writeFileDate($image['file'], '1965~', '1970');
+
+        $this->sync($image['id']);
+
+        $this->assertSame('ca. 1965', $this->shown($image['id']));
+    }
+
+    /**
+     * [HAPPY] For a HEIC with a JPEG representative core reads the
+     * representative, but photoinfo wrote the date into the HEIC: the date is
+     * read from the photo's own file.
+     */
+    public function testAHeicsDateIsReadFromTheHeicNotItsRepresentative(): void
+    {
+        $image = $this->fixture->createTestImageAs('heic');
+        $representative = $this->fixture->addRepresentative($image);
+        FixtureBuilder::writeFileDate($image['file'], '1965-03', null);
+        $this->assertNull(FixtureBuilder::readDateTags($representative)['XMP-pwginfo:DateEDTF'], 'anti-vacuity: the representative has no date');
+
+        $this->sync($image['id']);
+
+        $this->assertSame("M\u{e4}rz 1965", $this->shown($image['id']));
+    }
+
+    /** [NEG] A simulated filesystem sync writes no date, though it reads the file. */
+    public function testASimulatedSyncWritesNoDate(): void
+    {
+        $image = $this->fixture->createPhysicalTestImage('png');
+        FixtureBuilder::writeFileDate($image['file'], '1965', '1965');
+        $before = $this->dateColumns($image['id']);
+
+        $this->siteSync($image['album'], true);
+
+        $this->assertNull($this->fixture->imageRow($image['id'])['date_metadata_update'], 'a simulation wrote the row');
+        $this->assertSame($before, $this->dateColumns($image['id']));
+
+        // anti-vacuity: the same request without simulate does write the date
+        $this->siteSync($image['album'], false);
+        $this->assertSame('1965', $this->shown($image['id']));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function sync(int $imageId): void
@@ -211,6 +301,25 @@ final class SyncMetadataTest extends TestCase
             ));
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
         $this->assertSame(1, (int)($res['json']['result']['nb_synchronized'] ?? 0), $res['body']);
+    }
+
+    /**
+     * The filesystem sync's metadata step over one album, for photos never
+     * synced (no meta_all), as the deploy posts it.
+     */
+    private function siteSync(int $albumId, bool $simulate): void
+    {
+        $fields = array(
+            'sync' => 'metadata',
+            'cat' => $albumId,
+            'sync_meta' => '1',
+            'submit' => 'Submit',
+            );
+        if ($simulate)
+        {
+            $fields['simulate'] = '1';
+        }
+        $this->ws->postPage('/admin.php?page=site_update&site=1', $fields);
     }
 
     /** The photo's date as the picture page shows it. */

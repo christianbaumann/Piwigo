@@ -37,7 +37,11 @@ add_event_handler('ws_add_methods', 'photoinfo_add_methods');
 add_event_handler('provenance_caption_parts', 'photoinfo_caption_parts_handler',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/writer.inc.php');
 
-// Keeps a metadata sync from replacing the photo's date with a scan date.
+// Keeps a metadata sync from replacing the photo's date with a scan date, and
+// lets it take the date photoinfo wrote into the file, with the date columns
+// it maps (decision 0075).
+global $conf;
+$conf['use_exif_mapping'] += photoinfo_sync_mapping();
 add_event_handler('format_exif_data', 'photoinfo_format_exif_data',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_sync.inc.php');
 

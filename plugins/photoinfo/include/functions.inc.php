@@ -276,12 +276,18 @@ function photoinfo_date_day($date_creation)
  * Without one, the file's date is dropped unless the file carries camera
  * metadata (Make or Model): on a scan, the file's date is the scan date.
  *
+ * The date handed in, photoinfo's own or the one its file carries in
+ * photoinfo's tags, travels with photoinfo's date columns, each in the EXIF
+ * field of its own name (photoinfo_sync_mapping()).
+ *
  * @param array|null $exif what core read from the file; null when it read nothing
  * @param string|null $date_field the EXIF field mapped to date_creation
- * @param string|null $stored_date the photo's date_creation when photoinfo set it
+ * @param string|null $stored_date the date_creation photoinfo set, or the file's
+ *   photoinfo date (photoinfo_sync_file_columns())
+ * @param array $columns photoinfo's date columns going with it, column => value
  * @return array|null
  */
-function photoinfo_sync_exif($exif, $date_field, $stored_date)
+function photoinfo_sync_exif($exif, $date_field, $stored_date, $columns = array())
 {
   if ($date_field === null)
   {
@@ -292,6 +298,10 @@ function photoinfo_sync_exif($exif, $date_field, $stored_date)
   {
     $exif = is_array($exif) ? $exif : array();
     $exif[$date_field] = $stored_date;
+    foreach ($columns as $column => $value)
+    {
+      $exif[$column] = $value;
+    }
     return $exif;
   }
 
@@ -310,6 +320,86 @@ function photoinfo_sync_exif($exif, $date_field, $stored_date)
 
   unset($exif[$date_field]);
   return $exif;
+}
+
+/**
+ * photoinfo's date columns as entries of $conf['use_exif_mapping'], each read
+ * from the EXIF field of its own name, which only photoinfo_sync_exif() fills.
+ * So a metadata sync writes them in the same row update as date_creation, and
+ * a simulated sync writes none of them (decision 0075).
+ *
+ * @return array column => field
+ */
+function photoinfo_sync_mapping()
+{
+  $columns = array_keys(photoinfo_image_columns());
+  return array_combine($columns, $columns);
+}
+
+/**
+ * The date columns a file without a photoinfo date in its row gives a sync:
+ * XMP-pwginfo:DateEDTF when photoinfo can read it, else the day, month or year
+ * of XMP-photoshop:DateCreated as an exact date, its time of day dropped. A
+ * stored date_creation on the same day keeps its time, as in the rescan.
+ *
+ * @param array $file_dates photoinfo_parse_sync_date_xml()'s answer
+ * @param int $current_year
+ * @param string|null $stored_date the row's date_creation
+ * @return array|null photoinfo_dating_columns(); null for no readable date
+ */
+function photoinfo_sync_file_columns($file_dates, $current_year, $stored_date)
+{
+  $dating = null;
+  if ($file_dates['edtf'] !== null)
+  {
+    $dating = photoinfo_dating_from_edtf($file_dates['edtf'], $current_year)['dating'];
+  }
+  if ($dating === null and $file_dates['date_created'] !== null
+    and preg_match('~^(\d{4})(?:[:-](\d{2})(?:[:-](\d{2}))?)?(?:[ T]|$)~', trim($file_dates['date_created']), $m))
+  {
+    $m = array_pad($m, 4, '');
+    $dating = photoinfo_dating_from_input('', array($m[1], $m[2], $m[3]), array('', '', ''), $current_year)['dating'];
+  }
+  if ($dating === null)
+  {
+    return null;
+  }
+
+  $columns = photoinfo_dating_columns($dating);
+  if (photoinfo_date_day($stored_date) === photoinfo_date_day($columns['date_creation']))
+  {
+    $columns['date_creation'] = $stored_date;
+  }
+  return $columns;
+}
+
+/** exiftool -X's namespace of XMP-photoshop:DateCreated. */
+define('PHOTOINFO_XMP_PHOTOSHOP_URI', 'http://ns.exiftool.org/XMP/XMP-photoshop/1.0/');
+
+/**
+ * The two date tags out of exiftool -X's output.
+ *
+ * @param string $xml
+ * @return array|null array('edtf' => string|null, 'date_created' => string|null);
+ *   null when the output is no XML
+ */
+function photoinfo_parse_sync_date_xml($xml)
+{
+  $document = new DOMDocument();
+  if (trim((string)$xml) === '' or !@$document->loadXML($xml, LIBXML_NONET))
+  {
+    return null;
+  }
+
+  $values = array();
+  foreach (array('edtf' => array(PHOTOINFO_RDF_GROUP_URI, 'DateEDTF'),
+    'date_created' => array(PHOTOINFO_XMP_PHOTOSHOP_URI, 'DateCreated')) as $key => $tag)
+  {
+    $nodes = $document->getElementsByTagNameNS($tag[0], $tag[1]);
+    $value = $nodes->length > 0 ? $nodes->item(0)->textContent : '';
+    $values[$key] = $value === '' ? null : $value;
+  }
+  return $values;
 }
 
 /**
