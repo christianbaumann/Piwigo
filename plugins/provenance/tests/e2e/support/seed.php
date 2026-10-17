@@ -17,6 +17,7 @@
  *   php tests/e2e/support/seed.php --scenario=photo-provenance
  *   php tests/e2e/support/seed.php --scenario=writeback
  *   php tests/e2e/support/seed.php --scenario=move
+ *   php tests/e2e/support/seed.php --scenario=album-tree
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -382,9 +383,9 @@ if (isset($args['read-photo']))
 // ── Seed ──────────────────────────────────────────────────────────────────
 
 $scenario = $args['scenario'] ?? null;
-if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback', 'move'), true))
+if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback', 'move', 'album-tree'), true))
 {
-    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback, move');
+    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback, move, album-tree');
 }
 
 // Carry forward anything an earlier seed in this test already recorded, so a
@@ -406,7 +407,35 @@ $originalDisplayInfo = $existing['display_info'] ?? read_display_info($db);
 force_display_info($db);
 
 $destination = null;
-if ($scenario === 'writeback')
+if ($scenario === 'album-tree')
+{
+    // The album properties screen's parent picker: an album with a child and a
+    // grandchild, which it must not offer, and an unrelated album it must. No
+    // photos - the move this scenario drives rearranges albums only, and every
+    // album is a throwaway, so a real album is never moved.
+    $catId = $builder->createTestAlbum('provenance E2E tree parent');
+    $childId = $builder->createTestSubAlbum('provenance E2E tree child', $catId);
+    $tree = array(
+        'child_id' => $childId,
+        'child_name' => 'provenance E2E tree child',
+        'grandchild_id' => $builder->createTestSubAlbum('provenance E2E tree grandchild', $childId),
+        'grandchild_name' => 'provenance E2E tree grandchild',
+        'other_id' => $builder->createTestAlbum('provenance E2E tree other'),
+        'other_name' => 'provenance E2E tree other',
+        );
+
+    // No photo, so none of the provenance steps below apply: snapshot and report here.
+    save_snapshot(array(
+        'state' => $builder->exportState(),
+        'test_objects' => $builder->exportTestObjects(),
+        'album_id' => $catId,
+        'display_info' => $originalDisplayInfo,
+        'history_id' => $existing['history_id'] ?? history_high_water($db),
+        ));
+    echo json_encode(array('scenario' => $scenario, 'album_id' => $catId, 'tree' => $tree)), "\n";
+    exit(0);
+}
+elseif ($scenario === 'writeback')
 {
     // The write-back writes every photo of the album it is started from, so it
     // is never pointed at an album holding real scans. This album holds copies

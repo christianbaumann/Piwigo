@@ -15,7 +15,7 @@ $(window).on('keypress', function(e) {
  * @param {Boolean} showRootButton - Flag to indicate whether to show the "root" button.
  * @param {Boolean} adminMode - Flag to indicate if the selector is in admin mode.
  * @param {Number} limitParam - Maximum number of results to retrieve.
- * @param {Number} currentAlbumId - ID of the currently selected album. (Only if you use ShowRootButton to keep one album always selected)
+ * @param {Number} currentAlbumId - ID of the currently selected album. (Only if you use ShowRootButton to keep one album always selected). The album's own sub-albums are not offered.
  * @param {String} modalTitle - Custom title for the album selector modal.
  * @param {String} modalSearchPlaceholder - Custom placeholder text for the search input in the modal.
  */
@@ -481,6 +481,7 @@ class AlbumSelector {
     const iconAlbum = this.#isAlbumCreationChecked ? 'icon-add-album' : 'gallery-icon-plus-circled';
     const tempSelectedCat = this.#current_cat ? [...this.#selected_categories, this.#current_cat.toString()] : [...this.#selected_categories];
 
+    cats = cats.filter(c => !this.#isSubAlbumOfCurrent(c));
     this.#cats = { ...this.#cats, ...Object.fromEntries(cats.map(c => [c.id, c])) };
     let display_div = $('#subcat-' + rank);
     if ('root' == rank) {
@@ -492,7 +493,7 @@ class AlbumSelector {
 
     cats.forEach(cat => {
       let subcat = '';
-      if (cat.nb_categories > 0) {
+      if (cat.nb_categories > 0 && String(cat.id) !== String(this.#current_cat)) {
         subcat = `<span id="${cat.id}" class="display-subcat gallery-icon-up-open"></span>`
       }
 
@@ -543,6 +544,7 @@ class AlbumSelector {
     const iconAlbum = this.#isAlbumCreationChecked ? 'icon-add-album' : 'gallery-icon-plus-circled';
     const tempSelectedCat = this.#current_cat ? [...this.#selected_categories, this.#current_cat.toString()] : [...this.#selected_categories];
 
+    cats = cats.filter(c => !this.#isSubAlbumOfCurrent(c));
     this.#searchCat = Object.fromEntries(cats.map(c => [c.id, c]));
     AlbumSelector.selectors.searchResult.empty();
 
@@ -570,6 +572,12 @@ class AlbumSelector {
     });
 
     !this.#isAlbumCreationChecked && this.#loadFillResultEvent(tempSelectedCat);
+  }
+
+  #isSubAlbumOfCurrent(cat) {
+    return this.#current_cat
+      && String(cat.id) !== String(this.#current_cat)
+      && String(cat.uppercats).split(',').includes(String(this.#current_cat));
   }
 
   #getEllipsisName(str, lenght = 50) {

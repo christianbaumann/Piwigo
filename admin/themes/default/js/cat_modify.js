@@ -2,6 +2,7 @@ jQuery(document).ready(function() {
   
   activateCommentDropdown();
   checkAlbumLock();
+  let default_parent_html = $("#cat-parent").html();
   const ab = new AlbumSelector({ 
     selectedCategoriesIds: related_categories_ids,
     selectAlbum: add_related_category,
@@ -71,91 +72,92 @@ jQuery(document).ready(function() {
     save_button_set_loading(true)
     $('.info-error,.info-message').hide()
 
-    jQuery.ajax({
-      url: "ws.php?format=json&method=pwg.categories.setInfo",
-      type:"POST",
-      dataType: "json",
-      data: {
-        category_id: album_id,
-        name: $("#cat-name").val(),
-        comment: $("#cat-comment").val(),
-        visible: $("#cat-locked").is(":checked") ? 'false' : 'true',
-        commentable: $("#cat-commentable").is(":checked") ? "true":"false",
-        pwg_token: pwg_token,
-      },
-      success:function(data) {
-        if (data.stat == "ok") {
-          save_button_set_loading(false)
+    set_album_info()
+      .then(() => {
+        $('.cat-modification .cat-modify-info-content').html(str_just_now)
+        $('.cat-modification .cat-modify-info-subcontent').html('')
 
-          $('.info-message').show()
-          $('.cat-modification .cat-modify-info-subcontent').html(str_just_now)
-          $('.cat-modification .cat-modify-info-content').html(str_just_now)
+        is_visible = $("#cat-locked").is(":checked") ? 'false' : 'true';
+        checkAlbumLock();
 
-          is_visible = $("#cat-locked").is(":checked") ? 'false' : 'true';
-          checkAlbumLock();
-
-          setTimeout(
-            function() {
-              $('.info-message').hide()
-            }, 
-            5000
-          )
-        } else {
-          $('.info-error').show()
-          setTimeout(
-            function() {
-              $('.info-error').hide()
-            }, 
-            5000
-          )
-        }
-      },
-      error:function(XMLHttpRequest, textStatus, errorThrows) {
+        return move_album()
+      })
+      .then(() => {
         save_button_set_loading(false)
+        $('.info-message').show()
+        setTimeout(() => $('.info-message').hide(), 5000)
+      })
+      .catch((message) => {
+        save_button_set_loading(false)
+        show_save_error(message)
+      })
+  })
 
-        $('.info-error').show()
-        setTimeout(
-          function() {
-            $('.info-error').hide()
-          }, 
-          5000
-        )
-        console.log(errorThrows);
-      }
-    });
-
-    if (parent_album != default_parent_album) {
+  function ws_post(method, data) {
+    return new Promise((resolve, reject) => {
       jQuery.ajax({
-        url: "ws.php?format=json&method=pwg.categories.move",
-        type:"POST",
+        url: "ws.php?format=json&method=" + method,
+        type: "POST",
         dataType: "json",
-        data: {
-          category_id: album_id,
-          parent: parent_album,
-          pwg_token: pwg_token,
-        },
-        success: function (data) {
-          if (data.stat === "ok") {
-            $(".cat-modify-ariane").html(
-              data.result.new_ariane_string
-            )
-            default_parent_album = parent_album;
+        data: { ...data, pwg_token: pwg_token },
+        success: (result) => {
+          if (result.stat === "ok") {
+            resolve(result)
           } else {
-            $('.info-error').show()
-            setTimeout(
-              function() {
-                $('.info-error').hide()
-              }, 
-              5000
-            )
+            reject(result.message)
           }
         },
-        error: function(e) {
-          console.log(e.message);
-        }
-      });
+        error: (xhr, textStatus, errorThrown) => {
+          console.log(errorThrown)
+          reject(xhr.responseJSON && xhr.responseJSON.message)
+        },
+      })
+    })
+  }
+
+  function set_album_info() {
+    return ws_post("pwg.categories.setInfo", {
+      category_id: album_id,
+      name: $("#cat-name").val(),
+      comment: $("#cat-comment").val(),
+      visible: $("#cat-locked").is(":checked") ? 'false' : 'true',
+      commentable: $("#cat-commentable").is(":checked") ? "true":"false",
+    })
+  }
+
+  function move_album() {
+    if (parent_album == default_parent_album) {
+      return Promise.resolve()
     }
-  })
+
+    return ws_post("pwg.categories.move", {
+      category_id: album_id,
+      parent: parent_album,
+    })
+      .then((result) => {
+        $(".cat-modify-ariane").html(result.result.new_ariane_string)
+        default_parent_album = parent_album
+        default_parent_html = $("#cat-parent").html()
+      })
+      .catch((message) => {
+        parent_album = default_parent_album
+        $("#cat-parent").html(default_parent_html)
+        return Promise.reject(message)
+      })
+  }
+
+  function show_save_error(message) {
+    const error = $('.info-error')
+    const default_text = error.text()
+    if (message) {
+      error.text(message)
+    }
+    error.show()
+    setTimeout(() => {
+      error.hide()
+      error.text(default_text)
+    }, 5000)
+  }
 
   function save_button_set_loading(state = true) {
     if (state) {

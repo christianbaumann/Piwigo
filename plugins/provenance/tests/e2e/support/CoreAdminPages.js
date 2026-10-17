@@ -17,11 +17,38 @@ class AlbumSettingsPage {
     this.saveButton = page.locator('#cat-properties-save');
     this.confirmation = page.locator('#cat-modify .info-message');
     this.error = page.locator('#cat-modify .info-error');
+
+    this.parentField = page.locator('#cat-parent');
+    this.ariane = page.locator('.cat-modify-ariane');
+    this.picker = page.locator('#addLinkedAlbum');
+    this.pickerSearch = page.locator('#search-input-ab');
+    this.modifiedCard = page.locator('.cat-modification');
+    this.modifiedContent = page.locator('.cat-modification .cat-modify-info-content');
+    this.modifiedSubcontent = page.locator('.cat-modification .cat-modify-info-subcontent');
   }
 
   async goto(albumId) {
     await this.page.goto(`/admin.php?page=album-${albumId}-properties`);
     await this.saveButton.waitFor({ state: 'visible' });
+  }
+
+  async openPicker() {
+    await this.parentField.click();
+    await this.picker.waitFor({ state: 'visible' });
+  }
+
+  /** The picker's row for one album, in the browsable list (not the search). */
+  pickerRow(albumId) {
+    return this.picker.locator(`.prefill-results-item[id="${albumId}"]`);
+  }
+
+  /** The picker's row for one album, after a search. */
+  searchRow(albumId) {
+    return this.picker.locator(`#searchResult .search-result-item[id="${albumId}"]`);
+  }
+
+  pickerExpander(albumId) {
+    return this.picker.locator(`.display-subcat[id="${albumId}"]`);
   }
 }
 
