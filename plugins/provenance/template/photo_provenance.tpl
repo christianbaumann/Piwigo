@@ -10,7 +10,7 @@ const provenance_str_error = '{'Provenance could not be saved'|@translate|escape
 
 <div id="provenance-photo-wrap">
     <p id="provenance-photo">
-      <strong>{'Provenance'|@translate}</strong>
+      <strong id="provenance-photo-heading" role="heading" aria-level="3">{'Provenance'|@translate}</strong>
       <br>
       <span class="provenance-inherited">
         <span>{'Physical album'|@translate}: {$PROVENANCE_PHOTO.PHYSICAL_ALBUM|escape}</span>
@@ -20,7 +20,7 @@ const provenance_str_error = '{'Provenance could not be saved'|@translate|escape
       </span>
       <label for="provenance-photo-note">{'Note'|@translate}</label>
       <textarea rows="3" id="provenance-photo-note" class="description">{$PROVENANCE_PHOTO.NOTE|escape}</textarea>
-      <span class="buttonLike" id="provenance-photo-save"><i class="icon-floppy"></i> {'Save Settings'|@translate}</span>
+      <span class="buttonLike" id="provenance-photo-save"><i class="icon-floppy"></i> {'Save note'|@translate}</span>
       <span id="provenance-photo-message"></span>
     </p>
 </div>

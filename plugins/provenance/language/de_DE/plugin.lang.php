@@ -8,6 +8,7 @@ $lang['Provenance saved'] = 'Herkunft gespeichert';
 $lang['Provenance could not be saved'] = 'Herkunft konnte nicht gespeichert werden';
 $lang['Album note'] = 'Albumnotiz';
 $lang['Note'] = 'Notiz';
+$lang['Save note'] = 'Notiz speichern';
 $lang['Apply to %d photos'] = 'Auf %d Fotos anwenden';
 $lang['Applying provenance to %d photos...'] = 'Herkunft wird auf %d Fotos angewendet...';
 $lang['Provenance applied to %d photos'] = 'Herkunft auf %d Fotos angewendet';

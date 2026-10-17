@@ -27,6 +27,9 @@ class PhotoPropertiesPage {
     this.note = page.locator('#provenance-photo-note');
     this.saveButton = page.locator('#provenance-photo-save');
     this.message = page.locator('#provenance-photo-message');
+    this.heading = page.locator('#provenance-photo-heading');
+    /** Core's own save button in the fixed save bar of the photo form. */
+    this.coreSaveButton = page.locator('#pictureModify button[name="submit"]');
     this.description = page.locator('#pictureModify #description');
     /** The block when core's photo form contains it - there must be none. */
     this.blockInsideCoreForm = page.locator('#pictureModify #provenance-photo');

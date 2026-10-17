@@ -92,6 +92,21 @@ test.describe('photo provenance block', () => {
     await expect(photo.blockInsideCoreForm).toHaveCount(0);
   });
 
+  test('the note has its own heading and button, apart from core\'s save button', async ({ page }) => {
+    const fixture = seed('photo-provenance');
+
+    const photo = new PhotoPropertiesPage(page);
+    await photo.goto(fixture.photo.id);
+
+    await expect(photo.heading).toBeVisible();
+    await expect(photo.heading).toHaveText('Herkunft');
+    await expect(photo.saveButton).toHaveText(/Notiz speichern/);
+    await expect(photo.coreSaveButton).toHaveText(/Einstellungen sichern/);
+    // Exactly one of each label on the page: no second "Einstellungen sichern".
+    await expect(page.getByText('Einstellungen sichern')).toHaveCount(1);
+    await expect(page.getByText('Notiz speichern')).toHaveCount(1);
+  });
+
   test('the album-sourced values are shown but not editable', async ({ page }) => {
     const fixture = seed('photo-provenance');
 

@@ -8,6 +8,7 @@ $lang['Provenance saved'] = 'Provenance saved';
 $lang['Provenance could not be saved'] = 'Provenance could not be saved';
 $lang['Album note'] = 'Album note';
 $lang['Note'] = 'Note';
+$lang['Save note'] = 'Save note';
 $lang['Apply to %d photos'] = 'Apply to %d photos';
 $lang['Applying provenance to %d photos...'] = 'Applying provenance to %d photos...';
 $lang['Provenance applied to %d photos'] = 'Provenance applied to %d photos';
