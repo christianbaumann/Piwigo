@@ -52,6 +52,46 @@ test.describe('photo provenance block', () => {
     await expect(photo.note).toHaveValue(edited);
   });
 
+  test('saving the note leaves no unsaved-changes warning on leaving', async ({ page }) => {
+    const fixture = seed('photo-provenance');
+
+    const photo = new PhotoPropertiesPage(page);
+    await photo.goto(fixture.photo.id);
+    const dialogs = photo.collectBeforeUnloadDialogs();
+
+    await photo.note.fill('Notiz ohne Warnung beim Verlassen');
+    await photo.saveButton.click();
+    await expect(photo.message).not.toBeEmpty();
+    await expect(photo.message).not.toHaveClass(/provenance-error/);
+
+    await photo.leave();
+    expect(dialogs()).toBe(0);
+  });
+
+  test('editing a core field still warns on leaving', async ({ page }) => {
+    const fixture = seed('photo-provenance');
+
+    const photo = new PhotoPropertiesPage(page);
+    await photo.goto(fixture.photo.id);
+    const dialogs = photo.collectBeforeUnloadDialogs();
+
+    await photo.description.fill('geaendert, nicht gespeichert');
+    await photo.description.blur();
+
+    await photo.leave();
+    expect(dialogs()).toBe(1);
+  });
+
+  test('the note block sits outside the core photo form', async ({ page }) => {
+    const fixture = seed('photo-provenance');
+
+    const photo = new PhotoPropertiesPage(page);
+    await photo.goto(fixture.photo.id);
+
+    await expect(photo.block).toBeVisible();
+    await expect(photo.blockInsideCoreForm).toHaveCount(0);
+  });
+
   test('the album-sourced values are shown but not editable', async ({ page }) => {
     const fixture = seed('photo-provenance');
 

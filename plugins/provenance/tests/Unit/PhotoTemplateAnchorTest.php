@@ -37,22 +37,24 @@ final class PhotoTemplateAnchorTest extends TestCase
         $this->assertSame(
             1,
             substr_count($this->template(), PROVENANCE_TPL_PHOTO_ANCHOR),
-            'the photo savebar anchor no longer matches picture_modify.tpl - the prefilter injects nothing'
+            'the photo anchor no longer matches picture_modify.tpl - the prefilter injects nothing'
         );
     }
 
     /**
-     * [BVA] The anchor sits after the form's last field, so the injected block
-     * lands among the photo's own properties rather than ahead of them.
+     * [BVA] The anchor sits after the close of the photo form, so the injected
+     * block is outside it and core's unsaved-changes tracking never sees the
+     * Notiz field.
      */
-    public function testAnchorFollowsThePhotoFormFields(): void
+    public function testAnchorFollowsTheClosingOfThePhotoForm(): void
     {
         $content = $this->template();
 
         $anchorAt = strpos($content, PROVENANCE_TPL_PHOTO_ANCHOR);
-        $lastFieldAt = strrpos($content, 'id="description"');
+        $formCloseAt = strrpos($content, '</form>');
 
-        $this->assertNotFalse($lastFieldAt, 'the photo description field is gone; the layout assumption no longer holds');
-        $this->assertGreaterThan($lastFieldAt, $anchorAt);
+        $this->assertNotFalse($formCloseAt, 'the photo form is gone; the layout assumption no longer holds');
+        $this->assertSame(1, substr_count($content, '</form>'), 'a second form makes "after the last </form>" ambiguous');
+        $this->assertGreaterThan($formCloseAt, $anchorAt);
     }
 }

@@ -831,8 +831,14 @@ define('PROVENANCE_TPL_ALBUM_ANCHOR', '<span class="buttonLike" id="cat-properti
  */
 define('PROVENANCE_TPL_BATCH_MOVE_ANCHOR', '<div id="action_move" class="bulkAction">');
 
-/** Injection point on the photo properties screen: immediately before its save bar. */
-define('PROVENANCE_TPL_PHOTO_ANCHOR', '<div class="savebar-footer">');
+/**
+ * Injection point on the photo properties screen: immediately before the album
+ * selector include, which follows the close of <form id="pictureModify">.
+ * Core's unsaved-changes tracking watches every input inside that form and the
+ * Notiz saves over AJAX, so inside the form leaving the page warned after a
+ * successful save.
+ */
+define('PROVENANCE_TPL_PHOTO_ANCHOR', "{include file='include/album_selector.inc.tpl'}");
 
 /**
  * Injection point on the public picture page: the close of <dl id="standard">,

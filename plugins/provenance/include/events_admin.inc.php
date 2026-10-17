@@ -173,7 +173,7 @@ SELECT '.implode(', ', $columns).'
 }
 
 /**
- * Injects the block immediately before the photo screen's save bar.
+ * Injects the block immediately after the photo form, outside it (before the album selector include).
  *
  * @param string $content
  * @return string

@@ -8,6 +8,7 @@ const provenance_str_saved = '{'Provenance saved'|@translate|escape:javascript}'
 const provenance_str_error = '{'Provenance could not be saved'|@translate|escape:javascript}';
 {/footer_script}
 
+<div id="provenance-photo-wrap">
     <p id="provenance-photo">
       <strong>{'Provenance'|@translate}</strong>
       <br>
@@ -22,4 +23,4 @@ const provenance_str_error = '{'Provenance could not be saved'|@translate|escape
       <span class="buttonLike" id="provenance-photo-save"><i class="icon-floppy"></i> {'Save Settings'|@translate}</span>
       <span id="provenance-photo-message"></span>
     </p>
-
+</div>

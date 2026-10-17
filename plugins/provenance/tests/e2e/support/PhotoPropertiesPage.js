@@ -27,6 +27,31 @@ class PhotoPropertiesPage {
     this.note = page.locator('#provenance-photo-note');
     this.saveButton = page.locator('#provenance-photo-save');
     this.message = page.locator('#provenance-photo-message');
+    this.description = page.locator('#pictureModify #description');
+    /** The block when core's photo form contains it - there must be none. */
+    this.blockInsideCoreForm = page.locator('#pictureModify #provenance-photo');
+  }
+
+  /**
+   * Counts the beforeunload dialogs the page raises; each is dismissed so
+   * leaving proceeds.
+   * @returns {() => number}
+   */
+  collectBeforeUnloadDialogs() {
+    let count = 0;
+    this.page.on('dialog', async (dialog) => {
+      if (dialog.type() === 'beforeunload') {
+        count++;
+      }
+      await dialog.accept();
+    });
+    return () => count;
+  }
+
+  /** Navigates away, which raises beforeunload when the form counts unsaved edits. */
+  async leave() {
+    await this.page.goto('/admin.php?page=intro');
+    await this.page.waitForLoadState('domcontentloaded');
   }
 
   /** @param {number} imageId */

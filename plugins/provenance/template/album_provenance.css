@@ -65,3 +65,16 @@
 #provenance-photo-message.provenance-error {
   color: #c00;
 }
+
+/* The photo screen's block sits below core's form, not inside it, so it clears
+   the fixed save bar itself. */
+#provenance-photo-wrap {
+  margin: 30px 30px 100px;
+  text-align: left;
+}
+
+#provenance-photo-wrap #provenance-photo-note {
+  width: 100%;
+  max-width: 45%;
+  box-sizing: border-box;
+}
