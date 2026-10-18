@@ -127,6 +127,51 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $this->assertSame(1, $summary['errors']);
     }
 
+    /**
+     * [ERR] [ECP] A photo stored in a kept album but linked only into a removed
+     * folder is not deleted with it, so it is not counted.
+     *
+     * Oracle: the sync calls delete_categories() in its default 'no_delete' mode
+     * (admin/site_update.php), which deletes the photos stored in the removed
+     * folders and only drops the links of the others. No requirement confirms
+     * this; task 47 assumed the opposite and this records what core does.
+     */
+    public function testAPhotoStoredElsewhereSurvivesAndIsNotCounted(): void
+    {
+        $sub = $this->syncedSubFolderBesideAKeptPhoto();
+        $this->db->query("DELETE FROM piwigo_image_category WHERE image_id = {$sub['kept']}");
+        $this->db->query("INSERT INTO piwigo_image_category (image_id, category_id) VALUES ({$sub['kept']}, {$sub['id']})");
+        $this->removeFolder($sub);
+
+        $simulated = $this->summary($this->sync($sub['parent'], true));
+        $this->assertSame(1, $simulated['deleted_photos'], 'only the photo stored in the folder');
+
+        $real = $this->summary($this->sync($sub['parent'], false));
+
+        $this->assertSame(1, $real['deleted_albums']);
+        $this->assertSame(1, $real['deleted_photos'], 'only the photo stored in the folder');
+        $this->assertSame(
+            1,
+            (int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_images WHERE id = {$sub['kept']}"),
+            'the photo stored in the kept album is still there'
+        );
+    }
+
+    /** [ERR] [ECP] A photo stored in the removed folder and linked elsewhere too is deleted and counted. */
+    public function testAPhotoStoredInTheFolderAndLinkedElsewhereIsDeletedAndCounted(): void
+    {
+        $sub = $this->syncedSubFolderBesideAKeptPhoto();
+        $stored = (int)$this->db->scalar("SELECT id FROM piwigo_images WHERE storage_category_id = {$sub['id']}");
+        $this->assertGreaterThan(0, $stored, 'anti-vacuity: the folder stores a photo');
+        $this->db->query("INSERT INTO piwigo_image_category (image_id, category_id) VALUES ($stored, {$sub['parent']})");
+        $this->removeFolder($sub);
+
+        $real = $this->summary($this->sync($sub['parent'], false));
+
+        $this->assertSame(1, $real['deleted_photos']);
+        $this->assertSame(0, (int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_images WHERE id = $stored"));
+    }
+
     private function syncedAlbumWithOnePhoto(): array
     {
         $album = $this->fixture->createPhysicalAlbum('provenance-sync-' . bin2hex(random_bytes(4)));
@@ -159,6 +204,32 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $this->assertSame(1, $this->photosOf($id), 'anti-vacuity: the first sync registered the photo');
 
         return array('id' => $id, 'parent' => $parent['id'], 'path' => $path);
+    }
+
+    /**
+     * A parent album storing one photo of its own (`kept`) and a sub folder
+     * storing another, both registered by one sync.
+     *
+     * @return array{id:int,parent:int,path:string,kept:int}
+     */
+    private function syncedSubFolderBesideAKeptPhoto(): array
+    {
+        $parent = $this->fixture->createPhysicalAlbum('provenance-sync-' . bin2hex(random_bytes(4)));
+        $this->fixture->placePhotoInPhysicalAlbum($parent['id']);
+        $moved = $this->fixture->placePhotoInPhysicalAlbum($parent['id']);
+        $path = $parent['path'] . 'sub/';
+        $this->assertTrue(mkdir($path, 0755), 'anti-vacuity: the sub folder exists');
+        $this->subFolders[] = array('parent' => $parent['id'], 'path' => $path);
+        $this->assertTrue(rename($parent['path'] . $moved, $path . $moved));
+        $this->sync($parent['id'], false);
+
+        $id = (int)$this->db->scalar("SELECT id FROM piwigo_categories WHERE id_uppercat = {$parent['id']} AND dir = 'sub'");
+        $this->assertGreaterThan(0, $id, 'anti-vacuity: the first sync registered the sub folder');
+        $this->assertSame(1, $this->photosOf($id), 'anti-vacuity: the folder stores one photo');
+        $kept = (int)$this->db->scalar("SELECT id FROM piwigo_images WHERE storage_category_id = {$parent['id']}");
+        $this->assertGreaterThan(0, $kept, 'anti-vacuity: the parent stores a photo');
+
+        return array('id' => $id, 'parent' => $parent['id'], 'path' => $path, 'kept' => $kept);
     }
 
     /** Whatever a case left of the sub folders: rows, files, folder. */
