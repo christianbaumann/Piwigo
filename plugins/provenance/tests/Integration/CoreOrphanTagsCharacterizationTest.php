@@ -19,8 +19,9 @@ use PHPUnit\Framework\TestCase;
  * behaviour it pins (docs/agents/TESTING.md).
  *
  * The cleanup is global: it sweeps every unused tag of the install, not only this
- * test's. setUp() therefore snapshots the unused tags that already exist and
- * tearDown() puts back any the run swept away.
+ * test's. setUp() therefore writes the unused tags that already exist to a git-ignored
+ * file (OrphanTagSnapshot; a killed run's leftover is restored first) and
+ * tearDown() puts back any the run swept away and removes the file.
  */
 final class CoreOrphanTagsCharacterizationTest extends TestCase
 {
@@ -38,8 +39,8 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
     private WsClient $ws;
     private FixtureBuilder $fixture;
 
-    /** Unused tags the install held before the run, put back in tearDown. */
-    private array $existingOrphans = array();
+    /** Unused tags the install held before the run, on disk until tearDown puts them back. */
+    private OrphanTagSnapshot $snapshot;
     private array $testTagIds = array();
 
     protected function setUp(): void
@@ -49,10 +50,8 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
         $this->ws->login(Config::username(), Config::password());
         $this->fixture = new FixtureBuilder($this->db);
 
-        $result = $this->db->query(
-            'SELECT t.* FROM `piwigo_tags` t LEFT JOIN `piwigo_image_tag` i ON t.id = i.tag_id WHERE i.tag_id IS NULL'
-        );
-        $this->existingOrphans = $result->fetch_all(MYSQLI_ASSOC);
+        $this->snapshot = new OrphanTagSnapshot($this->db);
+        $this->snapshot->take();
     }
 
     protected function tearDown(): void
@@ -62,24 +61,39 @@ final class CoreOrphanTagsCharacterizationTest extends TestCase
             $this->db->query('DELETE FROM `piwigo_image_tag` WHERE tag_id = ' . (int)$id);
             $this->db->query('DELETE FROM `piwigo_tags` WHERE id = ' . (int)$id);
         }
-        foreach ($this->existingOrphans as $row)
-        {
-            $columns = array();
-            $values = array();
-            foreach ($row as $column => $value)
-            {
-                $columns[] = '`' . $column . '`';
-                $values[] = $value === null ? 'NULL' : "'" . $this->db->escape((string)$value) . "'";
-            }
-            $this->db->query(
-                'INSERT IGNORE INTO `piwigo_tags` (' . implode(',', $columns) . ') VALUES (' . implode(',', $values) . ')'
-            );
-        }
-        $this->testTagIds = $this->existingOrphans = array();
+        $this->snapshot->restore();
+        $this->testTagIds = array();
 
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
         $this->ws->logout();
+    }
+
+    /** [ST] A run killed after the sweep leaves its snapshot file; the next take() gives the tags back. */
+    public function testALeftoverSnapshotIsRestoredAtTheNextSetUp(): void
+    {
+        $id = $this->makeTag('keepme-' . bin2hex(random_bytes(3)), self::OLD_ENOUGH_DAYS);
+        (new OrphanTagSnapshot($this->db))->take();
+        $this->assertFileExists(OrphanTagSnapshot::path(), 'the snapshot is on disk before any sweep');
+
+        $this->db->query('DELETE FROM `piwigo_tags` WHERE id = ' . $id);
+        $this->assertFalse($this->tagExists($id), 'anti-vacuity: the simulated sweep removed the tag');
+
+        (new OrphanTagSnapshot($this->db))->take();
+
+        $this->assertTrue($this->tagExists($id), 'the next setUp puts the swept tag back');
+    }
+
+    /** [NEG] A tag this suite made (a killed run leaves it unused) is not written to the snapshot. */
+    public function testFixtureTagsAreNotKept(): void
+    {
+        $fixtureId = $this->makeTag('plain-' . bin2hex(random_bytes(3)), self::OLD_ENOUGH_DAYS);
+        $keepId = $this->makeTag('keepme-' . bin2hex(random_bytes(3)), self::OLD_ENOUGH_DAYS);
+        (new OrphanTagSnapshot($this->db))->take();
+
+        $kept = array_column(json_decode((string)file_get_contents(OrphanTagSnapshot::path()), true), 'id');
+        $this->assertContains((string)$keepId, array_map('strval', $kept), 'anti-vacuity: a real unused tag is kept');
+        $this->assertNotContains((string)$fixtureId, array_map('strval', $kept));
     }
 
     /** [HAPPY] [ECP] Each of the three cleanup paths removes an unused tag. */

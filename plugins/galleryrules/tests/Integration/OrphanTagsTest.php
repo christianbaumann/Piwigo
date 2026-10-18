@@ -8,8 +8,9 @@ use PHPUnit\Framework\TestCase;
  * name list; galleryrules filters its result through a fork-local trigger.
  *
  * The cleanup is global: it sweeps every unused tag of the install. setUp()
- * snapshots the unused tags that already exist and tearDown() puts back any the
- * run swept away. The tags and the person rows are this suite's own.
+ * writes the unused tags that already exist to a git-ignored file
+ * (OrphanTagSnapshot), restoring a leftover of a killed run first, and
+ * tearDown() puts back any the run swept away and removes the file. The tags and the person rows are this suite's own.
  */
 final class OrphanTagsTest extends TestCase
 {
@@ -26,7 +27,7 @@ final class OrphanTagsTest extends TestCase
     private Db $db;
     private WsClient $ws;
     private FixtureBuilder $fixture;
-    private array $existingOrphans = array();
+    private OrphanTagSnapshot $snapshot;
     private array $testTagIds = array();
     private array $testPersonIds = array();
     private array $testColorIds = array();
@@ -43,10 +44,8 @@ final class OrphanTagsTest extends TestCase
         [$user, $password] = Config::credentials(TestUsers::WEBMASTER);
         $this->ws->login($user, $password);
 
-        $result = $this->db->query(
-            'SELECT t.* FROM piwigo_tags t LEFT JOIN piwigo_image_tag i ON t.id = i.tag_id WHERE i.tag_id IS NULL'
-        );
-        $this->existingOrphans = $result->fetch_all(MYSQLI_ASSOC);
+        $this->snapshot = new OrphanTagSnapshot($this->db);
+        $this->snapshot->take();
     }
 
     protected function tearDown(): void
@@ -64,23 +63,39 @@ final class OrphanTagsTest extends TestCase
         {
             $this->db->query('DELETE FROM piwigo_typetags WHERE id = ' . (int)$id);
         }
-        foreach ($this->existingOrphans as $row)
-        {
-            $columns = array();
-            $values = array();
-            foreach ($row as $column => $value)
-            {
-                $columns[] = '`' . $column . '`';
-                $values[] = $value === null ? 'NULL' : "'" . $this->db->escape((string)$value) . "'";
-            }
-            $this->db->query(
-                'INSERT IGNORE INTO piwigo_tags (' . implode(',', $columns) . ') VALUES (' . implode(',', $values) . ')'
-            );
-        }
-        $this->testTagIds = $this->testPersonIds = $this->testColorIds = $this->existingOrphans = array();
+        $this->snapshot->restore();
+        $this->testTagIds = $this->testPersonIds = $this->testColorIds = array();
 
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
+    }
+
+    /** [ST] A run killed after the sweep leaves its snapshot file; the next take() gives the tags back. */
+    public function testALeftoverSnapshotIsRestoredAtTheNextSetUp(): void
+    {
+        $name = 'keepme-' . bin2hex(random_bytes(3));
+        $id = $this->makeTag($name);
+        (new OrphanTagSnapshot($this->db))->take();
+        $this->assertFileExists(OrphanTagSnapshot::path(), 'the snapshot is on disk before any sweep');
+
+        $this->db->query('DELETE FROM piwigo_tags WHERE id = ' . $id);
+        $this->assertFalse($this->tagExists($id), 'anti-vacuity: the simulated sweep removed the tag');
+
+        (new OrphanTagSnapshot($this->db))->take();
+
+        $this->assertTrue($this->tagExists($id), 'the next setUp puts the swept tag back');
+    }
+
+    /** [NEG] A tag this suite made (a killed run leaves it unused) is not written to the snapshot. */
+    public function testFixtureTagsAreNotKept(): void
+    {
+        $fixtureId = $this->makeTag('plain-' . bin2hex(random_bytes(3)));
+        $keepId = $this->makeTag('keepme-' . bin2hex(random_bytes(3)));
+        (new OrphanTagSnapshot($this->db))->take();
+
+        $kept = array_column(json_decode((string)file_get_contents(OrphanTagSnapshot::path()), true), 'id');
+        $this->assertContains((string)$keepId, array_map('strval', $kept), 'anti-vacuity: a real unused tag is kept');
+        $this->assertNotContains((string)$fixtureId, array_map('strval', $kept));
     }
 
     /** [HAPPY] [ECP] Each path still removes an unused plain tag. */
