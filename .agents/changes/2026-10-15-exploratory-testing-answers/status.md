@@ -1,4 +1,4 @@
-# Status — paused 2026-10-18 (all tasks done)
+# Status — paused 2026-10-18 (all 54 tasks done, ready to deploy)
 
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
@@ -64,10 +64,19 @@ seed left.
 
 ## Next
 
-Tasks 1-50 are done. In progress since 2026-10-18 (third-round answers below): 51 sync keeps
-photos in an album, 52+53 handbook (one agent, one demo seed), 54 tag-cloud fixture. Then:
+All 54 tasks are done (51 `313c967ab`, 52+53 `5294de127`, 54 `9cf2652da`). Final integration
+check 2026-10-18 by an Opus 5.5 subagent: ready to deploy. Every suite once under the lock: typetags
+91/179/66, provenance 313/435 (3 skipped)/79, persons 218/224 (1 skipped)/187+1 (the one,
+`editor.spec.js:653`, passed alone 5x; a DB change outside the suite lock made the photo invisible
+mid-test: environment), photoedit 107/110/34, photoinfo 288/230/59, galleryrules 51/84/28,
+`check.php` OK, `test-hooks.sh` OK, deploy pytest 599. No design gap. Its two test-side leak fixes
+and the handbook.md key count (35): `bbe01a9d5`.
 
-1. Final change-integration check by an Opus 5.5 subagent, every plugin suite once under the lock.
+Next:
+
+1. The user runs the leftover cleanup (7 empty `provenance-sync-other-%` albums, 64 dead
+   `image_category` rows, 16 `upload/buffer/*.block`, 12 `upload/galleryrules-test/*_original`);
+   auto mode refuses these deletes.
 2. Deploy, then the remote `display_errors` check and the compiled-template purge
    (Werkzeuge > Wartung > *Kompilierte Vorlagen entfernen*).
 
