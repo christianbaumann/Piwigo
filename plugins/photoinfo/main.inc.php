@@ -78,6 +78,11 @@ add_event_handler('photoedit_begin', 'photoinfo_photoedit_begin',
 add_event_handler('photoedit_end', 'photoinfo_photoedit_end',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $photoinfo_tags_file);
 
+// A replaced or uploaded file and the gallery are merged field by field (decision 0084).
+// After persons' handler, which indexes the file's regions and so settles the person tags first.
+add_event_handler('loc_end_add_uploaded_file', 'photoinfo_uploaded_file',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, PHOTOINFO_PATH . 'include/events_upload.inc.php');
+
 // The Datum and Info rows. Registered only on the picture page, and the file behind it is
 // pulled in only when the event actually fires.
 if (script_basename() == 'picture')

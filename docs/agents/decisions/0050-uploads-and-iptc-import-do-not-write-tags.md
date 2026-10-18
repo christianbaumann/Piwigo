@@ -1,7 +1,7 @@
 # 0050 — uploads and core's IPTC keyword import write no tags into the file
 
 Date: 2026-10-09
-Status: accepted
+Status: accepted (for a replace, the upload part is superseded by [decision 0084](0084-an-upload-or-replace-merges-file-and-gallery-field-by-field.md))
 
 ## Context
 
