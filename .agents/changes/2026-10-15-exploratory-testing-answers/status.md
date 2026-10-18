@@ -69,7 +69,7 @@ agent is running, no flip is applied, nothing is staged; the install is at 5 alb
 | Task | State | Uncommitted files |
 |---|---|---|
 | 40 person tag guard | read only; plan in WIP (extend `persons_guard_ws_invoke` for `pwg.images.add` / `uploadAsync` tag_ids, rename, pruneTags; no core edit) | none |
-| 47 upload level, sync count | read only; plan in WIP. Open: `pwg.images.uploadAsync` has the same level gap but is not in the task - include it (recommended) | none |
+| 47 upload level, sync count | read only; plan in WIP. `pwg.images.uploadAsync` is included (answer 2026-10-18) | none |
 | 48 tag cloud | seed + spec drafted, never run; `tags.css` not fixed | `plugins/provenance/tests/e2e/long-words.spec.js`, `.../support/wrap-seed.php` (adds a `full_tag_cloud_items_number` config row, removed by `--restore`) |
 | 49 polluted scans | findings only: the four test persons/tags exist only on photos 100, 103-105; no other photo is polluted. Script and dry run not written | none |
 | 50 handbook German | 03 and 04 checked against sources (OK, not yet in a browser); 05-07 not read | none |
@@ -162,6 +162,17 @@ too, the delete is handed to the user (auto mode refused it). Task 42 added for 
    the four test persons and tags; the user runs the script).
 6. typetags pushed by the user.
 7. Task 50: a Sonnet agent reads the handbook German and adds ledger rows.
+
+## Answered 2026-10-18 (second round, "all a"; apply when resuming)
+
+1. Task 47 includes `pwg.images.uploadAsync` (same level check, own characterization case).
+2. Task 49: the agent writes the script and proves it on throwaway copies; the user runs the final
+   `! ...` command.
+3. Task 40: no core edit; the persons guard merges the marked persons' tags into `tag_ids` before
+   `pwg.images.add` / `uploadAsync` run.
+4. Resume all five (40, 47-50) in parallel.
+5. Deploy after every task is committed and task 49's cleanup has run; then the remote
+   `display_errors` check and the compiled-template purge.
 
 ## Incidents (all repaired, recorded so a later failure can be traced)
 
