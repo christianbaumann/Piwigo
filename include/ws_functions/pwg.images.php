@@ -2673,6 +2673,12 @@ function ws_images_setInfo($params, $service)
     return new PwgError(403, 'Invalid security token');
   }
 
+  // fork-local: the same rule as ws_images_setPrivacyLevel()
+  if (isset($params['level']) and !in_array($params['level'], $conf['available_permission_levels']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid level');
+  }
+
   include_once(PHPWG_ROOT_PATH.'admin/include/functions.php');
 
   $query='

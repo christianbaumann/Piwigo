@@ -451,6 +451,14 @@ SELECT id_uppercat, MAX(`rank`)+1 AS next_rank
   
   if (count($to_delete) > 0)
   {
+    // fork-local: the photos of a removed folder go with it (delete_categories()) and count as deleted
+    $query = '
+SELECT COUNT(*)
+  FROM '.IMAGES_TABLE.'
+  WHERE storage_category_id IN ('.implode(',', get_subcat_ids($to_delete)).')
+;';
+    list($counts['del_elements']) = pwg_db_fetch_row(pwg_query($query));
+
     if (!$simulate)
     {
       delete_categories($to_delete);
@@ -730,7 +738,7 @@ DELETE
     {
       delete_elements($to_delete_elements);
     }
-    $counts['del_elements'] = count($to_delete_elements);
+    $counts['del_elements'] += count($to_delete_elements);
   }
 
   $template->append('footer_elements', '<!-- scanning files : '
@@ -811,24 +819,6 @@ if (isset($_POST['submit'])
       . get_elapsed_time($start,get_moment())
       . ' -->');
   }// end if sync files
-}
-
-// +-----------------------------------------------------------------------+
-// |                          synchronize files                            |
-// +-----------------------------------------------------------------------+
-if (isset($_POST['submit'])
-    and ($_POST['sync'] == 'dirs' or $_POST['sync'] == 'files'))
-{
-  $template->assign(
-    'update_result',
-    array(
-      'NB_NEW_CATEGORIES'=>$counts['new_categories'],
-      'NB_DEL_CATEGORIES'=>$counts['del_categories'],
-      'NB_NEW_ELEMENTS'=>$counts['new_elements'],
-      'NB_DEL_ELEMENTS'=>$counts['del_elements'],
-      'NB_UPD_ELEMENTS'=>$counts['upd_elements'],
-      'NB_ERRORS'=>count($errors),
-      ));
 }
 
 // +-----------------------------------------------------------------------+
@@ -935,6 +925,25 @@ if (isset($_POST['submit']) and isset($_POST['sync_meta'])
       'NB_ELEMENTS_DONE' => count($datas),
       'NB_ELEMENTS_CANDIDATES' => count($files),
       'NB_ERRORS' => count($errors),
+      ));
+}
+
+// +-----------------------------------------------------------------------+
+// |                     result of the synchronization                     |
+// +-----------------------------------------------------------------------+
+if (isset($_POST['submit'])
+    and ($_POST['sync'] == 'dirs' or $_POST['sync'] == 'files'))
+{
+  // fork-local: after the metadata pass, whose errors are listed on the page too
+  $template->assign(
+    'update_result',
+    array(
+      'NB_NEW_CATEGORIES'=>$counts['new_categories'],
+      'NB_DEL_CATEGORIES'=>$counts['del_categories'],
+      'NB_NEW_ELEMENTS'=>$counts['new_elements'],
+      'NB_DEL_ELEMENTS'=>$counts['del_elements'],
+      'NB_UPD_ELEMENTS'=>$counts['upd_elements'],
+      'NB_ERRORS'=>count($errors),
       ));
 }
 

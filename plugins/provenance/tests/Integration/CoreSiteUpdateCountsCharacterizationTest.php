@@ -14,16 +14,17 @@ use PHPUnit\Framework\TestCase;
  * go red by breaking the behaviour it claims to watch.
  *
  * Every sync is limited to the throwaway folder of one fixture album (`cat`),
- * never the whole gallery. Cases marked DEFECT record a counter that disagrees
- * with the page or the database; they are expected to go red when the change
- * lands and are replaced by the requirement tests in SiteUpdateCountsTest.
+ * never the whole gallery. Cases marked [REQ] are requirements: the counters of
+ * a removed folder's photos and of the metadata pass's errors disagreed with the
+ * page and the database (task 36, fixed in admin/site_update.php). They were [ERR]
+ * cases recording the defect until the fix.
  */
 final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
 {
     private Db $db;
     private WsClient $ws;
     private FixtureBuilder $fixture;
-    /** @var array<int, array{id:int,path:string}> */
+    /** @var array<int, array{parent:int,path:string}> registered before the first sync, so a failing case still cleans up */
     private array $subFolders = array();
 
     protected function setUp(): void
@@ -56,8 +57,8 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $this->assertSame(0, $this->photosOf($album['id']));
     }
 
-    /** [ERR] [ST] DEFECT, recorded: a removed folder deletes its photos (real run) and counts none. */
-    public function testARemovedFolderDeletesItsPhotosAndCountsNone(): void
+    /** [REQ] [ST] A removed folder deletes its photos (real run) and counts them. */
+    public function testARemovedFolderCountsItsPhotosAsDeleted(): void
     {
         $sub = $this->syncedSubFolderWithOnePhoto();
         $this->removeFolder($sub);
@@ -65,12 +66,12 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $real = $this->summary($this->sync($sub['parent'], false));
 
         $this->assertSame(1, $real['deleted_albums']);
-        $this->assertSame(0, $real['deleted_photos']);
+        $this->assertSame(1, $real['deleted_photos']);
         $this->assertSame(0, $this->photosOf($sub['id']), 'anti-vacuity: the photo really went');
     }
 
-    /** [ERR] [ST] DEFECT, recorded: a simulation of a removed folder counts none of its photos. */
-    public function testASimulatedRemovedFolderCountsNoPhotos(): void
+    /** [REQ] [ST] A simulation of a removed folder counts its photos and deletes none. */
+    public function testASimulatedRemovedFolderCountsItsPhotos(): void
     {
         $sub = $this->syncedSubFolderWithOnePhoto();
         $this->removeFolder($sub);
@@ -78,8 +79,27 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $simulated = $this->summary($this->sync($sub['parent'], true));
 
         $this->assertSame(1, $simulated['deleted_albums']);
-        $this->assertSame(0, $simulated['deleted_photos']);
+        $this->assertSame(1, $simulated['deleted_photos']);
         $this->assertSame(1, $this->photosOf($sub['id']), 'a simulation deletes nothing');
+    }
+
+    /** [REQ] [ECP] A removed folder's photos and a removed file of the synced album add up. */
+    public function testARemovedFolderAndARemovedFileAreBothCounted(): void
+    {
+        $sub = $this->syncedSubFolderWithOnePhoto();
+        $parent = array('id' => $sub['parent'], 'path' => dirname($sub['path']) . '/');
+        $this->fixture->placePhotoInPhysicalAlbum($parent['id']);
+        $this->sync($parent['id'], false);
+        $this->assertSame(1, $this->photosOf($parent['id']), 'anti-vacuity: the album holds a photo of its own');
+        foreach (glob($parent['path'] . '*.png') as $file)
+        {
+            unlink($file);
+        }
+        $this->removeFolder($sub);
+
+        $summary = $this->summary($this->sync($parent['id'], false));
+
+        $this->assertSame(2, $summary['deleted_photos']);
     }
 
     /** [ERR] [HAPPY] An error found while reading the folder (a file name core refuses) is counted and listed. */
@@ -95,8 +115,8 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $this->assertSame(1, $summary['errors']);
     }
 
-    /** [ERR] [ST] DEFECT, recorded: an error of the metadata pass is listed but not counted. */
-    public function testAnErrorOfTheMetadataPassIsListedButNotCounted(): void
+    /** [REQ] [ST] An error of the metadata pass is counted as well as listed. */
+    public function testAnErrorOfTheMetadataPassIsCounted(): void
     {
         $album = $this->syncedAlbumWithOnePhoto();
         $this->removeFiles($album);
@@ -104,7 +124,7 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $summary = $this->summary($this->sync($album['id'], true, true));
 
         $this->assertSame(1, $summary['listed_errors'], 'anti-vacuity: the page lists the unreadable file');
-        $this->assertSame(0, $summary['errors']);
+        $this->assertSame(1, $summary['errors']);
     }
 
     private function syncedAlbumWithOnePhoto(): array
@@ -130,13 +150,13 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         $name = $this->fixture->placePhotoInPhysicalAlbum($parent['id']);
         $path = $parent['path'] . 'sub/';
         $this->assertTrue(mkdir($path, 0755), 'anti-vacuity: the sub folder exists');
+        $this->subFolders[] = array('parent' => $parent['id'], 'path' => $path);
         $this->assertTrue(rename($parent['path'] . $name, $path . $name));
         $this->sync($parent['id'], false);
 
         $id = (int)$this->db->scalar("SELECT id FROM piwigo_categories WHERE id_uppercat = {$parent['id']} AND dir = 'sub'");
         $this->assertGreaterThan(0, $id, 'anti-vacuity: the first sync registered the sub folder');
         $this->assertSame(1, $this->photosOf($id), 'anti-vacuity: the first sync registered the photo');
-        $this->subFolders[] = array('id' => $id, 'path' => $path);
 
         return array('id' => $id, 'parent' => $parent['id'], 'path' => $path);
     }
@@ -146,10 +166,16 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
     {
         foreach ($this->subFolders as $sub)
         {
-            $this->db->query("DELETE FROM piwigo_image_category WHERE category_id = {$sub['id']}");
-            $this->db->query("DELETE FROM piwigo_image_category WHERE image_id IN (SELECT id FROM piwigo_images WHERE storage_category_id = {$sub['id']})");
-            $this->db->query("DELETE FROM piwigo_images WHERE storage_category_id = {$sub['id']}");
-            $this->db->query("DELETE FROM piwigo_categories WHERE id = {$sub['id']}");
+            $id = (int)$this->db->scalar(
+                "SELECT id FROM piwigo_categories WHERE id_uppercat = {$sub['parent']} AND dir = 'sub'"
+            );
+            if ($id > 0)
+            {
+                $this->db->query("DELETE FROM piwigo_image_category WHERE category_id = $id");
+                $this->db->query("DELETE FROM piwigo_image_category WHERE image_id IN (SELECT id FROM piwigo_images WHERE storage_category_id = $id)");
+                $this->db->query("DELETE FROM piwigo_images WHERE storage_category_id = $id");
+                $this->db->query("DELETE FROM piwigo_categories WHERE id = $id");
+            }
             foreach (glob($sub['path'] . '*') ?: array() as $file)
             {
                 @unlink($file);

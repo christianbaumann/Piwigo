@@ -13,10 +13,10 @@ use PHPUnit\Framework\TestCase;
  * recorded code rather than drove it. Here that is the point, so each was watched
  * go red by breaking the behaviour it claims to watch.
  *
- * Two cases record the defects themselves (the hidden id in getList, a level
- * outside available_permission_levels stored by setInfo). They are expected to
- * go red when the change lands and are replaced by the requirement tests in
- * CoreApiAnswersTest.
+ * Two cases are requirements, not [ERR]: the hidden id in getList and a level
+ * outside available_permission_levels in setInfo were defects (task 36, fixed
+ * in include/ws_functions/pwg.categories.php and pwg.images.php). They were
+ * [ERR] cases recording the defect until the fix.
  */
 final class CoreApiAnswersCharacterizationTest extends TestCase
 {
@@ -65,14 +65,27 @@ final class CoreApiAnswersCharacterizationTest extends TestCase
         $this->assertStringNotContainsString(basename($f['hiddenFile'], '.png'), $cat['tn_url']);
     }
 
-    /** [ERR] [ST] DEFECT, recorded: the substitute is used for the thumbnail, but the hidden photo's id is what is returned. */
-    public function testTheHiddenRepresentativesIdIsStillReturned(): void
+    /** [REQ] [ST] The id returned is the substitute's, never the hidden photo's: it names what the thumbnail shows. */
+    public function testTheHiddenRepresentativesIdIsNotReturned(): void
     {
         $f = $this->albumWithRepresentative(true);
 
         $cat = $this->listedAs($this->normal(), $f['album']);
 
-        $this->assertSame((string)$f['hidden'], (string)$cat['representative_picture_id']);
+        $this->assertSame((string)$f['visible'], (string)$cat['representative_picture_id']);
+    }
+
+    /** [REQ] [ST] The first call after an administrator hid the photo already names no hidden id, and neither does the second. */
+    public function testNoCallNamesTheHiddenRepresentative(): void
+    {
+        $f = $this->albumWithRepresentative(true);
+        $client = $this->normal();
+
+        $first = $this->listedAs($client, $f['album']);
+        $second = $this->listedAs($client, $f['album']);
+
+        $this->assertNotSame((string)$f['hidden'], (string)$first['representative_picture_id']);
+        $this->assertNotSame((string)$f['hidden'], (string)$second['representative_picture_id']);
     }
 
     /** [ERR] [HAPPY] setInfo with a level the install offers stores it. */
@@ -86,15 +99,54 @@ final class CoreApiAnswersCharacterizationTest extends TestCase
         $this->assertSame('4', (string)$this->db->scalar("SELECT level FROM piwigo_images WHERE id = $id"));
     }
 
-    /** [ERR] [BVA] DEFECT, recorded: a level between two offered ones (3) is accepted and stored. */
-    public function testSetInfoStoresALevelOutsideTheAvailableOnes(): void
+    /**
+     * [REQ] [BVA] A level between two offered ones (3, 5) is refused
+     * and the stored level stays, as setPrivacyLevel does.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('levelsOutsideTheAvailableOnes')]
+    public function testSetInfoRefusesALevelOutsideTheAvailableOnes(int $level): void
+    {
+        $id = $this->fixture->createTestImage()['id'];
+        $this->db->query("UPDATE piwigo_images SET level = 2 WHERE id = $id");
+
+        $answer = $this->admin->call('pwg.images.setInfo', array('image_id' => $id, 'level' => $level));
+
+        $this->assertSame('fail', $answer['json']['stat'] ?? null, $answer['body']);
+        $this->assertSame('2', (string)$this->db->scalar("SELECT level FROM piwigo_images WHERE id = $id"));
+    }
+
+    /** @return array<string, array{0: int}> */
+    public static function levelsOutsideTheAvailableOnes(): array
+    {
+        return array(
+            '[BVA] between 2 and 4' => array(3),
+            '[BVA] between 4 and 8' => array(5),
+            );
+    }
+
+    /**
+     * [ERR] [BVA] A level above the last offered one (9) is not refused: ws.php registers the
+     * parameter with maxValue = the highest offered level, and the framework clamps to it.
+     */
+    public function testALevelAboveTheLastIsClampedByTheMethodRegistration(): void
     {
         $id = $this->fixture->createTestImage()['id'];
 
-        $answer = $this->admin->call('pwg.images.setInfo', array('image_id' => $id, 'level' => 3));
+        $answer = $this->admin->call('pwg.images.setInfo', array('image_id' => $id, 'level' => 9));
 
         $this->assertSame('ok', $answer['json']['stat'] ?? null, $answer['body']);
-        $this->assertSame('3', (string)$this->db->scalar("SELECT level FROM piwigo_images WHERE id = $id"));
+        $this->assertSame('8', (string)$this->db->scalar("SELECT level FROM piwigo_images WHERE id = $id"));
+    }
+
+    /** [REQ] [BVA] The highest offered level (8) is still accepted. */
+    public function testSetInfoStoresTheHighestAvailableLevel(): void
+    {
+        $id = $this->fixture->createTestImage()['id'];
+
+        $answer = $this->admin->call('pwg.images.setInfo', array('image_id' => $id, 'level' => 8));
+
+        $this->assertSame('ok', $answer['json']['stat'] ?? null, $answer['body']);
+        $this->assertSame('8', (string)$this->db->scalar("SELECT level FROM piwigo_images WHERE id = $id"));
     }
 
     /** [ERR] [ECP] A call without a level leaves the stored level alone. */

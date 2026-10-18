@@ -266,6 +266,25 @@ final class CoreEditTest extends TestCase
         $this->assertSame('1965-03-14', FixtureBuilder::readDateTags($this->image['file'])['XMP-pwginfo:DateEDTF']);
     }
 
+    /**
+     * [NEG] A level core refuses (setInfo checks available_permission_levels) is refused through
+     * photoinfo's wrapper too: the answer is core's error, the level stays, no date is written.
+     */
+    public function testSetInfoRefusesALevelOutsideTheAvailableOnesThroughTheWrapper(): void
+    {
+        $this->db->query("UPDATE piwigo_images SET level = 2 WHERE id = {$this->image['id']}");
+
+        $res = $this->ws->call('pwg.images.setInfo', array(
+            'image_id' => $this->image['id'],
+            'level' => 3,
+            'single_value_mode' => 'replace',
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('fail', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame('2', (string)$this->fixture->imageRow($this->image['id'])['level']);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function newPhoto(): array
