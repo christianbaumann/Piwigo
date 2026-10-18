@@ -25,6 +25,19 @@ class WsClient
         return array('body' => $body, 'json' => json_decode($body, true));
     }
 
+    /** A multipart call carrying one file in $field, as the upload form sends it. */
+    public function upload(string $method, array $params, string $field, string $file): array
+    {
+        $params['method'] = $method;
+        $params[$field] = new CURLFile($file, '', basename($file));
+        $body = $this->request('/ws.php?format=json', array(
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => $params,
+        ));
+
+        return array('body' => $body, 'json' => json_decode($body, true));
+    }
+
     /** The same call as a GET request, which a post_only method must refuse. */
     public function callGet(string $method, array $params = array()): array
     {
