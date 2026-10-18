@@ -1,5 +1,7 @@
 // @ts-check
 
+const { expect } = require('@playwright/test');
+
 /**
  * Page object for core's tag management screen (Schlagwortverwaltung).
  *
@@ -42,6 +44,8 @@ class AdminTagsPage {
    */
   async deleteTag(tagId, name) {
     await this.search.fill(name);
+    // tags.js filters 300 ms after the input and then rebuilds the boxes; a menu opened before that is thrown away with its box
+    await expect(this.page.locator('.tag-box', { hasNotText: name })).toHaveCount(0);
     const box = this.box(tagId);
     await box.locator('.showOptions').click();
     await box.locator('.dropdown-option.delete').click();

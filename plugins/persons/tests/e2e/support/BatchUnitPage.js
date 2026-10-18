@@ -45,8 +45,18 @@ class BatchUnitPage {
     return this.fieldset(photoId).locator('.local-error-badge');
   }
 
+  /** The server's own refusal text, shown inside the error badge. */
+  errorMessage(photoId) {
+    return this.fieldset(photoId).locator('.local-error-badge .local-error-message');
+  }
+
   successBadge(photoId) {
     return this.fieldset(photoId).locator('.local-success-badge');
+  }
+
+  /** The server's own refusal text, shown beside the error badge. */
+  errorMessage(photoId) {
+    return this.fieldset(photoId).locator('.local-error-message');
   }
 }
 

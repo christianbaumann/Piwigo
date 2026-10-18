@@ -24,6 +24,8 @@ final class TagToolGuardTest extends TestCase
     private FixtureBuilder $fixture;
     private WsClient $ws;
     private int $image;
+    private string $imageFile;
+    private array $scratch = array();
     private int $album;
     /** The person's tag, put on the photo by the mark. */
     private int $person;
@@ -44,7 +46,9 @@ final class TagToolGuardTest extends TestCase
             $this->fail('the persons plugin is not installed; activate it first');
         }
 
-        $this->image = (int)$this->fixture->createTestImage()['id'];
+        $fixtureImage = $this->fixture->createTestImage();
+        $this->image = (int)$fixtureImage['id'];
+        $this->imageFile = $fixtureImage['file'];
         $this->album = $this->fixture->createTestAlbum('Persons guard fixture');
         $this->fixture->attachImage($this->image, $this->album);
         $this->fixture->invalidateUserCache();
@@ -67,6 +71,10 @@ final class TagToolGuardTest extends TestCase
 
     protected function tearDown(): void
     {
+        foreach ($this->scratch as $file)
+        {
+            @unlink($file);
+        }
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
         $this->fixture->destroyPersons(array(self::NAME));
@@ -309,6 +317,130 @@ final class TagToolGuardTest extends TestCase
         $this->assertNotContains($this->person, $ids);
     }
 
+    // ── pwg.tags.rename ───────────────────────────────────────────────────
+
+    /** [NEG] Renaming the person's tag is refused; the person is renamed under Personen. */
+    public function testRenamingThePersonsTagIsRefused(): void
+    {
+        $res = $this->ws->call('pwg.tags.rename', array(
+            'tag_id' => $this->person,
+            'new_name' => 'Persons guard renamed ' . bin2hex(random_bytes(3)),
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertRefused($res, PERSONS_TAG_RENAME_REFUSED_MESSAGE);
+        $this->assertPersonIntact();
+    }
+
+    /** [HAPPY] Renaming an ordinary tag still works. */
+    public function testRenamingAnOrdinaryTagWorks(): void
+    {
+        $new = 'Persons guard renamed ' . bin2hex(random_bytes(3));
+        $res = $this->ws->call('pwg.tags.rename', array(
+            'tag_id' => $this->plain,
+            'new_name' => $new,
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertSame($new, $this->db->scalar('SELECT name FROM piwigo_tags WHERE id = ' . $this->plain));
+    }
+
+    // ── uploads with tag_ids ──────────────────────────────────────────────
+
+    /** [NEG] pwg.images.uploadAsync replacing a photo with tag_ids that lack the person's tag keeps it. */
+    public function testUploadAsyncReplaceKeepsThePersonsTag(): void
+    {
+        $file = $this->smallPng();
+        $sum = md5_file($file);
+        $res = $this->ws->upload('pwg.images.uploadAsync', $file, 'file', array(
+            'chunk' => 0, 'chunk_sum' => $sum, 'chunks' => 1, 'original_sum' => $sum,
+            'category' => $this->album, 'filename' => basename($this->imageFile),
+            'image_id' => $this->image, 'tag_ids' => (string)$this->plain,
+            'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertTrue($this->carries($this->image, $this->person), "the replace dropped the person's tag");
+        $this->assertTrue($this->carries($this->image, $this->plain), 'the tag the caller asked for was not set');
+        $this->assertPersonIntact();
+    }
+
+    /** [NEG] pwg.images.add on an existing photo with tag_ids that lack the person's tag keeps it. */
+    public function testImagesAddOnAnExistingPhotoKeepsThePersonsTag(): void
+    {
+        $file = $this->smallPng();
+        $sum = md5_file($file);
+        $chunk = $this->ws->call('pwg.images.addChunk', array(
+            'data' => base64_encode(file_get_contents($file)), 'original_sum' => $sum,
+            'type' => 'file', 'position' => 0,
+            ));
+        $this->assertSame('ok', $chunk['json']['stat'] ?? null, $chunk['body']);
+
+        $res = $this->ws->call('pwg.images.add', array(
+            'original_sum' => $sum, 'original_filename' => basename($this->imageFile),
+            'image_id' => $this->image, 'check_uniqueness' => 'false',
+            'tag_ids' => (string)$this->plain,
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertTrue($this->carries($this->image, $this->person), "pwg.images.add dropped the person's tag");
+        $this->assertTrue($this->carries($this->image, $this->plain), 'the tag the caller asked for was not set');
+        $this->assertPersonIntact();
+    }
+
+    /** [ECP] A replace whose tag_ids are empty still keeps the person's tag and drops the ordinary one. */
+    public function testUploadAsyncReplaceWithEmptyTagIdsChangesNoTags(): void
+    {
+        $file = $this->smallPng();
+        $sum = md5_file($file);
+        $res = $this->ws->upload('pwg.images.uploadAsync', $file, 'file', array(
+            'chunk' => 0, 'chunk_sum' => $sum, 'chunks' => 1, 'original_sum' => $sum,
+            'category' => $this->album, 'filename' => basename($this->imageFile),
+            'image_id' => $this->image, 'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertTrue($this->carries($this->image, $this->person));
+        $this->assertTrue($this->carries($this->image, $this->plain), 'a call without tag_ids changed the tags');
+    }
+
+    // ── pwg.photoinfo.pruneTags ───────────────────────────────────────────
+
+    /** [NEG] The prune removes a tag the file does not name, but not the tag of a person marked on the photo. */
+    public function testPruneTagsKeepsThePersonsTag(): void
+    {
+        foreach (array('photoinfo', 'provenance') as $plugin)
+        {
+            if ($this->db->scalar("SELECT state FROM piwigo_plugins WHERE id = '$plugin'") !== 'active')
+            {
+                $this->fail("$plugin is not active; activate it to run the prune case");
+            }
+        }
+        $extraName = 'Persons guard extra ' . bin2hex(random_bytes(4));
+        $this->db->query("INSERT INTO piwigo_tags (name, url_name) VALUES ('$extraName', '" . str_replace(' ', '_', $extraName) . "')");
+        $extra = $this->db->insertId();
+        $this->link($this->image, $extra);
+        // The file names only the ordinary tag, as a file written elsewhere without the person's keyword would.
+        $command = 'exiftool -config ' . escapeshellarg(PIWIGO_ROOT . 'plugins/photoinfo/exiftool/pwginfo.config')
+            . ' -q -overwrite_original -XMP-dc:Subject= -XMP-lr:HierarchicalSubject= '
+            . escapeshellarg('-XMP-dc:Subject=' . $this->plainName) . ' -XMP-pwginfo:TagsWritten=1 '
+            . escapeshellarg($this->imageFile);
+        exec($command . ' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+
+        $res = $this->ws->call('pwg.photoinfo.pruneTags', array(
+            'image_ids' => (string)$this->image, 'pwg_token' => $this->ws->token(),
+            ));
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $this->assertFalse($this->carries($this->image, $extra), 'anti-vacuity: the prune removed nothing');
+        $this->assertTrue($this->carries($this->image, $this->plain));
+        $this->assertTrue($this->carries($this->image, $this->person), "the prune removed the person's tag");
+        $this->db->query('DELETE FROM piwigo_tags WHERE id = ' . $extra);
+        $this->assertPersonIntact();
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private function mark(int $imageId): void
@@ -320,6 +452,17 @@ final class TagToolGuardTest extends TestCase
             'pwg_token' => $this->ws->token(),
             ));
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+    }
+
+    /** A small PNG carrying no marks, to replace the fixture photo with. */
+    private function smallPng(): string
+    {
+        $file = sys_get_temp_dir() . '/persons_guard_' . bin2hex(random_bytes(6)) . '.png';
+        $img = imagecreatetruecolor(300, 200);
+        imagefill($img, 0, 0, imagecolorallocate($img, 0, 255, 0));
+        imagepng($img, $file);
+        $this->scratch[] = $file;
+        return $file;
     }
 
     private function setInfo(array $params, ?int $imageId = null): array

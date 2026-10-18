@@ -255,8 +255,13 @@ function hideUnsavedLocalBadge(pictureId) {
 //   }
 // });
 //Error badge
-function showErrorLocalBadge(pictureId) {
-  $("#picture-" + pictureId + " .local-error-badge").css('display', 'block');
+function showErrorLocalBadge(pictureId, message) {
+  const badge = $("#picture-" + pictureId + " .local-error-badge");
+  badge.find(".local-error-message").remove();
+  if (message) {
+    badge.append($('<p class="local-error-message"></p>').text(message));
+  }
+  badge.css('display', 'block');
 }
 
 function hideErrorLocalBadge(pictureId) {
@@ -406,7 +411,7 @@ async function saveChanges(pictureId) {
           enableLocalButton(pictureId);
           enableGlobalButton();
           hideUnsavedLocalBadge(pictureId);
-          showErrorLocalBadge(pictureId);
+          showErrorLocalBadge(pictureId, data.message);
           updateSuccessGlobalBadge();
       }
       },

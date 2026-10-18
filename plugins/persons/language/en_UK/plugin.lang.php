@@ -38,5 +38,6 @@ $lang['This crop would remove person marks only an administrator may delete:'] =
 
 $lang['A person tag stays on a photo while the person is marked there: %s. Remove the mark on the photo to remove the tag.'] = 'A person tag stays on a photo while the person is marked there: %s. Remove the mark on the photo to remove the tag.';
 $lang['A person tag is deleted only with its person: %s. Delete the person under Persons.'] = 'A person tag is deleted only with its person: %s. Delete the person under Persons.';
+$lang['A person tag is renamed only with its person: %s. Rename the person under Persons.'] = 'A person tag is renamed only with its person: %s. Rename the person under Persons.';
 
 ?>

@@ -62,6 +62,7 @@ define('PERSONS_CROP_REFUSED_MESSAGE', 'This crop would remove person marks only
  */
 define('PERSONS_TAG_REMOVAL_REFUSED_MESSAGE', 'A person tag stays on a photo while the person is marked there: %s. Remove the mark on the photo to remove the tag.');
 define('PERSONS_TAG_DELETE_REFUSED_MESSAGE', 'A person tag is deleted only with its person: %s. Delete the person under Persons.');
+define('PERSONS_TAG_RENAME_REFUSED_MESSAGE', 'A person tag is renamed only with its person: %s. Rename the person under Persons.');
 
 /** The tooltip of a stale region's box, as a language key. */
 define('PERSONS_STALE_TITLE', 'Region may be out of date: the image was resized since it was tagged');

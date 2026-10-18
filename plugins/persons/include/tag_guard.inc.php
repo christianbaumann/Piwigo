@@ -233,6 +233,11 @@ function persons_guard_ws_invoke($res, $method, $params)
     $key = PERSONS_TAG_DELETE_REFUSED_MESSAGE;
     $refused = persons_own_tags_among((array)$params['tag_id']);
   }
+  elseif ('pwg.tags.rename' == $method)
+  {
+    $key = PERSONS_TAG_RENAME_REFUSED_MESSAGE;
+    $refused = persons_own_tags_among(array($params['tag_id']));
+  }
   elseif ('pwg.tags.merge' == $method)
   {
     // merge deletes every merged tag but the destination
@@ -247,6 +252,111 @@ function persons_guard_ws_invoke($res, $method, $params)
   }
 
   return new PwgError(WS_ERR_INVALID_PARAM, persons_tag_refusal_message($key, $refused));
+}
+
+/**
+ * photoinfo_prune_keeps_tag_ids: pwg.photoinfo.pruneTags leaves the tags of the
+ * persons marked on the photo, whatever its file names.
+ *
+ * @param int[] $tag_ids
+ * @param int $image_id
+ * @return int[]
+ */
+function persons_prune_keeps_marked_tags($tag_ids, $image_id)
+{
+  return persons_typetags_fixed_tag_ids($tag_ids, $image_id);
+}
+
+/**
+ * ws_add_methods, after core's: puts persons around the two upload methods
+ * that set a photo's tags from tag_ids. ws_invoke_allowed cannot change the
+ * parameters a method receives, so the wrapper does.
+ *
+ * @param array $arr
+ */
+function persons_wrap_upload_methods($arr)
+{
+  $service = $arr[0];
+  $wrapped = &persons_wrapped_upload_methods();
+
+  foreach (array('pwg.images.add' => 'ws_persons_images_add',
+                 'pwg.images.uploadAsync' => 'ws_persons_images_uploadAsync') as $method => $callback)
+  {
+    if (!$service->hasMethod($method) or isset($wrapped[$method]))
+    {
+      continue;
+    }
+
+    $wrapped[$method] = array(
+      'callback' => $service->_methods[$method]['callback'],
+      'include' => $service->_methods[$method]['include'],
+      );
+    $service->addMethod(
+      $method,
+      $callback,
+      $service->getMethodSignature($method),
+      $service->getMethodDescription($method),
+      PERSONS_PATH.'include/tag_guard.inc.php',
+      $service->getMethodOptions($method)
+      );
+  }
+}
+
+/**
+ * @return array method => array('callback', 'include') of the callbacks persons_wrap_upload_methods() replaced
+ */
+function &persons_wrapped_upload_methods()
+{
+  static $methods = array();
+  return $methods;
+}
+
+/**
+ * tag_ids with the tags of the persons marked on an existing photo added, so
+ * the upload's set_tags() cannot take them off. Empty tag_ids stay empty: core
+ * sets no tags then.
+ *
+ * @param string|null $tag_ids comma separated ids
+ * @param int|null $image_id
+ * @return string|null
+ */
+function persons_tag_ids_with_marked($tag_ids, $image_id)
+{
+  if (empty($tag_ids) or empty($image_id) or (int)$image_id < 1)
+  {
+    return $tag_ids;
+  }
+
+  $marked = persons_marked_tag_ids(array((int)$image_id));
+  if (!isset($marked[(int)$image_id]))
+  {
+    return $tag_ids;
+  }
+
+  return implode(',', array_unique(array_merge(explode(',', $tag_ids), $marked[(int)$image_id])));
+}
+
+function persons_call_wrapped_upload($method, $params, &$service)
+{
+  $params['tag_ids'] = persons_tag_ids_with_marked($params['tag_ids'], $params['image_id']);
+
+  $wrapped = persons_wrapped_upload_methods();
+  if (!empty($wrapped[$method]['include']))
+  {
+    include_once($wrapped[$method]['include']);
+  }
+
+  return call_user_func_array($wrapped[$method]['callback'], array($params, &$service));
+}
+
+function ws_persons_images_add($params, &$service)
+{
+  return persons_call_wrapped_upload('pwg.images.add', $params, $service);
+}
+
+function ws_persons_images_uploadAsync($params, &$service)
+{
+  return persons_call_wrapped_upload('pwg.images.uploadAsync', $params, $service);
 }
 
 /**

@@ -2,6 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { seed, restore } = require('./support/seed');
 const { BatchUnitPage } = require('./support/BatchUnitPage');
+const { germanTextOf } = require('./support/lang');
 
 /**
  * The Batch Manager's unit mode saves through pwg.images.setInfo. Taking a
@@ -35,6 +36,8 @@ test('[NEG] removing a person tag is refused, the error badge shows and the tag 
   await unit.save(seeded.photo_id);
 
   await expect(unit.errorBadge(seeded.photo_id)).toBeVisible();
+  await expect(unit.errorMessage(seeded.photo_id))
+    .toHaveText(germanTextOf('PERSONS_TAG_REMOVAL_REFUSED_MESSAGE').replace('%s', PERSON));
 
   await unit.open(seeded.album_id);
   await expect(unit.tagChip(seeded.photo_id, PERSON)).toBeVisible();

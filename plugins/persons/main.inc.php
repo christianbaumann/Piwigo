@@ -70,11 +70,15 @@ add_event_handler('loc_end_add_uploaded_file', 'persons_uploaded_file',
 $persons_tag_guard_file = PERSONS_PATH . 'include/tag_guard.inc.php';
 add_event_handler('ws_invoke_allowed', 'persons_guard_ws_invoke',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $persons_tag_guard_file);
+add_event_handler('ws_add_methods', 'persons_wrap_upload_methods',
+  EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $persons_tag_guard_file);
 add_event_handler('picture_modify_before_update', 'persons_properties_keep_marked_tags',
   EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
 add_event_handler('loc_begin_element_set_unit', 'persons_batch_unit_keep_marked_tags',
   EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
 add_event_handler('loc_begin_element_set_global', 'persons_batch_refuse_del_tags',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
+add_event_handler('photoinfo_prune_keeps_tag_ids', 'persons_prune_keeps_marked_tags',
   EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);
 add_event_handler('typetags_fixed_tag_ids', 'persons_typetags_fixed_tag_ids',
   EVENT_HANDLER_PRIORITY_NEUTRAL, $persons_tag_guard_file);

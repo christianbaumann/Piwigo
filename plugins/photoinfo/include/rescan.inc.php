@@ -302,6 +302,9 @@ SELECT id, path
     }
 
     $not_in_file = photoinfo_rescan_tags($tags, photoinfo_image_tags($image_id), photoinfo_existing_tag_ids($tags))['not_in_file'];
+    // Tags another plugin keeps on the photo (persons: the marked persons').
+    $not_in_file = array_diff_key($not_in_file,
+      array_flip(trigger_change('photoinfo_prune_keeps_tag_ids', array(), $image_id)));
     if (count($not_in_file) == 0)
     {
       continue;

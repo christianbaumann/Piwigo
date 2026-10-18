@@ -138,6 +138,10 @@ function photoinfo_merge_uploaded_tags($image, $tags)
   if ($tags['tags_marker'])
   {
     $added = photoinfo_rescan_apply_tags($image_id, $tags)['added'];
+    // Tags the prune leaves (a marked person's) that the file does not name: the file needs them written.
+    $left = array_intersect_key(
+      photoinfo_rescan_tags($tags, photoinfo_image_tags($image_id), photoinfo_existing_tag_ids($tags))['not_in_file'],
+      array_flip(trigger_change('photoinfo_prune_keeps_tag_ids', array(), $image_id)));
     $pruned = photoinfo_prune_images(array($image_id));
     if (isset($pruned['failed'][$image_id]))
     {
@@ -151,6 +155,7 @@ function photoinfo_merge_uploaded_tags($image, $tags)
       include_once(PERSONS_PATH.'include/index.inc.php');
       $restored = persons_sync_image_tags($image_id);
     }
+    $restored = $restored || count($left) > 0;
     if ($added > 0 or isset($pruned['removed'][$image_id]))
     {
       invalidate_user_cache_nb_tags();
