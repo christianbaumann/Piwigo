@@ -1,4 +1,4 @@
-# Status — paused 2026-10-18
+# Status — paused 2026-10-18 (all tasks done)
 
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
@@ -53,162 +53,39 @@ not in them.
 | 32 upload merges file and gallery | `3abe24231` (characterization), `45af91938` (decision 0084, supersedes 0050 for replace) |
 | 46 ch6 restore end to end | `255378088` |
 | 41 add-album dialog hint | closed as not needed (user's answer); finding in `docs/backlog.md` |
+| 50 handbook German | `ca39d31dc` |
+| 49 polluted scans | `06c68e0f7` (script run by the user 2026-10-18 14:15, `OK (real)`; `IndexRebuildTest` OK) |
+| 48 tag cloud | `9fc67bde7` (also ticks task 44's work boxes, done in `f3f576ad9`) |
+| 47 upload level | `e0ddda21b` (characterization), `bff4a401b` (also closes task 27's suite item) |
+| 40 person tag guard | `161bc26d1` (characterization), `94dbc44b9` |
 
-Nothing is in progress: no agent running, nothing staged. Uncommitted only: this file, task 41's
-file and two `docs/backlog.md` lines (committed with this handoff), and the four
-`galleries/Verschiedenes/*.png`: NOT the user's edits but test pollution (test persons written into
-four real scans on 2026-10-16; pixels unchanged). Do not commit them; task 49 cleans them up.
+Every task file is fully ticked; the working tree is clean. No agent running, no flip applied, no
+seed left.
 
 ## Next
 
-Paused 2026-10-18 right after starting tasks 40, 47-50 (user's `/pause`). Each task file has a
-`## WIP (paused 2026-10-18)` section with findings and next steps; read it before resuming. No
-agent is running, no flip is applied, nothing is staged; the install is at 5 albums / 106 photos /
-16 tags, no stray config row, no snapshot file.
+All 50 tasks are done (paused 2026-10-18). What follows:
 
-| Task | State | Uncommitted files |
-|---|---|---|
-| 40 person tag guard | read only; plan in WIP (extend `persons_guard_ws_invoke` for `pwg.images.add` / `uploadAsync` tag_ids, rename, pruneTags; no core edit) | none |
-| 47 upload level, sync count | read only; plan in WIP. `pwg.images.uploadAsync` is included (answer 2026-10-18) | none |
-| 48 tag cloud | seed + spec drafted, never run; `tags.css` not fixed | `plugins/provenance/tests/e2e/long-words.spec.js`, `.../support/wrap-seed.php` (adds a `full_tag_cloud_items_number` config row, removed by `--restore`) |
-| 49 polluted scans | findings only: the four test persons/tags exist only on photos 100, 103-105; no other photo is polluted. Script and dry run not written | none |
-| 50 handbook German | 03 and 04 checked against sources (OK, not yet in a browser); 05-07 not read | none |
+1. Answer the open question below (task 47).
+2. Deploy (user agreed: every task committed, task 49 run), then the remote `display_errors`
+   check and the compiled-template purge (Werkzeuge > Wartung > *Kompilierte Vorlagen entfernen*).
+3. A final change-integration check by a subagent (skill step "after all tasks are complete").
 
-Resume with `/implement-tasks` (max 6 in parallel). Task 40 and 47 both touch
-`include/ws_functions/pwg.images.php` (different functions). After task 49's script has been
-run by the user and its result committed, the deploy (user agreed) and the remote
-`display_errors` check follow.
+Open question (2026-10-18, task 47): the sync never deletes a photo stored outside a removed
+folder; it only drops that photo's links, which can leave it in no album
+(`delete_categories()` default `no_delete`). The count was already right; task 36's note was
+wrong. Should such photos be deleted (`delete_orphans`) and counted? Behaviour change, not done.
 
-Questions to raise at the next pause (found 2026-10-17/18, not yet asked):
-
-1. `pwg.images.upload` / `addSimple` / `add` accept a `level` between the offered ones (3, 5, 6, 7);
-   admin-only. Same check as task 36's `setInfo`? (task 36 Deviations)
-2. Task 36: the sync's deleted counter misses a photo stored elsewhere whose only links were in a
-   removed album (rare; task 36 Deviations).
-3. Task 37 / 41 / 42 backlog lines (tag cloud nowrap, letter list on phones, first-album modal,
-   concurrent provenance seeds): turn any into tasks?
-
-typetags `843065a` (task 38) and `5d5e65d` (task 18): pushed by the user 2026-10-18.
-
-Decision numbers used so far: 0069 (05), 0070 (07), 0071 (11), 0072 (14), 0073 (03), 0074 (23),
-0075 (21), 0076 (26), 0077 (28), 0078 (31), 0079 (27), 0083 (39), 0084 (32). 0080-0082 were
-reserved for tasks that needed none and are unused. Next free: 0085.
-
-Answered 2026-10-17 ("all a"): task 18's unguarded paths and the Batch Manager message become
-task 40; task 25's other dialog becomes task 41; the five dead `image_category` rows are deleted
-(guarded, under the suite lock) and the counts re-checked; a subagent reviews task 18's German text
-and a Playwright run opens task 24's group-merge modal; `plugin-test-suites.md` names the
-characterization file pattern instead of a count (done). Done 2026-10-17 after DDEV came back: the five
-dead rows deleted (0 left; `CoreMenuPhotoCount*` and `CoreHiddenSubalbumCount` 14 OK), the
-group-merge modal opened (task 24 note), `check.php` OK after the task 18 rewording.
-
-Decisions the answers above cover (in the task files' Deviations):
-
-- Task 18: not guarded, outside the design's list: `pwg.tags.rename` of a person's tag,
-  `pwg.images.add` / `uploadAsync` with `tag_ids` on an existing photo, `pwg.photoinfo.pruneTags`.
-  The Batch Manager's JS unit mode shows core's generic error badge, not the refusal message.
-- Task 25: the add-album dialog of Fotos hinzufügen / Batch Manager (`include/add_album.inc.tpl`)
-  has no hint; not examined.
-
-New seed options of tasks 18
-(`--coloured-tags`), 22 (`--scenario=empty`) and 25 are documented only in the seeds' headers.
-
-## Questions to the user (asked 2026-10-16; unanswered, so 2026-10-17 the defaults `a` apply)
-
-1. Person 146: a) run the prepared DELETE under the suite lock, re-run `IndexRebuildTest`;
-   b) leave to task 38; c) make the test skip region-less persons.
-2. Task 20 — sub-albums inherit only on a new link (photos already in a sub-album, and
-   *Auf N Fotos anwenden* on a sub-album without own values, do not use the parent's):
-   a) keep, handbook says so; b) new task: apply uses the nearest parent, dialog shows it;
-   c) one-time backfill.
-3. Task 19 — deleting an album with "keep photos" can leave photos in no album:
-   a) new task (refuse, or link to parent); b) backlog entry only; c) accept, decision file.
-4. Task 20 — hand check of the two new paragraphs in `handbuch/03-fototexte.html`:
-   a) user reads them; b) open row in the `docs/agents/TESTING.md` ledger; c) accept unchecked.
-5. Next batch: a) wait for the user; b) 21, 38, 22, 23; c) only 38.
-
-Applied 2026-10-17: 1a (in task 38), 2a, 3a (task 39 added), 4a (hand check still open), batch 18, 21, 22, 38. 2026-10-17: task 39 refuses the delete (default a); the handbook paragraphs of task 20 are read by a subagent (user's answer).
-
-## Answered 2026-10-17 (second round, "all a")
-
-1. Task 28: keep the MWG clip, decision 0077.
-2. typetags `843065a` / `5d5e65d`: the user pushes `plugins/typetags` with the right account before
-   any push of the main repo.
-3. Remote `display_errors`: deploy once the batch 26/28/30/34 is committed, then the read-only
-   phpinfo check.
-4. Next batch: 27, 29, 31, 33.
-5. No worktrees; parallel agents share the main checkout on disjoint files.
-
-Later 2026-10-17: leftover "provenance E2E tree" albums 19-25 deleted (user approved); 6-18 approved
-too, the delete is handed to the user (auto mode refused it). Task 42 added for the seed leak.
-
-## Answered 2026-10-17 (third round, "all a")
-
-1. Task 41 closed as not needed; first-album modal in `docs/backlog.md`.
-2. Task 43: both album delete screens show a refused delete's message.
-3. Task 44: the photo page's Notiz button reads "Notiz speichern" and the block gets a heading.
-4. Task 45: `OrphanTagsTest` keeps its unused-tag snapshot in a git-ignored file and restores leftovers at the next setUp.
-5. Deploy once every task is committed; the user first commits or reverts the four `galleries/Verschiedenes/*.png`.
-6. Task 46: handbook ch6's restore path run end to end on a throwaway photo.
-7. Task 42's concurrent-seed race: backlog line only.
-
-## Answered 2026-10-18
-
-1. Task 47: uploads refuse a level outside the offered ones, and the sync counts every photo it deletes.
-2. (folded into 47)
-3. Task 48: the tag cloud; letter list on phones, first-album modal, concurrent seeds stay in the backlog.
-4. Tasks 40, 47, 48, 49, 50 run in parallel (max 6).
-5. The four PNGs turned out to be test pollution: task 49 (default a: revert the files, rescan, delete
-   the four test persons and tags; the user runs the script).
-6. typetags pushed by the user.
-7. Task 50: a Sonnet agent reads the handbook German and adds ledger rows.
-
-## Answered 2026-10-18 (second round, "all a"; apply when resuming)
-
-1. Task 47 includes `pwg.images.uploadAsync` (same level check, own characterization case).
-2. Task 49: the agent writes the script and proves it on throwaway copies; the user runs the final
-   `! ...` command.
-3. Task 40: no core edit; the persons guard merges the marked persons' tags into `tag_ids` before
-   `pwg.images.add` / `uploadAsync` run.
-4. Resume all five (40, 47-50) in parallel.
-5. Deploy after every task is committed and task 49's cleanup has run; then the remote
-   `display_errors` check and the compiled-template purge.
-
-## Incidents (all repaired, recorded so a later failure can be traced)
-
-- 2026-10-17/18: the login expired mid-run and cut off three verifiers (tasks 32, 45, 46). Checked
-  afterwards: no mutant left (container md5 = host = backups), real unused tags 13835/28562 intact,
-  no snapshot file left; one scratch test (`ScratchRestoreTest.php`) removed. All three re-verified.
-- 2026-10-17: task 35's `album-tree` seed leaked 20 albums (ids 6-25, no photos); deleted (19-25 by
-  the main agent, 6-18 by the user, auto mode refused it). Cause and fix: task 42.
-
-- 2026-10-17, task 33 verify: the provenance photo anchor stayed flipped back to the old
-  `savebar-footer` value for a few minutes outside the suite lock (one attempt flipped on the host
-  while still queued for the lock; one restore trap used a relative path after `cd`). Restored by
-  hand, templates_c cleared, md5 host = container. A provenance photo-page run in that window saw
-  the old placement.
-
-- 2026-10-17, task 34 verify: one mutant run (photoinfo tags builder without the
-  `CodedCharacterSet` line, about 10 s) ran without the suite lock (the `flock` wrapper was a
-  no-op). Restored at once; a parallel photoinfo run in that window could have read the mutant.
-
-- 2026-10-17, task 23: two mutant runs did not hold the suite lock; for about 30 s each, core's
-  menu count query ran with one join removed. Restored at once.
-
-- Task 09's flip script briefly copied typetags' `admin.php` over core's root `admin.php` and
-  created a stray root `main.inc.php` (relative paths in an EXIT trap after `cd`); restored, checked
-  clean. Use absolute paths in flip traps.
-- typetags' `TypeTags show_all` was off for 15-30 minutes after `CsrfTest` ran against old code;
-  reset to `b:1`, the test now restores the config.
-
-Task 16 found, out of its scope: the persons picker search (`pwg.persons.getList` `q`) and
-`admin/persons.php`'s `$_GET['q']` still use core's slashed value (`docs/backlog.md`).
+Hand-check left open (task 50): left click zone on an album's first photo goes to the album
+(handbook says only "zum vorigen Foto"); the Eigenschaften page's own *Notiz speichern* is not
+named in handbook 03. Both listed in task 50's file.
 
 ## Open items needing the user
 
 - **Remote `display_errors` re-check:** after the next deploy, the remote phpinfo should read
   `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). The user
-  agreed to the deploy once every task is committed and the four PNGs are settled.
+  agreed to the deploy once every task is committed and the four PNGs are settled (both true
+  since 2026-10-18).
 - typetags `843065a`, `5d5e65d`: pushed by the user 2026-10-18 (both on `origin/master`).
 
 
