@@ -3,17 +3,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The regression net for the privacy level the four upload methods store
- * (pwg.images.upload, addSimple, add, uploadAsync), which task 47 changes.
+ * The privacy level the four upload methods store (pwg.images.upload, addSimple,
+ * add, uploadAsync), task 47.
  *
- * Every case here is [ERR]: the oracle is the current implementation, not a
- * requirement. Nothing promises that a level between the offered ones (3, 5) is
- * stored; these record that it is today. They report a change; they prove
- * nothing correct.
- *
- * They land and pass before the change, which is normally the tell that a test
- * recorded code rather than drove it. Here that is the point, so each was
- * watched go red by breaking the behaviour it claims to watch.
+ * Cases marked [REQ] are requirements: a level the install does not offer
+ * (`$conf['available_permission_levels']`) is refused with 'Invalid level',
+ * as pwg.images.setInfo does, and nothing is stored. The [ERR] case records that
+ * an offered level is stored as sent, which is core's behaviour and unchanged.
+ * Until task 47 a level between the offered ones was stored as well; that was an
+ * [ERR] case recording the defect.
  *
  * `ws.php` registers `level` with `maxValue` = the highest offered level, so a
  * value above 8 never reaches a handler and 3, 5, 6 and 7 are the ones that can.
@@ -47,12 +45,23 @@ final class CoreUploadLevelCharacterizationTest extends TestCase
     }
 
     /** @return array<string, array{string, int}> */
-    public static function storedLevels(): array
+    public static function offeredLevels(): array
+    {
+        return self::rows(array(0, 4, 8));
+    }
+
+    /** @return array<string, array{string, int}> */
+    public static function unofferedLevels(): array
+    {
+        return self::rows(array(3, 5));
+    }
+
+    private static function rows(array $levels): array
     {
         $rows = array();
         foreach (array('upload', 'addSimple', 'add', 'uploadAsync') as $method)
         {
-            foreach (array(0, 4, 8, 3, 5) as $level)
+            foreach ($levels as $level)
             {
                 $rows["$method level $level"] = array($method, $level);
             }
@@ -61,21 +70,50 @@ final class CoreUploadLevelCharacterizationTest extends TestCase
         return $rows;
     }
 
-    /** [ERR] [ECP] A level, offered or not, is stored as sent. */
-    #[DataProvider('storedLevels')]
-    public function testTheLevelSentIsStored(string $method, int $level): void
+    /** [ERR] [ECP] An offered level is stored as sent. */
+    #[DataProvider('offeredLevels')]
+    public function testAnOfferedLevelIsStored(string $method, int $level): void
     {
-        $id = $this->send($method, $level);
+        $sent = $this->send($method, $level);
+        $id = $sent['id'];
 
         $this->assertGreaterThan(0, $id, "the $method call created no photo");
+        $this->assertSame(
+            $sent['md5'],
+            (string)$this->db->scalar("SELECT md5sum FROM `piwigo_images` WHERE id = $id"),
+            'anti-vacuity: the refusal case looks a photo up by this checksum'
+        );
         $this->assertSame(
             $level,
             (int)$this->db->scalar("SELECT level FROM `piwigo_images` WHERE id = $id")
         );
     }
 
-    /** Sends one upload of a fresh photo and hands back the new id (0 when none was created). */
-    private function send(string $method, int $level): int
+    /** [REQ] [ECP] A level the install does not offer is refused and nothing is stored. */
+    #[DataProvider('unofferedLevels')]
+    public function testAnUnofferedLevelIsRefusedAndNothingIsStored(string $method, int $level): void
+    {
+        $sent = $this->send($method, $level);
+
+        $this->assertSame('fail', $sent['json']['stat'] ?? null, $sent['body']);
+        $this->assertStringContainsString('Invalid level', (string)$sent['body']);
+        $this->assertSame(
+            0,
+            (int)$this->db->scalar("SELECT COUNT(*) FROM `piwigo_images` WHERE md5sum = '{$sent['md5']}'"),
+            'a refused upload must create no photo row'
+        );
+        if ($method === 'uploadAsync')
+        {
+            $this->assertSame(
+                array(),
+                glob(PIWIGO_ROOT . 'upload/buffer/' . $sent['md5'] . '-u*'),
+                'a refused chunk must leave no buffer file'
+            );
+        }
+    }
+
+    /** @return array{id:int,json:?array,body:string,md5:string} the new photo's id (0 when none was created) and the answer */
+    private function send(string $method, int $level): array
     {
         $file = $this->uniqueFile();
         $name = 'provenance-level-' . bin2hex(random_bytes(4)) . '.png';
@@ -135,7 +173,7 @@ final class CoreUploadLevelCharacterizationTest extends TestCase
             $this->fixture->adoptImage($id);
         }
 
-        return $id;
+        return array('id' => $id, 'json' => $res['json'], 'body' => (string)$res['body'], 'md5' => $md5);
     }
 
     /** A copy of the fixture photo with random bytes after its end, so its md5 is this call's alone. */

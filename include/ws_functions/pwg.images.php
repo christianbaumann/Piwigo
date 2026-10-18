@@ -1400,6 +1400,11 @@ function ws_images_add($params, $service)
       ), 'WS');
   }
 
+  if (isset($params['level']) and !in_array($params['level'], $conf['available_permission_levels']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid level');
+  }
+
   if ($params['image_id'] > 0)
   {
     $query = '
@@ -1551,6 +1556,11 @@ SELECT id, name, permalink
 function ws_images_addSimple($params, $service)
 {
   global $conf, $logger;
+
+  if (isset($params['level']) and !in_array($params['level'], $conf['available_permission_levels']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid level');
+  }
 
   if (!isset($_FILES['image']))
   {
@@ -1806,6 +1816,11 @@ function ws_images_upload($params, $service)
     return new PwgError(403, 'Invalid security token');
   }
 
+  if (isset($params['level']) and !in_array($params['level'], $conf['available_permission_levels']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid level');
+  }
+
   if (isset($params['format_of']))
   {
     $format_ext = null;
@@ -2053,6 +2068,11 @@ function ws_images_uploadAsync($params, &$service)
   if (!preg_match('/^[a-fA-F0-9]{32}$/', $params['original_sum']))
   {
     return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid original_sum');
+  }
+
+  if (isset($params['level']) and !in_array($params['level'], $conf['available_permission_levels']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid level');
   }
 
   if ($params['image_id'] > 0)

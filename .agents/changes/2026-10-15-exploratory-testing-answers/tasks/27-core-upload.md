@@ -31,8 +31,9 @@ No upload ever stores bytes of another upload, Abbrechen leaves nothing behind, 
   * **Note:** Verified via `CoreUploadChunkIsolationTest::testCancelRemovesTheSentChunks` and `...FromTheLounge`
 * [x] E2E: disallowed file in a selection, valid files shown once; fake `.jpg` reported as failed; failed `uploadCompleted` reported; Abbrechen before the first file leaves a usable page
   * **Note:** Verified via galleryrules `upload-page.spec.js` (5 cases green; all 5 red on the old JS)
-* [ ] provenance suites pass
+* [x] provenance suites pass
   * **Note:** unit 307 green; integration 387 tests, 2 failures in `CoreDeleteCategoriesCharacterizationTest` (the last-album refusal of another task, not upload)
+  * **Note:** closed 2026-10-18: provenance integration 432 tests OK (3 skipped), unit 307 OK, run by task 47 under the suite lock; the two `CoreDeleteCategoriesCharacterizationTest` cases pass since task 39
 
 ## Deviations
 

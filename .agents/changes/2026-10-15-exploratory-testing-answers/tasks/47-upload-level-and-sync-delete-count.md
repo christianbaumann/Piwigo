@@ -16,24 +16,23 @@ Added 2026-10-18 from task 36's findings (user's answers 1a, 2a).
 
 ## Work
 
-* [-] Characterize the touched core area first (`[ERR]`, own commit), watch each case go red when the behaviour is broken
-  * **Note:** paused before writing any test; nothing changed yet
-* [ ] `pwg.images.upload`, `pwg.images.addSimple`, `pwg.images.add` refuse a `level` not in `available_permission_levels` (same error as task 36's `setInfo`), nothing stored
-* [ ] The sync's deleted counter counts the photos `delete_categories()` actually deletes, including a photo stored elsewhere whose only links were in a removed album; simulation and real
-* [ ] Add the edit to `.claude/rules/fork-local-core-edits.md`
+* [x] Characterize the touched core area first (`[ERR]`, own commit), watch each case go red when the behaviour is broken
+  * **Note:** `CoreUploadLevelCharacterizationTest` (new; 20 cases, level stored as sent on upload, addSimple, add, uploadAsync) and two new cases in `CoreSiteUpdateCountsCharacterizationTest`; four mutants killed (storing level 0 in `add_uploaded_file()`, dropping `level` from addSimple's `$info_columns`, `WHERE 0 AND` and the links table in the sync count)
+* [x] `pwg.images.upload`, `pwg.images.addSimple`, `pwg.images.add`, `pwg.images.uploadAsync` refuse a `level` not in `available_permission_levels` (same error as task 36's `setInfo`), nothing stored
+* [x] The sync's deleted counter counts the photos `delete_categories()` actually deletes
+  * **Note:** no code change, see Deviations
+* [x] Add the edit to `.claude/rules/fork-local-core-edits.md`
 
 ## Verification
 
-* [ ] Integration: level 3 and 5 refused on all three methods, no photo row created / row unchanged; 0 and 8 accepted
-* [ ] Integration: the counter equals the deleted photo rows, simulation and real
-* [ ] provenance and photoinfo suites pass
+* [x] Integration: level 3 and 5 refused on all four methods, no photo row created; 0, 4 and 8 accepted
+  * **Note:** Verified via `CoreUploadLevelCharacterizationTest`
+* [x] Integration: the counter equals the deleted photo rows, simulation and real
+  * **Note:** Verified via `CoreSiteUpdateCountsCharacterizationTest` (`testAPhotoStoredElsewhereSurvivesAndIsNotCounted`, `testARemovedFolderCountsItsPhotosAsDeleted`, `testASimulatedRemovedFolderCountsItsPhotos`)
+* [x] provenance and photoinfo suites pass (see report)
 
-## WIP (paused 2026-10-18)
+## Deviations
 
-* Read only so far; no file changed (tracked or untracked), no flip run, no throwaway folder or scratchpad copy created.
-* Findings for the next step:
-  * `level` handlers: `ws_images_add` (~1468, passes `$params['level']` to `add_uploaded_file()`), `ws_images_addSimple` (~1575; stores via `$info_columns` incl. `level`, `single_update`), `ws_images_upload` (~1975), also `ws_images_uploadAsync` (~2211, same flaw; decide whether to include).
-  * `ws.php` registers `level` with `maxValue` = 8, so only 3, 5, 6, 7 reach a handler check (as in task 36). Add `isset($params['level']) and !in_array(..., $conf['available_permission_levels'])` -> `PwgError(WS_ERR_INVALID_PARAM, 'Invalid level')` at the top of each handler, before any file is stored (re-read pwg.images.php before editing; task 40 may touch it).
-  * Sync counter: `admin/site_update.php` (task 36 counts `storage_category_id IN get_subcat_ids($to_delete)`); the gap is a photo stored elsewhere whose only links were in the removed album(s); `delete_categories()` deletes it. Fix idea: count the photos `delete_categories()` would delete (images linked to the removed albums and to no other album) in addition to / instead of the storage count, simulation and real.
-  * Fixtures: `CoreUploadCharacterizationTest`, `CoreUploadChunkCharacterizationTest` (provenance) for upload, `CoreSiteUpdateCountsCharacterizationTest` for the sync (helpers `syncedSubFolderWithOnePhoto()`, `sync()`, `summary()`).
-* Next: write [ERR] characterization (level 3/5 stored today on add/addSimple/upload; deleted-count misses the elsewhere-stored photo), commit alone, then implement, add the fork-local-core-edits.md line, run provenance unit+integration and photoinfo integration under the flock.
+* The premise "`delete_categories()` deletes a photo stored elsewhere whose only links were in a removed album" is false. The sync calls it in `no_delete` mode: it deletes the photos stored in the removed folders and only drops links of the others. A photo stored elsewhere survives (orphaned from that album), so the existing count (task 36) already equals the deleted rows. `admin/site_update.php` is unchanged; the case is recorded `[ERR]` in `testAPhotoStoredElsewhereSurvivesAndIsNotCounted`, and `testAPhotoStoredInTheFolderAndLinkedElsewhereIsDeletedAndCounted` covers the other direction. Task 36's Deviation bullet on this was wrong.
+* The level check sits at the top of each handler (after the token check in `upload`, after the `original_sum` check in `uploadAsync`), before any file is moved or row written. `ws.php` clamps values above 8, so only 3, 5, 6, 7 reach it.
+* The refusal case counts rows by the sent file's `md5sum`, not all rows: other agents create photos in the shared install, a total count flapped.
