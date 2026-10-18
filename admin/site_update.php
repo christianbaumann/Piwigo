@@ -136,6 +136,7 @@ if (isset($_POST['submit'])
   $counts['new_categories'] = 0;
   $counts['del_categories'] = 0;
   $counts['del_elements'] = 0;
+  $counts['relinked'] = 0;
   $counts['new_elements'] = 0;
   $counts['upd_elements'] = 0;
 }
@@ -458,6 +459,9 @@ SELECT COUNT(*)
   WHERE storage_category_id IN ('.implode(',', get_subcat_ids($to_delete)).')
 ;';
     list($counts['del_elements']) = pwg_db_fetch_row(pwg_query($query));
+
+    // fork-local: a photo stored elsewhere must not be left in no album
+    $counts['relinked'] = relink_photos_of_albums_to_be_removed($to_delete, $simulate);
 
     if (!$simulate)
     {
@@ -942,6 +946,7 @@ if (isset($_POST['submit'])
       'NB_DEL_CATEGORIES'=>$counts['del_categories'],
       'NB_NEW_ELEMENTS'=>$counts['new_elements'],
       'NB_DEL_ELEMENTS'=>$counts['del_elements'],
+      'NB_RELINKED'=>$counts['relinked'],
       'NB_UPD_ELEMENTS'=>$counts['upd_elements'],
       'NB_ERRORS'=>count($errors),
       ));

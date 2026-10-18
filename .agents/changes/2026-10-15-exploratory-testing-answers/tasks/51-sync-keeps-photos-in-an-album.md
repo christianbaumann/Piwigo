@@ -17,12 +17,21 @@ Added 2026-10-18 (user's answer 1a). The filesystem sync removes the album of a 
 
 ## Work
 
-* [ ] Such a photo is linked to the parent of the highest removed album; when that is the root, to an album `Ohne Album` created on demand (private, admins only). Real sync only; the simulation reports it without linking
-* [ ] The sync result names the number of photos so relinked (German string via `local/language/de_DE.lang.php` if core has none, with its `GermanOverrideKeyTest` row)
-* [ ] Decision file 0085; fork-local bullet
+* [x] Such a photo is linked to the parent of the highest removed album; when that is the root, to an album `Ohne Album` created on demand (private, admins only). Real sync only; the simulation reports it without linking
+  * **Note:** `relink_photos_of_albums_to_be_removed()` in `admin/include/functions.php`
+* [x] The sync result names the number of photos so relinked (German string via `local/language/de_DE.lang.php` if core has none, with its `GermanOverrideKeyTest` row)
+  * **Note:** keys `Without album` and `photos linked to a remaining album`
+* [x] Decision file 0085; fork-local bullet
 
 ## Verification
 
-* [ ] Integration: photo stored elsewhere, only link in the removed folder's album: after the real sync it is in the parent album (sub-folder case) and in `Ohne Album` (top-level case); simulation changes nothing and reports it; a photo with another album keeps only that one
-* [ ] The [ERR] case `testAPhotoStoredElsewhereSurvivesAndIsNotCounted` updated in its own cycle with the reason
-* [ ] provenance suites pass
+* [x] Integration: photo stored elsewhere, only link in the removed folder's album: after the real sync it is in the parent album (sub-folder case) and in `Ohne Album` (top-level case); simulation changes nothing and reports it; a photo with another album keeps only that one
+  * **Note:** Verified via `CoreSiteUpdateCountsCharacterizationTest` (3 new cases); mutants killed: simulate guard, `NOT EXISTS`, root target
+* [x] The [ERR] case `testAPhotoStoredElsewhereSurvivesAndIsNotCounted` updated in its own cycle with the reason
+  * **Note:** now [REQ], asserts the link to the parent
+* [x] provenance suites pass
+  * **Note:** unit 313 OK; integration 435 tests OK, 3 skipped
+
+## Deviations
+
+* The top-level case cannot be reached by a real sync (a sync limited to an album never removes a top-level folder; a full sync was off limits). The test sets a sub-folder's `id_uppercat` to NULL; target from `id_uppercat`, highest album from `uppercats`.

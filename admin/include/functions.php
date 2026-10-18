@@ -2122,6 +2122,119 @@ SELECT
 }
 
 /**
+ * fork-local: links every photo that the removal of the given albums would leave in no
+ * album to the parent of the highest removed album it was in, or to a private album
+ * "Ohne Album" at the root when that album is a top-level one. Photos stored in the
+ * removed albums are not touched (delete_categories() deletes them).
+ *
+ * @param int[] $removed_ids albums about to be removed (their sub-albums go with them)
+ * @param bool $simulate count only, link nothing and create no album
+ * @return int number of photos relinked
+ */
+function relink_photos_of_albums_to_be_removed($removed_ids, $simulate)
+{
+  $all_ids = get_subcat_ids($removed_ids);
+  if (count($all_ids) == 0)
+  {
+    return 0;
+  }
+  $in_set = implode(',', $all_ids);
+
+  $query = '
+SELECT ic.image_id, ic.category_id
+  FROM '.IMAGE_CATEGORY_TABLE.' AS ic
+    INNER JOIN '.IMAGES_TABLE.' AS i ON i.id = ic.image_id
+  WHERE ic.category_id IN ('.$in_set.')
+    AND (i.storage_category_id IS NULL OR i.storage_category_id NOT IN ('.$in_set.'))
+    AND NOT EXISTS (
+      SELECT 1 FROM '.IMAGE_CATEGORY_TABLE.' AS other
+        WHERE other.image_id = ic.image_id AND other.category_id NOT IN ('.$in_set.')
+    )
+  ORDER BY ic.image_id, ic.category_id
+;';
+  $links = query2array($query);
+  if (count($links) == 0)
+  {
+    return 0;
+  }
+
+  $query = '
+SELECT id, id_uppercat, uppercats
+  FROM '.CATEGORIES_TABLE.'
+  WHERE id IN ('.$in_set.')
+;';
+  $categories = query2array($query, 'id');
+
+  $target_of = array();
+  foreach ($links as $link)
+  {
+    if (isset($target_of[ $link['image_id'] ]))
+    {
+      continue;
+    }
+    $highest = $link['category_id'];
+    foreach (explode(',', $categories[ $link['category_id'] ]['uppercats']) as $id)
+    {
+      if (isset($categories[$id]))
+      {
+        $highest = $id;
+        break;
+      }
+    }
+    $parent = $categories[$highest]['id_uppercat'];
+    $target_of[ $link['image_id'] ] = empty($parent) ? 0 : (int)$parent;
+  }
+
+  if (!$simulate)
+  {
+    $images_of = array();
+    foreach ($target_of as $image_id => $target)
+    {
+      $images_of[$target][] = $image_id;
+    }
+    foreach ($images_of as $target => $image_ids)
+    {
+      if ($target == 0)
+      {
+        $target = get_unsorted_album_id();
+      }
+      associate_images_to_categories($image_ids, array($target));
+    }
+  }
+
+  return count($target_of);
+}
+
+/**
+ * fork-local: the private top-level album "Ohne Album" (administrators only), created on demand.
+ *
+ * @return int
+ */
+function get_unsorted_album_id()
+{
+  $name = l10n('Without album');
+  $query = '
+SELECT id
+  FROM '.CATEGORIES_TABLE.'
+  WHERE name = \''.pwg_db_real_escape_string($name).'\'
+    AND id_uppercat IS NULL
+    AND dir IS NULL
+    AND status = \'private\'
+  ORDER BY id
+  LIMIT 1
+;';
+  $ids = query2array($query, null, 'id');
+  if (count($ids) > 0)
+  {
+    return (int)$ids[0];
+  }
+
+  $created = create_virtual_category($name, null, array('status' => 'private'));
+
+  return (int)$created['id'];
+}
+
+/**
  * Dissociate a list of images from a category.
  *
  * @param int[] $images

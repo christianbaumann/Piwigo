@@ -219,6 +219,16 @@ final class GermanOverrideKeyTest extends TestCase
                 "l10n('You have %d orphan tags %s')",
                 1,
             ),
+            'Without album' => array(
+                'admin/include/functions.php',
+                "l10n('Without album')",
+                1,
+            ),
+            'photos linked to a remaining album' => array(
+                'admin/themes/default/template/site_update.tpl',
+                "{'photos linked to a remaining album'|@translate}",
+                1,
+            ),
             'A person needs a name' => array(
                 'plugins/persons/include/functions.inc.php',
                 "define('PERSONS_NAME_REQUIRED_MESSAGE', 'A person needs a name');",

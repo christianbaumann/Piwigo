@@ -70,3 +70,8 @@ $lang['The name of directories and files must be composed of letters, numbers, "
 // wording reads "1 nicht benutzte Schlagworte" and "11 verwaiste :"
 $lang['You have %s1 orphan : %s2'] = 'Nicht benutzte Schlagworte (%s1):%s2';
 $lang['You have %d orphan tags %s'] = 'Nicht benutzte Schlagworte (%d): %s';
+
+// admin/include/functions.php and admin/themes/default/template/site_update.tpl - the sync
+// links a photo stored elsewhere to a remaining album (decision 0085)
+$lang['Without album'] = 'Ohne Album';
+$lang['photos linked to a remaining album'] = 'Fotos, die einem verbleibenden Album zugeordnet wurden';

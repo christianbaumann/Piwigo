@@ -20,6 +20,7 @@ $('#syncFiles label').click(function () {
   <li class="update_summary_new">{$update_result.NB_NEW_ELEMENTS} {'photos added in the database'|@translate}</li>
   <li class="update_summary_del">{$update_result.NB_DEL_CATEGORIES} {'albums deleted in the database'|@translate}</li>
   <li class="update_summary_del">{$update_result.NB_DEL_ELEMENTS} {'photos deleted from the database'|@translate}</li>
+  <li class="update_summary_relinked">{$update_result.NB_RELINKED} {'photos linked to a remaining album'|@translate}</li>
   <li>{$update_result.NB_UPD_ELEMENTS} {'photos updated in the database'|@translate}</li>
   <li class="update_summary_err">{$update_result.NB_ERRORS} {'errors during synchronization'|@translate}</li>
 </ul>

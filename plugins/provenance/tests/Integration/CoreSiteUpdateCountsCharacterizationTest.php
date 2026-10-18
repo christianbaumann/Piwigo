@@ -26,6 +26,7 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
     private FixtureBuilder $fixture;
     /** @var array<int, array{parent:int,path:string}> registered before the first sync, so a failing case still cleans up */
     private array $subFolders = array();
+    private bool $unsortedWasAbsent = false;
 
     protected function setUp(): void
     {
@@ -38,7 +39,9 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
     protected function tearDown(): void
     {
         $this->destroySubFolders();
+        $this->destroyUnsortedAlbum();
         $this->fixture->destroyPhysicalAlbums();
+        $this->fixture->destroyTestAlbums();
         $this->ws->logout();
     }
 
@@ -128,13 +131,14 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
     }
 
     /**
-     * [ERR] [ECP] A photo stored in a kept album but linked only into a removed
-     * folder is not deleted with it, so it is not counted.
+     * [REQ] [ECP] A photo stored in a kept album but linked only into a removed
+     * folder is not deleted with it, so it is not counted, and it is linked to
+     * the removed folder's parent instead of being left in no album (task 51).
      *
-     * Oracle: the sync calls delete_categories() in its default 'no_delete' mode
-     * (admin/site_update.php), which deletes the photos stored in the removed
-     * folders and only drops the links of the others. No requirement confirms
-     * this; task 47 assumed the opposite and this records what core does.
+     * Was [ERR]: core's sync calls delete_categories() in its default 'no_delete'
+     * mode, which deletes the photos stored in the removed folders and only drops
+     * the links of the others, leaving such a photo in no album. The deletion
+     * and count half is still core's behaviour; the final link is the fork's.
      */
     public function testAPhotoStoredElsewhereSurvivesAndIsNotCounted(): void
     {
@@ -155,6 +159,7 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
             (int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_images WHERE id = {$sub['kept']}"),
             'the photo stored in the kept album is still there'
         );
+        $this->assertSame(array($sub['parent']), $this->albumsOf($sub['kept']), 'it is not left in no album');
     }
 
     /** [ERR] [ECP] A photo stored in the removed folder and linked elsewhere too is deleted and counted. */
@@ -170,6 +175,77 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
 
         $this->assertSame(1, $real['deleted_photos']);
         $this->assertSame(0, (int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_images WHERE id = $stored"));
+    }
+
+    /**
+     * [REQ] [ST] A photo linked only to a removed sub-folder is linked to the
+     * removed folder's parent, so it does not end up in no album (task 51). A
+     * simulation reports the count and links nothing.
+     */
+    public function testAPhotoOfARemovedSubFolderMovesToTheParent(): void
+    {
+        $sub = $this->syncedSubFolderBesideAKeptPhoto();
+        $this->linkOnlyTo($sub['kept'], $sub['id']);
+        $this->removeFolder($sub);
+
+        $simulated = $this->summary($this->sync($sub['parent'], true));
+        $this->assertSame(1, $simulated['relinked_photos']);
+        $this->assertSame(array($sub['id']), $this->albumsOf($sub['kept']), 'a simulation links nothing');
+
+        $real = $this->summary($this->sync($sub['parent'], false));
+
+        $this->assertSame(1, $real['relinked_photos']);
+        $this->assertSame(array($sub['parent']), $this->albumsOf($sub['kept']));
+    }
+
+    /** [REQ] [ECP] A photo that has another album keeps exactly that one; nothing is added. */
+    public function testAPhotoWithAnotherAlbumIsNotRelinked(): void
+    {
+        $sub = $this->syncedSubFolderBesideAKeptPhoto();
+        $other = $this->fixture->createTestAlbum('provenance-sync-other-' . bin2hex(random_bytes(4)));
+        $this->linkOnlyTo($sub['kept'], $sub['id']);
+        $this->db->query("INSERT INTO piwigo_image_category (image_id, category_id) VALUES ({$sub['kept']}, $other)");
+        $this->removeFolder($sub);
+
+        $real = $this->summary($this->sync($sub['parent'], false));
+
+        $this->assertSame(1, $real['deleted_albums'], 'anti-vacuity: the folder really went');
+        $this->assertSame(0, $real['relinked_photos']);
+        $this->assertSame(array($other), $this->albumsOf($sub['kept']));
+    }
+
+    /**
+     * [REQ] [ST] When the removed album is a top-level one, its stray photo goes
+     * to a private album at the root named "Ohne Album", created on demand.
+     *
+     * A sync limited to an album never removes a top-level folder, so the
+     * sub-folder's row is made top-level (id_uppercat NULL) while its uppercats
+     * still lead below the synced album; core derives the folder's path from
+     * uppercats and the target from id_uppercat.
+     */
+    public function testAPhotoOfARemovedTopLevelAlbumMovesToAPrivateRootAlbum(): void
+    {
+        $this->forgetUnsortedAlbum();
+        $sub = $this->syncedSubFolderBesideAKeptPhoto();
+        $this->db->query("UPDATE piwigo_categories SET id_uppercat = NULL WHERE id = {$sub['id']}");
+        $this->linkOnlyTo($sub['kept'], $sub['id']);
+        $this->removeFolder($sub);
+
+        $simulated = $this->summary($this->sync($sub['parent'], true));
+        $this->assertSame(1, $simulated['relinked_photos']);
+        $this->assertSame(0, $this->unsortedAlbums(), 'a simulation creates no album');
+
+        $real = $this->summary($this->sync($sub['parent'], false));
+
+        $this->assertSame(1, $real['relinked_photos']);
+        $this->assertSame(1, $this->unsortedAlbums());
+        $unsorted = (int)$this->db->scalar($this->unsortedQuery('id'));
+        $this->assertSame(array($unsorted), $this->albumsOf($sub['kept']));
+        $this->assertSame(
+            0,
+            (int)$this->db->scalar("SELECT COUNT(*) FROM piwigo_user_access WHERE cat_id = $unsorted AND user_id NOT IN (SELECT user_id FROM piwigo_user_infos WHERE status IN ('webmaster','admin'))"),
+            'only administrators are granted the album'
+        );
     }
 
     private function syncedAlbumWithOnePhoto(): array
@@ -232,13 +308,66 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         return array('id' => $id, 'parent' => $parent['id'], 'path' => $path, 'kept' => $kept);
     }
 
+    /** @param int $imageId a photo, @param int $catId its only album from now on */
+    private function linkOnlyTo(int $imageId, int $catId): void
+    {
+        $this->db->query("DELETE FROM piwigo_image_category WHERE image_id = $imageId");
+        $this->db->query("INSERT INTO piwigo_image_category (image_id, category_id) VALUES ($imageId, $catId)");
+    }
+
+    /** @return int[] */
+    private function albumsOf(int $imageId): array
+    {
+        $res = $this->db->query("SELECT category_id FROM piwigo_image_category WHERE image_id = $imageId ORDER BY category_id");
+        $ids = array();
+        while ($row = $res->fetch_row())
+        {
+            $ids[] = (int)$row[0];
+        }
+
+        return $ids;
+    }
+
+    private function unsortedQuery(string $column): string
+    {
+        return "SELECT $column FROM piwigo_categories WHERE name = 'Ohne Album' AND id_uppercat IS NULL AND dir IS NULL AND status = 'private'";
+    }
+
+    private function unsortedAlbums(): int
+    {
+        return (int)$this->db->scalar(str_replace('SELECT id', 'SELECT COUNT(*)', $this->unsortedQuery('id')));
+    }
+
+    /** Remembers whether the install already has the album, so teardown removes only one a case caused. */
+    private function forgetUnsortedAlbum(): void
+    {
+        $this->assertSame(0, $this->unsortedAlbums(), 'the install already has an "Ohne Album"; the case would prove nothing');
+        $this->unsortedWasAbsent = true;
+    }
+
+    private function destroyUnsortedAlbum(): void
+    {
+        if (!$this->unsortedWasAbsent)
+        {
+            return;
+        }
+        $res = $this->db->query($this->unsortedQuery('id'));
+        while ($row = $res->fetch_row())
+        {
+            $this->db->query("DELETE FROM piwigo_image_category WHERE category_id = {$row[0]}");
+            $this->db->query("DELETE FROM piwigo_user_access WHERE cat_id = {$row[0]}");
+            $this->db->query("DELETE FROM piwigo_categories WHERE id = {$row[0]}");
+        }
+        $this->unsortedWasAbsent = false;
+    }
+
     /** Whatever a case left of the sub folders: rows, files, folder. */
     private function destroySubFolders(): void
     {
         foreach ($this->subFolders as $sub)
         {
             $id = (int)$this->db->scalar(
-                "SELECT id FROM piwigo_categories WHERE id_uppercat = {$sub['parent']} AND dir = 'sub'"
+                "SELECT id FROM piwigo_categories WHERE uppercats LIKE '{$sub['parent']},%' AND dir = 'sub'"
             );
             if ($id > 0)
             {
@@ -299,12 +428,13 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
         return (string)$res['body'];
     }
 
-    /** @return array{deleted_albums:int,deleted_photos:int,errors:int,listed_errors:int} what the result page says */
+    /** @return array{deleted_albums:int,deleted_photos:int,errors:int,listed_errors:int,relinked_photos:int} what the result page says */
     private function summary(string $page): array
     {
         $this->assertGreaterThan(2000, strlen($page), 'anti-vacuity: a result page, not an error page');
         preg_match_all('~<li class="update_summary_del">(\d+) ~', $page, $del);
         $this->assertCount(2, $del[1], 'anti-vacuity: both deletion counters are on the page');
+        $relinked = preg_match('~<li class="update_summary_relinked">(\d+) ~', $page, $rel) ? (int)$rel[1] : -1;
         $this->assertSame(1, preg_match('~<li class="update_summary_err">(\d+) ~', $page, $err));
         preg_match('~<div class="errors">\s*<ul>(.*?)</ul>~s', $page, $list);
 
@@ -312,6 +442,7 @@ final class CoreSiteUpdateCountsCharacterizationTest extends TestCase
             'deleted_albums' => (int)$del[1][0],
             'deleted_photos' => (int)$del[1][1],
             'errors' => (int)$err[1],
+            'relinked_photos' => $relinked,
             'listed_errors' => isset($list[1]) ? substr_count($list[1], '<li>') : 0,
         );
     }
