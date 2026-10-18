@@ -1,4 +1,4 @@
-# Status — paused 2026-10-17
+# Status — paused 2026-10-18
 
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
@@ -34,21 +34,55 @@ not in them.
 | 18 tag tools guard person tags | `7acc5a1cb` (characterization), `be1bf8005` (typetags `5d5e65d`, **not pushed**) |
 | 23 menu photo count | `22ab265a7` (characterization), `71711d391` (core fix, decision 0074) |
 | 25 blank album name hint | `3e88343ba` |
+| 28 addRegion frame | `7367e2c59` (decision 0077: the MWG clip stays) |
+| 34 IPTC charset | `6c249cf2f` |
+| 30 Verlauf "Von wem" | `43c7dad22` |
+| 31 handbook ch6/ch7 | `690259041` (decision 0078: marking needs a mouse) |
+| 26 core tag admin | `b5927f3f0` (characterization), `8992faed0` (decision 0076) |
+| 33 Notiz outside form | `66feef108` |
+| 29 marking editor | `6fd846937` |
+| 35 album properties | `c84c9d9db` (characterization), `7b96192a7` |
+| 27 core upload | `9d78156ed` (characterization), `791e2de19` (decision 0079) |
+| 39 album delete keeps photos | `a3a4602fb` (decision 0083) |
+| 37 modus wrap and zoom | `3bbb97334` |
+| 42 tree seed restores | `861fdfd75` |
+| 43 delete refusal shown | `a0ff54e54` |
+| 44 Notiz button and heading | `f3f576ad9` |
+| 36 API checks, sync counts | `4e1a79ae9` (characterization), `b8256fe25` |
+| 45 orphan-tag snapshot on disk | `b15bfa2b4` |
+| 32 upload merges file and gallery | `3abe24231` (characterization), `45af91938` (decision 0084, supersedes 0050 for replace) |
+| 46 ch6 restore end to end | `255378088` |
+| 41 add-album dialog hint | closed as not needed (user's answer); finding in `docs/backlog.md` |
 
-Nothing is in progress: no agent running, working tree clean except the four
-`galleries/Verschiedenes/*.png` that were modified before this change started (not ours; leave them).
+Nothing is in progress: no agent running, nothing staged. Uncommitted only: this file, task 41's
+file and two `docs/backlog.md` lines (committed with this handoff), and the four
+`galleries/Verschiedenes/*.png` that were modified before this change started (the user's; leave them).
 
 ## Next
 
-Open tasks: 26-37, 39, 40, 41 (check each task's `dependencies`; 26 and 27 touch core tag admin /
-upload, 26 overlaps 18's `admin/themes/default/js/tags.js` edit).
+**Only open task: 40** (person tag guard: rename, upload, prune, Batch Manager message). Its
+dependency 18 is done; it was held back only because task 32 edited persons/photoinfo, now committed.
+Then, per the user's answers: the deploy (only after the user commits or reverts the four
+`galleries/Verschiedenes/*.png` — `pwg-deploy` uploads files as they are on disk, uncommitted work
+included), the remote `display_errors` re-check, and the remote compiled-template purge
+(Werkzeuge > Wartung; task 26 changed `tags.tpl`, task 41-style prefilters unchanged).
+
+Questions to raise at the next pause (found 2026-10-17/18, not yet asked):
+
+1. `pwg.images.upload` / `addSimple` / `add` accept a `level` between the offered ones (3, 5, 6, 7);
+   admin-only. Same check as task 36's `setInfo`? (task 36 Deviations)
+2. Task 36: the sync's deleted counter misses a photo stored elsewhere whose only links were in a
+   removed album (rare; task 36 Deviations).
+3. Task 37 / 41 / 42 backlog lines (tag cloud nowrap, letter list on phones, first-album modal,
+   concurrent provenance seeds): turn any into tasks?
 
 **typetags `843065a` (task 38) and `5d5e65d` (task 18) are not pushed** (403, git used account
 `dark-sith-lord`); the main repo's submodule pointer references them. Push `plugins/typetags` with
 the right account before pushing the main repo.
 
 Decision numbers used so far: 0069 (05), 0070 (07), 0071 (11), 0072 (14), 0073 (03), 0074 (23),
-0075 (21). Next free: 0076.
+0075 (21), 0076 (26), 0077 (28), 0078 (31), 0079 (27), 0083 (39), 0084 (32). 0080-0082 were
+reserved for tasks that needed none and are unused. Next free: 0085.
 
 Answered 2026-10-17 ("all a"): task 18's unguarded paths and the Batch Manager message become
 task 40; task 25's other dialog becomes task 41; the five dead `image_category` rows are deleted
@@ -85,7 +119,46 @@ New seed options of tasks 18
 
 Applied 2026-10-17: 1a (in task 38), 2a, 3a (task 39 added), 4a (hand check still open), batch 18, 21, 22, 38. 2026-10-17: task 39 refuses the delete (default a); the handbook paragraphs of task 20 are read by a subagent (user's answer).
 
+## Answered 2026-10-17 (second round, "all a")
+
+1. Task 28: keep the MWG clip, decision 0077.
+2. typetags `843065a` / `5d5e65d`: the user pushes `plugins/typetags` with the right account before
+   any push of the main repo.
+3. Remote `display_errors`: deploy once the batch 26/28/30/34 is committed, then the read-only
+   phpinfo check.
+4. Next batch: 27, 29, 31, 33.
+5. No worktrees; parallel agents share the main checkout on disjoint files.
+
+Later 2026-10-17: leftover "provenance E2E tree" albums 19-25 deleted (user approved); 6-18 approved
+too, the delete is handed to the user (auto mode refused it). Task 42 added for the seed leak.
+
+## Answered 2026-10-17 (third round, "all a")
+
+1. Task 41 closed as not needed; first-album modal in `docs/backlog.md`.
+2. Task 43: both album delete screens show a refused delete's message.
+3. Task 44: the photo page's Notiz button reads "Notiz speichern" and the block gets a heading.
+4. Task 45: `OrphanTagsTest` keeps its unused-tag snapshot in a git-ignored file and restores leftovers at the next setUp.
+5. Deploy once every task is committed; the user first commits or reverts the four `galleries/Verschiedenes/*.png`.
+6. Task 46: handbook ch6's restore path run end to end on a throwaway photo.
+7. Task 42's concurrent-seed race: backlog line only.
+
 ## Incidents (all repaired, recorded so a later failure can be traced)
+
+- 2026-10-17/18: the login expired mid-run and cut off three verifiers (tasks 32, 45, 46). Checked
+  afterwards: no mutant left (container md5 = host = backups), real unused tags 13835/28562 intact,
+  no snapshot file left; one scratch test (`ScratchRestoreTest.php`) removed. All three re-verified.
+- 2026-10-17: task 35's `album-tree` seed leaked 20 albums (ids 6-25, no photos); deleted (19-25 by
+  the main agent, 6-18 by the user, auto mode refused it). Cause and fix: task 42.
+
+- 2026-10-17, task 33 verify: the provenance photo anchor stayed flipped back to the old
+  `savebar-footer` value for a few minutes outside the suite lock (one attempt flipped on the host
+  while still queued for the lock; one restore trap used a relative path after `cd`). Restored by
+  hand, templates_c cleared, md5 host = container. A provenance photo-page run in that window saw
+  the old placement.
+
+- 2026-10-17, task 34 verify: one mutant run (photoinfo tags builder without the
+  `CodedCharacterSet` line, about 10 s) ran without the suite lock (the `flock` wrapper was a
+  no-op). Restored at once; a parallel photoinfo run in that window could have read the mutant.
 
 - 2026-10-17, task 23: two mutant runs did not hold the suite lock; for about 30 s each, core's
   menu count query ran with one join removed. Restored at once.
@@ -102,8 +175,9 @@ Task 16 found, out of its scope: the persons picker search (`pwg.persons.getList
 ## Open items needing the user
 
 - **Remote `display_errors` re-check:** after the next deploy, the remote phpinfo should read
-  `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). A deploy
-  changes the live web space; ask before running it.
+  `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). The user
+  agreed to the deploy once every task is committed and the four PNGs are settled.
+- **typetags push:** `843065a`, `5d5e65d` still need pushing with the right account before the main repo.
 
 
 ## Known failures (not caused by this change; task 38)
@@ -122,6 +196,12 @@ Task 16 found, out of its scope: the persons picker search (`pwg.persons.getList
 - No worktrees: DDEV serves only the main checkout. Parallel agents edit shared files with small
   exact replacements and do not commit; the main agent stages per task (`git hash-object` +
   `git update-index --cacheinfo` to stage one task's hunks of a shared file).
+- Staging one task's line of `.claude/rules/fork-local-core-edits.md` (HEAD + that line) leaves the
+  working copy in a different line order after the commit; check `sort | diff` is empty and
+  `git restore` it.
+- Characterization that only passes against the old code: keep the pre-change file in the
+  scratchpad, stage it with `git hash-object -w` + `git update-index --add --cacheinfo`, commit,
+  then commit the change (with the working-tree version or a `git rm --cached`).
 - `.claude/rules/plugin-test-suites.md` is at 498 of 500 lines; any addition there must remove
   as much.
 - `tools/deploy` README and `deployment.md` cite the pytest count (598 on 2026-10-15);
