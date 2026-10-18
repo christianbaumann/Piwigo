@@ -14,8 +14,10 @@ Added 2026-10-18 (user's answer 3a): the photo's Eigenschaften page has its own 
 
 ## Work
 
-* [ ] One sentence in chapter 03 naming the Eigenschaften page's Notiz block and its button (checked against the live page on the demo album)
+* [x] One sentence in chapter 03 naming the Eigenschaften page's Notiz block and its button (checked against the live page on the demo album)
+  * **Note:** Eigenschaften page shows the Herkunft block with Notiz and a visible Notiz speichern button (demo album, 2026-10-18)
 
 ## Verification
 
-* [ ] `ddev exec php handbuch/tools/check.php` passes; dated ledger row in `docs/agents/TESTING.md`
+* [x] `ddev exec php handbuch/tools/check.php` passes; dated ledger row in `docs/agents/TESTING.md`
+  * **Note:** `OK  8 pages, 74 references, ...` (2026-10-18); ledger row dated 2026-10-18
