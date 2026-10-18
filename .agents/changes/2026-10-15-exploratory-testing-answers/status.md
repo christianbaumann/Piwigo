@@ -56,16 +56,28 @@ not in them.
 
 Nothing is in progress: no agent running, nothing staged. Uncommitted only: this file, task 41's
 file and two `docs/backlog.md` lines (committed with this handoff), and the four
-`galleries/Verschiedenes/*.png` that were modified before this change started (the user's; leave them).
+`galleries/Verschiedenes/*.png`: NOT the user's edits but test pollution (test persons written into
+four real scans on 2026-10-16; pixels unchanged). Do not commit them; task 49 cleans them up.
 
 ## Next
 
-**Only open task: 40** (person tag guard: rename, upload, prune, Batch Manager message). Its
-dependency 18 is done; it was held back only because task 32 edited persons/photoinfo, now committed.
-Then, per the user's answers: the deploy (only after the user commits or reverts the four
-`galleries/Verschiedenes/*.png` — `pwg-deploy` uploads files as they are on disk, uncommitted work
-included), the remote `display_errors` re-check, and the remote compiled-template purge
-(Werkzeuge > Wartung; task 26 changed `tags.tpl`, task 41-style prefilters unchanged).
+Paused 2026-10-18 right after starting tasks 40, 47-50 (user's `/pause`). Each task file has a
+`## WIP (paused 2026-10-18)` section with findings and next steps; read it before resuming. No
+agent is running, no flip is applied, nothing is staged; the install is at 5 albums / 106 photos /
+16 tags, no stray config row, no snapshot file.
+
+| Task | State | Uncommitted files |
+|---|---|---|
+| 40 person tag guard | read only; plan in WIP (extend `persons_guard_ws_invoke` for `pwg.images.add` / `uploadAsync` tag_ids, rename, pruneTags; no core edit) | none |
+| 47 upload level, sync count | read only; plan in WIP. Open: `pwg.images.uploadAsync` has the same level gap but is not in the task - include it (recommended) | none |
+| 48 tag cloud | seed + spec drafted, never run; `tags.css` not fixed | `plugins/provenance/tests/e2e/long-words.spec.js`, `.../support/wrap-seed.php` (adds a `full_tag_cloud_items_number` config row, removed by `--restore`) |
+| 49 polluted scans | findings only: the four test persons/tags exist only on photos 100, 103-105; no other photo is polluted. Script and dry run not written | none |
+| 50 handbook German | 03 and 04 checked against sources (OK, not yet in a browser); 05-07 not read | none |
+
+Resume with `/implement-tasks` (max 6 in parallel). Task 40 and 47 both touch
+`include/ws_functions/pwg.images.php` (different functions). After task 49's script has been
+run by the user and its result committed, the deploy (user agreed) and the remote
+`display_errors` check follow.
 
 Questions to raise at the next pause (found 2026-10-17/18, not yet asked):
 
@@ -76,9 +88,7 @@ Questions to raise at the next pause (found 2026-10-17/18, not yet asked):
 3. Task 37 / 41 / 42 backlog lines (tag cloud nowrap, letter list on phones, first-album modal,
    concurrent provenance seeds): turn any into tasks?
 
-**typetags `843065a` (task 38) and `5d5e65d` (task 18) are not pushed** (403, git used account
-`dark-sith-lord`); the main repo's submodule pointer references them. Push `plugins/typetags` with
-the right account before pushing the main repo.
+typetags `843065a` (task 38) and `5d5e65d` (task 18): pushed by the user 2026-10-18.
 
 Decision numbers used so far: 0069 (05), 0070 (07), 0071 (11), 0072 (14), 0073 (03), 0074 (23),
 0075 (21), 0076 (26), 0077 (28), 0078 (31), 0079 (27), 0083 (39), 0084 (32). 0080-0082 were
@@ -142,6 +152,17 @@ too, the delete is handed to the user (auto mode refused it). Task 42 added for 
 6. Task 46: handbook ch6's restore path run end to end on a throwaway photo.
 7. Task 42's concurrent-seed race: backlog line only.
 
+## Answered 2026-10-18
+
+1. Task 47: uploads refuse a level outside the offered ones, and the sync counts every photo it deletes.
+2. (folded into 47)
+3. Task 48: the tag cloud; letter list on phones, first-album modal, concurrent seeds stay in the backlog.
+4. Tasks 40, 47, 48, 49, 50 run in parallel (max 6).
+5. The four PNGs turned out to be test pollution: task 49 (default a: revert the files, rescan, delete
+   the four test persons and tags; the user runs the script).
+6. typetags pushed by the user.
+7. Task 50: a Sonnet agent reads the handbook German and adds ledger rows.
+
 ## Incidents (all repaired, recorded so a later failure can be traced)
 
 - 2026-10-17/18: the login expired mid-run and cut off three verifiers (tasks 32, 45, 46). Checked
@@ -177,7 +198,7 @@ Task 16 found, out of its scope: the persons picker search (`pwg.persons.getList
 - **Remote `display_errors` re-check:** after the next deploy, the remote phpinfo should read
   `display_errors` Local `Off` (today: Local `On` from core's default, Master `Off`). The user
   agreed to the deploy once every task is committed and the four PNGs are settled.
-- **typetags push:** `843065a`, `5d5e65d` still need pushing with the right account before the main repo.
+- typetags `843065a`, `5d5e65d`: pushed by the user 2026-10-18 (both on `origin/master`).
 
 
 ## Known failures (not caused by this change; task 38)
