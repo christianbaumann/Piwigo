@@ -36,6 +36,10 @@ final class CopiesTest extends TestCase
         if ($this->replacement !== null)
         {
             @unlink($this->replacement);
+            if (dirname($this->replacement) !== sys_get_temp_dir())
+            {
+                @rmdir(dirname($this->replacement));
+            }
         }
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
@@ -54,6 +58,11 @@ final class CopiesTest extends TestCase
         $this->assertIsArray($res['json'], 'not JSON: ' . $res['body']);
         $this->assertSame('ok', $res['json']['stat'], $res['body']);
         return $res['json']['result'];
+    }
+
+    private function pixelSignature(string $file): string
+    {
+        return trim(FixtureBuilder::run('identify -format %# ' . escapeshellarg($file)));
     }
 
     /** @return string[] the photo's copies under their live names */
@@ -86,6 +95,55 @@ final class CopiesTest extends TestCase
         $copies = $this->liveCopies();
         $this->assertCount(1, $copies);
         $this->assertSame($this->image['md5'], md5_file($copies[0]));
+    }
+
+    /**
+     * [HAPPY] The handbook's restore (chapter 6, Rückgängig machen): the
+     * kept copy of an edited photo, renamed like the photo's file and sent
+     * as a replace into its album, brings back the bytes from before the
+     * edit; the photo keeps its id and properties. The image content, not the
+     * file's bytes, is the oracle: a replace merges the gallery's Info text
+     * into the file (decision 0084), so the bytes differ from before the edit.
+     */
+    public function testRestoringTheKeptCopyThroughAReplaceBringsBackTheOldFile(): void
+    {
+        $client = $this->webmaster();
+        $this->db->query("UPDATE piwigo_images SET comment = 'Restore info text' WHERE id = " . (int)$this->image['id']);
+        $pixelsBefore = $this->pixelSignature($this->image['file']);
+        $this->assertOk($client->call('pwg.photoedit.apply', array(
+            'image_id' => $this->image['id'],
+            'turns' => 1,
+            'pwg_token' => $client->token(),
+            )));
+        clearstatcache();
+        $this->assertNotSame($pixelsBefore, $this->pixelSignature($this->image['file']), 'anti-vacuity: the edit changed no pixel');
+        $copies = $this->liveCopies();
+        $this->assertCount(1, $copies, 'anti-vacuity: the edit left no copy');
+        $before = $this->fixture->imageRow((int)$this->image['id']);
+
+        $dir = sys_get_temp_dir() . '/photoedit_restore_' . bin2hex(random_bytes(6));
+        mkdir($dir);
+        $this->replacement = $dir . '/' . basename($this->image['file']);
+        copy($copies[0], $this->replacement);
+
+        $this->assertOk($client->upload('pwg.images.upload', array(
+            'name' => basename($this->image['file']),
+            'category' => $this->album,
+            'update_mode' => 'true',
+            'chunk' => 0,
+            'chunks' => 1,
+            'pwg_token' => $client->token(),
+            ), 'file', $this->replacement));
+
+        clearstatcache();
+        $this->assertSame($pixelsBefore, $this->pixelSignature($this->image['file']), 'the image is not the pre-edit image');
+        $this->assertStringContainsString('Restore info text', FixtureBuilder::run('exiftool -s3 -XMP-pwginfo:Info ' . escapeshellarg($this->image['file'])), 'the gallery info text is not in the file');
+        $after = $this->fixture->imageRow((int)$this->image['id']);
+        foreach (array('id', 'file', 'path', 'name', 'comment', 'author', 'date_available', 'level') as $column)
+        {
+            $this->assertSame($before[$column], $after[$column], "column $column changed");
+        }
+        $this->assertCount(2, $this->liveCopies(), 'the replace kept no copy of the edited state');
     }
 
     /** [HAPPY] A delete moves the photo's copies and exiftool's sidecar into one folder under deleted/. */
