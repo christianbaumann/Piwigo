@@ -15,8 +15,10 @@ Added 2026-10-17 from task 33's finding (user's answer a): the photo properties 
 
 ## Work
 
-* [ ] The Notiz block gets a heading and its button reads "Notiz speichern" (language file entry; German override test if a core string is touched)
-* [ ] Handbook text and screenshots naming the old label updated (`handbook.md` cycle only if a shot shows it)
+* [x] The Notiz block gets a heading and its button reads "Notiz speichern" (language file entry; German override test if a core string is touched)
+  * **Note:** done in `f3f576ad9` (`Save note` in provenance's de_DE/en_UK lang files, `photo_provenance.tpl`; no core string touched); boxes ticked 2026-10-18 when the file was found unticked
+* [x] Handbook text and screenshots naming the old label updated (`handbook.md` cycle only if a shot shows it)
+  * **Note:** done in `f3f576ad9` (`handbuch/03-fototexte.html`, shot 10 re-shot)
 
 ## Verification
 

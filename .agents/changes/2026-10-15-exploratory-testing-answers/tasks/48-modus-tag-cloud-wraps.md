@@ -15,21 +15,18 @@ Added 2026-10-18 from task 37's uncovered gap (user's answer 3). The letter list
 
 ## Work
 
-* [-] A long tag in the tag cloud wraps instead of widening the page (a seed whose long tag is reliably in the cloud's top 200)
-* [ ] Add the edit to `.claude/rules/fork-local-core-edits.md`; remove the tag-cloud line from `docs/backlog.md`
+* [x] A long tag in the tag cloud wraps instead of widening the page: `#fullTagCloud SPAN` in `themes/modus/css/tags.css` now `white-space: normal; overflow-wrap: anywhere` (the seed lifts `full_tag_cloud_items_number` so the tag is in the cloud)
+* [x] Add the edit to `.claude/rules/fork-local-core-edits.md` (task 37's modus bullet, its "tag cloud not covered" sentence fixed); remove the tag-cloud line from `docs/backlog.md`
 
 ## Verification
 
-* [-] E2E: 255-character tag in the cloud, no horizontal page scroll at 1920 and 390 wide; short multi-word tags still break only at spaces
-* [ ] provenance E2E `long-words.spec.js` still passes
+* [x] E2E: 255-character tag in the cloud, no horizontal page scroll at 1920 and 390 wide; short multi-word tags still break only at spaces
+  **Note:** Verified via `long-words.spec.js` (cloud case per width; red before the fix: scroll width 2013 against 391 at 390 px; the short-tag test counts line boxes against words)
+  Scripted flip 2026-10-18 (verify): `white-space: nowrap` restored in `tags.css` -> both cloud cases (1920, 390) red; fix back -> both green.
+* [x] provenance E2E `long-words.spec.js` and `roles.spec.js` still pass (see the final run in the report)
 
-## WIP (paused 2026-10-18)
+## Deviations
 
-Where I stopped: tests written, never run (no seed, no flip, no lock taken; nothing to restore). Next: run `long-words.spec.js` under `flock /tmp/pwg-suite.lock` to watch the new cloud cases fail red, then fix `themes/modus/css/tags.css` (`#fullTagCloud SPAN`: replace `white-space: nowrap` so a long word wraps, e.g. `overflow-wrap: anywhere` plus keep short tags unbroken), rerun twice, run `roles.spec.js`, then the fork-local-core-edits line and the backlog line removal.
-
-Findings: `tags.php` takes `$conf['full_tag_cloud_items_number']` (default 200) tags by count; a `piwigo_config` row overrides it. The seed now inserts that row (100000) and `--restore` deletes it (refuses to start if the install already has one).
-
-Files changed:
-- plugins/provenance/tests/e2e/support/wrap-seed.php (config row, state flag `cloud_row`)
-- plugins/provenance/tests/e2e/long-words.spec.js (cloud case at both widths; the multi-word short-tag test is a rough draft: its Range-rect check is unproven and likely needs rewriting, e.g. compare each short tag's link height to one line)
-- this task file
+* `wrap-seed.php` sleeps 1 s after invalidating the user cache. The tag list is cached per user under `cache_update_time` (one-second resolution); a view in the same second as the previous run's last one got a list without the new tag, which made the cloud case, and once the existing tag-list case, flaky.
+* The short-tag test counts distinct line tops of the link's client rects against its word count rather than the draft's rect width check.
+* `tags.css` has CRLF line endings; the edit keeps them.

@@ -21,6 +21,10 @@ const WRAP_STATE_FILE = __DIR__ . '/../.state/wrap.json';
 /** piwigo_tags.name is varchar(255). */
 const TAG_NAME_CHARS = 255;
 
+/** The cloud shows this many tags, most photos first; the install's own value is a config default of 200. */
+const CLOUD_ITEMS_PARAM = 'full_tag_cloud_items_number';
+const CLOUD_ITEMS_ALL = 100000;
+
 /** Wider than any window the spec uses at the theme's text size. */
 const DESCRIPTION_WORD_CHARS = 400;
 
@@ -37,6 +41,10 @@ if (in_array('--restore', $argv, true))
         {
             $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$state['tag_id']);
             $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$state['tag_id']);
+        }
+        if (!empty($state['cloud_row']))
+        {
+            $db->query("DELETE FROM piwigo_config WHERE param = '" . CLOUD_ITEMS_PARAM . "'");
         }
         $builder->destroyTestImages();
         $builder->destroyTestAlbums();
@@ -58,7 +66,7 @@ $tagName = substr($tagName, 0, TAG_NAME_CHARS);
 $word = substr(str_repeat('Beschreibung', 40), 0, DESCRIPTION_WORD_CHARS);
 
 /** Written after every creation, so a seed that dies halfway is still restorable. */
-function saveWrapState(FixtureBuilder $builder, int $tagId): void
+function saveWrapState(FixtureBuilder $builder, int $tagId, bool $cloudRow = false): void
 {
     if (!is_dir(dirname(WRAP_STATE_FILE)))
     {
@@ -67,6 +75,7 @@ function saveWrapState(FixtureBuilder $builder, int $tagId): void
     file_put_contents(WRAP_STATE_FILE, json_encode(array(
         'test_objects' => $builder->exportTestObjects(),
         'tag_id' => $tagId,
+        'cloud_row' => $cloudRow,
     )));
 }
 
@@ -88,7 +97,23 @@ if ($tagId <= 0 or $db->scalar("SELECT name FROM piwigo_tags WHERE id = $tagId")
     exit(1);
 }
 $db->query("INSERT INTO piwigo_image_tag (image_id, tag_id) VALUES ($imageId, $tagId)");
+
+// The cloud takes the most photographed tags only; a one-photo tag is in it for sure
+// once the limit is lifted. Refuse to overwrite a row the install has of its own.
+if ($db->scalar("SELECT COUNT(*) FROM piwigo_config WHERE param = '" . CLOUD_ITEMS_PARAM . "'") > 0)
+{
+    fwrite(STDERR, "wrap-seed.php: the install sets " . CLOUD_ITEMS_PARAM . " itself\n");
+    exit(1);
+}
+saveWrapState($builder, $tagId, true);
+$db->query(
+    "INSERT INTO piwigo_config (param, value, comment) VALUES ('" . CLOUD_ITEMS_PARAM . "', '" . CLOUD_ITEMS_ALL . "', 'provenance E2E wrap seed')"
+);
 $builder->invalidateUserCache();
+// The tag list is cached per user under cache_update_time, which has one-second
+// resolution; a page viewed in the same second as the previous run's last view
+// would be served that run's list, without this seed's tag.
+sleep(1);
 
 echo json_encode(array(
     'album_id' => $catId,

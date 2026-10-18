@@ -6,7 +6,8 @@
 }
 
 #fullTagCloud SPAN {
-	white-space: nowrap;
+	white-space: normal;
+	overflow-wrap: anywhere;
 	margin: 0 2px;
 }
 
