@@ -25,6 +25,9 @@ const TAG_NAME_CHARS = 255;
 const CLOUD_ITEMS_PARAM = 'full_tag_cloud_items_number';
 const CLOUD_ITEMS_ALL = 100000;
 
+/** A short tag of several words, for the check that the cloud breaks only at spaces. */
+const SHORT_TAG_NAME = 'Wrap Test kurz zwei';
+
 /** Wider than any window the spec uses at the theme's text size. */
 const DESCRIPTION_WORD_CHARS = 400;
 
@@ -41,6 +44,11 @@ if (in_array('--restore', $argv, true))
         {
             $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$state['tag_id']);
             $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$state['tag_id']);
+        }
+        if (!empty($state['short_tag_id']))
+        {
+            $db->query('DELETE FROM piwigo_image_tag WHERE tag_id = ' . (int)$state['short_tag_id']);
+            $db->query('DELETE FROM piwigo_tags WHERE id = ' . (int)$state['short_tag_id']);
         }
         if (!empty($state['cloud_row']))
         {
@@ -66,7 +74,7 @@ $tagName = substr($tagName, 0, TAG_NAME_CHARS);
 $word = substr(str_repeat('Beschreibung', 40), 0, DESCRIPTION_WORD_CHARS);
 
 /** Written after every creation, so a seed that dies halfway is still restorable. */
-function saveWrapState(FixtureBuilder $builder, int $tagId, bool $cloudRow = false): void
+function saveWrapState(FixtureBuilder $builder, int $tagId, bool $cloudRow = false, int $shortTagId = 0): void
 {
     if (!is_dir(dirname(WRAP_STATE_FILE)))
     {
@@ -76,6 +84,7 @@ function saveWrapState(FixtureBuilder $builder, int $tagId, bool $cloudRow = fal
         'test_objects' => $builder->exportTestObjects(),
         'tag_id' => $tagId,
         'cloud_row' => $cloudRow,
+        'short_tag_id' => $shortTagId,
     )));
 }
 
@@ -98,6 +107,18 @@ if ($tagId <= 0 or $db->scalar("SELECT name FROM piwigo_tags WHERE id = $tagId")
 }
 $db->query("INSERT INTO piwigo_image_tag (image_id, tag_id) VALUES ($imageId, $tagId)");
 
+$db->query(
+    "INSERT INTO piwigo_tags (name, url_name) VALUES ('" . $db->escape(SHORT_TAG_NAME) . "', 'provenance-e2e-wrap-test-kurz-zwei')"
+);
+$shortTagId = $db->insertId();
+saveWrapState($builder, $tagId, false, max($shortTagId, 0));
+if ($shortTagId <= 0 or $db->scalar("SELECT name FROM piwigo_tags WHERE id = $shortTagId") !== SHORT_TAG_NAME)
+{
+    fwrite(STDERR, "wrap-seed.php: the short tag was not stored whole\n");
+    exit(1);
+}
+$db->query("INSERT INTO piwigo_image_tag (image_id, tag_id) VALUES ($imageId, $shortTagId)");
+
 // The cloud takes the most photographed tags only; a one-photo tag is in it for sure
 // once the limit is lifted. Refuse to overwrite a row the install has of its own.
 if ($db->scalar("SELECT COUNT(*) FROM piwigo_config WHERE param = '" . CLOUD_ITEMS_PARAM . "'") > 0)
@@ -105,7 +126,7 @@ if ($db->scalar("SELECT COUNT(*) FROM piwigo_config WHERE param = '" . CLOUD_ITE
     fwrite(STDERR, "wrap-seed.php: the install sets " . CLOUD_ITEMS_PARAM . " itself\n");
     exit(1);
 }
-saveWrapState($builder, $tagId, true);
+saveWrapState($builder, $tagId, true, $shortTagId);
 $db->query(
     "INSERT INTO piwigo_config (param, value, comment) VALUES ('" . CLOUD_ITEMS_PARAM . "', '" . CLOUD_ITEMS_ALL . "', 'provenance E2E wrap seed')"
 );
@@ -120,5 +141,6 @@ echo json_encode(array(
     'image_id' => $imageId,
     'tag_id' => $tagId,
     'tag_name' => $tagName,
+    'short_tag_name' => SHORT_TAG_NAME,
     'description' => $word,
 )), "\n";

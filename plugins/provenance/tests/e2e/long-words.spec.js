@@ -23,7 +23,7 @@ const WIDTHS = [
 /** Sub-pixel layout can leave the scroll width one pixel past the client width. */
 const ROUNDING_PX = 1;
 
-/** @type {{album_id: number, tag_id: number, tag_name: string, description: string}} */
+/** @type {{album_id: number, tag_id: number, tag_name: string, short_tag_name: string, description: string}} */
 let seeded;
 
 test.beforeEach(() => {
@@ -53,14 +53,14 @@ test('a short multi-word tag in the cloud breaks only at spaces', async ({ page 
   await page.goto('/tags.php?display_mode=cloud');
   const result = await page.evaluate((shortChars) => {
     let checked = 0;
-    let multiWord = 0;
+    const multiWord = [];
     const broken = [];
     for (const a of document.querySelectorAll('#fullTagCloud span a')) {
       const text = a.textContent.trim();
       if (text.length > shortChars) continue;
       checked++;
       const words = text.split(/\s+/).length;
-      if (words > 1) multiWord++;
+      if (words > 1) multiWord.push(text);
       const range = document.createRange();
       range.selectNodeContents(a);
       const lines = new Set(Array.from(range.getClientRects()).map((r) => Math.round(r.top)));
@@ -69,6 +69,8 @@ test('a short multi-word tag in the cloud breaks only at spaces', async ({ page 
     return { checked, multiWord, broken };
   }, SHORT_TAG_CHARS);
   expect(result.checked).toBeGreaterThan(1);
+  // Anti-vacuity: the seeded multi-word tag was among those checked.
+  expect(result.multiWord).toContain(seeded.short_tag_name);
   expect(result.broken).toEqual([]);
 });
 

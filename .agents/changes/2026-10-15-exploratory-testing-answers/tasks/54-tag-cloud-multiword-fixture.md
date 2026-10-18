@@ -14,8 +14,10 @@ Added 2026-10-18 (user's answer 4a), from task 48's verify: `multiWord` is count
 
 ## Work
 
-* [ ] The seed creates a short multi-word tag on its photo (removed by `--restore`); the spec asserts at least one multi-word tag was checked
+* [x] The seed creates a short multi-word tag on its photo (removed by `--restore`); the spec asserts at least one multi-word tag was checked
+  **Note:** `wrap-seed.php` adds `Wrap Test kurz zwei` (state key `short_tag_id`, deleted with its link in `--restore`); the spec collects the multi-word names and asserts `toContain(seeded.short_tag_name)`.
 
 ## Verification
 
-* [ ] The new assertion goes red with the seed's tag removed; `long-words.spec.js` passes twice
+* [x] The new assertion goes red with the seed's tag removed; `long-words.spec.js` passes twice
+  **Note:** with the short tag's link insert flipped off (scratch flip, EXIT-trap restore) the cloud test failed with Received `["Feste, Bräuche, Jahreskreis", ...]` lacking the tag; reverted, 12 passed twice in a row. The flip's `(0,0)` insert also broke later seeds (duplicate key); the stray row was deleted.
