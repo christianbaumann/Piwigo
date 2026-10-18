@@ -14,20 +14,28 @@ Added 2026-10-18 (user's answer 7a).
 
 ## Work
 
-* [ ] Each changed paragraph read against the screen it describes (demo album, persons test accounts); wording fixed where it is wrong or reads unnaturally
-* [ ] One dated ledger row per page; anything for the user to decide listed in the task file
+* [x] Each changed paragraph read against the screen it describes (demo album, persons test accounts); wording fixed where it is wrong or reads unnaturally
+  * **Note:** 05-07 driven in a browser on the demo album; 03 live; 04 source only (no unused tag older than a day on the demo)
+* [x] One dated ledger row per page; anything for the user to decide listed in the task file
 
 ## Verification
 
-* [ ] `ddev exec php handbuch/tools/check.php` passes
-* [ ] Ledger rows dated 2026-10-18
+* [x] `ddev exec php handbuch/tools/check.php` passes
+  * **Note:** `OK  8 pages, 74 references, 28 screenshots all referenced, 8 admin routes resolve` (2026-10-18)
+* [x] Ledger rows dated 2026-10-18
 
-## WIP (paused 2026-10-18)
+## Result (2026-10-18)
 
-No handbuch page edited, no ledger row written, demo album never seeded (nothing to restore), check.php not run.
+Demo album seeded and restored under `flock /tmp/pwg-suite.lock`; screenshots and scripts in `.agent-tests/2026-10-18-task50-handbook/`.
 
-Read against source (labels only, no browser):
-* 03-fototexte: "Notiz speichern", "Herkunft gespeichert", "Von wem" match `plugins/provenance/language/de_DE/plugin.lang.php`. OK.
-* 04-schlagworte: "Nicht benutzte Schlagworte (Anzahl)" matches `local/language/de_DE.lang.php`; "Überprüfung", "Löschen", "Behalten" match; names listed one per line (`<br>` join in tags.js); exemption of colour-group and person tags matches `plugins/galleryrules/include/events_orphan_tags.inc.php`. OK, not yet seen in browser.
+* 03: matches the live screens (*Notiz speichern*, provenance page columns incl. *Von wem*). No change.
+* 04: checked against source only (message needs a tag unused over a day; not producible on the demo). No change.
+* 05: Enter behaviour verified in the picker; the hinweis box reworded (dropped the "sucht zuerst mit genau diesem Text" implementation detail).
+* 06: restore text named a non-existent label ("Option *aktualisieren Sie die Datei*"); now *Optionen* and the quoted switch.
+* 07: "oberen Streifen" was wrong, the zone is the upper half of the middle area; fixed. Side zones keep "knapp ein Drittel" (design.md rejected "30 %"). Narrow window and kept zoom verified.
+* No screenshot changed meaning, none re-shot. Install after `--restore`: 5 albums, 106 photos (the baseline in handbook.md says 105; another task's fixture, not the demo, which is gone).
 
-Not yet read: 05-personen (Enter behaviour vs persons picker JS; JS file not yet located under plugins/persons/template or admin), 06-drehen (restore procedure via replace upload, check 02-fotos.html link and option label "aktualisieren Sie die Datei"), 07-fotoseite (click zones "knapp ein Drittel", mobile +/- keys, zoom kept across widths: check modus js/photo.zoom.js and navigation zones CSS).
+### For the user to decide
+
+* On the first photo of an album a click on the left zone led to the album page in the check (there is no previous photo); the handbook only says "zum vorigen Foto". Leave, or add "(beim ersten Foto zum Album)"? Not verified further, theme behaviour.
+* The photo's Eigenschaften page also has a *Notiz speichern* button; handbook 03 only describes it on the picture page - confirm that is the intended place.
