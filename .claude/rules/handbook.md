@@ -70,8 +70,8 @@ manual, repeated on every re-shoot, and unrecoverable if missed once.
 ## The German strings the handbook shows
 
 Twenty-two strings core and the Colored Tags plugin leave in English or French, one persons message,
-and ten core German strings replaced on purpose ([decision 0052](../../docs/agents/decisions/0052-named-core-german-strings-are-replaced-on-purpose.md)),
-33 keys in all (measured 2026-10-17), are translated in the tracked `local/language/de_DE.lang.php` — a **flat** file, not a directory
+ten core German strings replaced on purpose ([decision 0052](../../docs/agents/decisions/0052-named-core-german-strings-are-replaced-on-purpose.md))
+and two strings of the sync result (decision 0085), 35 keys in all (measured 2026-10-18), are translated in the tracked `local/language/de_DE.lang.php` — a **flat** file, not a directory
 (`include/common.inc.php:239` loads it with `'local'=>true`, which resolves to
 `<dir><language>.<filename>`). It merges over core and wins.
 

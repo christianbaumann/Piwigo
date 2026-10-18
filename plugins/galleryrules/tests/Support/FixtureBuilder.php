@@ -199,6 +199,8 @@ class FixtureBuilder
             $this->db->query('DELETE FROM piwigo_image_category WHERE image_id = ' . (int)$image['id']);
             $this->db->query('DELETE FROM piwigo_images WHERE id = ' . (int)$image['id']);
             @unlink($image['file']);
+            // exiftool's backup, left beside the copy when photoinfo wrote its tags into it
+            @unlink($image['file'] . '_original');
             $derivatives = PIWIGO_ROOT . '_data/i/' . self::TEST_IMAGE_DIR . pathinfo($image['file'], PATHINFO_FILENAME) . '-*';
             foreach (glob($derivatives) ?: array() as $derivative)
             {

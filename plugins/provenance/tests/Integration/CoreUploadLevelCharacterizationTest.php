@@ -147,6 +147,8 @@ final class CoreUploadLevelCharacterizationTest extends TestCase
                     ));
                 break;
             case 'add':
+                // core merges and removes the chunk only when pwg.images.add accepts the photo
+                $this->scratchFiles[] = PIWIGO_ROOT . 'upload/buffer/' . $md5 . '-file-00000.block';
                 $chunk = $this->ws->call('pwg.images.addChunk', array(
                     'data' => base64_encode((string)file_get_contents($file)),
                     'original_sum' => $md5,
