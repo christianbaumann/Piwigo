@@ -47,6 +47,13 @@
 </ul>
 
 <p>
+  <strong>Titel</strong>, <strong>Autor</strong> und <strong>Beschreibung</strong> sind reiner
+  Text. Was wie eine HTML-Auszeichnung aussieht, etwa <code>&lt;b&gt;fett&lt;/b&gt;</code>,
+  erscheint auf der Fotoseite genau so, wie es eingetippt wurde. Fettdruck, Kursivschrift
+  und Links lassen sich in diesen Feldern nicht einsetzen.
+</p>
+
+<p>
   Auf dem Bildschirm liegen zwischen <strong>Aufnahmedatum</strong> und
   <strong>Beschreibung</strong> noch drei weitere Felder, siehe
   <a href="#weitere-felder">Die weiteren Felder derselben Seite</a>.
@@ -94,6 +101,12 @@
   <p>
     Beim Sichern gilt für <strong>Verknüpfte Alben</strong> genau die Liste, die im Feld steht.
     Ein Album, das hier fehlt, verliert das Foto.
+    Das letzte Album eines Fotos lässt sich nicht entfernen: Wer es mit dem <strong>x</strong>
+    entfernt und sichert, bekommt <em>Nichts entfernt: Das Foto #&#8230; wäre danach in keinem
+    Album mehr. Verschieben Sie es stattdessen in ein anderes Album.</em> Das Foto bleibt dann in
+    seinen bisherigen Alben, die übrigen Felder werden trotzdem gesichert. Um ein Foto in ein
+    anderes Album zu bringen, in der Stapelverarbeitung <strong>Ins Album verschieben</strong>
+    wählen (siehe <a href="02-fotos.html">Fotos zu einem Album hinzufügen</a>).
     Wer ein Foto einem weiteren Album hinzufügen will, ohne die bisherigen zu verlieren,
     benutzt in der Stapelverarbeitung die Aktion <strong>Mit einem Album verbinden</strong>
     (siehe <a href="02-fotos.html">Fotos zu einem Album hinzufügen</a>). Das Album, in dem die
@@ -125,15 +138,21 @@
   </li>
   <li>
     Ein Foto, das schon eine Herkunft hat, behält sie, wenn es zusätzlich in ein weiteres Album
-    kommt. Nur ein Foto ohne Herkunft übernimmt die des neuen Albums. Es gilt also das Album, in
-    das das Foto zuerst kam. Beim Verschieben lässt sich das anders wählen (siehe
+    kommt. Nur ein Foto ohne Herkunft übernimmt die des neuen Albums. Bei neuen Verknüpfungen gilt also
+    das Album, das dem Foto zuerst eine Herkunft gab. <strong>Auf N Fotos anwenden</strong>
+    dagegen überschreibt die Herkunft aller Fotos des Albums mit den Werten des Albums; liegt
+    ein Foto schon mit einer abweichenden Herkunft darin, fragt Piwigo vorher mit
+    <em>N Fotos haben bereits eine Herkunft, die dabei überschrieben wird. Fortfahren?</em>
+    nach, und <strong>Abbrechen</strong> wendet nichts an. Beim Verschieben lässt sich das anders wählen (siehe
     <a href="02-fotos.html">Vorhandene Fotos einem weiteren Album zuordnen</a>).
   </li>
   <li>
     Hat ein Unteralbum keine eigene Herkunft, übernimmt ein neu hinzukommendes Foto die Herkunft
     des nächsthöheren Albums, das eine hat. Fotos, die schon vorher im Unteralbum lagen, erhalten
-    sie dadurch nicht. Für sie die Herkunft im Unteralbum selbst eintragen und mit
-    <strong>Auf N Fotos anwenden</strong> übertragen.
+    sie dadurch nicht. Dafür im Unteralbum <strong>Auf N Fotos anwenden</strong> wählen: Hat das
+    Unteralbum keine eigene Herkunft, überträgt die Schaltfläche die des nächsthöheren Albums,
+    das eine hat. Hat es eine eigene, gilt nur diese, und ein dort leeres Feld wird bei den
+    Fotos geleert.
   </li>
   <li>
     <strong>Notiz</strong> ist das einzige Feld dieses Abschnitts, das zu diesem einen Foto
@@ -144,9 +163,7 @@
 
 <p>
   Für die Notiz gibt es eine eigene Schaltfläche <strong>Notiz speichern</strong> direkt
-  darunter. Danach erscheint <strong>Herkunft gespeichert</strong>. Dieselbe Notiz mit derselben
-  Schaltfläche steht auch auf der Seite <strong>Eigenschaften</strong> des Fotos, im Abschnitt
-  <strong>Herkunft</strong>.
+  darunter. Danach erscheint <strong>Herkunft gespeichert</strong>.
 </p>
 
 <h3 id="herkunft-nachlesen">Herkunft nachlesen</h3>
@@ -300,6 +317,19 @@
     dort oder in der Stapelverarbeitung geändert, gilt es danach als genauer Tag.
   </li>
 </ul>
+
+<p>
+  Schlägt das Schreiben in die Bilddatei fehl, wenn Aufnahmedatum oder Beschreibung in den
+  Eigenschaften oder in der Stapelverarbeitung geändert werden, ist die Änderung trotzdem in der
+  Galerie gespeichert. Oben steht dann eine Meldung, die mit <em>Fotoinfo:</em> beginnt, in den
+  Eigenschaften und in der Stapelverarbeitung im Modus für alle Fotos. In der Einzelansicht der
+  Stapelverarbeitung erscheint der Grund stattdessen in der roten Plakette des Fotos.
+</p>
+
+<figure>
+  <img src="assets/screenshots/31-einzelansicht-warnung.png" alt="Die Einzelansicht der Stapelverarbeitung mit der Meldung zur nicht geschriebenen Bilddatei" />
+  <figcaption>Die Einzelansicht der Stapelverarbeitung, wenn die Bilddatei nicht beschreibbar ist.</figcaption>
+</figure>
 
 <div class="hinweis">
   <p>
