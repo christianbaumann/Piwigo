@@ -1,4 +1,4 @@
-# Status — paused 2026-10-18 (all 54 tasks done, ready to deploy)
+# Status — 2026-10-19: all 54 tasks done, deployed
 
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
@@ -72,7 +72,12 @@ mid-test: environment), photoedit 107/110/34, photoinfo 288/230/59, galleryrules
 `check.php` OK, `test-hooks.sh` OK, deploy pytest 599. No design gap. Its two test-side leak fixes
 and the handbook.md key count (35): `bbe01a9d5`.
 
-Next:
+Done 2026-10-19: the leftover cleanup ran (`OK`, 0 left), the deploy ran clean (94 new, 80 changed,
+galleryrules activated, persons and photoinfo rescans 840 of 840), and the remote phpinfo reads
+`display_errors` Local `Off` (ledger row in `docs/agents/TESTING.md`). Left for the user: the
+compiled-template purge on the remote (Werkzeuge > Wartung > *Kompilierte Vorlagen entfernen*).
+
+Previously next:
 
 1. The user runs the leftover cleanup (7 empty `provenance-sync-other-%` albums, 64 dead
    `image_category` rows, 16 `upload/buffer/*.block`, 12 `upload/galleryrules-test/*_original`);
