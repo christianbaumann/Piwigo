@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from pwgdeploy import albums
 from pwgdeploy.bootstrap import login
-from pwgdeploy.cli import http_client
+from pwgdeploy.cli import STATE_DIR, http_client
 from pwgdeploy.config import load_file
 from pwgdeploy.errors import DeployError
 
@@ -26,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run(args, out, client_factory=http_client) -> None:
+def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> None:
     folder = Path(args.folder)
     if not folder.is_dir():
         raise DeployError(f"{folder} is not a directory")
@@ -38,25 +39,26 @@ def run(args, out, client_factory=http_client) -> None:
     local = albums.walk(folder.resolve())
     actions = albums.plan(local, albums.read_remote(client, base_url))
     ids: dict[str, int] = {}
-    created = skipped = 0
+    results: list[albums.Result] = []
     for action in actions:
         if action.kind == albums.SKIP:
-            skipped += 1
-            print(f"skipped (exists)  {action.path}", file=out)
+            results.append(albums.Result(action.path, "skipped (exists)", action.album_id))
             continue
         parent_id = None if action.parent is None else ids[action.parent]
         ids[action.path] = albums.create_album(client, base_url, action.name, parent_id)
-        created += 1
-        print(f"created           {action.path}", file=out)
-    print(f"{created} created, {skipped} skipped", file=out)
+        results.append(albums.Result(action.path, "created", ids[action.path]))
+    report = albums.write_report(state_dir, results, datetime.now())
+    created = sum(1 for r in results if r.status == "created")
+    print(f"{created} created, {len(results) - created} skipped", file=out)
+    print(f"report: {report}", file=out)
 
 
-def main(argv: list[str] | None = None, *, stdout=None, stderr=None, client_factory=http_client) -> int:
+def main(argv: list[str] | None = None, *, stdout=None, stderr=None, client_factory=http_client, state_dir=STATE_DIR) -> int:
     args = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     try:
-        run(args, out, client_factory)
+        run(args, out, client_factory, state_dir)
     except DeployError as error:
         print(f"{type(error).__name__}: {error}", file=err)
         return error.exit_code

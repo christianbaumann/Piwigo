@@ -6,8 +6,10 @@ acts. Only `plan()` holds decisions, so it is the pure part the unit tests drive
 
 from __future__ import annotations
 
+import json
 import unicodedata
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from pwgdeploy.bootstrap import ws_call
@@ -104,3 +106,25 @@ def create_album(client, base_url: str, name: str, parent_id: int | None) -> int
     if parent_id is not None:
         fields["parent"] = str(parent_id)
     return int(ws_call(client, base_url, "pwg.categories.add", fields)["id"])
+
+
+@dataclass(frozen=True)
+class Result:
+    path: str
+    status: str
+    album_id: int | None = None
+    message: str | None = None
+    """The server's message for a failure."""
+
+
+def write_report(state_dir: Path, results: list[Result], now: datetime) -> Path:
+    """One entry per album, in tree order, in `albums-<timestamp>.json`."""
+    state_dir = Path(state_dir)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    report = state_dir / f"albums-{now.strftime('%Y%m%d-%H%M%S')}.json"
+    entries = [
+        {"path": r.path, "album_id": r.album_id, "status": r.status, "message": r.message}
+        for r in results
+    ]
+    report.write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return report

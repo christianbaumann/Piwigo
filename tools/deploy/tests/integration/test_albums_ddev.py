@@ -6,6 +6,7 @@ unique name and deletes it in teardown; never touches another album. Not for pro
 """
 
 import io
+import json
 import uuid
 from pathlib import Path
 
@@ -41,19 +42,26 @@ def folder(tmp_path):
     return root
 
 
-def run(folder):
+def run(folder, state_dir):
     out, err = io.StringIO(), io.StringIO()
-    code = main([str(CONFIG), str(folder)], stdout=out, stderr=err)
+    code = main([str(CONFIG), str(folder)], stdout=out, stderr=err, state_dir=state_dir)
     return code, out.getvalue(), err.getvalue()
 
 
-def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder):
+def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder, tmp_path):
+    state = tmp_path / "state"
     config, client, token = session
     base_url = config.site.base_url
     try:
-        code, out, err = run(folder)
+        code, out, err = run(folder, state)
         assert code == 0, err
         assert f"{EXPECTED_ALBUMS} created, 0 skipped" in out
+        (report_file,) = state.glob("albums-*.json")
+        assert f"report: {report_file}" in out
+        entries = json.loads(report_file.read_text(encoding="utf-8"))
+        assert len(entries) == EXPECTED_ALBUMS
+        assert {e["status"] for e in entries} == {"created"}
+        assert all(isinstance(e["album_id"], int) for e in entries)
 
         remote = albums.read_remote(client, base_url)
         by_id = {a.id: a for a in remote}
@@ -65,7 +73,7 @@ def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder):
         assert by_id[children["Hochzeit"].id].parent_id == top.id
 
         count_before = len(remote)
-        code, out, err = run(folder)
+        code, out, err = run(folder, state)
         assert code == 0, err
         assert "0 created, 1 skipped" in out
         assert len(albums.read_remote(client, base_url)) == count_before

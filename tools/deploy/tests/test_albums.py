@@ -5,8 +5,10 @@ Decision table not applicable: one condition per folder (does a same-named album
 under the same parent), two outcomes.
 """
 
+import json
 import os
 import unicodedata
+from datetime import datetime
 
 from pwgdeploy import albums
 from pwgdeploy.albums import Action, LocalFolder, RemoteAlbum
@@ -120,3 +122,26 @@ def test_walk_sorts_siblings_by_name(tmp_path):
     for name in ("b", "c", "a"):
         (tmp_path / "A" / name).mkdir(parents=True)
     assert [c.name for c in albums.walk(tmp_path / "A").children] == ["a", "b", "c"]
+
+
+# --- write_report() ----------------------------------------------------------------------
+
+
+def test_the_report_lists_every_result_with_its_status_id_and_message(tmp_path):
+    """[HAPPY] [ECP] one entry per result in order; a result carries any status as given."""
+    results = [
+        albums.Result("A", "created", 7),
+        albums.Result("A/B", "failed", None, "Invalid name"),
+        albums.Result("A/B/C", "skipped (parent failed)"),
+        albums.Result("D/Müller", "skipped (exists)", 3),
+    ]
+    report = albums.write_report(tmp_path / "state", results, datetime(2026, 10, 19, 14, 5, 9))
+    assert report.name == "albums-20261019-140509.json"
+    entries = json.loads(report.read_text(encoding="utf-8"))
+    assert entries == [
+        {"path": "A", "album_id": 7, "status": "created", "message": None},
+        {"path": "A/B", "album_id": None, "status": "failed", "message": "Invalid name"},
+        {"path": "A/B/C", "album_id": None, "status": "skipped (parent failed)", "message": None},
+        {"path": "D/Müller", "album_id": 3, "status": "skipped (exists)", "message": None},
+    ]
+    assert "Müller" in report.read_text(encoding="utf-8")
