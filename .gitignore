@@ -57,3 +57,6 @@ __pycache__/
 /.playwright-cli/
 .DS_Store
 /tools/deploy/.playwright-cli/
+
+# git worktrees of parallel agent work
+/.agents/worktrees/
