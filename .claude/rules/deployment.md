@@ -14,7 +14,7 @@ uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts del
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
-uv run pytest                                    # 599 tests, measured 2026-10-16
+uv run pytest                                    # 600 tests, measured 2026-10-19
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -256,12 +256,16 @@ selected:
 Visitors' browsers can still show the old photo for a while after that: the URLs stay the same, and
 the web server sends derivatives with only `Last-Modified` (nginx locally does), which browsers turn into hours or days of reuse.
 Locally the plugin appends the file's version to an edited photo's URLs (`get_derivative_url`,
-`get_src_image_url`); on the remote it is inactive, so nothing does.
+`get_src_image_url`). On the remote that happens only for an edit made there (decision 0087): the
+version lives in the database, which no deploy carries, so a photo edited locally and deployed gets
+no versioned URL.
 
-`PLUGINS_TO_ACTIVATE` in `tools/deploy/pwgdeploy/bootstrap.py` leaves `photoedit` out on purpose.
-The plugin's files are published, but it stays inactive on the remote: an edit made there would
-change a file that is not in git, and the next deploy would overwrite it with the working copy's
-version (decision 0026).
+`PLUGINS_TO_ACTIVATE` in `tools/deploy/pwgdeploy/bootstrap.py` activates `photoedit` on the remote
+([decision 0087](../../docs/agents/decisions/0087-photoedit-is-active-on-the-remote.md)). An edit
+made there changes a file that is not in git. For a photo under `galleries/` it survives until that
+photo's local file changes or the manifest is deleted; then the deploy overwrites it with the
+working copy's version without a warning. Copy a remote edit back into the working copy to keep it.
 
-The backups under `_data/photoedit/originals/` are local only, like the rest of `_data`. For a
-photo under `galleries/` git holds the previous version as well.
+The backups under `_data/photoedit/originals/` stay on the install that made the edit, like the
+rest of `_data`: a remote edit's backup exists only on the remote. For a photo under `galleries/`
+git holds the previous version as well.

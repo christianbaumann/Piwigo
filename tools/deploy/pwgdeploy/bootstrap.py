@@ -42,7 +42,7 @@ CONFIG_RELATIVE_PATH = fileset.GENERATED_CONFIG_PATH
 
 # photoinfo after provenance: it refuses to activate without it
 # (plugins/photoinfo/maintain.class.php, activate()).
-PLUGINS_TO_ACTIVATE = ("typetags", "provenance", "persons", "photoinfo", "galleryrules")
+PLUGINS_TO_ACTIVATE = ("typetags", "provenance", "persons", "photoinfo", "galleryrules", "photoedit")
 ACTIVE_STATE = "active"
 ACTIVATE_ACTION = "activate"
 

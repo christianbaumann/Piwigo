@@ -2,8 +2,8 @@
 
 Uploads this Piwigo fork to a shared web space over FTPS — only the files the install needs,
 and only the ones that changed since the last run — then completes the remote install over
-HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of four of the
-five fork-local plugins (photoedit stays inactive, see `.claude/rules/deployment.md`), a
+HTTP: `install.php`, the generated `local/config/config.inc.php`, activation of typetags and
+the five fork-local plugins (photoedit included, decision 0087), a
 seed of the tag groups and tags `tag-groups.json` names, a `site_update` scan that turns the
 uploaded `galleries/` tree into albums and photos, a persons rescan that rebuilds the person
 index from the face regions in each file, and a photoinfo rescan that reads each photo's date and info text back out of its file.
@@ -340,7 +340,7 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 cd tools/deploy && uv run pytest
 ```
 
-599 tests, measured 2026-10-16. Everything that decides *what* to do is a pure function and is
+600 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

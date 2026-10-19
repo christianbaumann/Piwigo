@@ -363,6 +363,7 @@ def test_an_inactive_plugin_is_activated_while_its_neighbour_is_not(cfg):
             "persons": "uninstalled",
             "photoinfo": "active",
             "galleryrules": "active",
+            "photoedit": "active",
         },
     )
     token = bootstrap.login(gallery, cfg)
@@ -375,6 +376,7 @@ def test_an_inactive_plugin_is_activated_while_its_neighbour_is_not(cfg):
         "persons": "activated",
         "photoinfo": "active",
         "galleryrules": "active",
+        "photoedit": "active",
     }
     assert sorted(call["plugin"] for call in gallery.posts_to("ws.php") if call.get("action") == "activate") == [
         "persons",
@@ -403,6 +405,16 @@ def test_the_deploy_activates_galleryrules(cfg, gallery):
 
     assert outcome.get("galleryrules") == "activated"
     assert gallery.plugin_states["galleryrules"] == "active"
+
+
+def test_the_deploy_activates_photoedit(cfg, gallery):
+    """[HAPPY] Decision 0087: turning and cropping is offered on the remote too."""
+    token = bootstrap.login(gallery, cfg)
+
+    outcome = bootstrap.activate_plugins(gallery, cfg.site.base_url, token)
+
+    assert outcome.get("photoedit") == "activated"
+    assert gallery.plugin_states["photoedit"] == "active"
 
 
 def test_activation_sends_the_token_with_every_action(cfg, gallery):
