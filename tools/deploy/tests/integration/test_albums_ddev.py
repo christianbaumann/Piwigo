@@ -41,9 +41,9 @@ def folder(tmp_path):
     return root
 
 
-def run(folder):
+def run(folder, *flags):
     out, err = io.StringIO(), io.StringIO()
-    code = main([str(CONFIG), str(folder)], stdout=out, stderr=err)
+    code = main([*flags, str(CONFIG), str(folder)], stdout=out, stderr=err)
     return code, out.getvalue(), err.getvalue()
 
 
@@ -51,6 +51,12 @@ def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder):
     config, client, token = session
     base_url = config.site.base_url
     try:
+        count_empty = len(albums.read_remote(client, base_url))
+        code, out, err = run(folder, "--dry-run")
+        assert code == 0, err
+        assert f"{EXPECTED_ALBUMS} would create, 0 skipped" in out
+        assert len(albums.read_remote(client, base_url)) == count_empty
+
         code, out, err = run(folder)
         assert code == 0, err
         assert f"{EXPECTED_ALBUMS} created, 0 skipped" in out

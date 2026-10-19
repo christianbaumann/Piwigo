@@ -5,11 +5,15 @@ Decision table not applicable: one condition per folder (does a same-named album
 under the same parent), two outcomes.
 """
 
+import io
+import json
 import os
 import unicodedata
+from types import SimpleNamespace
 
 from pwgdeploy import albums
 from pwgdeploy.albums import Action, LocalFolder, RemoteAlbum
+from pwgdeploy.albums_cli import main
 
 
 def tree(name, *children):
@@ -120,3 +124,65 @@ def test_walk_sorts_siblings_by_name(tmp_path):
     for name in ("b", "c", "a"):
         (tmp_path / "A" / name).mkdir(parents=True)
     assert [c.name for c in albums.walk(tmp_path / "A").children] == ["a", "b", "c"]
+
+
+# --- --dry-run ---------------------------------------------------------------------------
+
+
+class RecordingClient:
+    """Answers login and an empty getList; records every ws method called."""
+
+    def __init__(self, remote=()):
+        self.methods = []
+        self.remote = list(remote)
+
+    def post(self, url, fields, *, timeout=None):
+        method = fields["method"]
+        self.methods.append(method)
+        result = {"pwg_token": "t"} if method == "pwg.session.getStatus" else {}
+        if method == "pwg.categories.getList":
+            result = {"categories": self.remote}
+        if method == "pwg.categories.add":
+            result = {"id": 99}
+        return SimpleNamespace(body=json.dumps({"stat": "ok", "result": result}))
+
+
+def run_cli(tmp_path, client, *flags):
+    config = tmp_path / "deploy.json"
+    config.write_text(
+        json.dumps(
+            {
+                "site": {"base_url": "https://g.example.test"},
+                "ftp": {"host": "h", "user": "u", "password": "p", "remote_root": "/r"},
+                "mysql": {"host": "h", "user": "u", "password": "p", "database": "d", "prefix": "piwigo_"},
+                "admin": {"username": "a", "password": "secret", "email": "a@example.test"},
+            }
+        )
+    )
+    folder = tmp_path / "Familie"
+    (folder / "Urlaub").mkdir(parents=True)
+    out, err = io.StringIO(), io.StringIO()
+    code = main([*flags, str(config), str(folder)], stdout=out, stderr=err, client_factory=lambda c: client)
+    return code, out.getvalue(), err.getvalue()
+
+
+def test_dry_run_prints_the_plan_and_creates_nothing(tmp_path):
+    """[HAPPY] Reads the remote, never calls pwg.categories.add."""
+    client = RecordingClient()
+    code, out, err = run_cli(tmp_path, client, "--dry-run")
+    assert code == 0, err
+    assert "pwg.categories.getList" in client.methods
+    assert "pwg.categories.add" not in client.methods
+    assert "would create      Familie" in out
+    assert "would create      Familie/Urlaub" in out
+    assert "2 would create, 0 skipped" in out
+
+
+def test_dry_run_reports_an_existing_album_as_skipped(tmp_path):
+    """[ECP]"""
+    client = RecordingClient([{"id": 7, "name_raw": "Familie", "id_uppercat": None}])
+    code, out, err = run_cli(tmp_path, client, "--dry-run")
+    assert code == 0, err
+    assert "skipped (exists)  Familie" in out
+    assert "would create" not in out.replace("0 would create", "")
+    assert "pwg.categories.add" not in client.methods

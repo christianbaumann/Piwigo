@@ -21,9 +21,22 @@ def build_parser() -> argparse.ArgumentParser:
         description="Create a local folder and its sub-folders as albums on the remote. "
         "An album that exists is skipped with everything below it.",
     )
+    parser.add_argument("--dry-run", action="store_true", help="print the plan, create nothing")
     parser.add_argument("config_json", help="credential file, as for pwg-deploy")
     parser.add_argument("folder", help="local folder to create as an album tree")
     return parser
+
+
+def print_dry_run(actions, out) -> None:
+    would_create = skipped = 0
+    for action in actions:
+        if action.kind == albums.SKIP:
+            skipped += 1
+            print(f"skipped (exists)  {action.path}", file=out)
+        else:
+            would_create += 1
+            print(f"would create      {action.path}", file=out)
+    print(f"{would_create} would create, {skipped} skipped (dry run)", file=out)
 
 
 def run(args, out, client_factory=http_client) -> None:
@@ -37,6 +50,9 @@ def run(args, out, client_factory=http_client) -> None:
 
     local = albums.walk(folder.resolve())
     actions = albums.plan(local, albums.read_remote(client, base_url))
+    if args.dry_run:
+        print_dry_run(actions, out)
+        return
     ids: dict[str, int] = {}
     created = skipped = 0
     for action in actions:

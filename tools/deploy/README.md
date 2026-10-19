@@ -344,7 +344,8 @@ uv run pwg-albums deploy.<target>.json ~/Scans/Familie_1970
 Creates the folder and its sub-folders as an album tree at the remote root, over `ws.php`
 (`pwg.categories.add`). Albums only: no photos, no `galleries/` folder. Hidden folders (`.*`) and
 symlinks are skipped, names are taken in Unicode NFC, empty folders count. It prints one line per
-album and a summary.
+album and a summary. `--dry-run` logs in, reads the remote tree and prints the same plan as
+`would create` / `skipped (exists)` lines, creating nothing.
 
 An album that exists (same parent, same name as the server compares it: case and accents
 ignored) is skipped **with everything below it**, so a second run creates nothing, and a new
@@ -366,7 +367,7 @@ uv run pytest -m integration
 cd tools/deploy && uv run pytest
 ```
 
-613 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
+615 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).
