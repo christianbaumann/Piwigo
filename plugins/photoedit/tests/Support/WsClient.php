@@ -79,7 +79,7 @@ class WsClient
         curl_setopt_array($ch, $options + array(
             CURLOPT_URL => Config::baseUrl() . $path,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => 45,
             CURLOPT_COOKIEJAR => $this->cookieFile,
             CURLOPT_COOKIEFILE => $this->cookieFile,
         ));

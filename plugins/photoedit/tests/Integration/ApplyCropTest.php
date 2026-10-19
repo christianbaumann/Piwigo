@@ -171,11 +171,11 @@ final class ApplyCropTest extends TestCase
     public static function refusedCrops(): array
     {
         return array(
-            '[BVA] the whole photo and no turn is nothing to do' => array('0,0,1,1', 'nothing to do'),
+            '[BVA] the whole photo and no turn is nothing to do' => array('0,0,1,1', 'Nichts zu tun'),
             '[BVA] one pixel wide' => array('0,0,' . (1 / 300) . ',1', (string)PHOTOEDIT_MIN_CROP_PX),
             '[BVA] one below the minimum' => array('0,0,' . ((PHOTOEDIT_MIN_CROP_PX - 1) / 300) . ',1', (string)PHOTOEDIT_MIN_CROP_PX),
-            '[BVA] l >= r' => array('0.5,0,0.5,1', 'crop'),
-            '[BVA] outside 0..1' => array('0,0,1.01,1', 'crop'),
+            '[BVA] l >= r' => array('0.5,0,0.5,1', 'Ausschnitt'),
+            '[BVA] outside 0..1' => array('0,0,1.01,1', 'Ausschnitt'),
             );
     }
 

@@ -301,7 +301,7 @@ final class ApplyTurnTest extends TestCase
         $res = $this->apply($this->client($role), array('turns' => 1));
 
         $this->assertRefused($res, 404);
-        $this->assertSame(PHOTOEDIT_NOT_FOUND_MESSAGE, $res['json']['message']);
+        $this->assertSame('Kein Foto mit dieser Nummer.', $res['json']['message']);
         $this->assertSame($this->image['md5'], md5_file($this->image['file']));
     }
 
