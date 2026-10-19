@@ -38,6 +38,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { createRequire } = require('module');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -152,6 +153,12 @@ async function signIn(page, role) {
 
   // The form is gone on success; on a wrong password it is still there.
   await page.waitForSelector('input[name="username"]', { state: 'detached', timeout: NAV_TIMEOUT });
+}
+
+/** Makes one demo file read-only (a slug) or all of them writable again (null), through the seed. */
+function setReadOnly(slug) {
+  const seed = path.join(__dirname, 'seed.php');
+  execFileSync('php', [seed, slug === null ? '--writable' : '--read-only=' + slug], { cwd: ROOT, stdio: 'inherit' });
 }
 
 async function open(page, url) {
@@ -812,6 +819,64 @@ const SHOTS = [
       // A group the account sees no tag of says so instead of listing badges.
       await group.locator('.typetags-group-tags li').first().waitFor({ timeout: ELEMENT_TIMEOUT });
       await shoot(group, this.file, demo.image_dir);
+    },
+  },
+  {
+    file: '29-album-loeschen-verweigert.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      // Every demo photo is in the demo album only, so "keep the photos"
+      // (the dialog's default) would leave them in no album and is refused.
+      await open(page, '/admin.php?page=albums');
+      await page.click('.tree .move-cat-delete[data-id="' + demo.album_id + '"]');
+      await page.waitForSelector('#DeleteAlbum .DeleteAlbumSubmit', { state: 'visible', timeout: ELEMENT_TIMEOUT });
+      await page.click('#DeleteAlbum .DeleteAlbumSubmit');
+      await page.waitForFunction(
+        () => document.querySelector('#DeleteAlbum .DeleteAlbumErrors').textContent.trim() !== '',
+        null,
+        { timeout: ELEMENT_TIMEOUT }
+      );
+      await waitForOpaque(page, '#DeleteAlbum .DeleteAlbumPopInContainer');
+      await page.mouse.move(0, 0);
+      await shoot(page.locator('#DeleteAlbum .DeleteAlbumPopInContainer'), this.file, demo.image_dir);
+      // Closed, not deleted: the refusal left the album in place anyway.
+      await page.click('#DeleteAlbum .DeleteAlbumCancel');
+    },
+  },
+  {
+    file: '30-album-abtrennen-verweigert.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      await open(page, '/admin.php?page=batch_manager&filter=album-' + demo.album_id);
+      await page.click('#selectAll');
+      await page.selectOption('select[name=selectAction]', 'dissociate');
+      await page.waitForSelector('#action_dissociate .selectize-input .item', { timeout: ELEMENT_TIMEOUT });
+      await page.click('#applyAction');
+      await page.waitForSelector('#content .errors li', { timeout: ELEMENT_TIMEOUT });
+      await page.mouse.move(0, 0);
+      await shoot(page.locator('#content .errors').first(), this.file, demo.image_dir);
+    },
+  },
+  {
+    file: '31-einzelansicht-warnung.png',
+    role: 'WEBMASTER',
+    async take(page, demo) {
+      // A photo whose file cannot be written. The seed makes it read-only for
+      // this shot only and the finally puts it back.
+      const slug = 'werkstatt';
+      const photoId = demo.photos[slug].id;
+      setReadOnly(slug);
+      try {
+        await open(page, '/admin.php?page=batch_manager&mode=unit&filter=album-' + demo.album_id);
+        const fieldset = page.locator('#picture-' + photoId);
+        await fieldset.locator('#description').fill('Wohl am Gartentor aufgenommen.');
+        await fieldset.locator('.action-save-picture').click();
+        await fieldset.locator('.local-error-badge .local-error-message').waitFor({ state: 'visible', timeout: ELEMENT_TIMEOUT });
+        await page.mouse.move(0, 0);
+        await shoot(fieldset, this.file, demo.image_dir);
+      } finally {
+        setReadOnly(null);
+      }
     },
   },
 ];

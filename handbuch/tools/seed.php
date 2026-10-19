@@ -19,8 +19,12 @@
  * Usage:
  *   php handbuch/tools/seed.php --scenario=demo
  *   php handbuch/tools/seed.php --restore
+ *   php handbuch/tools/seed.php --read-only=<slug>   (one demo photo's file to mode 0444)
+ *   php handbuch/tools/seed.php --writable           (every demo photo's file back to 0644)
  *
- * Both print one JSON object on stdout. Errors go to stderr with exit 1.
+ * --read-only/--writable need a seeded demo album and touch only its files under
+ * upload/handbuch-demo/; shot 31 uses them. --restore removes a read-only file too.
+ * All print one JSON object on stdout. Errors go to stderr with exit 1.
  *
  * This inserts and deletes rows, writes image files and rewrites their
  * metadata. It is never safe against a production install, and refuses to run
@@ -1005,10 +1009,40 @@ function destroy_persons(array $names): void
 
 // ---------------------------------------------------------------- entry point
 
-$args = getopt('', array('scenario::', 'restore'));
+$args = getopt('', array('scenario::', 'restore', 'read-only:', 'writable'));
 
 boot_piwigo();
 assert_throwaway_install();
+
+if (isset($args['read-only']) or isset($args['writable']))
+{
+    $demo = is_file(DEMO_FILE) ? json_decode((string)file_get_contents(DEMO_FILE), true) : null;
+    if (!is_array($demo) or empty($demo['photos']))
+    {
+        fail('no demo album is seeded; run --scenario=demo first');
+    }
+
+    $slugs = isset($args['read-only']) ? array((string)$args['read-only']) : array_keys($demo['photos']);
+    foreach ($slugs as $slug)
+    {
+        $found = glob(PHPWG_ROOT_PATH . DEMO_IMAGE_DIR . 'handbuch-*-' . $slug . '.png') ?: array();
+        $file = $found[0] ?? null;
+        if (!isset($demo['photos'][$slug]) or $file === null)
+        {
+            fail("'$slug' is not a demo photo");
+        }
+        $mode = isset($args['read-only']) ? 0444 : 0644;
+        chmod($file, $mode);
+        clearstatcache(true, $file);
+        if ((fileperms($file) & 0777) !== $mode)
+        {
+            fail("could not set the mode of $slug");
+        }
+    }
+
+    echo json_encode(array('read_only' => isset($args['read-only']) ? $slugs[0] : null)), "\n";
+    exit(0);
+}
 
 if (isset($args['restore']))
 {
