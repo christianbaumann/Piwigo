@@ -1,7 +1,7 @@
-# Status — 2026-10-19: all 54 tasks done, deployed
+# Status — 2026-10-19: tasks 1-65 done (1-54 deployed); follow-ups 66, 67 open
 
-Tasks 55-65 added 2026-10-19 (handbook gap fix), design in
-[design-handbook-gap-fix.md](design-handbook-gap-fix.md). None started.
+Tasks 55-65 (handbook gap fix), design in
+[design-handbook-gap-fix.md](design-handbook-gap-fix.md). All done; review follow-ups 66 and 67 open.
 
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
@@ -62,12 +62,50 @@ not in them.
 | 47 upload level | `e0ddda21b` (characterization), `bff4a401b` (also closes task 27's suite item) |
 | 40 person tag guard | `161bc26d1` (characterization), `94dbc44b9` |
 
-Every task file is fully ticked; the working tree is clean. No agent running, no flip applied, no
+Tasks 1-54 are fully ticked (state at 2026-10-18); tasks 66 and 67 are open, see below. No agent running, no flip applied, no
 seed left.
+
+## Handbook gap fix, tasks 55-65 (2026-10-19)
+
+| Task | Commit |
+|---|---|
+| 55 unit-mode write warning | `bbf8556ff` |
+| 56 photoedit German errors | `a007c39fe` |
+| 57 apply nearest ancestor and confirm | `564b1d51b` (decision 0086) |
+| 58 screenshots of refusals and badge | `1e80e58e7` |
+| 59 handbook 01 | `d27685057` |
+| 60 handbook 02 | `ab3fa1224` |
+| 61 handbook 03 | `742f0252f` |
+| 62 handbook 04 | `2d393e842` |
+| 63 handbook 05 | `670a5b209` |
+| 64 handbook 06 | `5088f261c` |
+| 65 independent review, ledger rows, German read | this commit |
+
+- Review (fresh agent, playwright on the demo album, normal and webmaster): 35 rows, 31 TRUE, 4 WRONG
+  (F1-F4). Report `.agent-tests/2026-10-19-handbook-gap-fix/report.md` (git-ignored). Follow-ups:
+  task 66 (F3, code: `renameTag()` shows the server's message), task 67 (F1, F2, F4, a nit, two owner
+  wording decisions: "Code Points", "über die Schnittstelle"). Next free decision number: 0087.
+- German read (delegated to a critical subagent): wording edits in chapters 01-06; its doubt
+  "Modus für alle Fotos" was wrong (core's tab is *Übersicht*), fixed in 03 and 04; "von der Galerie
+  geschriebene Schlagworte" is right (TagsWritten marker), no change.
+- `handbook.md` says the demo cycle returns the install to 5 albums / 105 photos (measured
+  2026-08-31); it now has 106 (photo 56012, uploaded 2026-10-15). Dated measurement, left as is.
+- Backlog lines added: English upload reason (core's text), no E2E for the stale-box border colour.
+
+Incidents of this run (nothing left behind):
+- One agent ran `seed.php --restore` on another agent's seeded demo album.
+- One agent ran `pkill -f flock` in the container.
+- A demo seed once failed with "only 13 of 6 photos": 7 stale `image_category` rows pointed at a
+  reused album id. Cause not found, nothing left over.
+- The review agent's Write into `.agent-tests/` was refused; the main agent wrote the report from
+  its answer.
+
+Rule learned: hold the suite lock for the whole seed, check, restore cycle in one command; never
+`--restore` an album you did not seed; never `pkill` in the shared container.
 
 ## Next
 
-All 54 tasks are done (51 `313c967ab`, 52+53 `5294de127`, 54 `9cf2652da`). Final integration
+Tasks 1-54 were done at that point (51 `313c967ab`, 52+53 `5294de127`, 54 `9cf2652da`). Final integration
 check 2026-10-18 by an Opus 5.5 subagent: ready to deploy. Every suite once under the lock: typetags
 91/179/66, provenance 313/435 (3 skipped)/79, persons 218/224 (1 skipped)/187+1 (the one,
 `editor.spec.js:653`, passed alone 5x; a DB change outside the suite lock made the photo invisible

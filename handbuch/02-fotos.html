@@ -67,11 +67,11 @@
   Die Schaltfläche <strong>Optionen</strong> blendet einen Schalter ein: <em>Wenn ein Foto in
   diesem Album denselben Dateinamen hat, aktualisieren Sie die Datei, ohne die Eigenschaften
   des Fotos zu ändern.</em> Damit wird eine bestehende Bilddatei ersetzt. Der Titel des Fotos
-  bleibt immer erhalten. Bei Info-Text, Datum, Schlagworten und Personenmarkierungen gilt für
-  jedes Feld einzeln: Enthält die neue Datei den Wert (Info-Text, Datum, markierte
-  Schlagworte, Personenmarkierungen), gilt der Wert aus der Datei. Sonst bleibt der Wert der
-  Galerie und wird in die neue Datei geschrieben. Ein markierter Mensch behält sein Schlagwort,
-  auch wenn die Datei es nicht nennt. Ist der Schalter aus, entsteht ein
+  bleibt immer erhalten. Bei Info-Text, Datum, Schlagworten und Personenmarkierungen gilt
+  jedes Feld einzeln: Enthält die neue Datei den Wert, gilt der Wert aus der Datei; bei
+  Schlagworten zählen nur die von der Galerie in die Datei geschriebenen. Sonst bleibt der Wert
+  der Galerie und wird in die neue Datei geschrieben. Das Schlagwort einer markierten Person
+  bleibt auch dann erhalten, wenn die Datei es nicht nennt. Ist der Schalter aus, entsteht ein
   zweites Foto, es sei denn, die Datei ist genau dieselbe wie die eines vorhandenen Fotos; dann
   wird nur das vorhandene Foto dem Album zugeordnet.
 </p>
@@ -85,7 +85,7 @@
 <p>
   Haben mehrere Fotos des Albums den hochgeladenen Dateinamen, ersetzt Piwigo keines davon.
   Die Seite meldet dann zum Beispiel <em>Nichts ersetzt: Die Fotos #12, #15 dieses Albums
-  haben alle den Dateinamen „bild.png“.</em> Eines der Fotos umbenennen oder löschen und den
+  haben alle den Dateinamen „bild.png“.</em> Dann eines der Fotos umbenennen oder löschen und den
   Upload wiederholen.
 </p>
 
