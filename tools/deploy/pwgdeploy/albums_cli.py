@@ -32,6 +32,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dry-run", action="store_true", help="list the plan in the report, create nothing")
     parser.add_argument("--parent", type=positive_int, help="id of the album to create the tree under")
+    parser.add_argument(
+        "--contents", action="store_true", help="create the sub-folders of <folder> as top albums, not <folder> itself"
+    )
     parser.add_argument("config_json", help="credential file, as for pwg-deploy")
     parser.add_argument("folder", help="local folder to create as an album tree")
     return parser
@@ -60,7 +63,7 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]
     remote = albums.read_remote(client, base_url)
     if args.parent is not None and args.parent not in {album.id for album in remote}:
         raise DeployError(f"--parent {args.parent}: no such album on the remote")
-    actions = albums.plan(local, remote, args.parent)
+    actions = albums.plan(local, remote, args.parent, args.contents)
     if args.dry_run:
         results = [
             albums.Result(a.path, "skipped (exists)", a.album_id)

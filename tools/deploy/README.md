@@ -346,7 +346,9 @@ Creates the folder and its sub-folders as an album tree at the remote root (or u
 symlinks are skipped, names are taken in Unicode NFC, empty folders count. It prints a summary line (`N created, M skipped, K failed`), the
 errors and the path of a report, `.state/albums-<timestamp>.json`, with one entry per album: path,
 album id, status (`created`, `skipped (exists)`, `skipped (parent failed)`, `failed` with the
-server's message, `would create`). `--dry-run` logs in, reads the remote tree and writes the
+server's message, `would create`). With `--contents` the folder itself is not created: each of
+its sub-folders becomes a top album (under `--parent`, if given), and report paths start at
+those sub-folders, without the folder's name. `--dry-run` logs in, reads the remote tree and writes the
 plan to the report as `would create` / `skipped (exists)`, creating nothing.
 
 An album that exists (same parent, same name as the server compares it: case and accents
@@ -372,7 +374,7 @@ uv run pytest -m integration
 cd tools/deploy && uv run pytest
 ```
 
-621 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
+624 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

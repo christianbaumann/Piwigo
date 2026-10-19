@@ -132,6 +132,30 @@ def test_parent_creates_the_tree_below_that_album_and_an_unknown_id_creates_noth
     assert parent.name not in remaining and folder.name not in remaining
 
 
+def test_contents_creates_the_subfolders_directly_under_the_parent(session, tmp_path, folder):
+    config, client, token = session
+    base_url = config.site.base_url
+    parent = tmp_path / f"pwg-albums-parent-{uuid.uuid4().hex[:12]}"
+    parent.mkdir()
+    try:
+        assert run(parent, tmp_path / "state")[0] == 0
+        parent_id = next(a.id for a in albums.read_remote(client, base_url) if a.name == parent.name)
+
+        code, out, err = run(folder, tmp_path / "state", "--contents", "--parent", str(parent_id))
+        assert code == 0, err
+        assert f"{EXPECTED_ALBUMS - 1} created, 0 skipped" in out
+        remote = albums.read_remote(client, base_url)
+        assert {a.name for a in remote if a.parent_id == parent_id} == {"Urlaub", "Hochzeit", "Müller"}
+        assert folder.name not in {a.name for a in remote}
+
+        code, out, err = run(folder, tmp_path / "state", "--contents", "--parent", str(parent_id))
+        assert code == 0, err
+        assert "0 created, 3 skipped" in out
+    finally:
+        delete_named(client, base_url, token, parent.name)
+    assert parent.name not in {a.name for a in albums.read_remote(client, base_url)}
+
+
 def test_a_refused_album_fails_the_run_but_not_its_siblings(session, tmp_path):
     """[NEG] The server refuses a blank name; its child is never requested."""
     config, client, token = session

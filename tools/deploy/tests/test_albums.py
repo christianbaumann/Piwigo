@@ -106,6 +106,30 @@ def test_the_same_name_at_the_root_is_not_an_existing_album_under_the_parent():
     assert [a.kind for a in actions] == ["create"]
 
 
+def test_contents_plans_the_subfolders_as_top_folders_and_not_the_folder_itself():
+    """[HAPPY]"""
+    local = tree("Fotos SW", tree("1950", tree("Sommer")), tree("1960"))
+    actions = albums.plan(local, [], contents=True)
+    assert [(a.path, a.parent, a.kind) for a in actions] == [
+        ("1950", None, "create"),
+        ("1950/Sommer", "1950", "create"),
+        ("1960", None, "create"),
+    ]
+
+
+def test_contents_skips_an_existing_subfolder_with_its_subtree_under_the_parent():
+    """[ECP]"""
+    remote = [RemoteAlbum(5, "Archiv", None), RemoteAlbum(8, "1950", 5)]
+    local = tree("Fotos SW", tree("1950", tree("Sommer")), tree("1960"))
+    actions = albums.plan(local, remote, parent_id=5, contents=True)
+    assert [(a.path, a.kind, a.album_id) for a in actions] == [("1950", "skip", 8), ("1960", "create", None)]
+
+
+def test_contents_of_a_folder_without_subfolders_plans_nothing():
+    """[BVA]"""
+    assert albums.plan(tree("Leer"), [], contents=True) == []
+
+
 # --- walk() ------------------------------------------------------------------------------
 
 
