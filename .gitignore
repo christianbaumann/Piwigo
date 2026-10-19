@@ -60,3 +60,4 @@ __pycache__/
 
 # git worktrees of parallel agent work
 /.agents/worktrees/
+/users.md
