@@ -345,6 +345,8 @@ function removeTag(id, name) {
   });
 }
 
+const RENAME_DUPLICATE_MESSAGE = 'This name is already token';
+
 function renameTag(id, new_name) {
   return new Promise((resolve, reject) => {
     jQuery.ajax({
@@ -372,7 +374,7 @@ function renameTag(id, new_name) {
 
           resolve(data);
         } else {
-          reject(str_already_exist.replace('%s', new_name))
+          reject(data.message && data.message !== RENAME_DUPLICATE_MESSAGE ? data.message : str_already_exist.replace('%s', new_name))
         }
       },
       error:function(XMLHttpRequest) {

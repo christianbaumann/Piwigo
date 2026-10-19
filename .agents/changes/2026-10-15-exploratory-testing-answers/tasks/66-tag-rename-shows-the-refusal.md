@@ -16,12 +16,16 @@ Added 2026-10-19 (finding F3 of the independent handbook review). `pwg.tags.rena
 
 ## Work
 
-* [ ] Test first, red: a case in persons `admin-tag-guard.spec.js` renaming a person's tag on `admin.php?page=tags` and asserting the error line shows the refusal text, not *existiert bereits*; record the red reason
-* [ ] `renameTag()` rejects with `data.message` when the server sends one, keeping `str_already_exist` for a real duplicate (check what the ws answers for a duplicate)
-* [ ] A real duplicate rename still shows *existiert bereits* (assert in the same spec)
-* [ ] Bullet added to `.claude/rules/fork-local-core-edits.md` in the same commit (extend the tag-screen bullet of task 26/18)
+* [x] Test first, red: a case in persons `admin-tag-guard.spec.js` renaming a person's tag on `admin.php?page=tags` and asserting the error line shows the refusal text, not *existiert bereits*; record the red reason
+* [x] `renameTag()` rejects with `data.message` when the server sends one, keeping `str_already_exist` for a real duplicate (check what the ws answers for a duplicate)
+* [x] A real duplicate rename still shows *existiert bereits* (assert in the same spec)
+* [x] Bullet added to `.claude/rules/fork-local-core-edits.md` in the same commit (extend the tag-screen bullet of task 26/18)
 
 ## Verification
 
-* [ ] `admin-tag-guard.spec.js` green under the suite lock (name the command)
-* [ ] `git diff` of `tags.js` limited to `renameTag()`
+* [x] `admin-tag-guard.spec.js` green under the suite lock (name the command)
+* [x] `git diff` of `tags.js` limited to `renameTag()`
+
+**Note:** Red reason: screen showed `Schlagwort »E2E Guard Renamed« existiert bereits`. Duplicate answers `This name is already token` (same WS_ERR_INVALID_PARAM), so `renameTag()` compares against that literal (const `RENAME_DUPLICATE_MESSAGE`, declared just above the function). Verified by admin-tag-guard.spec.js (8 passed) and the whole chromium-admin project (20 passed).
+
+**Note (verifier):** the const copies core literal (`include/ws_functions/pwg.tags.php`, untranslated English; photoinfo wrapper returns core PwgError unchanged). Added provenance unit `TagRenameDuplicateMessageTest` (guard JS const == PHP literal); flipped const -> red, restored -> green via `ddev exec plugins/provenance/vendor/bin/phpunit --testsuite unit --filter TagRenameDuplicateMessageTest`. Other failures (403 token, missing tag) now show the server text instead of a false "existiert bereits"; empty name is a silent no-op in core, unchanged.

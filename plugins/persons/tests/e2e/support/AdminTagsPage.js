@@ -19,6 +19,8 @@ class AdminTagsPage {
     this.message = page.locator('.info-message p');
     /** The confirm dialog's red "yes, delete" button. */
     this.confirmDelete = page.locator('.jconfirm .btn-red');
+    this.renameInput = page.locator('.RenameTagPopInContainer .tag-property-input');
+    this.renameSubmit = page.locator('.RenameTagPopInContainer .TagSubmit');
   }
 
   static url() {
@@ -50,6 +52,30 @@ class AdminTagsPage {
     await box.locator('.showOptions').click();
     await box.locator('.dropdown-option.delete').click();
     await this.confirmDelete.click();
+  }
+
+  /**
+   * Renames one tag through its menu: search it, open the menu, choose Edit,
+   * type the new name and press Rename Tag.
+   *
+   * @param {number} tagId
+   * @param {string} name
+   * @param {string} newName
+   */
+  async renameTag(tagId, name, newName) {
+    await this.search.fill(name);
+    await expect(this.page.locator('.tag-box', { hasNotText: name })).toHaveCount(0);
+    const box = this.box(tagId);
+    await box.locator('.showOptions').click();
+    await box.locator('.dropdown-option.edit').click();
+    await this.renameInput.fill(newName);
+    await this.renameSubmit.click();
+  }
+
+  /** The screen's own "already exists" text for a name, as tags.js builds it. */
+  async alreadyExistsText(name) {
+    const template = await this.page.evaluate(() => str_already_exist);
+    return template.replace('%s', name);
   }
 }
 

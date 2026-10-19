@@ -41,6 +41,25 @@ test('[NEG] deleting a person tag is refused with the message pointing to Person
   await expect(tags.box(tagId)).toBeVisible();
 });
 
+test('[NEG] renaming a person tag shows the refusal, not "already exists"', async ({ page }) => {
+  const tags = new AdminTagsPage(page);
+  const tagId = seeded.person_tag_ids[PERSON];
+  await tags.open();
+
+  await tags.renameTag(tagId, PERSON, 'E2E Guard Renamed');
+
+  await expect(tags.error).toHaveText(germanTextOf('PERSONS_TAG_RENAME_REFUSED_MESSAGE').replace('%s', PERSON));
+});
+
+test('[NEG] renaming a tag to a name that exists still says "already exists"', async ({ page }) => {
+  const tags = new AdminTagsPage(page);
+  await tags.open();
+
+  await tags.renameTag(seeded.plain_tag_id, PLAIN, PERSON);
+
+  await expect(tags.error).toHaveText(await tags.alreadyExistsText(PERSON));
+});
+
 test('[HAPPY] an ordinary tag is still deleted', async ({ page }) => {
   const tags = new AdminTagsPage(page);
   await tags.open();
