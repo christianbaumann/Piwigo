@@ -1,5 +1,8 @@
 # Status — 2026-10-19: all 54 tasks done, deployed
 
+Tasks 55-65 added 2026-10-19 (handbook gap fix), design in
+[design-handbook-gap-fix.md](design-handbook-gap-fix.md). None started.
+
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
 
