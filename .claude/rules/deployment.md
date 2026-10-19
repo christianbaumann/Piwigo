@@ -14,7 +14,7 @@ uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts del
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
-uv run pytest                                    # 614 tests, measured 2026-10-19
+uv run pytest                                    # 616 tests, measured 2026-10-19
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
