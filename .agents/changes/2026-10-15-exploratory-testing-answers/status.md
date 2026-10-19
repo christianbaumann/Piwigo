@@ -74,8 +74,10 @@ and the handbook.md key count (35): `bbe01a9d5`.
 
 Done 2026-10-19: the leftover cleanup ran (`OK`, 0 left), the deploy ran clean (94 new, 80 changed,
 galleryrules activated, persons and photoinfo rescans 840 of 840), and the remote phpinfo reads
-`display_errors` Local `Off` (ledger row in `docs/agents/TESTING.md`). Left for the user: the
-compiled-template purge on the remote (Werkzeuge > Wartung > *Kompilierte Vorlagen entfernen*).
+`display_errors` Local `Off` (ledger row in `docs/agents/TESTING.md`). The remote's
+compiled templates were purged 2026-10-19 through the Wartung link as the deploy admin (answer:
+*Aktion erfolgreich ausgeführt*). The button shows *Nicht zutreffend* until the cache sizes are
+calculated, which looks disabled but is not. Nothing of this change is left.
 
 Previously next:
 
