@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Create a local folder and its sub-folders as albums on the remote. "
         "An album that exists is skipped with everything below it.",
     )
-    parser.add_argument("--dry-run", action="store_true", help="print the plan, create nothing")
+    parser.add_argument("--dry-run", action="store_true", help="list the plan in the report, create nothing")
     parser.add_argument("--parent", type=positive_int, help="id of the album to create the tree under")
     parser.add_argument("config_json", help="credential file, as for pwg-deploy")
     parser.add_argument("folder", help="local folder to create as an album tree")
@@ -63,7 +63,9 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]
     actions = albums.plan(local, remote, args.parent)
     if args.dry_run:
         results = [
-            albums.Result(a.path, "skipped (exists)", a.album_id) if a.kind == albums.SKIP else albums.Result(a.path, "would create")
+            albums.Result(a.path, "skipped (exists)", a.album_id)
+            if a.kind == albums.SKIP
+            else albums.Result(a.path, "would create")
             for a in actions
         ]
         finish(results, [], out, state_dir, done="would create")

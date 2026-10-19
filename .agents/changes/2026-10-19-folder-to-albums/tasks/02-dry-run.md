@@ -27,3 +27,5 @@ With `--dry-run`, `pwg-albums` logs in, reads the remote tree and prints the pla
 * [x] A real run afterwards creates exactly the albums the dry run listed as `would create`
   **Note:** Verified via integration test (5 would create, then 5 created) and ad hoc (4/4)
 * [x] `uv run pytest` and `uv run pytest -m integration` pass
+
+**Note (integration):** A dry run no longer prints per-album lines; the plan (`would create` / `skipped (exists)`) goes to the JSON report, the terminal shows the summary and the report path.

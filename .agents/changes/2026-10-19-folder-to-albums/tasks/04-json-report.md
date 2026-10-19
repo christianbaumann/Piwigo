@@ -28,3 +28,5 @@ Each run writes `tools/deploy/.state/albums-<timestamp>.json` with one entry per
 * [x] `git status` shows no report file
   **Note:** integration test writes to tmp_path; `git status` shows only source changes
 * [x] `uv run pytest` passes
+
+**Note (integration):** Per-album terminal lines were dropped in the integration commit; the report is the only per-album output, as this task intended.

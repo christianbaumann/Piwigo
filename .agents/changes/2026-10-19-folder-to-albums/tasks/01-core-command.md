@@ -44,3 +44,5 @@ dependencies: []
   * **Note:** Verified via the integration test and ad hoc: 3 created, then 0 created 1 skipped; album deleted afterwards
 * [x] A non-directory `<folder>` and a wrong password each exit ≠ 0 with a message naming the problem
   * **Note:** Verified ad hoc: non-directory exits 1 (`... is not a directory`), wrong password exits 7 (`Invalid username/password`)
+
+**Note (integration):** The "one line per album" and "first error aborts" items were superseded by tasks 02, 04 and 05: the terminal shows a summary line, the errors and the report path; a failed album does not stop the run.
