@@ -10,6 +10,7 @@ const provenance_photo_ids = '{$PROVENANCE_ALBUM.PHOTO_IDS}'.split(',').filter(B
 const provenance_apply_max_chunk = {$PROVENANCE_APPLY_MAX_CHUNK};
 const provenance_str_applying = '{'Applying provenance to %d photos...'|@translate|escape:javascript}';
 const provenance_str_applied = '{'Provenance applied to %d photos'|@translate|escape:javascript}';
+const provenance_str_confirm_overwrite = '{'%d photos already carry provenance that this will overwrite. Continue?'|@translate|escape:javascript}';
 const provenance_str_apply_error = '{'Provenance could not be applied'|@translate|escape:javascript}';
 const provenance_writeback_max_chunk = {$PROVENANCE_WRITEBACK_MAX_CHUNK};
 const provenance_str_writing = '{'Writing metadata into %d files...'|@translate|escape:javascript}';

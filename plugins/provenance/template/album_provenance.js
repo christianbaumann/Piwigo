@@ -107,6 +107,11 @@ jQuery(function ($) {
 
       // Serialized deliberately: chunk N+1 starts only once N has answered, so a
       // failure stops the run instead of being buried under later requests.
+      function start() {
+        message.text('');
+        next(0);
+      }
+
       function next(index) {
         if (index >= chunks.length) {
           button.removeClass('provenance-busy');
@@ -147,8 +152,59 @@ jQuery(function ($) {
           .text((options.errorText + ' ' + (detail || '')).trim() + ' (' + done + ' / ' + total + ')');
       }
 
-      next(0);
+      if (options.preflight) {
+        message.text('');
+        options.preflight(chunks, start, fail, function () {
+          button.removeClass('provenance-busy');
+          box.css('display', 'none');
+        });
+      } else {
+        start();
+      }
     });
+  }
+
+  // Asks, chunk by chunk and without writing, how many photos the apply would
+  // overwrite, then lets the administrator decide. start() runs the apply,
+  // cancel() puts the button back as if it had not been pressed.
+  function provenanceApplyPreflight(chunks, start, fail, cancel) {
+    let overwrites = 0;
+
+    function ask(index) {
+      if (index >= chunks.length) {
+        if (overwrites === 0 || window.confirm(sprintf(provenance_str_confirm_overwrite, overwrites))) {
+          start();
+        } else {
+          cancel();
+        }
+        return;
+      }
+
+      $.ajax({
+        url: 'ws.php?format=json&method=pwg.provenance.applyToPhotos',
+        type: 'POST',
+        dataType: 'json',
+        data: {
+          pwg_token: provenance_pwg_token,
+          cat_id: provenance_album_id,
+          image_ids: chunks[index].join(','),
+          dry_run: 1
+        },
+        success: function (data) {
+          if (data.stat !== 'ok') {
+            fail(data.message);
+            return;
+          }
+          overwrites += data.result.would_overwrite;
+          ask(index + 1);
+        },
+        error: function () {
+          fail('');
+        }
+      });
+    }
+
+    ask(0);
   }
 
   provenanceRunner({
@@ -165,7 +221,8 @@ jQuery(function ($) {
     doneText: function (done) {
       return sprintf(provenance_str_applied, done);
     },
-    errorText: provenance_str_apply_error
+    errorText: provenance_str_apply_error,
+    preflight: provenanceApplyPreflight
   });
 
   provenanceRunner({

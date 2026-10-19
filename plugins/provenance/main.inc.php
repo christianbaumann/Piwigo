@@ -136,6 +136,7 @@ function provenance_add_methods($arr)
     array(
       'cat_id' => array('type' => WS_TYPE_ID),
       'image_ids' => array('default' => '', 'info' => 'At most '.PROVENANCE_APPLY_MAX_CHUNK.' comma-separated photo ids, all in this album'),
+      'dry_run' => array('default' => false, 'type' => WS_TYPE_BOOL, 'info' => 'Write nothing; answer how many photos hold Herkunft the apply would change'),
       'pwg_token' => array(),
       ),
     'Copies an album\'s provenance onto the photos of one chunk. The photo\'s own note is never touched.',

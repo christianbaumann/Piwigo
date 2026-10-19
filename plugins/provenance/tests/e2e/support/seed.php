@@ -18,6 +18,7 @@
  *   php tests/e2e/support/seed.php --scenario=writeback
  *   php tests/e2e/support/seed.php --scenario=move
  *   php tests/e2e/support/seed.php --scenario=album-tree
+ *   php tests/e2e/support/seed.php --scenario=overwrite
  *   php tests/e2e/support/seed.php --restore
  *
  * Both forms print one JSON object on stdout. Errors go to stderr with exit 1.
@@ -217,6 +218,9 @@ const SEEDED_VALUES = array(
     'provenance_note'           => 'geliehen im August',
     );
 
+/** How many photos the 'overwrite' scenario gives a foreign Herkunft. */
+const OVERWRITE_PHOTOS = 2;
+
 /**
  * The photo's own note 'photo-provenance' writes.
  *
@@ -386,9 +390,9 @@ if (isset($args['read-photo']))
 // ── Seed ──────────────────────────────────────────────────────────────────
 
 $scenario = $args['scenario'] ?? null;
-if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback', 'move', 'album-tree'), true))
+if (!in_array($scenario, array('no-provenance', 'with-provenance', 'photo-provenance', 'writeback', 'move', 'album-tree', 'overwrite'), true))
 {
-    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback, move, album-tree');
+    fail('--scenario must be one of: no-provenance, with-provenance, photo-provenance, writeback, move, album-tree, overwrite');
 }
 
 // Carry forward anything an earlier seed in this test already recorded, so a
@@ -517,6 +521,19 @@ if ($scenario === 'writeback')
     }
 }
 
+// 'overwrite' gives the first OVERWRITE_PHOTOS photos a Herkunft that differs
+// from the album's, so the apply has exactly that many photos to overwrite and
+// the rest are empty.
+$overwrite_count = 0;
+if ($scenario === 'overwrite')
+{
+    foreach (array_slice($photo_ids, 0, OVERWRITE_PHOTOS) as $photo_id)
+    {
+        $builder->imageProvenance($photo_id, array('provenance_owner' => 'Fremder Eigentümer'));
+        $overwrite_count++;
+    }
+}
+
 // 'move' puts its one photo in the state the copy-down would leave it in, so the
 // spec starts from a photo that really carries the *source* album's provenance -
 // otherwise 'keep' and 'clear' would be indistinguishable and 'replace' would
@@ -567,6 +584,7 @@ echo json_encode(array(
     'values' => $actual,
     'photo_ids' => $photo_ids,
     'photo_count' => count($photo_ids),
+    'overwrite_count' => $overwrite_count,
     'photo' => $photo,
     'photo_note' => $scenario === 'writeback' ? SEEDED_PHOTO_NOTE : null,
     // The 'move' scenario's second album: where the photo is moved to, and the

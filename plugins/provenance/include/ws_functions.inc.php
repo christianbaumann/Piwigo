@@ -169,6 +169,10 @@ UPDATE '.CATEGORIES_TABLE.'
  * photo outside the album, refuses the whole request rather than applying part
  * of it, because a half-applied album is invisible afterwards.
  *
+ * The values are the album's own, else its nearest ancestor's (decision 0086).
+ * With dry_run set nothing is written and 'would_overwrite' answers how many of
+ * the chunk's photos hold Herkunft the apply would change.
+ *
  * provenance_note on the photo is not in the update set at all: the album's own
  * free text lands in provenance_album_note, and what somebody wrote about one
  * photo is never overwritten from above (decision C3).
@@ -191,18 +195,16 @@ function ws_provenance_applyToPhotos($param, &$service)
 
   $cat_id = (int)$param['cat_id'];
 
-  $result = pwg_query('
-SELECT '.implode(', ', array_keys(provenance_album_columns())).'
+  $exists = pwg_query('
+SELECT id
   FROM '.CATEGORIES_TABLE.'
   WHERE id = '.$cat_id.'
 ;');
 
-  if (!pwg_db_num_rows($result))
+  if (!pwg_db_num_rows($exists))
   {
     return new PwgError(404, 'Album not found');
   }
-
-  $album = pwg_db_fetch_assoc($result);
 
   $image_ids = provenance_parse_id_list($param['image_ids']);
   if ($image_ids === null)
@@ -212,7 +214,7 @@ SELECT '.implode(', ', array_keys(provenance_album_columns())).'
 
   if (empty($image_ids))
   {
-    return array('cat_id' => $cat_id, 'applied' => 0, 'changed' => 0);
+    return array('cat_id' => $cat_id, 'applied' => 0, 'changed' => 0, 'would_overwrite' => 0);
   }
 
   $id_list = implode(',', $image_ids);
@@ -229,11 +231,15 @@ SELECT image_id
     return new PwgError(400, 'Every photo in image_ids must belong to this album');
   }
 
-  // The copy-down target columns, and what the album puts in each of them.
+  // The copy-down target columns, and what the album puts in each of them: its
+  // own, else its nearest ancestor's (decision 0086). With no values anywhere
+  // the fields are blank and apply clears the photos.
+  include_once(PROVENANCE_PATH.'include/events_inherit.inc.php');
+  $album = provenance_inherited_album_values($cat_id);
   $values = array();
   foreach (provenance_copy_down_map() as $album_column => $image_column)
   {
-    $values[$image_column] = (string)$album[$album_column];
+    $values[$image_column] = $album === null ? '' : (string)$album[$album_column];
   }
 
   // Read before the update, so the history rows say what really changed.
@@ -242,6 +248,16 @@ SELECT id, '.implode(', ', array_keys($values)).'
   FROM '.IMAGES_TABLE.'
   WHERE id IN ('.$id_list.')
 ;', 'id');
+
+  if ($param['dry_run'])
+  {
+    return array(
+      'cat_id' => $cat_id,
+      'applied' => 0,
+      'changed' => 0,
+      'would_overwrite' => provenance_count_overwrites($before, $values),
+      );
+  }
 
   // mass_updates() applies no escaping of its own.
   $escaped = array();
@@ -284,6 +300,7 @@ SELECT id, '.implode(', ', array_keys($values)).'
     'cat_id' => $cat_id,
     'applied' => count($image_ids),
     'changed' => provenance_record_changes($changes),
+    'would_overwrite' => 0,
     );
 }
 

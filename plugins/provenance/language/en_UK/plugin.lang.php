@@ -12,6 +12,7 @@ $lang['Save note'] = 'Save note';
 $lang['Apply to %d photos'] = 'Apply to %d photos';
 $lang['Applying provenance to %d photos...'] = 'Applying provenance to %d photos...';
 $lang['Provenance applied to %d photos'] = 'Provenance applied to %d photos';
+$lang['%d photos already carry provenance that this will overwrite. Continue?'] = '%d photos already carry provenance that this will overwrite. Continue?';
 $lang['Provenance could not be applied'] = 'Provenance could not be applied';
 $lang['This album holds no photo'] = 'This album holds no photo';
 $lang['Write to %d files'] = 'Write to %d files';

@@ -264,6 +264,135 @@ final class ApplyTest extends TestCase
     }
 
 
+    // ── the nearest ancestor's values (decision 0086) ─────────────────────
+
+    /** [HAPPY] A sub-album with four empty fields applies its nearest ancestor's values. */
+    public function testASubAlbumWithoutValuesAppliesItsAncestorsValues(): void
+    {
+        [$sub, $ids] = $this->subAlbumWithPhotos(self::ALBUM, array());
+
+        $res = $this->apply($ids, $sub);
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        foreach ($ids as $id)
+        {
+            $photo = $this->fixture->readImageProvenance($id);
+            $this->assertSame(self::ALBUM['provenance_owner'], $photo['provenance_owner'], "photo $id was blanked");
+            $this->assertSame(self::ALBUM['provenance_note'], $photo['provenance_album_note']);
+        }
+        $this->assertSame(4 * count($ids), $this->historyCount(), 'four changed fields per photo');
+        $this->assertSame(array('apply'), $this->distinctHistory('source'));
+    }
+
+    /** [ECP] The nearest album with values wins, not the root. */
+    public function testTheNearestAncestorWinsOverTheRoot(): void
+    {
+        $root = $this->fixture->createTestAlbum('provenance-apply-root');
+        $this->fixture->albumProvenance($root, array('provenance_owner' => 'Wurzel'));
+        $middle = $this->fixture->createTestSubAlbum('provenance-apply-middle', $root);
+        $this->fixture->albumProvenance($middle, array('provenance_owner' => 'Mitte'));
+        $leaf = $this->fixture->createTestSubAlbum('provenance-apply-leaf', $middle);
+        $ids = $this->chunk();
+        foreach ($ids as $id)
+        {
+            $this->fixture->attachImage($id, $leaf);
+        }
+
+        $this->apply($ids, $leaf);
+
+        $this->assertSame('Mitte', $this->fixture->readImageProvenance($ids[0])['provenance_owner']);
+    }
+
+    /** [ECP] A sub-album with values of its own applies those, not its parent's. */
+    public function testASubAlbumWithItsOwnValuesKeepsApplyingThem(): void
+    {
+        [$sub, $ids] = $this->subAlbumWithPhotos(self::ALBUM, array('provenance_owner' => 'Berta Schmidt'));
+
+        $this->apply($ids, $sub);
+
+        foreach ($ids as $id)
+        {
+            $photo = $this->fixture->readImageProvenance($id);
+            $this->assertSame('Berta Schmidt', $photo['provenance_owner']);
+            $this->assertNull($photo['provenance_physical_album'], 'the parent\'s field must not fill the gap');
+        }
+    }
+
+    /** [ECP] No values anywhere in the chain: the photos are cleared, as before. */
+    public function testAnAlbumWithNoValuesAnywhereClearsThePhotos(): void
+    {
+        [$sub, $ids] = $this->subAlbumWithPhotos(array(), array());
+        foreach ($ids as $id)
+        {
+            $this->fixture->imageProvenance($id, array('provenance_owner' => 'Altlast'));
+        }
+
+        $this->apply($ids, $sub);
+
+        foreach ($ids as $id)
+        {
+            $this->assertNull($this->fixture->readImageProvenance($id)['provenance_owner'], "photo $id kept its value");
+        }
+    }
+
+    // ── the dry run (decision 0086) ───────────────────────────────────────
+
+    /**
+     * [DT] The dry run counts the photos that carry Herkunft which the apply
+     * would change: empty photos and photos already equal to the values do not
+     * count, a photo differing in one field does.
+     */
+    public function testDryRunCountsOnlyPhotosThatWouldBeOverwritten(): void
+    {
+        $ids = array_slice($this->photoIds, 0, 4);
+        $this->assertCount(4, $ids, 'anti-vacuity: the four cases need four photos');
+        $equal = array(
+            'provenance_physical_album' => self::ALBUM['provenance_physical_album'],
+            'provenance_owner' => self::ALBUM['provenance_owner'],
+            'provenance_scanned_on' => self::ALBUM['provenance_scanned_on'],
+            'provenance_album_note' => self::ALBUM['provenance_note'],
+        );
+        // $ids[0] stays empty, $ids[1] equals, $ids[2] differs in one field, $ids[3] differs in all
+        $this->fixture->imageProvenance($ids[1], $equal);
+        $this->fixture->imageProvenance($ids[2], array_merge($equal, array('provenance_owner' => 'Berta Schmidt')));
+        $this->fixture->imageProvenance($ids[3], array('provenance_owner' => 'Fremd'));
+        $before = array_map(fn ($id) => $this->fixture->readImageProvenance($id), $ids);
+        $mark = $this->lastHistoryId();
+
+        $res = $this->apply($ids, null, true);
+
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+        $this->assertSame(2, $res['json']['result']['would_overwrite']);
+        $this->assertSame(0, $res['json']['result']['applied'], 'a dry run applies nothing');
+        $this->assertSame($before, array_map(fn ($id) => $this->fixture->readImageProvenance($id), $ids));
+        $this->assertSame(0, $this->historyCount($mark));
+    }
+
+    /** [BVA] With nothing to overwrite the dry run answers 0. */
+    public function testDryRunAnswersZeroOverEmptyPhotos(): void
+    {
+        $res = $this->apply($this->chunk(), null, true);
+
+        $this->assertSame(0, $res['json']['result']['would_overwrite']);
+    }
+
+    /** [ECP] The dry run of a sub-album compares against the ancestor's values. */
+    public function testDryRunOfASubAlbumComparesWithTheInheritedValues(): void
+    {
+        [$sub, $ids] = $this->subAlbumWithPhotos(self::ALBUM, array());
+        $this->fixture->imageProvenance($ids[0], array('provenance_owner' => 'Fremd'));
+
+        $this->assertSame(1, $this->apply($ids, $sub, true)['json']['result']['would_overwrite']);
+
+        $this->fixture->imageProvenance($ids[0], array(
+            'provenance_physical_album' => self::ALBUM['provenance_physical_album'],
+            'provenance_owner' => self::ALBUM['provenance_owner'],
+            'provenance_scanned_on' => self::ALBUM['provenance_scanned_on'],
+            'provenance_album_note' => self::ALBUM['provenance_note'],
+        ));
+        $this->assertSame(0, $this->apply($ids, $sub, true)['json']['result']['would_overwrite']);
+    }
+
     // ── the history ───────────────────────────────────────────────────────
 
     /** [DT] A changed field leaves a row; an unchanged one leaves none. */
@@ -385,18 +514,45 @@ final class ApplyTest extends TestCase
         return array_slice($this->photoIds, 0, 3);
     }
 
-    private function apply(array $ids, ?int $catId = null): array
+    private function apply(array $ids, ?int $catId = null, bool $dryRun = false): array
     {
-        return $this->applyRaw(implode(',', $ids), $catId);
+        return $this->applyRaw(implode(',', $ids), $catId, $dryRun);
     }
 
-    private function applyRaw(string $imageIds, ?int $catId = null): array
+    private function applyRaw(string $imageIds, ?int $catId = null, bool $dryRun = false): array
     {
-        return $this->ws->call(self::METHOD, array(
+        $params = array(
             'cat_id' => $catId ?? $this->catId,
             'image_ids' => $imageIds,
             'pwg_token' => $this->ws->token(),
-        ));
+        );
+        if ($dryRun)
+        {
+            $params['dry_run'] = 1;
+        }
+
+        return $this->ws->call(self::METHOD, $params);
+    }
+
+    /**
+     * A parent album with the given values and a sub-album with its own, holding
+     * the chunk's photos.
+     *
+     * @return array{0: int, 1: int[]} the sub-album and its photos
+     */
+    private function subAlbumWithPhotos(array $parentValues, array $subValues): array
+    {
+        $parent = $this->fixture->createTestAlbum('provenance-apply-parent');
+        $this->fixture->albumProvenance($parent, $parentValues);
+        $sub = $this->fixture->createTestSubAlbum('provenance-apply-sub', $parent);
+        $this->fixture->albumProvenance($sub, $subValues);
+        $ids = $this->chunk();
+        foreach ($ids as $id)
+        {
+            $this->fixture->attachImage($id, $sub);
+        }
+
+        return array($sub, $ids);
     }
 
     /** mtime and size of each photo's file, so a write-back would be visible. */

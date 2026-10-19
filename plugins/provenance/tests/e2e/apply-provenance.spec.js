@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { AlbumPropertiesPage } = require('./support/AlbumPropertiesPage');
 const { PhotoPropertiesPage } = require('./support/PhotoPropertiesPage');
-const { seed, restore } = require('./support/seed');
+const { seed, readPhoto, restore } = require('./support/seed');
 
 /**
  * The copy-down apply, in a real browser.
@@ -69,6 +69,60 @@ test.describe('applying album provenance to its photos', () => {
     await photo.goto(fixture.photo_ids[0]);
     await expect(photo.inherited).toContainText(fixture.values.provenance_physical_album);
     await expect(photo.inherited).toContainText(fixture.values.provenance_owner);
+  });
+
+  test('photos that would be overwritten are named in a confirm; cancelling applies nothing', async ({ page }) => {
+    const fixture = seed('overwrite');
+    expect(fixture.overwrite_count).toBeGreaterThan(0);
+    const overwritten = fixture.photo_ids[0];
+    const before = await readPhoto(overwritten);
+    expect(before.provenance_owner).not.toBe(fixture.values.provenance_owner);
+
+    const album = new AlbumPropertiesPage(page);
+    await album.goto(fixture.album_id);
+
+    /** @type {string[]} */
+    const dialogs = [];
+    page.on('dialog', async (dialog) => {
+      dialogs.push(dialog.message());
+      await dialog.dismiss();
+    });
+
+    await album.applyButton.click();
+    await expect.poll(() => dialogs.length).toBe(1);
+    expect(dialogs[0]).toContain(String(fixture.overwrite_count));
+    await expect(album.applyProgress).toBeHidden();
+    await expect(album.applyButton).not.toHaveClass(/provenance-busy/);
+
+    expect(await readPhoto(overwritten)).toEqual(before);
+  });
+
+  test('accepting the confirm applies and overwrites', async ({ page }) => {
+    const fixture = seed('overwrite');
+    page.on('dialog', (dialog) => dialog.accept());
+
+    const album = new AlbumPropertiesPage(page);
+    await album.goto(fixture.album_id);
+    await album.applyButton.click();
+
+    await expect(album.applyDone).toBeVisible();
+    expect((await readPhoto(fixture.photo_ids[0])).provenance_owner).toBe(fixture.values.provenance_owner);
+  });
+
+  test('with nothing to overwrite no confirm appears', async ({ page }) => {
+    const fixture = seed('with-provenance');
+    let dialogs = 0;
+    page.on('dialog', async (dialog) => {
+      dialogs++;
+      await dialog.dismiss();
+    });
+
+    const album = new AlbumPropertiesPage(page);
+    await album.goto(fixture.album_id);
+    await album.applyButton.click();
+
+    await expect(album.applyDone).toBeVisible();
+    expect(dialogs).toBe(0);
   });
 
   test('an application-level failure surfaces instead of stalling', async ({ page }) => {

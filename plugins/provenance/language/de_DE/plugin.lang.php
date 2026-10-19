@@ -12,6 +12,7 @@ $lang['Save note'] = 'Notiz speichern';
 $lang['Apply to %d photos'] = 'Auf %d Fotos anwenden';
 $lang['Applying provenance to %d photos...'] = 'Herkunft wird auf %d Fotos angewendet...';
 $lang['Provenance applied to %d photos'] = 'Herkunft auf %d Fotos angewendet';
+$lang['%d photos already carry provenance that this will overwrite. Continue?'] = '%d Fotos haben bereits eine Herkunft, die dabei überschrieben wird. Fortfahren?';
 $lang['Provenance could not be applied'] = 'Herkunft konnte nicht angewendet werden';
 $lang['This album holds no photo'] = 'Dieses Album enthält keine Fotos';
 $lang['Write to %d files'] = 'In %d Dateien schreiben';

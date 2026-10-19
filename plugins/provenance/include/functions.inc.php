@@ -252,6 +252,45 @@ function provenance_nearest_album_with_values($uppercats, $albums)
   return null;
 }
 
+/**
+ * How many photos carry Herkunft that an apply of $values would change.
+ *
+ * A photo with none of the four fields filled in loses nothing, and one already
+ * equal to $values is not changed, so neither counts.
+ *
+ * @param array $photos image id => image column => current value
+ * @param array $values image column => value the apply would write
+ * @return int
+ */
+function provenance_count_overwrites($photos, $values)
+{
+  $count = 0;
+  foreach ($photos as $photo)
+  {
+    $has_values = false;
+    $differs = false;
+    foreach ($values as $column => $value)
+    {
+      $current = trim((string)$photo[$column]);
+      if ($current !== '')
+      {
+        $has_values = true;
+      }
+      if ($current !== trim($value))
+      {
+        $differs = true;
+      }
+    }
+
+    if ($has_values and $differs)
+    {
+      $count++;
+    }
+  }
+
+  return $count;
+}
+
 /*
  * ---------------------------------------------------------------------------
  * Composition layer: what text goes into a file.
