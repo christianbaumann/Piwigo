@@ -334,13 +334,39 @@ It appears on `--dry-run` as a prediction and on a real run as a report, and nev
 `--no-prune`. Its absence is the signal that nothing irreplaceable is at stake. See
 [decision 0026](../../docs/agents/decisions/0026-tracked-gallery-photos-are-prune-eligible.md).
 
+## `pwg-albums` — a folder tree as albums
+
+```bash
+cd tools/deploy
+uv run pwg-albums deploy.<target>.json ~/Scans/Familie_1970
+```
+
+Creates the folder and its sub-folders as an album tree at the remote root, over `ws.php`
+(`pwg.categories.add`). Albums only: no photos, no `galleries/` folder. Hidden folders (`.*`) and
+symlinks are skipped, names are taken in Unicode NFC, empty folders count. It prints one line per
+album and a summary.
+
+An album that exists (same parent, same name as the server compares it: case and accents
+ignored) is skipped **with everything below it**, so a second run creates nothing, and a new
+sub-folder inside an existing album is not created. The first error stops the run. Exit codes are
+the tool's own: `3` for the credential file, `7` for a refusal by the remote (wrong password,
+account not an admin, a name the server rejects); `1` for a `<folder>` that is not a directory.
+Like `pwg-deploy` it is never safe against a production install.
+
+The integration test runs the command against DDEV, with a `deploy.ddev.json` as for
+`--seed-tags-only`, under an album with a unique name that it deletes again:
+
+```bash
+uv run pytest -m integration
+```
+
 ## Testing
 
 ```bash
 cd tools/deploy && uv run pytest
 ```
 
-600 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
+613 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

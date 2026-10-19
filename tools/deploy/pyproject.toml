@@ -7,6 +7,7 @@ dependencies = []                      # stdlib only, on purpose
 
 [project.scripts]
 pwg-deploy = "pwgdeploy.cli:main"
+pwg-albums = "pwgdeploy.albums_cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-randomly>=3"]
@@ -21,3 +22,4 @@ packages = ["pwgdeploy"]
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --strict-config -W error"
 testpaths = ["tests"]
+markers = ["integration: needs DDEV up and deploy.ddev.json; run with -m integration"]

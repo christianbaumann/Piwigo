@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from pwgdeploy import cli, config, errors, fileset, preflight
+from pwgdeploy import albums_cli, cli, config, errors, fileset, preflight
 
 README = Path(__file__).resolve().parents[1] / "README.md"
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -389,3 +389,16 @@ def test_the_readme_version_refusal_is_the_message_the_tool_produces(readme):
     produced = f"{type(raised.value).__name__}: {raised.value}"
 
     assert " ".join(documented.split()) == " ".join(produced.split())
+
+
+# --- pwg-albums -------------------------------------------------------------------------
+
+
+def test_the_pwg_albums_command_and_its_test_command_are_the_real_ones(readme):
+    """[HAPPY] `uv run pwg-albums` works only because of the console script, and the
+    documented integration command only because the marker is registered."""
+    pyproject = (README.parent / "pyproject.toml").read_text(encoding="utf-8")
+    assert "uv run pwg-albums" in readme
+    assert f'{albums_cli.PROGRAM} = "pwgdeploy.albums_cli:main"' in pyproject
+    assert "uv run pytest -m integration" in readme
+    assert 'markers = ["integration:' in pyproject
