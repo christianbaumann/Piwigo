@@ -142,7 +142,10 @@ def test_a_refused_album_fails_the_run_but_not_its_siblings(session, tmp_path):
     try:
         code, out, err = run(root, tmp_path / "state")
         assert code == RemoteHttpError.exit_code, err
-        assert "skipped (parent failed)  " + f"{root.name}/ /Child" in out
+        (report_file,) = (tmp_path / "state").glob("albums-*.json")
+        statuses = {e["path"]: e["status"] for e in json.loads(report_file.read_text(encoding="utf-8"))}
+        assert statuses[f"{root.name}/ "] == "failed"
+        assert statuses[f"{root.name}/ /Child"] == "skipped (parent failed)"
         remote = albums.read_remote(client, base_url)
         top = next(a for a in remote if a.name == root.name)
         assert [a.name for a in remote if a.parent_id == top.id] == ["Sibling"]

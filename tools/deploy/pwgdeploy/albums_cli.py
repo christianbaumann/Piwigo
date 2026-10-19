@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -36,16 +37,13 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def print_dry_run(actions, out) -> None:
-    would_create = skipped = 0
-    for action in actions:
-        if action.kind == albums.SKIP:
-            skipped += 1
-            print(f"skipped (exists)  {action.path}", file=out)
-        else:
-            would_create += 1
-            print(f"would create      {action.path}", file=out)
-    print(f"{would_create} would create, {skipped} skipped (dry run)", file=out)
+def finish(results, errors, out, state_dir, done="created") -> None:
+    report = albums.write_report(state_dir, results, datetime.now())
+    counts = Counter(r.status for r in results)
+    print(f"{counts[done]} {done}, {counts['skipped (exists)']} skipped, {len(errors)} failed", file=out)
+    for message in errors:
+        print(message, file=out)
+    print(f"report: {report}", file=out)
 
 
 def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]:
@@ -64,8 +62,12 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]
         raise DeployError(f"--parent {args.parent}: no such album on the remote")
     actions = albums.plan(local, remote, args.parent)
     if args.dry_run:
-        print_dry_run(actions, out)
-        return
+        results = [
+            albums.Result(a.path, "skipped (exists)", a.album_id) if a.kind == albums.SKIP else albums.Result(a.path, "would create")
+            for a in actions
+        ]
+        finish(results, [], out, state_dir, done="would create")
+        return []
     ids: dict[str, int] = {}
     results: list[albums.Result] = []
     parent_failed: set[str] = set()
@@ -77,7 +79,6 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]
         if action.parent in parent_failed:
             parent_failed.add(action.path)
             results.append(albums.Result(action.path, "skipped (parent failed)"))
-            print(f"skipped (parent failed)  {action.path}", file=out)
             continue
         parent_id = args.parent if action.parent is None else ids[action.parent]
         try:
@@ -86,17 +87,9 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]
             parent_failed.add(action.path)
             errors.append(f"failed  {action.path}: {error}")
             results.append(albums.Result(action.path, "failed", None, str(error)))
-            print(f"failed            {action.path}", file=out)
             continue
         results.append(albums.Result(action.path, "created", ids[action.path]))
-        print(f"created           {action.path}", file=out)
-    report = albums.write_report(state_dir, results, datetime.now())
-    created = sum(1 for r in results if r.status == "created")
-    skipped = sum(1 for r in results if r.status == "skipped (exists)")
-    print(f"{created} created, {skipped} skipped, {len(errors)} failed", file=out)
-    for message in errors:
-        print(message, file=out)
-    print(f"report: {report}", file=out)
+    finish(results, errors, out, state_dir)
     return errors
 
 

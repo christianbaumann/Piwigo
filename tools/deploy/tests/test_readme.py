@@ -94,12 +94,23 @@ def real_flags() -> set[str]:
     } - BUILTIN_FLAGS
 
 
-def test_every_documented_flag_is_accepted_by_the_parser(readme):
-    """[HAPPY] A flag in the README that argparse rejects is an instruction that fails
-    the moment it is followed."""
+def albums_flags() -> set[str]:
+    return {
+        option
+        for action in albums_cli.build_parser()._actions
+        for option in action.option_strings
+    } - BUILTIN_FLAGS
+
+
+def test_every_documented_flag_is_accepted_by_a_parser(readme):
+    """[HAPPY] A flag in the README that neither pwg-deploy's nor pwg-albums' argparse
+    rejects is an instruction that fails the moment it is followed."""
     documented = documented_flags(readme)
+    known = real_flags() | albums_flags()
     assert len(documented) >= MIN_FLAGS, f"only {len(documented)} flags found in README.md"
-    assert documented <= real_flags(), f"documented but unknown: {documented - real_flags()}"
+    assert albums_flags(), "pwg-albums has no flags; this guard is scanning nothing"
+    assert documented <= known, f"documented but unknown: {documented - known}"
+    assert albums_flags() <= documented, f"pwg-albums flags undocumented: {albums_flags() - documented}"
 
 
 def test_every_flag_the_tool_accepts_is_documented(readme):

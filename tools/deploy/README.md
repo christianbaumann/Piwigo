@@ -341,17 +341,18 @@ cd tools/deploy
 uv run pwg-albums deploy.<target>.json ~/Scans/Familie_1970
 ```
 
-Creates the folder and its sub-folders as an album tree at the remote root (or under the album whose id the option --parent names), over `ws.php`
+Creates the folder and its sub-folders as an album tree at the remote root (or under the album whose id `--parent` names), over `ws.php`
 (`pwg.categories.add`). Albums only: no photos, no `galleries/` folder. Hidden folders (`.*`) and
-symlinks are skipped, names are taken in Unicode NFC, empty folders count. It prints a summary line and the path of a
-report, `.state/albums-<timestamp>.json`, with one entry per album: path, album id, status.
-`--dry-run` logs in, reads the remote tree and prints the plan as `would create` / `skipped (exists)`
-lines, creating nothing.
+symlinks are skipped, names are taken in Unicode NFC, empty folders count. It prints a summary line (`N created, M skipped, K failed`), the
+errors and the path of a report, `.state/albums-<timestamp>.json`, with one entry per album: path,
+album id, status (`created`, `skipped (exists)`, `skipped (parent failed)`, `failed` with the
+server's message, `would create`). `--dry-run` logs in, reads the remote tree and writes the
+plan to the report as `would create` / `skipped (exists)`, creating nothing.
 
 An album that exists (same parent, same name as the server compares it: case and accents
 ignored) is skipped **with everything below it**, so a second run creates nothing, and a new
 sub-folder inside an existing album is not created. A name the server refuses is reported as
-`failed` with its message after the summary line, its sub-folders are `skipped (parent failed)`,
+`failed` with its message after the summary line and in the report, its sub-folders are `skipped (parent failed)`,
 the rest is created and the exit code is `7`; a re-run does not repair a failed sub-album under a
 created top album (it is skipped as existing), so create it by hand. Exit codes are
 the tool's own: `3` for the credential file, `7` for a refusal by the remote (wrong password,

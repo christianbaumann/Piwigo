@@ -207,8 +207,13 @@ def run_cli(tmp_path, client, *flags):
     folder = tmp_path / "Familie"
     (folder / "Urlaub").mkdir(parents=True)
     out, err = io.StringIO(), io.StringIO()
-    code = main([*flags, str(config), str(folder)], stdout=out, stderr=err, client_factory=lambda c: client)
+    code = main([*flags, str(config), str(folder)], stdout=out, stderr=err, client_factory=lambda c: client, state_dir=tmp_path / "state")
     return code, out.getvalue(), err.getvalue()
+
+
+def report_statuses(tmp_path):
+    (report,) = (tmp_path / "state").glob("albums-*.json")
+    return {e["path"]: e["status"] for e in json.loads(report.read_text(encoding="utf-8"))}
 
 
 def test_dry_run_prints_the_plan_and_creates_nothing(tmp_path):
@@ -218,9 +223,8 @@ def test_dry_run_prints_the_plan_and_creates_nothing(tmp_path):
     assert code == 0, err
     assert "pwg.categories.getList" in client.methods
     assert "pwg.categories.add" not in client.methods
-    assert "would create      Familie" in out
-    assert "would create      Familie/Urlaub" in out
     assert "2 would create, 0 skipped" in out
+    assert report_statuses(tmp_path) == {"Familie": "would create", "Familie/Urlaub": "would create"}
 
 
 def test_dry_run_reports_an_existing_album_as_skipped(tmp_path):
@@ -228,8 +232,8 @@ def test_dry_run_reports_an_existing_album_as_skipped(tmp_path):
     client = RecordingClient([{"id": 7, "name_raw": "Familie", "id_uppercat": None}])
     code, out, err = run_cli(tmp_path, client, "--dry-run")
     assert code == 0, err
-    assert "skipped (exists)  Familie" in out
-    assert "would create" not in out.replace("0 would create", "")
+    assert "0 would create, 1 skipped" in out
+    assert report_statuses(tmp_path) == {"Familie": "skipped (exists)"}
     assert "pwg.categories.add" not in client.methods
 
 
@@ -284,7 +288,7 @@ def run_main(monkeypatch, tmp_path, gallery, *tree_paths):
         client_factory=lambda cfg: gallery,
         state_dir=tmp_path / "state",
     )
-    return code, out.getvalue()
+    return code, out.getvalue(), report_statuses(tmp_path)
 
 
 def test_a_refused_album_is_reported_its_children_are_not_requested_and_siblings_are_created(
@@ -292,11 +296,15 @@ def test_a_refused_album_is_reported_its_children_are_not_requested_and_siblings
 ):
     """[NEG] Bad has a child; Gut is its sibling."""
     gallery = RefusingGallery(refuse="Bad")
-    code, out = run_main(monkeypatch, tmp_path, gallery, "Bad/Child", "Gut")
+    code, out, statuses = run_main(monkeypatch, tmp_path, gallery, "Bad/Child", "Gut")
     assert code != 0
     assert gallery.requested == ["Top", "Bad", "Gut"]
-    assert "created           Top/Gut" in out
-    assert "skipped (parent failed)  Top/Bad/Child" in out
+    assert statuses["Top/Gut"] == "created"
+    assert statuses["Top/Bad"] == "failed"
+    assert statuses["Top/Bad/Child"] == "skipped (parent failed)"
+    (report,) = (tmp_path / "state").glob("albums-*.json")
+    failed = next(e for e in json.loads(report.read_text(encoding="utf-8")) if e["status"] == "failed")
+    assert "bad name" in failed["message"]
     summary = out.index("2 created, 0 skipped, 1 failed")
     assert out.index("failed  Top/Bad: ", summary) > summary
     assert "bad name" in out[summary:]
@@ -304,5 +312,5 @@ def test_a_refused_album_is_reported_its_children_are_not_requested_and_siblings
 
 def test_a_run_without_a_refusal_exits_zero(monkeypatch, tmp_path):
     """[HAPPY] The counterpart: nothing failed, exit 0."""
-    code, out = run_main(monkeypatch, tmp_path, RefusingGallery(refuse=None), "A")
+    code, out, _ = run_main(monkeypatch, tmp_path, RefusingGallery(refuse=None), "A")
     assert code == 0 and "2 created, 0 skipped, 0 failed" in out
