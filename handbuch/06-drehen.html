@@ -72,7 +72,8 @@
 
 <p>
   Solange der Bearbeitungsmodus offen ist, lässt sich das Foto nicht vergrößern, ein Klick auf
-  das Foto führt nicht zum nächsten Foto und die Rahmen der Personen sind ausgeblendet. War
+  das Foto führt nicht zum nächsten Foto, die Pfeiltasten links und rechts blättern nicht weiter und
+  die Rahmen der Personen sind ausgeblendet. War
   gerade der Markierungsmodus für Personen offen, wird er beim Öffnen des
   Bearbeitungsmodus beendet. Wurde dabei eine
   Person markiert oder entfernt, lädt die Seite neu und der Bearbeitungsmodus öffnet sich nicht;
@@ -130,6 +131,13 @@
   kleineren Zuschnitt lässt sich erneut speichern.
 </p>
 
+<p>
+  Gelingt das Speichern nicht, zeigt die Seite eine Meldung mit dem Grund. Nach <strong>OK</strong>
+  bleibt der Bearbeitungsmodus offen und es lässt sich erneut speichern, solange die Datei
+  unverändert ist. Ist der Fehler erst beim Schreiben aufgetreten, lädt die Seite stattdessen neu
+  und zeigt das Foto, wie es jetzt ist.
+</p>
+
 <h3>Rückgängig machen</h3>
 
 <p>
@@ -142,6 +150,14 @@
   denselben Dateinamen hat, aktualisieren Sie die Datei ...</em> eingeschaltet hat (siehe
   <a href="02-fotos.html">Fotos hinzufügen</a>). Vorher legt die Galerie wieder eine
   Kopie des Zustands an, der ersetzt wird.
+</p>
+
+<p>
+  Die wiederhergestellte Kopie bringt zurück, was sie selbst enthält: Info-Text, Datum,
+  Personen-Markierungen und Schlagworte, die die Galerie in die Datei geschrieben hatte. Was nach
+  der Bearbeitung geändert wurde und in der Kopie anders steht, geht damit verloren, auch ein
+  später hinzugefügtes Schlagwort. Was in der Kopie fehlt, behält den Wert der Galerie und wird in
+  die Datei geschrieben.
 </p>
 
 <h3>Wenn die Schaltfläche ausgegraut ist</h3>
