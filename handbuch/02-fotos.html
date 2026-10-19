@@ -35,7 +35,9 @@
   <li>
     Auf <strong>Upload starten</strong> klicken. Die Schaltfläche ist erst aktiv, wenn
     mindestens eine Datei ausgewählt ist. Während der Übertragung kann der Vorgang mit
-    <strong>Abbrechen</strong> beendet werden.
+    <strong>Abbrechen</strong> beendet werden. Dateien, die schon vollständig übertragen sind,
+    bleiben im Album; angefangene werden verworfen. Schlägt eine Datei fehl, meldet die
+    Seite eine Zeile <em>Fehler bei Datei »name« : Grund</em>; die übrigen Dateien laufen weiter.
   </li>
 </ol>
 
@@ -64,10 +66,27 @@
 <p>
   Die Schaltfläche <strong>Optionen</strong> blendet einen Schalter ein: <em>Wenn ein Foto in
   diesem Album denselben Dateinamen hat, aktualisieren Sie die Datei, ohne die Eigenschaften
-  des Fotos zu ändern.</em> Damit wird eine bestehende Bilddatei ersetzt, während Titel,
-  Beschreibung und Schlagworte des Fotos erhalten bleiben. Ist der Schalter aus, entsteht ein
+  des Fotos zu ändern.</em> Damit wird eine bestehende Bilddatei ersetzt. Der Titel des Fotos
+  bleibt immer erhalten. Bei Info-Text, Datum, Schlagworten und Personenmarkierungen gilt für
+  jedes Feld einzeln: Enthält die neue Datei den Wert (Info-Text, Datum, markierte
+  Schlagworte, Personenmarkierungen), gilt der Wert aus der Datei. Sonst bleibt der Wert der
+  Galerie und wird in die neue Datei geschrieben. Ein markierter Mensch behält sein Schlagwort,
+  auch wenn die Datei es nicht nennt. Ist der Schalter aus, entsteht ein
   zweites Foto, es sei denn, die Datei ist genau dieselbe wie die eines vorhandenen Fotos; dann
   wird nur das vorhandene Foto dem Album zugeordnet.
+</p>
+
+<p>
+  Dieselbe Regel gilt für ein neues Foto: Trägt die hochgeladene Datei Info-Text, Datum,
+  markierte Schlagworte oder Personenmarkierungen, übernimmt die Galerie sie beim Upload.
+  Ein Einlesen von Hand ist dafür nicht nötig.
+</p>
+
+<p>
+  Haben mehrere Fotos des Albums den hochgeladenen Dateinamen, ersetzt Piwigo keines davon.
+  Die Seite meldet dann zum Beispiel <em>Nichts ersetzt: Die Fotos #12, #15 dieses Albums
+  haben alle den Dateinamen „bild.png“.</em> Eines der Fotos umbenennen oder löschen und den
+  Upload wiederholen.
 </p>
 
 <h3>Ein anderes Zielalbum wählen</h3>
@@ -144,9 +163,17 @@
     <strong>Leeren</strong> oder <strong>Durch die des Zielalbums ersetzen</strong>.
   </p>
   <p>
-    <strong>Von Album abtrennen</strong> entfernt das Foto aus einem einzelnen Album.
+    <strong>Von Album abtrennen</strong> entfernt das Foto aus einem einzelnen Album. Das letzte
+    Album eines Fotos lässt sich so nicht entfernen: Piwigo bricht ab und ändert nichts. Die
+    Meldung nennt die Fotos und den Ausweg, sie in ein anderes Album zu verschieben (<strong>Ins
+    Album verschieben</strong>).
   </p>
 </div>
+
+<figure>
+  <img src="assets/screenshots/30-album-abtrennen-verweigert.png" alt="Die Meldung beim Abtrennen des letzten Albums" />
+  <figcaption>Die Meldung, wenn Von Album abtrennen Fotos in keinem Album zurückließe. Die Fotos bleiben, wo sie sind.</figcaption>
+</figure>
 
 <h3>Große Mengen ohne Browser</h3>
 
@@ -154,7 +181,7 @@
   Sehr viele Dateien lassen sich mit Zugang zum Server per FTP im Verzeichnis
   <code>galleries/</code> ablegen und unter
   <span class="pwgScreen">Verwaltung » Werkzeuge » Synchronisieren</span> einlesen. Dieses
-  Handbuch beschreibt den Weg nicht, nennt aber zwei Fallen:
+  Handbuch beschreibt den Weg nicht, nennt aber drei Fallen:
 </p>
 
 <ul>
@@ -168,6 +195,14 @@
     Im Abschnitt <strong>Simulation</strong> ist das Kästchen bei jedem Aufruf angehakt:
     <em>Nur Simulation durchführen, ohne Änderungen in der Datenbank vorzunehmen.</em> Solange
     es angehakt ist, zeigt der Vorgang nur an, was er tun würde, und ändert nichts.
+  </li>
+  <li>
+    Fehlt ein Ordner im Verzeichnis, entfernt das Einlesen sein Album. Ein Foto, dessen Datei
+    in einem anderen Ordner liegt und das nur in diesem Album war, bleibt erhalten: Es kommt
+    in das übergeordnete Album, bei einem Album der obersten Ebene in das private Album
+    <strong>Ohne Album</strong>, das nur Administratoren sehen. Das Ergebnis nennt die Zahl in der Zeile
+    <em>... Fotos, die einem verbleibenden Album zugeordnet wurden</em>. Fotos, deren Datei im
+    fehlenden Ordner lag, werden mit dem Album gelöscht.
   </li>
 </ul>
 
