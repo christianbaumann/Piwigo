@@ -56,7 +56,10 @@
   <li>
     <strong>bearbeiten</strong>: benennt das Schlagwort um. Der neue Name kommt in das Feld
     <strong>Name des Schlagworts</strong>, bestätigt wird mit <strong>Ja, umbenennen</strong>. Der Name
-    ändert sich überall, an jedem Foto.
+    ändert sich überall, an jedem Foto. Das Schlagwort einer Person lässt sich hier nicht
+    umbenennen; es erscheint die Meldung <em>Personen-Schlagworte werden nur zusammen mit der
+    Person umbenannt: ...</em>, dahinter der Name des Schlagworts und der Hinweis, dass der
+    Webmaster die Person auf der Seite Personen umbenennt.
   </li>
   <li>
     <strong>Duplikat</strong>: legt eine Kopie des Schlagworts an, deren Name die Ergänzung
@@ -196,6 +199,18 @@
   </li>
 </ol>
 
+<p>
+  Ob eine Gruppe gestreift ist oder ein Bild trägt, lässt sich in diesem Dialog nicht
+  einstellen, sondern nur auf der Seite des Plugins. Sie ist über
+  <span class="pwgScreen">Verwaltung » Plugins</span> zu erreichen: beim Eintrag
+  <em>Colored Tags</em> auf <strong>Einstellungen</strong> klicken. Unter
+  <strong>Eine neue Farbe hinzufügen</strong> stehen die Felder <strong>Name</strong>,
+  <strong>Farbe</strong>, das Kästchen <strong>Gestreift</strong> (Streifen in der Farbe und
+  Weiß am linken Rand) und <strong>Emoji</strong> (ein Bild einfügen oder dessen Code Points
+  eingeben, leer für keines). Unter <strong>Farben verwalten</strong> öffnet das Symbol
+  <strong>bearbeiten</strong> einer Gruppe die Felder zum Ändern.
+</p>
+
 <h3 id="besondere">Die vier besonderen Gruppen</h3>
 
 <p>
@@ -323,8 +338,17 @@
 <h3 id="bilddatei">Schlagworte in der Bilddatei</h3>
 
 <p>
-  Ändern sich die Schlagworte eines Fotos, auf welchem Weg auch immer, werden sie auch in die
-  Bilddatei geschrieben, zusammen mit dem Namen ihrer Gruppe. Andere Bildprogramme zeigen sie
+  Ändern sich die Schlagworte eines Fotos, werden sie auch in die Bilddatei geschrieben,
+  zusammen mit dem Namen ihrer Gruppe. Das geschieht auf diesen Wegen: beim Setzen und
+  Entfernen auf der Fotoseite, beim Sichern der Eigenschaften eines Fotos, in der
+  Stapelverarbeitung (Schlagworte hinzufügen oder entfernen, in beiden Modi), beim
+  Umbenennen, Duplizieren, Zusammenführen und Löschen in der Schlagwortverwaltung, wenn ein
+  Schlagwort einer anderen Gruppe zugeordnet wird, beim Markieren und Löschen von Personen und
+  nach dem Drehen oder Zuschneiden eines Fotos. Nicht geschrieben wird beim Hochladen eines
+  Fotos mit Schlagworten über die Schnittstelle. Solche Schlagworte stehen erst in der Datei,
+  wenn sie sich das nächste Mal ändern. Beim Ersetzen der Datei eines Fotos gilt: Hat die neue
+  Datei vom Plugin geschriebene Schlagworte, gelten diese, sonst werden die der Galerie in die
+  Datei geschrieben. Andere Bildprogramme zeigen sie
   dann als Stichwörter der Datei. Ausgenommen sind die Schlagworte, die nur in der Arbeitskopie
   bleiben (siehe <a href="#besondere">Die vier besonderen Gruppen</a>).
 </p>
@@ -338,7 +362,10 @@
   <li>
     Kann die Datei nicht geschrieben werden, steht nach dem Sichern oben eine Fehlermeldung,
     die mit <em>Fotoinfo:</em> beginnt. Das gilt in den Eigenschaften eines Fotos und in der
-    Stapelverarbeitung. Auf der Fotoseite erscheint neben dem Feld für ein neues Schlagwort
+    Stapelverarbeitung im Modus für alle Fotos. In der Einzelansicht der Stapelverarbeitung
+    erscheint der Grund stattdessen in der roten Plakette des Fotos (Bild: siehe
+    <a href="03-fototexte.html">Titel, Autor, Datum und Beschreibung</a>, Abschnitt
+    <em>Datum, Info und Bilddatei</em>). Auf der Fotoseite erscheint neben dem Feld für ein neues Schlagwort
     die Meldung <em>Gespeichert, aber nicht in die Bilddatei geschrieben</em>, dahinter der
     Grund, etwa <em>Die Datei fehlt oder ist nicht beschreibbar</em>. Sie verschwindet bei der
     nächsten erfolgreichen Änderung oder wenn die Seite neu geladen wird. In der
