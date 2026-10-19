@@ -120,3 +120,77 @@ def test_walk_sorts_siblings_by_name(tmp_path):
     for name in ("b", "c", "a"):
         (tmp_path / "A" / name).mkdir(parents=True)
     assert [c.name for c in albums.walk(tmp_path / "A").children] == ["a", "b", "c"]
+
+
+# --- the create loop: a refused album does not stop the run ---------------------------------
+
+
+class RefusingGallery:
+    """Answers ws.php like a gallery that refuses one album name."""
+
+    def __init__(self, refuse):
+        self.refuse = refuse
+        self.requested = []
+
+    def post(self, url, fields, *, timeout=None):
+        import json
+        from types import SimpleNamespace
+
+        method = fields["method"]
+        if method == "pwg.session.getStatus":
+            result = {"pwg_token": "t"}
+        elif method == "pwg.categories.getList":
+            result = {"categories": []}
+        elif method == "pwg.categories.add":
+            self.requested.append(fields["name"])
+            if fields["name"] == self.refuse:
+                body = {"stat": "fail", "err": 1002, "message": "bad name"}
+                return SimpleNamespace(body=json.dumps(body))
+            result = {"id": 100 + len(self.requested)}
+        else:
+            result = True
+        return SimpleNamespace(body=json.dumps({"stat": "ok", "result": result}))
+
+
+def run_main(monkeypatch, tmp_path, gallery, *tree_paths):
+    import io
+    from types import SimpleNamespace
+
+    from pwgdeploy import albums_cli
+
+    for rel in tree_paths:
+        (tmp_path / "Top" / rel).mkdir(parents=True)
+    config = SimpleNamespace(
+        site=SimpleNamespace(base_url="http://x"),
+        admin=SimpleNamespace(username="a", password="p"),
+    )
+    monkeypatch.setattr(albums_cli, "load_file", lambda path: config)
+    out, err = io.StringIO(), io.StringIO()
+    code = albums_cli.main(
+        ["c.json", str(tmp_path / "Top")],
+        stdout=out,
+        stderr=err,
+        client_factory=lambda cfg: gallery,
+    )
+    return code, out.getvalue()
+
+
+def test_a_refused_album_is_reported_its_children_are_not_requested_and_siblings_are_created(
+    monkeypatch, tmp_path
+):
+    """[NEG] Bad has a child; Gut is its sibling."""
+    gallery = RefusingGallery(refuse="Bad")
+    code, out = run_main(monkeypatch, tmp_path, gallery, "Bad/Child", "Gut")
+    assert code != 0
+    assert gallery.requested == ["Top", "Bad", "Gut"]
+    assert "created           Top/Gut" in out
+    assert "skipped (parent failed)  Top/Bad/Child" in out
+    summary = out.index("2 created, 0 skipped, 1 failed")
+    assert out.index("failed  Top/Bad: ", summary) > summary
+    assert "bad name" in out[summary:]
+
+
+def test_a_run_without_a_refusal_exits_zero(monkeypatch, tmp_path):
+    """[HAPPY] The counterpart: nothing failed, exit 0."""
+    code, out = run_main(monkeypatch, tmp_path, RefusingGallery(refuse=None), "A")
+    assert code == 0 and "2 created, 0 skipped, 0 failed" in out

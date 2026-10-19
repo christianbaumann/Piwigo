@@ -348,7 +348,10 @@ album and a summary.
 
 An album that exists (same parent, same name as the server compares it: case and accents
 ignored) is skipped **with everything below it**, so a second run creates nothing, and a new
-sub-folder inside an existing album is not created. The first error stops the run. Exit codes are
+sub-folder inside an existing album is not created. A name the server refuses is reported as
+`failed` with its message after the summary line, its sub-folders are `skipped (parent failed)`,
+the rest is created and the exit code is `7`; a re-run does not repair a failed sub-album under a
+created top album (it is skipped as existing), so create it by hand. Exit codes are
 the tool's own: `3` for the credential file, `7` for a refusal by the remote (wrong password,
 account not an admin, a name the server rejects); `1` for a `<folder>` that is not a directory.
 Like `pwg-deploy` it is never safe against a production install.
@@ -366,7 +369,7 @@ uv run pytest -m integration
 cd tools/deploy && uv run pytest
 ```
 
-613 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
+615 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

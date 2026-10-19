@@ -16,6 +16,7 @@ from pwgdeploy.albums_cli import main
 from pwgdeploy.bootstrap import login, ws_call
 from pwgdeploy.cli import http_client
 from pwgdeploy.config import load_file
+from pwgdeploy.errors import RemoteHttpError
 
 CONFIG = Path(__file__).resolve().parents[2] / "deploy.ddev.json"
 SUBFOLDERS = ("Urlaub/Italien", "Hochzeit", "Müller")
@@ -79,3 +80,29 @@ def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder):
                     {"category_id": str(album.id), "pwg_token": token, "photo_deletion_mode": "no_delete"},
                 )
     assert not [a for a in albums.read_remote(client, base_url) if a.name == folder.name]
+
+
+def test_a_refused_album_fails_the_run_but_not_its_siblings(session, tmp_path):
+    """[NEG] The server refuses a blank name; its child is never requested."""
+    config, client, token = session
+    base_url = config.site.base_url
+    root = tmp_path / f"pwg-albums-test-{uuid.uuid4().hex[:12]}"
+    (root / " " / "Child").mkdir(parents=True)
+    (root / "Sibling").mkdir()
+    try:
+        code, out, err = run(root)
+        assert code == RemoteHttpError.exit_code, err
+        assert "skipped (parent failed)  " + f"{root.name}/ /Child" in out
+        remote = albums.read_remote(client, base_url)
+        top = next(a for a in remote if a.name == root.name)
+        assert [a.name for a in remote if a.parent_id == top.id] == ["Sibling"]
+        assert not [a for a in remote if a.name == "Child"]
+    finally:
+        for album in albums.read_remote(client, base_url):
+            if album.name == root.name:
+                ws_call(
+                    client,
+                    base_url,
+                    "pwg.categories.delete",
+                    {"category_id": str(album.id), "pwg_token": token, "photo_deletion_mode": "no_delete"},
+                )
