@@ -88,8 +88,8 @@ seed left.
   default applied, reasons in task 67's notes). 66 adds provenance `TagRenameDuplicateMessageTest`
   (the JS const equals core's literal). Deployed 2026-10-19 (17 new, 20 changed, 0 removed; persons and photoinfo
   rescans 553 of 553); no prefilter code changed, so no template purge. The remote held 553 photos,
-  840 at the morning's deploy; this deploy removed and deleted nothing, so the difference happened on
-  the remote in between (its 4 folder albums list 0 photos). Not investigated. Next free decision number: 0087.
+  840 at the morning's deploy; the owner removed them on the remote in between (its 4 folder albums
+  list 0 photos); this deploy removed and deleted nothing. Next free decision number: 0087.
 - German read (delegated to a critical subagent): wording edits in chapters 01-06; its doubt
   "Modus für alle Fotos" was wrong (core's tab is *Übersicht*), fixed in 03 and 04; "von der Galerie
   geschriebene Schlagworte" is right (TagsWritten marker), no change.
