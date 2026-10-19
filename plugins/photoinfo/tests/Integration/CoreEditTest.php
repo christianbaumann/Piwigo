@@ -42,6 +42,7 @@ final class CoreEditTest extends TestCase
     {
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
+        $this->fixture->destroyTestTags();
     }
 
     // ── the photo properties screen ───────────────────────────────────────
@@ -241,6 +242,38 @@ final class CoreEditTest extends TestCase
 
         $this->assertFalse($res['json']['result']['written'], $res['body']);
         $this->assertSame('Am See', $this->fixture->imageRow($this->image['id'])['comment']);
+    }
+
+    /**
+     * [REQ] [NEG] A failed date, Info or tag write brings the German reason the picture page
+     * shows (decision of change 2026-10-15, task 55): the unit mode of the Batch Manager
+     * displays it in the photo's badge.
+     */
+    public function testAFailedWriteBringsTheGermanReasonInTheSetInfoAnswer(): void
+    {
+        $german = sprintf(FixtureBuilder::germanText(PHOTOINFO_NOT_WRITTEN_MESSAGE),
+            FixtureBuilder::germanText(PHOTOINFO_FILE_NOT_WRITABLE_MESSAGE));
+        $tag = $this->fixture->createTag('Kirmes core edit ' . bin2hex(random_bytes(3)));
+        $this->lockFile($this->image);
+
+        $date = $this->setInfo(array('date_creation' => '1965-03-14'));
+        $info = $this->setInfo(array('comment' => 'Am See'));
+        $tags = $this->setInfo(array('tag_ids' => (string)$tag, 'multiple_value_mode' => 'replace'));
+
+        $this->assertFalse($date['json']['result']['written'], $date['body']);
+        $this->assertSame($german, $date['json']['result']['message_l10n'] ?? null, $date['body']);
+        $this->assertSame($german, $info['json']['result']['message_l10n'] ?? null, $info['body']);
+        $this->assertFalse($tags['json']['result']['tags_written'], $tags['body']);
+        $this->assertSame($german, $tags['json']['result']['tags_message_l10n'] ?? null, $tags['body']);
+    }
+
+    /** [HAPPY] A written file: the answer carries no reason to show. */
+    public function testASuccessfulWriteBringsNoReasonInTheSetInfoAnswer(): void
+    {
+        $res = $this->setInfo(array('comment' => 'Am See'));
+
+        $this->assertTrue($res['json']['result']['written'], $res['body']);
+        $this->assertArrayNotHasKey('message_l10n', $res['json']['result']);
     }
 
     /**

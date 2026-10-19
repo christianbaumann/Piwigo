@@ -202,6 +202,10 @@ function ws_photoinfo_images_setInfo($params, &$service)
   {
     $answer['written'] = $written['ok'];
     $answer['message'] = $written['message'];
+    if (!$written['ok'])
+    {
+      $answer['message_l10n'] = photoinfo_not_written_text($written['message']);
+    }
   }
 
   return array_merge($answer, photoinfo_tag_write_answer($tags_written));
@@ -228,17 +232,28 @@ function photoinfo_tag_write_answer($results)
   {
     if (!$result['ok'])
     {
-      // photoinfo_l10n_reason() loads the plugin's language file the prefix needs
-      $reason = photoinfo_l10n_reason($result['message']);
       return array(
         'tags_written' => false,
         'tags_message' => $result['message'],
-        'tags_message_l10n' => sprintf(l10n(PHOTOINFO_NOT_WRITTEN_MESSAGE), $reason),
+        'tags_message_l10n' => photoinfo_not_written_text($result['message']),
         );
     }
   }
 
   return $answer;
+}
+
+/**
+ * The picture page's warning for a failed file write, in the caller's language.
+ *
+ * @param string $message a write result's message
+ * @return string
+ */
+function photoinfo_not_written_text($message)
+{
+  // photoinfo_l10n_reason() loads the plugin's language file the prefix needs
+  $reason = photoinfo_l10n_reason($message);
+  return sprintf(l10n(PHOTOINFO_NOT_WRITTEN_MESSAGE), $reason);
 }
 
 /**

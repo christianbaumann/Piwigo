@@ -347,6 +347,20 @@ function enableGlobalButton() {
   $(".action-save-global i").removeClass("icon-spin6 animate-spin").addClass("icon-floppy");
 }
 
+// photoinfo's answer when it saved but could not write the date, Info or tags into the file
+function fileWriteWarning(result) {
+  if (!result) {
+    return '';
+  }
+  if (result.written === false) {
+    return result.message_l10n || result.message || '';
+  }
+  if (result.tags_written === false) {
+    return result.tags_message_l10n || result.tags_message || '';
+  }
+  return '';
+}
+
 async function saveChanges(pictureId) {
   if ($("#picture-" + pictureId + " .local-unsaved-badge").css('display') === 'block') {
     disableLocalButton(pictureId);
@@ -401,7 +415,12 @@ async function saveChanges(pictureId) {
           enableLocalButton(pictureId);
           enableGlobalButton();
           hideUnsavedLocalBadge(pictureId);
-          showSuccessLocalBadge(pictureId);
+          const writeWarning = fileWriteWarning(data.result);
+          if (writeWarning) {
+            showErrorLocalBadge(pictureId, writeWarning);
+          } else {
+            showSuccessLocalBadge(pictureId);
+          }
           updateSuccessGlobalBadge();
           // Method 1 for extension's save (see Skeleton extension for more details)
           pluginSaveLoop(activePlugins, pictureId);

@@ -17,16 +17,18 @@ Added 2026-10-19 (brainstorm Q2 A). Today unit mode shows a green badge when the
 
 ## Work
 
-* [ ] Integration test first, red: a failed date or Info write answers `message_l10n` with the German text that the picture page shows; a failed tag write already answers `tags_message_l10n` (asserted in the same test class)
-* [ ] `ws_photoinfo_images_setInfo()` adds `message_l10n` to the answer when `written` is false
-* [ ] E2E spec first, red: unit mode with a read-only demo file; changing the date, the Info, or a tag shows the German message in that photo's badge, not the success badge
-* [ ] `batchManagerUnit.js`: when `stat` is ok but `written === false` or `tags_written === false`, call `showErrorLocalBadge(pictureId, <message_l10n or tags_message_l10n>)`
-* [ ] New bullet in `fork-local-core-edits.md` in the same commit as the JS change
-* [ ] Unit layer recorded as not applicable, with the reason, in the commit message
+* [x] Integration test first, red: a failed date or Info write answers `message_l10n` with the German text that the picture page shows; a failed tag write already answers `tags_message_l10n` (asserted in the same test class)
+* [x] `ws_photoinfo_images_setInfo()` adds `message_l10n` to the answer when `written` is false
+* [x] E2E spec first, red: unit mode with a read-only demo file; changing the date, the Info, or a tag shows the German message in that photo's badge, not the success badge
+* [x] `batchManagerUnit.js`: when `stat` is ok but `written === false` or `tags_written === false`, call `showErrorLocalBadge(pictureId, <message_l10n or tags_message_l10n>)`
+* [x] New bullet in `fork-local-core-edits.md` in the same commit as the JS change
+* [x] Unit layer recorded as not applicable, with the reason, in the commit message
 
 ## Verification
 
-* [ ] Both new tests failed before the fix for the expected reason, and pass after it
-* [ ] With a writable file, unit mode still shows the success badge (E2E)
-* [ ] Global mode still shows "Fotoinfo: ..." at the top (existing `testAFailedBatchWriteIsReportedOnce` passes)
-* [ ] photoinfo integration and E2E suites pass, and persons `admin-batch-unit-guard.spec.js` passes; commands named in the notes
+* [x] Both new tests failed before the fix for the expected reason, and pass after it
+* [x] With a writable file, unit mode still shows the success badge (E2E)
+  **Note:** Verified via the [HAPPY] case in `batch-unit-write-warning.spec.js`.
+* [x] Global mode still shows "Fotoinfo: ..." at the top (existing `testAFailedBatchWriteIsReportedOnce` passes)
+* [x] photoinfo integration and E2E suites pass, and persons `admin-batch-unit-guard.spec.js` passes; commands named in the notes
+  **Note:** Verified via photoinfo integration (232 tests OK), photoinfo E2E (63 passed), photoinfo unit (288 OK), persons `admin-batch-unit-guard` (2 passed), all under the suite lock.
