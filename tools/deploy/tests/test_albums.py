@@ -80,6 +80,27 @@ def test_the_first_match_counts_when_the_remote_holds_two():
     assert albums.plan(tree("Urlaub"), remote)[0].album_id == 5
 
 
+def test_a_new_top_folder_is_created_under_the_parent():
+    """[HAPPY]"""
+    remote = [RemoteAlbum(5, "Archiv", None)]
+    actions = albums.plan(tree("Familie", tree("Urlaub")), remote, parent_id=5)
+    assert [(a.path, a.kind) for a in actions] == [("Familie", "create"), ("Familie/Urlaub", "create")]
+
+
+def test_an_existing_top_folder_under_the_parent_is_skipped():
+    """[ECP]"""
+    remote = [RemoteAlbum(5, "Archiv", None), RemoteAlbum(8, "Familie", 5)]
+    actions = albums.plan(tree("Familie", tree("Urlaub")), remote, parent_id=5)
+    assert [(a.path, a.kind, a.album_id) for a in actions] == [("Familie", "skip", 8)]
+
+
+def test_the_same_name_at_the_root_is_not_an_existing_album_under_the_parent():
+    """[NEG]"""
+    remote = [RemoteAlbum(5, "Archiv", None), RemoteAlbum(8, "Familie", None)]
+    actions = albums.plan(tree("Familie"), remote, parent_id=5)
+    assert [a.kind for a in actions] == ["create"]
+
+
 # --- walk() ------------------------------------------------------------------------------
 
 

@@ -15,12 +15,20 @@ from pwgdeploy.errors import DeployError
 PROGRAM = "pwg-albums"
 
 
+def positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{text} is not a positive integer")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=PROGRAM,
         description="Create a local folder and its sub-folders as albums on the remote. "
         "An album that exists is skipped with everything below it.",
     )
+    parser.add_argument("--parent", type=positive_int, help="id of the album to create the tree under")
     parser.add_argument("config_json", help="credential file, as for pwg-deploy")
     parser.add_argument("folder", help="local folder to create as an album tree")
     return parser
@@ -36,7 +44,10 @@ def run(args, out, client_factory=http_client) -> None:
     login(client, config)
 
     local = albums.walk(folder.resolve())
-    actions = albums.plan(local, albums.read_remote(client, base_url))
+    remote = albums.read_remote(client, base_url)
+    if args.parent is not None and args.parent not in {album.id for album in remote}:
+        raise DeployError(f"--parent {args.parent}: no such album on the remote")
+    actions = albums.plan(local, remote, args.parent)
     ids: dict[str, int] = {}
     created = skipped = 0
     for action in actions:
@@ -44,7 +55,7 @@ def run(args, out, client_factory=http_client) -> None:
             skipped += 1
             print(f"skipped (exists)  {action.path}", file=out)
             continue
-        parent_id = None if action.parent is None else ids[action.parent]
+        parent_id = args.parent if action.parent is None else ids[action.parent]
         ids[action.path] = albums.create_album(client, base_url, action.name, parent_id)
         created += 1
         print(f"created           {action.path}", file=out)
