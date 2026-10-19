@@ -99,7 +99,7 @@
   </li>
   <li>
     <strong>Beschreibung</strong>: freier Text über den Inhalt des Albums. Er erscheint auf der
-    öffentlichen Albumseite über den Vorschaubildern.
+    öffentlichen Albumseite über den Vorschaubildern. Zeilenumbrüche bleiben erhalten.
   </li>
   <li>
     <strong>Übergeordnetes Album</strong>: das Album, in dem dieses Album liegt.
@@ -111,6 +111,14 @@
     befüllt wird. Besucher sehen es dann nicht.
   </li>
 </ul>
+
+<div class="hinweis">
+  <p>
+    Name und Beschreibung sind reiner Text. Was wie Auszeichnung aussieht, etwa
+    <code>&lt;b&gt;fett&lt;/b&gt;</code>, erscheint genau so, wie es getippt wurde. Fett, kursiv
+    und Links gibt es in Beschreibungen nicht.
+  </p>
+</div>
 
 <p>
   Oben zeigt die Seite, wann das Album erstellt und zuletzt geändert wurde und wie viele Fotos
@@ -132,6 +140,29 @@
   <strong>Einstellungen sichern</strong> speichert die Angaben beim Album; danach erscheint
   <strong>Herkunft gespeichert</strong>. <strong>Auf N Fotos anwenden</strong> überträgt sie
   auf die Fotos des Albums; N ist deren Anzahl.
+</p>
+
+<p>Welche Werte übertragen werden, regelt diese Reihenfolge:</p>
+<ul>
+  <li>Hat das Album selbst Angaben, gelten seine vier Felder.</li>
+  <li>
+    Hat es keine, gelten die vier Felder des nächsthöheren Albums, das Angaben hat. Ein
+    Unteralbum ohne eigene Angaben überträgt also die seines Oberalbums.
+  </li>
+  <li>
+    Hat auch kein Oberalbum Angaben, sind alle vier Felder leer: <strong>Auf N Fotos
+    anwenden</strong> leert dann die Herkunft jedes Fotos des Albums.
+  </li>
+</ul>
+
+<p>
+  Haben Fotos des Albums schon eine Herkunft, die sich von den zu übertragenden Werten
+  unterscheidet, fragt der Browser vor dem Schreiben nach, zum Beispiel
+  <em>3 Fotos haben bereits eine Herkunft, die dabei überschrieben wird. Fortfahren?</em> Die
+  Zahl ist die der betroffenen Fotos. Wer die Frage abbricht, ändert nichts. Gibt es nichts zu
+  überschreiben, läuft die Übertragung ohne Frage. Die eigene <strong>Notiz</strong> eines
+  Fotos bleibt in jedem Fall unberührt; die <strong>Albumnotiz</strong> gehört zu den
+  übertragenen Feldern.
 </p>
 
 <div class="hinweis">
@@ -156,6 +187,60 @@
   der Seite des Albums nachlesen (siehe <a href="03-fototexte.html#herkunft-nachlesen">Herkunft
   nachlesen</a>).
 </p>
+
+<h3>Leere Alben</h3>
+
+<p>
+  Ein Album ohne Foto ist für Besucher unsichtbar, weder in der Albenliste noch über seine
+  Adresse. Sichtbar wird es, sobald es selbst oder eines seiner Unteralben ein Foto enthält.
+  Administratoren öffnen es weiterhin über <strong>In Galerie öffnen</strong>; auf der
+  Albumseite steht dann der Hinweis <em>Dieses Album enthält kein Foto. Besucher sehen es erst,
+  wenn ein Foto darin ist.</em>
+</p>
+
+<h3>Album löschen</h3>
+
+<p>
+  <strong>Album löschen</strong> gibt es in der Albenliste und, als Papierkorb-Symbol, auf der
+  Seite der Albumeigenschaften. Der Dialog (<em>Lösche Album "Name"</em>, bei Unteralben
+  <em>Lösche Album "Name" und N Unteralben</em>) bietet, soweit sie zutreffen, drei Möglichkeiten;
+  enthält das Album kein Foto, entfallen sie:
+</p>
+<ul>
+  <li>
+    <strong>Nur Album löschen, keine Fotos</strong> (Vorgabe): die Fotos bleiben in ihren
+    anderen Alben.
+  </li>
+  <li>
+    <strong>Lösche Album und N verwaiste Fotos</strong>: löscht zusätzlich die Fotos, die
+    sonst in keinem Album mehr lägen.
+  </li>
+  <li>
+    <strong>Album löschen und alle N Fotos, auch die M die mit anderen Alben verbunden
+    sind</strong>: löscht alle Fotos des Albums und seiner Unteralben, auch aus anderen Alben.
+  </li>
+</ul>
+<p>
+  In der Albenliste führt <strong>Löschen bestätigen</strong> es aus, auf der Seite der
+  Albumeigenschaften heißt diese Schaltfläche <strong>Album löschen</strong>.
+  <strong>Abbrechen</strong> schließt den Dialog.
+</p>
+
+<p>
+  Mit <strong>Nur Album löschen, keine Fotos</strong> wird nichts gelöscht, wenn dabei ein Foto
+  in keinem Album mehr läge. In der Albenliste bleibt der Dialog offen und nennt die Fotos; auf der Seite der
+  Albumeigenschaften schließt er sich und die Meldung erscheint kurz in der Fußzeile. Beispiel:
+  <em>Nichts gelöscht: Das Foto #5 wäre danach in keinem Album mehr. Verschieben Sie es zuerst
+  in ein anderes Album oder löschen Sie es mit dem Album.</em> Es gibt zwei Auswege: die Fotos
+  zuerst in ein anderes Album verschieben, oder die Fotos mit dem Album löschen. Fotos, die im
+  Ordner des gelöschten Albums gespeichert sind, gelten nicht als betroffen und werden nicht
+  genannt; die Galerie löscht sie mit dem Album.
+</p>
+
+<figure>
+  <img src="assets/screenshots/29-album-loeschen-verweigert.png" alt="Der Löschdialog mit der Meldung, dass nichts gelöscht wurde" />
+  <figcaption>Der Löschdialog nach der Ablehnung. Die Meldung nennt die Fotos, die ohne Album blieben.</figcaption>
+</figure>
 
 <h3>Wo die Beschreibung erscheint</h3>
 
