@@ -69,7 +69,11 @@
   </li>
   <li>
     Den Namen eintippen. Die Liste wird beim Tippen kürzer. Mit den Pfeiltasten nach oben und
-    unten wird ein Eintrag ausgewählt, ein Klick wählt ihn ebenfalls aus.
+    unten wird ein Eintrag ausgewählt, ein Klick wählt ihn ebenfalls aus. Die Liste bietet nur
+    Personen an, die auf mindestens einem Foto markiert sind, das man selbst sehen darf, oder die
+    noch auf keinem Foto markiert sind. Wer nur auf Fotos in einem privaten Album ohne Freigabe
+    steht, fehlt in der Liste; tippt man den vollständigen Namen ein und übernimmt ihn, wird
+    trotzdem diese Person zugeordnet und keine zweite angelegt.
   </li>
   <li>
     Steht der Name noch nicht in der Liste, erscheint der Eintrag
@@ -87,6 +91,14 @@
     Gesicht lässt sich gleich markieren.
   </li>
 </ol>
+
+<p>
+  Im Markierungsmodus zeigt jeder Rahmen seinen Namen, nicht nur der unter dem Mauszeiger. Ist
+  der Name länger als der Rahmen breit, wird er mit Auslassungspunkten gekürzt; steht der
+  Mauszeiger im Rahmen, erscheint der volle Name. Ein Zug mit der Maus beginnt auch innerhalb
+  eines vorhandenen Rahmens ein neues Rechteck. Nur der Name und das <strong>x</strong> reagieren
+  auf einen Klick. Veraltete Rahmen (siehe oben) haben im Markierungsmodus einen helleren Rand.
+</p>
 
 <div class="hinweis">
   <p>
@@ -130,6 +142,10 @@
   </li>
   <li>
     <strong>Markieren beenden</strong> verlässt den Modus ebenfalls.
+  </li>
+  <li>
+    Ist die Markierung schon von jemand anderem gelöscht worden, meldet die Seite beim Löschen
+    <em>Markierung ist nicht mehr vorhanden</em>.
   </li>
   <li>
     Eine gesetzte Markierung wird im Markierungsmodus über das <strong>x</strong> am Rahmen
@@ -179,17 +195,37 @@
 
 <p>
   Dieses Schlagwort hängt an der Markierung. Solange die Person auf einem Foto markiert ist,
-  lässt es sich dort nicht abnehmen: Auf der Fotoseite fehlt das <strong>x</strong>, und in den
-  Eigenschaften oder in der Stapelverarbeitung setzt die Galerie es beim Speichern wieder ein,
-  speichert die übrigen Änderungen und zeigt eine Meldung. Entfernt wird es, indem man die
-  Markierung löscht. Ist die Person auf einem Foto nicht markiert, lässt sich ihr Schlagwort dort
-  wie jedes andere entfernen.
+  lässt es sich dort nicht abnehmen. Entfernt wird es, indem man die Markierung löscht. Ist die
+  Person auf einem Foto nicht markiert, lässt sich ihr Schlagwort dort wie jedes andere
+  entfernen. Wie die Galerie einen Versuch ablehnt, hängt vom Ort ab:
 </p>
+
+<ul>
+  <li>
+    Auf der Fotoseite fehlt das <strong>x</strong> am Schlagwort.
+  </li>
+  <li>
+    In den <strong>Eigenschaften</strong> eines Fotos setzt die Galerie das Schlagwort beim
+    Speichern wieder ein, speichert die übrigen Änderungen und zeigt eine Meldung.
+  </li>
+  <li>
+    In der <strong>Stapelverarbeitung</strong> im Einzelmodus wird das Speichern dieses Fotos
+    ganz abgelehnt: auch seine übrigen Änderungen werden nicht gespeichert. Die Meldung steht
+    am Foto selbst, in seinem Fehlerfeld.
+  </li>
+  <li>
+    Die Aktion <strong>Schlagworte entfernen</strong> der Stapelverarbeitung wird für die
+    gesamte Auswahl abgelehnt, sobald das Schlagwort auf einem der Fotos zu einer dort
+    markierten Person gehört. Auch bei den übrigen Fotos wird dann nichts entfernt.
+  </li>
+</ul>
 
 <p>
   In der Schlagwortverwaltung lässt sich das Schlagwort einer Person weder löschen noch beim
-  Zusammenführen entfernen. Es verschwindet erst mit der Person, die der Webmaster auf der Seite
-  <span class="pwgScreen">Personen</span> löscht (siehe unten).
+  Zusammenführen entfernen, und auch nicht umbenennen: die Galerie lehnt das mit einer Meldung
+  ab. Der Name ändert sich nur mit der Person, die der Webmaster auf der Seite
+  <span class="pwgScreen">Personen</span> umbenennt, und das Schlagwort verschwindet erst mit
+  der Person, die er dort löscht (siehe unten).
 </p>
 
 <h3>Wenn die Schaltfläche ausgegraut ist</h3>
@@ -256,6 +292,19 @@
 <p>
   Unter der Liste steht, wie viele Personen und Bereiche es gibt und wann die Liste zuletzt neu
   aufgebaut wurde.
+</p>
+
+<h3>Markieren in der Verwaltung</h3>
+
+<p>
+  Administratoren können Personen auch auf der Seite eines Fotos in der Verwaltung markieren.
+  Dort steht in der Leiste mit den Aktionen (Eigenschaften eines Fotos, ein Foto öffnet man in
+  der Stapelverarbeitung über den Stift <strong>Foto bearbeiten</strong>) ein Symbol mit zwei
+  Personen und dem Kurzhinweis <em>Personen markieren</em>. Es öffnet die Markierungsseite des
+  Fotos. Liegt das Foto in keinem Album, auf das der Administrator Zugriff hat, zeigt sie nur
+  die Meldung <em>Auf diesem Foto können Sie keine Personen markieren: es liegt in keinem Album,
+  auf das Sie Zugriff haben</em>. Auch ein Administrator braucht für ein privates Album die
+  Freigabe.
 </p>
 
 <nav class="zurueck">
