@@ -78,9 +78,12 @@ def read_remote(client, base_url: str) -> list[RemoteAlbum]:
     ]
 
 
-def plan(local: LocalFolder, remote: list[RemoteAlbum]) -> list[Action]:
+def plan(
+    local: LocalFolder, remote: list[RemoteAlbum], parent_id: int | None = None
+) -> list[Action]:
     """One action per folder, top-down. An album that exists (same parent, same name as the
-    server compares it) is skipped, and its sub-folders get no action at all."""
+    server compares it) is skipped, and its sub-folders get no action at all. The top folder
+    is matched against the children of `parent_id` (None: the root)."""
     known: dict[tuple, int | None] = {}
     for album in remote:
         known.setdefault((album.parent_id, collated(album.name)), album.id)
@@ -97,7 +100,7 @@ def plan(local: LocalFolder, remote: list[RemoteAlbum]) -> list[Action]:
         for child in folder.children:
             visit(child, path, path)
 
-    visit(local, None, None)
+    visit(local, None, parent_id)
     return actions
 
 

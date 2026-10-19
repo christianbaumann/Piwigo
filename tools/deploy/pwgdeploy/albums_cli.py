@@ -16,6 +16,13 @@ from pwgdeploy.errors import DeployError
 PROGRAM = "pwg-albums"
 
 
+def positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{text} is not a positive integer")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=PROGRAM,
@@ -23,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
         "An album that exists is skipped with everything below it.",
     )
     parser.add_argument("--dry-run", action="store_true", help="print the plan, create nothing")
+    parser.add_argument("--parent", type=positive_int, help="id of the album to create the tree under")
     parser.add_argument("config_json", help="credential file, as for pwg-deploy")
     parser.add_argument("folder", help="local folder to create as an album tree")
     return parser
@@ -50,7 +58,10 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> None:
     login(client, config)
 
     local = albums.walk(folder.resolve())
-    actions = albums.plan(local, albums.read_remote(client, base_url))
+    remote = albums.read_remote(client, base_url)
+    if args.parent is not None and args.parent not in {album.id for album in remote}:
+        raise DeployError(f"--parent {args.parent}: no such album on the remote")
+    actions = albums.plan(local, remote, args.parent)
     if args.dry_run:
         print_dry_run(actions, out)
         return
@@ -60,7 +71,7 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> None:
         if action.kind == albums.SKIP:
             results.append(albums.Result(action.path, "skipped (exists)", action.album_id))
             continue
-        parent_id = None if action.parent is None else ids[action.parent]
+        parent_id = args.parent if action.parent is None else ids[action.parent]
         ids[action.path] = albums.create_album(client, base_url, action.name, parent_id)
         results.append(albums.Result(action.path, "created", ids[action.path]))
     report = albums.write_report(state_dir, results, datetime.now())

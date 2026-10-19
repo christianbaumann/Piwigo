@@ -93,3 +93,39 @@ def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder, tmp
                     {"category_id": str(album.id), "pwg_token": token, "photo_deletion_mode": "no_delete"},
                 )
     assert not [a for a in albums.read_remote(client, base_url) if a.name == folder.name]
+
+
+def delete_named(client, base_url, token, name):
+    for album in albums.read_remote(client, base_url):
+        if album.name == name:
+            ws_call(
+                client,
+                base_url,
+                "pwg.categories.delete",
+                {"category_id": str(album.id), "pwg_token": token, "photo_deletion_mode": "no_delete"},
+            )
+
+
+def test_parent_creates_the_tree_below_that_album_and_an_unknown_id_creates_nothing(session, tmp_path, folder):
+    config, client, token = session
+    base_url = config.site.base_url
+    parent = tmp_path / f"pwg-albums-parent-{uuid.uuid4().hex[:12]}"
+    parent.mkdir()
+    try:
+        assert run(parent, tmp_path / "state")[0] == 0
+        parent_id = next(a.id for a in albums.read_remote(client, base_url) if a.name == parent.name)
+
+        code, out, err = run(folder, tmp_path / "state", "--parent", str(parent_id))
+        assert code == 0, err
+        assert f"{EXPECTED_ALBUMS} created, 0 skipped" in out
+        top = next(a for a in albums.read_remote(client, base_url) if a.name == folder.name)
+        assert top.parent_id == parent_id
+
+        count_before = len(albums.read_remote(client, base_url))
+        code, out, err = run(folder, tmp_path / "state", "--parent", "999999999")
+        assert code != 0 and "999999999" in err
+        assert len(albums.read_remote(client, base_url)) == count_before
+    finally:
+        delete_named(client, base_url, token, parent.name)
+    remaining = {a.name for a in albums.read_remote(client, base_url)}
+    assert parent.name not in remaining and folder.name not in remaining
