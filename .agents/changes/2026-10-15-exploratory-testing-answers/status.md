@@ -1,4 +1,4 @@
-# Status — 2026-10-19: all 67 tasks done (1-54 deployed; 55-67 not yet deployed)
+# Status — 2026-10-19: all 67 tasks done and deployed
 
 Tasks 55-65 (handbook gap fix), design in
 [design-handbook-gap-fix.md](design-handbook-gap-fix.md). All done, including review follow-ups 66 (`98a6d3634`) and 67 (this commit).
@@ -86,8 +86,10 @@ seed left.
   task 66 (F3, code: `renameTag()` shows the server's message), task 67 (F1, F2, F4, a nit, two owner
   wording decisions: "Code Points", "über die Schnittstelle"; unanswered, so the plainest-wording
   default applied, reasons in task 67's notes). 66 adds provenance `TagRenameDuplicateMessageTest`
-  (the JS const equals core's literal). Deploy of 55-67 not run yet; it needs the remote template purge
-  only if a prefilter's code changed (none did). Next free decision number: 0087.
+  (the JS const equals core's literal). Deployed 2026-10-19 (17 new, 20 changed, 0 removed; persons and photoinfo
+  rescans 553 of 553); no prefilter code changed, so no template purge. The remote held 553 photos,
+  840 at the morning's deploy; this deploy removed and deleted nothing, so the difference happened on
+  the remote in between (its 4 folder albums list 0 photos). Not investigated. Next free decision number: 0087.
 - German read (delegated to a critical subagent): wording edits in chapters 01-06; its doubt
   "Modus für alle Fotos" was wrong (core's tab is *Übersicht*), fixed in 03 and 04; "von der Galerie
   geschriebene Schlagworte" is right (TagsWritten marker), no change.
