@@ -1,7 +1,7 @@
-# Status — 2026-10-19: tasks 1-65 done (1-54 deployed); follow-ups 66, 67 open
+# Status — 2026-10-19: all 67 tasks done (1-54 deployed; 55-67 not yet deployed)
 
 Tasks 55-65 (handbook gap fix), design in
-[design-handbook-gap-fix.md](design-handbook-gap-fix.md). All done; review follow-ups 66 and 67 open.
+[design-handbook-gap-fix.md](design-handbook-gap-fix.md). All done, including review follow-ups 66 (`98a6d3634`) and 67 (this commit).
 
 Handoff for the next agent. Task files hold the per-item detail; this file holds only what is
 not in them.
@@ -62,7 +62,7 @@ not in them.
 | 47 upload level | `e0ddda21b` (characterization), `bff4a401b` (also closes task 27's suite item) |
 | 40 person tag guard | `161bc26d1` (characterization), `94dbc44b9` |
 
-Tasks 1-54 are fully ticked (state at 2026-10-18); tasks 66 and 67 are open, see below. No agent running, no flip applied, no
+Every task file 1-67 is fully ticked (2026-10-19). No agent running, no flip applied, no
 seed left.
 
 ## Handbook gap fix, tasks 55-65 (2026-10-19)
@@ -84,7 +84,10 @@ seed left.
 - Review (fresh agent, playwright on the demo album, normal and webmaster): 35 rows, 31 TRUE, 4 WRONG
   (F1-F4). Report `.agent-tests/2026-10-19-handbook-gap-fix/report.md` (git-ignored). Follow-ups:
   task 66 (F3, code: `renameTag()` shows the server's message), task 67 (F1, F2, F4, a nit, two owner
-  wording decisions: "Code Points", "über die Schnittstelle"). Next free decision number: 0087.
+  wording decisions: "Code Points", "über die Schnittstelle"; unanswered, so the plainest-wording
+  default applied, reasons in task 67's notes). 66 adds provenance `TagRenameDuplicateMessageTest`
+  (the JS const equals core's literal). Deploy of 55-67 not run yet; it needs the remote template purge
+  only if a prefilter's code changed (none did). Next free decision number: 0087.
 - German read (delegated to a critical subagent): wording edits in chapters 01-06; its doubt
   "Modus für alle Fotos" was wrong (core's tab is *Übersicht*), fixed in 03 and 04; "von der Galerie
   geschriebene Schlagworte" is right (TagsWritten marker), no change.

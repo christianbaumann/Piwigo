@@ -206,8 +206,8 @@
   <em>Colored Tags</em> auf <strong>Einstellungen</strong> klicken. Unter
   <strong>Eine neue Farbe hinzufügen</strong> stehen die Felder <strong>Name</strong>,
   <strong>Farbe</strong>, das Kästchen <strong>Gestreift</strong> (Streifen in der Farbe und
-  Weiß am linken Rand) und <strong>Emoji</strong> (ein Bild einfügen oder dessen Code Points
-  eingeben, leer für keines). Unter <strong>Farben verwalten</strong> öffnet das Symbol
+  Weiß am linken Rand) und <strong>Emoji</strong> (das Emoji selbst einfügen, leer für
+  keines; das Feld nimmt auch die Unicode-Nummern des Zeichens an, etwa <em>1F5BC FE0F</em>). Unter <strong>Farben verwalten</strong> öffnet das Symbol
   <strong>bearbeiten</strong> einer Gruppe die Felder zum Ändern.
 </p>
 
@@ -343,9 +343,11 @@
   Entfernen auf der Fotoseite, beim Sichern der Eigenschaften eines Fotos, in der
   Stapelverarbeitung (Schlagworte hinzufügen oder entfernen, in beiden Modi), beim
   Umbenennen, Duplizieren, Zusammenführen und Löschen in der Schlagwortverwaltung, wenn ein
-  Schlagwort einer anderen Gruppe zugeordnet wird, beim Markieren und Löschen von Personen und
-  nach dem Drehen oder Zuschneiden eines Fotos. Nicht geschrieben wird beim Hochladen eines
-  Fotos mit Schlagworten über die Schnittstelle. Solche Schlagworte stehen erst in der Datei,
+  Schlagwort einer anderen Gruppe zugeordnet wird, beim Markieren und Löschen von Personen,
+  beim Umbenennen einer Person auf der Seite Personen (das schreibt alle Fotos dieser Person
+  neu) und nach dem Zuschneiden eines Fotos, wenn dabei eine Person wegfällt. Nicht
+  geschrieben wird beim Hochladen eines Fotos mit Schlagworten durch ein Programm außerhalb
+  der Galerie-Seiten, etwa eine Piwigo-App. Solche Schlagworte stehen erst in der Datei,
   wenn sich die Schlagworte des Fotos das nächste Mal ändern. Beim Ersetzen der Datei eines Fotos gilt: Hat die neue
   Datei vom Plugin geschriebene Schlagworte, gelten diese, sonst werden die der Galerie in die
   Datei geschrieben. Andere Bildprogramme zeigen sie
