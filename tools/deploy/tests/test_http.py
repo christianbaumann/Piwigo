@@ -7,6 +7,8 @@ observed through the opener the adapter was handed, so "the session carries over
 proven as a wiring fact rather than assumed.
 """
 
+import http.client
+import io
 import urllib.error
 import urllib.request
 from http.cookiejar import CookieJar
@@ -143,6 +145,45 @@ def test_an_http_error_status_becomes_a_remote_http_error():
 
     assert "500" in str(raised.value)
     assert URL in str(raised.value)
+
+
+def _error_with_body(status, body: bytes):
+    return urllib.error.HTTPError(URL, status, "x", {}, io.BytesIO(body))
+
+
+def test_a_ws_failure_envelope_adds_the_servers_message():
+    """[NEG] ws.php answers a refused call with an HTTP error status and a JSON body
+    naming the reason; the raised error carries it. [REQ] design.md, few checks."""
+    envelope = b'{"stat":"fail","err":1002,"message":"The name of an album must not be empty"}'
+    opener = FakeOpener(error=_error_with_body(500, envelope))
+
+    with pytest.raises(RemoteHttpError) as raised:
+        client(opener).get(URL)
+
+    assert "HTTP 500" in str(raised.value)
+    assert "The name of an album must not be empty" in str(raised.value)
+
+
+def test_an_error_body_that_is_not_a_ws_envelope_keeps_the_plain_message():
+    """[NEG] An HTML 404 page, JSON without a message and a JSON non-object all leave
+    today's text."""
+    for body in (b"<html><body>Not found</body></html>", b'{"stat":"fail"}', b"[1]"):
+        opener = FakeOpener(error=_error_with_body(404, body))
+        with pytest.raises(RemoteHttpError) as raised:
+            client(opener).get(URL)
+        assert str(raised.value) == f"{URL} returned HTTP 404"
+
+
+def test_an_error_body_that_cannot_be_read_keeps_the_plain_message():
+    """[NEG] A body cut off mid-read raises IncompleteRead; it must not replace the error."""
+    class Broken(io.BytesIO):
+        def read(self, size=-1):
+            raise http.client.IncompleteRead(b"")
+
+    opener = FakeOpener(error=urllib.error.HTTPError(URL, 500, "x", {}, Broken()))
+    with pytest.raises(RemoteHttpError) as raised:
+        client(opener).get(URL)
+    assert str(raised.value) == f"{URL} returned HTTP 500"
 
 
 def test_a_connection_failure_becomes_a_remote_http_error():

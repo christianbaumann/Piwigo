@@ -169,6 +169,9 @@ def test_a_refused_album_fails_the_run_but_not_its_siblings(session, tmp_path):
         (report_file,) = (tmp_path / "state").glob("albums-*.json")
         statuses = {e["path"]: e["status"] for e in json.loads(report_file.read_text(encoding="utf-8"))}
         assert statuses[f"{root.name}/ "] == "failed"
+        report = json.loads(report_file.read_text(encoding="utf-8"))
+        refused = next(e for e in report if e["path"] == f"{root.name}/ ")
+        assert refused["message"].partition("HTTP 500: ")[2].strip()  # the server's text, in its language
         assert statuses[f"{root.name}/ /Child"] == "skipped (parent failed)"
         remote = albums.read_remote(client, base_url)
         top = next(a for a in remote if a.name == root.name)

@@ -11,6 +11,8 @@ session cookie that the `admin.php?page=site_update` form POST needs, exactly as
 
 from __future__ import annotations
 
+import http.client
+import json
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -58,6 +60,19 @@ def build_opener() -> urllib.request.OpenerDirector:
     )
 
 
+MAX_ERROR_BODY_BYTES = 65536
+
+
+def _server_message(error: urllib.error.HTTPError) -> str:
+    """The `message` of a ws.php failure envelope, or "" for any other error body."""
+    try:
+        envelope = json.loads(error.read(MAX_ERROR_BODY_BYTES).decode("utf-8", "replace"))
+    except (OSError, http.client.HTTPException, ValueError, AttributeError):
+        return ""
+    message = envelope.get("message") if isinstance(envelope, dict) else None
+    return message if isinstance(message, str) else ""
+
+
 class UrllibClient:
     """`urllib.request` behind the port, with the session cookie carried across calls."""
 
@@ -88,6 +103,8 @@ class UrllibClient:
                 body = handle.read().decode("utf-8", "replace")
                 return Response(url=handle.geturl(), status=handle.status, body=body)
         except urllib.error.HTTPError as error:
-            raise RemoteHttpError(f"{url} returned HTTP {error.code}") from error
+            reason = _server_message(error)
+            suffix = f": {reason}" if reason else ""
+            raise RemoteHttpError(f"{url} returned HTTP {error.code}{suffix}") from error
         except urllib.error.URLError as error:
             raise RemoteHttpError(f"{url} could not be reached: {error.reason}") from error
