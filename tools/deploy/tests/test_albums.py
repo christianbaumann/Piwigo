@@ -338,3 +338,20 @@ def test_a_run_without_a_refusal_exits_zero(monkeypatch, tmp_path):
     """[HAPPY] The counterpart: nothing failed, exit 0."""
     code, out, _ = run_main(monkeypatch, tmp_path, RefusingGallery(refuse=None), "A")
     assert code == 0 and "2 created, 0 skipped, 0 failed" in out
+
+
+# --- create_album(): new albums go after their siblings --------------------------------------
+
+
+def test_create_album_asks_for_the_last_position():
+    """[HAPPY] Core's default puts a new album first, which reverses siblings created in folder order."""
+    sent = []
+
+    class Client:
+        def post(self, url, fields, *, timeout=None):
+            sent.append(fields)
+            return SimpleNamespace(body=json.dumps({"stat": "ok", "result": {"id": 5}}))
+
+    assert albums.create_album(Client(), "https://g.example.test", "Urlaub", 3) == 5
+    assert sent[0]["method"] == "pwg.categories.add"
+    assert sent[0]["position"] == "last"

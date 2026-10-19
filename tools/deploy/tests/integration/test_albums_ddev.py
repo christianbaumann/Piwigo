@@ -96,6 +96,32 @@ def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder, tmp
     assert not [a for a in albums.read_remote(client, base_url) if a.name == folder.name]
 
 
+def rank_key(rank):
+    return tuple(int(part) for part in rank.split("."))
+
+
+def test_siblings_are_created_in_folder_name_order(session, tmp_path):
+    """[REQ] Core's default position puts each new album first, which reversed the folder order."""
+    config, client, token = session
+    base_url = config.site.base_url
+    names = ("Anna", "Berta", "Clara", "Dora")
+    root = tmp_path / f"pwg-albums-test-{uuid.uuid4().hex[:12]}"
+    for name in names:
+        (root / name).mkdir(parents=True)
+    try:
+        code, out, err = run(root, tmp_path / "state")
+        assert code == 0, err
+        listed = ws_call(client, base_url, "pwg.categories.getList", {"recursive": "true"})["categories"]
+        top = next(c for c in listed if c["name_raw"] == root.name)
+        siblings = [c for c in listed if str(c.get("id_uppercat")) == str(top["id"])]
+        assert len(siblings) == len(names) >= 3
+        by_rank = sorted(siblings, key=lambda c: rank_key(c["global_rank"]))
+        assert [c["name_raw"] for c in by_rank] == sorted(names)
+    finally:
+        delete_named(client, base_url, token, root.name)
+    assert root.name not in {a.name for a in albums.read_remote(client, base_url)}
+
+
 def delete_named(client, base_url, token, name):
     for album in albums.read_remote(client, base_url):
         if album.name == name:

@@ -110,7 +110,7 @@ def plan(
 
 
 def create_album(client, base_url: str, name: str, parent_id: int | None) -> int:
-    fields = {"name": name}
+    fields = {"name": name, "position": "last"}
     if parent_id is not None:
         fields["parent"] = str(parent_id)
     return int(ws_call(client, base_url, "pwg.categories.add", fields)["id"])
