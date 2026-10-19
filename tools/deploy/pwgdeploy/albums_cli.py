@@ -11,7 +11,7 @@ from pwgdeploy import albums
 from pwgdeploy.bootstrap import login
 from pwgdeploy.cli import STATE_DIR, http_client
 from pwgdeploy.config import load_file
-from pwgdeploy.errors import DeployError
+from pwgdeploy.errors import DeployError, RemoteHttpError
 
 PROGRAM = "pwg-albums"
 
@@ -48,7 +48,8 @@ def print_dry_run(actions, out) -> None:
     print(f"{would_create} would create, {skipped} skipped (dry run)", file=out)
 
 
-def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> None:
+def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> list[str]:
+    """Returns the failure messages, one per album the server refused."""
     folder = Path(args.folder)
     if not folder.is_dir():
         raise DeployError(f"{folder} is not a directory")
@@ -67,17 +68,36 @@ def run(args, out, client_factory=http_client, state_dir=STATE_DIR) -> None:
         return
     ids: dict[str, int] = {}
     results: list[albums.Result] = []
+    parent_failed: set[str] = set()
+    errors: list[str] = []
     for action in actions:
         if action.kind == albums.SKIP:
             results.append(albums.Result(action.path, "skipped (exists)", action.album_id))
             continue
+        if action.parent in parent_failed:
+            parent_failed.add(action.path)
+            results.append(albums.Result(action.path, "skipped (parent failed)"))
+            print(f"skipped (parent failed)  {action.path}", file=out)
+            continue
         parent_id = args.parent if action.parent is None else ids[action.parent]
-        ids[action.path] = albums.create_album(client, base_url, action.name, parent_id)
+        try:
+            ids[action.path] = albums.create_album(client, base_url, action.name, parent_id)
+        except RemoteHttpError as error:
+            parent_failed.add(action.path)
+            errors.append(f"failed  {action.path}: {error}")
+            results.append(albums.Result(action.path, "failed", None, str(error)))
+            print(f"failed            {action.path}", file=out)
+            continue
         results.append(albums.Result(action.path, "created", ids[action.path]))
+        print(f"created           {action.path}", file=out)
     report = albums.write_report(state_dir, results, datetime.now())
     created = sum(1 for r in results if r.status == "created")
-    print(f"{created} created, {len(results) - created} skipped", file=out)
+    skipped = sum(1 for r in results if r.status == "skipped (exists)")
+    print(f"{created} created, {skipped} skipped, {len(errors)} failed", file=out)
+    for message in errors:
+        print(message, file=out)
     print(f"report: {report}", file=out)
+    return errors
 
 
 def main(argv: list[str] | None = None, *, stdout=None, stderr=None, client_factory=http_client, state_dir=STATE_DIR) -> int:
@@ -85,8 +105,8 @@ def main(argv: list[str] | None = None, *, stdout=None, stderr=None, client_fact
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     try:
-        run(args, out, client_factory, state_dir)
+        errors = run(args, out, client_factory, state_dir)
     except DeployError as error:
         print(f"{type(error).__name__}: {error}", file=err)
         return error.exit_code
-    return 0
+    return RemoteHttpError.exit_code if errors else 0
