@@ -18,6 +18,7 @@ from typing import Callable, Iterable, Mapping
 
 from pwgdeploy import fileset
 from pwgdeploy.backup import DUMP_DIR_PREFIX
+from pwgdeploy.errors import DeployError
 from pwgdeploy.transport import RemoteEntry
 from pwgdeploy.urls import remote_path
 
@@ -140,6 +141,22 @@ def leftover_dumps(orphans: Iterable[str], root: str, base: str | None = None) -
         if len(segments) > 1 and segments[0].startswith(DUMP_DIR_PREFIX):
             found.append(path)
     return found
+
+
+def outside_dump_leftovers(
+    list_dir: Callable[[str], list[RemoteEntry]], root: str, dump_dir: str
+) -> list[str] | None:
+    """The files inside `dump-*` directories of a dump base outside the web root (`../x`).
+
+    The web-root walk never reaches a sibling of the root, so it is listed on its own.
+    None when the listing fails (absent, unreachable): the audit says so and carries on.
+    """
+    base = remote_path(root, dump_dir)
+    try:
+        files, _directories = walk(list_dir, base)
+    except DeployError:
+        return None
+    return leftover_dumps(files, base)
 
 
 def _relative(path: str, root: str) -> str:

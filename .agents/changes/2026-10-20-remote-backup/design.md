@@ -310,4 +310,7 @@ Answered by the user after tasks 01-10 were built:
 | Exit codes | Separate codes for a deploy stopped by its predeploy snapshot and for a failed restore, instead of reusing `11` |
 | New mtimes after a restore | Accepted: the next backup downloads every restored file once more |
 | Size mismatch during a fetch | Accepted: the run aborts and the next run retries |
+| Mail for a failed predeploy snapshot | None: `pwg-deploy` is run by hand and its terminal shows the failure (exit 14); only `pwg-backup` runs mail |
+| `pwg-backup --check` | Appends a `check` line (`ok` or `failed`) to `backup.log`; its failure mail is labelled kind `check` |
+| Audit of `backup.dump_dir` | `pwg-deploy --audit` also lists a `../` dump location and reports leftover `dump-*` files; a listing that fails is reported as not checked |
 | `test_albums_ddev` flake | Fixed: the test picks the newest report file |

@@ -883,6 +883,54 @@ def test_audit_names_a_dump_directory_left_in_the_web_root(run):
     assert "/piwigo/plugins/x/dump-1/y" not in dump_block
 
 
+def _outside_dump_run(tmp_path, repo, transport):
+    import json
+
+    path = tmp_path / "deploy.outside.json"
+    path.write_text(json.dumps({**RAW, "backup": {"dir": str(tmp_path / "bk"), "dump_dir": "../dumps"}}), encoding="utf-8")
+    return Run(path, repo, tmp_path, transport=transport)
+
+
+def test_audit_names_a_dump_directory_left_in_a_dump_dir_outside_the_web_root(tmp_path, repo):
+    """[HAPPY] The web-root listing never reaches `../dumps`; the audit lists it on its own."""
+    transport = FakeTransport()
+    outside = _outside_dump_run(tmp_path, repo, transport)
+    transport.files["/piwigo/../dumps/dump-0123abcd/dump.sql.gz"] = b"x"
+    transport.files["/piwigo/../dumps/keep.txt"] = b"x"
+
+    assert outside("--audit") == 0
+
+    assert "  leftover    1 file of a dump directory outside the web root" in outside.text
+    assert "/piwigo/../dumps/dump-0123abcd/dump.sql.gz" in outside.text
+    leftover_block = outside.text.split("  leftover ", 1)[1].split("  orphans ", 1)[0]
+    assert "keep.txt" not in leftover_block
+    assert "delete" not in transport.names()
+
+
+def test_audit_says_so_when_the_outside_dump_dir_cannot_be_listed(tmp_path, repo):
+    """[ERR] An absent or unreachable directory is one line, not a failed audit."""
+    from pwgdeploy.errors import TransportError
+
+    class Refusing(FakeTransport):
+        def list_dir(self, remote_dir):
+            if "dumps" in remote_dir:
+                raise TransportError("MLSD failed")
+            return super().list_dir(remote_dir)
+
+    outside = _outside_dump_run(tmp_path, repo, Refusing())
+
+    assert outside("--audit") == 0
+    assert "  dumps       /piwigo/../dumps not checked" in outside.text
+    assert "  leftover " not in outside.text
+
+
+def test_audit_lists_no_extra_directory_without_an_outside_dump_dir(run):
+    """[NEG] Without backup.dump_dir the audit lists the web root tree and nothing beside it."""
+    _audited(run)
+
+    assert all(not path.startswith("/piwigo/..") for path in run.transport.paths("list_dir"))
+
+
 def test_audit_reports_no_leftover_line_when_the_web_root_is_clean(run):
     """[NEG] Silent when empty, so its absence is the all-clear."""
     _audited(run, ORPHAN_REMOTE_PATH)

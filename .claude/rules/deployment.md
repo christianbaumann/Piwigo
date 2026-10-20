@@ -15,7 +15,7 @@ uv run pwg-deploy --list-files deploy.local.json # the published file set, one p
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
-uv run pytest                                    # 919 tests, measured 2026-10-20
+uv run pytest                                    # 927 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -41,8 +41,9 @@ the temporary script on the host while the snapshot runs is accepted in
 [decision 0089](../../docs/agents/decisions/0089-database-export-and-restore-through-a-temporary-token-gated-script.md);
 a killed run leaves it there, `--audit` reports it as `leftover`, and also every file inside a
 `dump-*` directory of the dump location (`audit.leftover_dumps()`, the prefix read from
-`backup.DUMP_DIR_PREFIX`). A dump location outside the web root (`backup.dump_dir` `../...`) is never
-listed by the audit.
+`backup.DUMP_DIR_PREFIX`). A dump location outside the web root (`backup.dump_dir` `../...`) is listed
+separately (`audit.outside_dump_leftovers()`); a listing that fails prints a `dumps ... not checked`
+line and does not fail the audit. A failed predeploy snapshot sends no mail (user decision, task 08).
 
 ## `pwg-backup` — what an agent needs
 

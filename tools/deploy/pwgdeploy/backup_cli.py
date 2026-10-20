@@ -18,6 +18,7 @@ PROGRAM = "pwg-backup"
 DEFAULT_KIND = "manual"
 LABEL_WIDTH = 10
 OK = "ok"
+CHECK_KIND = "check"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -81,8 +82,14 @@ def main(
             problems = io.StringIO()
             code = check.check_main(backup_dir, out, problems)
             err.write(problems.getvalue())
+            backup.append_log(
+                backup_dir,
+                backup.format_log_line(
+                    started, clock(), CHECK_KIND, "-", "-", "-", OK if code == 0 else "failed",
+                ),
+            )
             if code:
-                _mail_failure(config, args.kind, "check", problems.getvalue(), err, send_mail, clock)
+                _mail_failure(config, CHECK_KIND, "check", problems.getvalue(), err, send_mail, clock)
             return code
 
         if args.restore:

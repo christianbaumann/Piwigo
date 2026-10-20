@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pwgdeploy import audit, backup, bootstrap, fileset, manifest, preflight, seed, upload, version
-from pwgdeploy.config import DeployConfig, load_file
+from pwgdeploy.config import OUTSIDE_WEB_ROOT, DeployConfig, load_file
 from pwgdeploy.errors import (
     AgentLeftoverError,
     ConfigError,
@@ -437,6 +437,10 @@ def _audit(out, config, state_dir, transport_factory) -> None:
     transport.connect()
     try:
         files, directories = audit.walk(transport.list_dir, root)
+        outside_dumps = _outside_dump_base(config)
+        outside_leftovers = (
+            audit.outside_dump_leftovers(transport.list_dir, root, outside_dumps) if outside_dumps else []
+        )
     finally:
         transport.close()
 
@@ -472,6 +476,16 @@ def _audit(out, config, state_dir, transport_factory) -> None:
         report.leftover_dumps,
         "of a dump directory pwg-backup did not remove; it holds the database, delete it over FTP",
     )
+    if outside_leftovers is None:
+        _line(out, "dumps", f"{remote_path(root, outside_dumps)} not checked: the directory could not be listed")
+    else:
+        _report_paths(
+            out,
+            "leftover",
+            outside_leftovers,
+            "of a dump directory outside the web root (backup.dump_dir) pwg-backup did not remove; "
+            "it holds the database, delete it over FTP",
+        )
     _report_paths(
         out, "orphans", report.orphans, "on the server the manifest does not cover"
     )
@@ -479,6 +493,12 @@ def _audit(out, config, state_dir, transport_factory) -> None:
         out, "missing", report.missing, "the manifest records and the server does not hold"
     )
     print(f"  {AUDIT_READ_ONLY_NOTICE}", file=out)
+
+
+def _outside_dump_base(config) -> str | None:
+    """`backup.dump_dir` when it is a sibling of the web root, which the web-root listing never reaches."""
+    dump_dir = config.backup.dump_dir if config.backup else None
+    return dump_dir if dump_dir and dump_dir.startswith(OUTSIDE_WEB_ROOT) else None
 
 
 def _plural(count: int, singular: str, plural: str | None = None) -> str:

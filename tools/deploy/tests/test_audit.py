@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from pwgdeploy import audit, fileset
+from pwgdeploy.errors import TransportError
 from pwgdeploy.transport import RemoteEntry
 
 ROOT = "/piwigo"
@@ -290,3 +291,41 @@ def test_compare_carries_the_leftover_dumps_beside_the_orphans():  # [HAPPY]
 
     assert report.orphans == ["/piwigo/dump-ab/dump.sql.gz"]
     assert report.leftover_dumps == ["/piwigo/dump-ab/dump.sql.gz"]
+
+
+# --- dump base outside the web root ------------------------------------------------------
+
+
+class _Listing:
+    def __init__(self, files):
+        self.files = files
+
+    def __call__(self, remote_dir):
+        prefix = remote_dir.rstrip("/") + "/"
+        names = {}
+        for path in self.files:
+            if path.startswith(prefix):
+                name, sep, _ = path[len(prefix):].partition("/")
+                names[name] = bool(sep)
+        return [RemoteEntry(name=name, is_dir=is_dir) for name, is_dir in sorted(names.items())]
+
+
+def test_outside_dump_leftovers_names_files_in_dump_directories_of_the_sibling():  # [HAPPY]
+    listing = _Listing({
+        "/piwigo/../x/dump-ab/dump.sql.gz": b"",
+        "/piwigo/../x/other/file": b"",
+        "/piwigo/../x/stray.txt": b"",
+    })
+
+    assert audit.outside_dump_leftovers(listing, "/piwigo", "../x") == ["/piwigo/../x/dump-ab/dump.sql.gz"]
+
+
+def test_outside_dump_leftovers_is_empty_for_a_clean_sibling():  # [NEG]
+    assert audit.outside_dump_leftovers(_Listing({"/piwigo/../x/keep": b""}), "/piwigo", "../x") == []
+
+
+def test_outside_dump_leftovers_is_none_when_the_listing_fails():  # [ERR] unreachable or absent directory
+    def failing(remote_dir):
+        raise TransportError("MLSD failed")
+
+    assert audit.outside_dump_leftovers(failing, "/piwigo", "../x") is None

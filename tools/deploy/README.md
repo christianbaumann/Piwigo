@@ -110,7 +110,8 @@ After the preflight and before the first upload, a deploy to an **installed** re
 with exit `14` before anything on the remote is changed (an unsafe listed path keeps `12`, a
 leftover script `13`). The
 report says when it was skipped: `--no-backup`, `--dry-run` (no socket is opened), or a first
-deploy onto a remote where `install.php` says nothing is installed yet.
+deploy onto a remote where `install.php` says nothing is installed yet. A failed predeploy
+snapshot sends no mail (you are watching the terminal); it is in `backup.log`.
 
 Interrupting is safe. The manifest records completed uploads only, so re-running the same
 command resumes from where it stopped rather than starting over.
@@ -425,9 +426,10 @@ scans of identifiable people. Only its location protects it; keep it out of any 
 folder you do not control. For the length of a run the temporary script, which can dump the
 database, exists on the host behind a one-time token, an expiry and a random name.
 `pwg-deploy --audit` lists any `*.php` directly in the web root that the manifest does not cover,
-and any file inside a `dump-*` directory of the dump location (`leftover`); delete them over FTP. It
-cannot see a dump location outside the web root (`backup.dump_dir` starting with `../`); check that
-one over FTP after a failed run. The dump goes to a random-named directory below the web
+and any file inside a `dump-*` directory of the dump location (`leftover`); delete them over FTP. A dump location
+outside the web root (`backup.dump_dir` starting with `../`) is listed on its own and reported the
+same way; when that directory cannot be listed the audit prints one `dumps ... not checked` line and
+carries on. The dump goes to a random-named directory below the web
 root with a deny-all `.htaccess` (`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`). With
 `backup.dump_dir` set, each run makes its random-named subdirectory inside that one instead (same
 `.htaccess`, removed again after the run). A leading `../` puts it beside the web root, outside what
@@ -436,10 +438,10 @@ the web server serves, provided the FTP login may climb there and the PHP user m
 
 ### Failure mail and the daily job
 
-A failed run (any exit but 0 and Ctrl-C) and a failed `--check` send one mail through the
+A failed `pwg-backup` run (any exit but 0 and Ctrl-C) and a failed `--check` send one mail through the
 credential file's `mail` section (`smtplib`: `ssl` connects encrypted, `tls` runs STARTTLS first, 30 s
 timeout) to `backup.notify`, or to `admin.email` when that is absent. Subject: gallery host and the
-failed step (the error class, `check` for the restore check); body: the error and the last ten log
+failed step (the error class, `check` for the restore check, which also appends a `check` line, `ok` or `failed`, to `backup.log`); body: the error and the last ten log
 lines, with the configured passwords replaced. A mail that cannot be sent is printed and logged
 (`mail-failed`) and does not change the exit code; without a `mail` section the run logs
 `no-mail-section` instead.
@@ -530,7 +532,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-919 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+927 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

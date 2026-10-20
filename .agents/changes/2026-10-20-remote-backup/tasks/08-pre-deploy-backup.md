@@ -37,6 +37,7 @@ deploy when that snapshot fails.
 
 ## Deviations
 
+* **No failure mail from `pwg-deploy` (follow-up 13, user decision):** a failed predeploy snapshot is logged to `backup.log` and ends the deploy with exit 14, but sends no mail; the operator watches the terminal of a deploy. Only `pwg-backup` runs (daily job, `--check`) mail.
 * **Superseded by follow-up 2026-10-20:** a deploy stopped by its predeploy snapshot exits 14 (`PredeployBackupError`); every `DeployError` of the run is wrapped except `UnsafeRemotePathError` (12) and `AgentLeftoverError` (13), which keep their codes. Below is the original decision.
 * **Exit code (original):** `BackupError` (11) reused, no new code. Its meaning ("a backup run could not be taken or stored") fits. Any other `DeployError` raised inside the predeploy run (e.g. an HTTP failure of the dump, 7) is wrapped into `BackupError`, so 11 always means "the backup stopped this deploy"; 12 and 13 keep their own codes.
 * **Blank remote** is decided from the preflight's `RemoteState.installed` (`install.php` answer), no extra request. `_preflight()` now returns that state (None on a dry run).

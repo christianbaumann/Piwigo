@@ -201,6 +201,23 @@ def test_a_failing_check_mails_too(tmp_path, host, monkeypatch):  # [HAPPY]
     assert "table images differs" in err
     assert "table images differs" in outbox.sent[0][1].get_content()
     assert "check" in outbox.sent[0][1]["Subject"]
+    assert "manual" not in outbox.sent[0][1]["Subject"]
+
+
+def test_a_passing_check_appends_an_ok_check_line_to_the_log(tmp_path, host, monkeypatch):  # [HAPPY]
+    monkeypatch.setattr(check, "check_main", lambda root, out, err: 0)
+
+    invoke(tmp_path, host, "--check")
+
+    assert log_lines(tmp_path) == ["2026-10-20T10:00:00 2026-10-20T10:00:00 check fetched=- linked=- bytes=- ok"]
+
+
+def test_a_failing_check_appends_a_failed_check_line_to_the_log(tmp_path, host, monkeypatch):  # [NEG]
+    monkeypatch.setattr(check, "check_main", lambda root, out, err: check.EXIT_CHECK_FAILED)
+
+    invoke(tmp_path, host, "--check")
+
+    assert log_lines(tmp_path)[0] == "2026-10-20T10:00:00 2026-10-20T10:00:00 check fetched=- linked=- bytes=- failed"
 
 
 def test_a_passing_check_sends_no_mail(tmp_path, host, monkeypatch):  # [NEG]
