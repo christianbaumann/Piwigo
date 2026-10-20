@@ -60,10 +60,13 @@ def test_a_tree_is_created_once_and_skipped_the_second_time(session, folder, tmp
         assert f"{EXPECTED_ALBUMS} would create, 0 skipped" in out
         assert len(albums.read_remote(client, base_url)) == count_empty
 
+        older_report = state / "albums-20000101-000000.json"
+        older_report.write_text("[]\n", encoding="utf-8")  # a dry run that landed in an earlier second
+
         code, out, err = run(folder, state)
         assert code == 0, err
         assert f"{EXPECTED_ALBUMS} created, 0 skipped" in out
-        (report_file,) = state.glob("albums-*.json")
+        report_file = max(state.glob("albums-*.json"))
         assert f"report: {report_file}" in out
         entries = json.loads(report_file.read_text(encoding="utf-8"))
         assert len(entries) == EXPECTED_ALBUMS
