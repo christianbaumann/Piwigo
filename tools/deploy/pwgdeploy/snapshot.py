@@ -17,7 +17,7 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 NAME_TIME_FORMAT = "%Y-%m-%dT%H%M%S"
 STAMP_LENGTH = len("2026-10-20T100338")
@@ -158,13 +158,17 @@ def build(
     name: str,
     plan: Plan,
     fetch: Callable[[str, Path], None],
-    meta: dict | None = None,
+    meta: dict | Callable[[], dict] | None = None,
+    extras: Mapping[str, Path] | None = None,
 ) -> Path:
     """Build snapshot `name` under `root` and return its folder.
 
     `plan.link` entries are hardlinked from the latest complete snapshot; `plan.fetch` files
     are fetched unless a resumed `.partial` folder already holds them at the right size.
-    `meta` is merged into snapshot.json (kind, git_commit, counts, ...).
+    `meta` is merged into snapshot.json (kind, git_commit, counts, ...); a callable is called
+    once the files are in place, for values that are only known by then.
+    `extras` maps a path inside the snapshot (`db/dump.sql.gz`) to a local file that is moved
+    there before the rename, so the snapshot is never complete without them.
     """
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
@@ -197,7 +201,13 @@ def build(
             os.utime(target, (item.mtime, item.mtime))
         entries[item.path] = {"size": item.size, "mtime": item.mtime, "sha1": _sha1(target)}
 
-    _write_json(partial / SNAPSHOT_JSON, {**(meta or {}), "files": entries})
+    for relative, source in (extras or {}).items():
+        target = partial / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(source, target)
+
+    document = meta() if callable(meta) else (meta or {})
+    _write_json(partial / SNAPSHOT_JSON, {**document, "files": entries})
     final = root / name
     os.rename(partial, final)
     return final

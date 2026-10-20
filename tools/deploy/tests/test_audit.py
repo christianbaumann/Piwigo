@@ -243,3 +243,25 @@ def test_every_bucket_is_sorted(bucket):
     paths = getattr(report, bucket)
     assert len(paths) >= MIN_AUDIT_FILES
     assert paths == sorted(paths)
+
+
+# --- leftover scripts ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("root,orphans,expected", [
+    ("/piwigo", ["/piwigo/a1b2.php"], ["/piwigo/a1b2.php"]),
+    ("/piwigo", ["/piwigo/A1B2.PHP"], ["/piwigo/A1B2.PHP"]),
+    ("", ["a1b2.php"], ["a1b2.php"]),
+    ("/piwigo", ["/piwigo/plugins/x/a.php", "/piwigo/readme.txt", "/piwigo/dump-1/dump.sql.gz"], []),
+    ("/piwigo/", ["/piwigo/a.php"], ["/piwigo/a.php"]),
+    ("/piwigo", [], []),
+])
+def test_only_a_php_file_directly_in_the_web_root_is_a_leftover_script(root, orphans, expected):  # [ECP][BVA]
+    assert audit.leftover_scripts(orphans, root) == expected
+
+
+def test_compare_carries_the_leftover_scripts_beside_the_orphans():  # [HAPPY]
+    report = audit.compare(["/piwigo/index.php", "/piwigo/zz.php"], {"/piwigo/index.php": "x"}, [], root="/piwigo")
+
+    assert report.orphans == ["/piwigo/zz.php"]
+    assert report.leftover_scripts == ["/piwigo/zz.php"]

@@ -13,7 +13,7 @@ both are pure given their inputs and neither knows what FTP is.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Iterable, Mapping
 
 from pwgdeploy import fileset
@@ -40,6 +40,8 @@ class AuditReport:
     """In the manifest, absent from the server. The next run would call them unchanged."""
     directories: int = 0
     skipped: tuple[str, ...] = ()
+    leftover_scripts: list[str] = field(default_factory=list)
+    """Orphans that are a `*.php` file in the web root itself: where pwg-backup's temporary script sits."""
 
 
 def walk(
@@ -82,6 +84,7 @@ def compare(
     *,
     directories: int = 0,
     skipped: tuple[str, ...] = AUDIT_SKIP,
+    root: str = "",
 ) -> AuditReport:
     """Three buckets, each sorted so two runs of the audit are comparable.
 
@@ -93,13 +96,33 @@ def compare(
     present = set(remote_files)
     recorded = set(entries)
     accounted = recorded | set(generated)
+    orphans = sorted(present - accounted)
     return AuditReport(
         covered=sorted(present & accounted),
-        orphans=sorted(present - accounted),
+        orphans=orphans,
+        leftover_scripts=leftover_scripts(orphans, root),
         missing=sorted(recorded - present),
         directories=directories,
         skipped=tuple(skipped),
     )
+
+
+def leftover_scripts(orphans: Iterable[str], root: str) -> list[str]:
+    """The orphans that are a `.php` file directly in the web root.
+
+    The manifest records every PHP file the deploy publishes, so one it does not know, at the
+    top level, is what a killed `pwg-backup` leaves behind (a random name, nothing else about it).
+    """
+    return [
+        path
+        for path in orphans
+        if "/" not in _relative(path, root) and path.lower().endswith(".php")
+    ]
+
+
+def _relative(path: str, root: str) -> str:
+    prefix = root.rstrip("/")
+    return path[len(prefix):].lstrip("/") if prefix and path.startswith(prefix) else path.lstrip("/")
 
 
 def _dir_path(root: str, relative: str) -> str:

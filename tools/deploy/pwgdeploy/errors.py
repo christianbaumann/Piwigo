@@ -61,3 +61,21 @@ class VersionError(DeployError):
     """
 
     exit_code = 10
+
+
+class BackupError(DeployError):
+    """A backup run could not be taken or stored: a short download, a refused dump, a bad answer."""
+
+    exit_code = 11
+
+
+class UnsafeRemotePathError(BackupError):
+    """The temporary script listed a path that is not under a backed-up folder, or climbs out of it."""
+
+    exit_code = 12
+
+
+class AgentLeftoverError(BackupError):
+    """The temporary script could not be removed from the host; it is still there and must be deleted by hand."""
+
+    exit_code = 13

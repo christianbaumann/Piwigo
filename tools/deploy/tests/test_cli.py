@@ -853,6 +853,23 @@ def test_audit_reports_an_orphan_by_name(run):
     assert "1 file on the server the manifest does not cover" in run.text
 
 
+def test_audit_names_a_php_file_in_the_web_root_as_a_possible_leftover_script(run):
+    """[HAPPY] What a killed pwg-backup leaves: a random-named script the manifest never knew."""
+    _audited(run, "/piwigo/0123456789abcdef.php", "/piwigo/plugins/x/deep.php")
+
+    assert "  leftover    1 file in the web root" in run.text
+    leftover_block = run.text.split("  leftover ", 1)[1].split("  orphans ", 1)[0]
+    assert "/piwigo/0123456789abcdef.php" in leftover_block
+    assert "/piwigo/plugins/x/deep.php" not in leftover_block
+
+
+def test_audit_reports_no_leftover_line_when_the_web_root_is_clean(run):
+    """[NEG] Silent when empty, so its absence is the all-clear."""
+    _audited(run, ORPHAN_REMOTE_PATH)
+
+    assert "  leftover " not in run.text
+
+
 def test_a_single_orphan_is_counted_in_the_singular(run):
     """[BVA] One is the count the real host actually reports — `local/config/database.inc.php`,
     written by install.php and unreachable by any run — so it is the phrasing an operator

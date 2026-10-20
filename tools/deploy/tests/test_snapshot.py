@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 
@@ -206,3 +207,48 @@ def test_other_filesystem_is_refused(tmp_path, monkeypatch):  # [NEG]
     with pytest.raises(SnapshotError):
         build(tmp_path, "2026-10-20T030000", diff(None, []), fetcher())
     assert not list(tmp_path.glob("*.partial"))
+
+
+# --- extras and late meta
+
+def test_extras_are_moved_into_the_snapshot_before_the_rename(tmp_path):  # [HAPPY]
+    source = tmp_path / "incoming.bin"
+    source.write_bytes(b"dump")
+
+    folder = build(tmp_path / "root", "2026-10-20T100338", diff(None, []), fetcher(),
+                   extras={"db/dump.sql.gz": source})
+
+    assert (folder / "db/dump.sql.gz").read_bytes() == b"dump"
+    assert not source.exists()
+
+
+def test_a_killed_build_does_not_expose_a_snapshot_without_its_extras(tmp_path):  # [NEG]
+    source = tmp_path / "incoming.bin"
+    source.write_bytes(b"dump")
+    plan = diff(None, [RemoteFile("upload/a", 3, 1)])
+
+    def fail(path, local):
+        raise RuntimeError("cut")
+
+    with pytest.raises(RuntimeError):
+        build(tmp_path / "root", "2026-10-20T100338", plan, fail, extras={"db/dump.sql.gz": source})
+
+    assert latest(tmp_path / "root") is None
+    assert source.exists()
+
+
+def test_meta_given_as_a_callable_is_evaluated_after_the_files_arrive(tmp_path):  # [ST]
+    seen = []
+
+    def fetch(path, local):
+        seen.append("fetched")
+        local.write_bytes(b"abc")
+
+    def meta():
+        seen.append("meta")
+        return {"kind": "daily"}
+
+    folder = build(tmp_path, "2026-10-20T100338", diff(None, [RemoteFile("upload/a", 3, 1)]), fetch, meta=meta)
+
+    assert seen == ["fetched", "meta"]
+    assert json.loads((folder / "snapshot.json").read_text())["kind"] == "daily"

@@ -350,7 +350,7 @@ def _audit(out, config, state_dir, transport_factory) -> None:
 
     generated = {remote_path(root, name) for name in fileset.GENERATED_REMOTE_PATHS}
     report = audit.compare(
-        files, entries, generated, directories=directories, skipped=audit.AUDIT_SKIP
+        files, entries, generated, directories=directories, skipped=audit.AUDIT_SKIP, root=root
     )
 
     skipped = " ".join(f"{name}/" for name in report.skipped)
@@ -365,6 +365,13 @@ def _audit(out, config, state_dir, transport_factory) -> None:
         out,
         "covered",
         f"{_plural(len(report.covered), 'file')} the manifest records and the server holds",
+    )
+    _report_paths(
+        out,
+        "leftover",
+        report.leftover_scripts,
+        "in the web root the manifest does not cover; a killed pwg-backup leaves its script here, "
+        "delete it over FTP",
     )
     _report_paths(
         out, "orphans", report.orphans, "on the server the manifest does not cover"

@@ -89,7 +89,8 @@ reports the plugins already active.
 
 Exit codes are one per failure mode — `3` bad credential file, `4` git, `5` transport, `6` no
 FTPS offered, `7` remote HTTP, `8` `install.php` refused, `9` manifest and remote disagree,
-`10` core versions differ — and `130` for Ctrl-C.
+`10` core versions differ, `11` a backup could not be taken or stored, `12` the backup script listed an
+unsafe path, `13` the backup script could not be removed from the host — and `130` for Ctrl-C.
 
 Interrupting is safe. The manifest records completed uploads only, so re-running the same
 command resumes from where it stopped rather than starting over.
@@ -369,6 +370,41 @@ The integration test runs the command against DDEV, with a `deploy.ddev.json` as
 uv run pytest -m integration
 ```
 
+## Backups — `pwg-backup`
+
+```bash
+uv run pwg-backup deploy.local.json                  # a manual snapshot
+uv run pwg-backup --kind daily deploy.local.json     # kinds: daily, manual, predeploy, prerestore
+```
+
+`--kind` names the snapshot (the folder name suffix, none for `daily`; manual when omitted), `--check` runs the
+restore check below instead of a backup. Needs the optional `backup.dir` in the credential file (absolute or `~`, outside this repository).
+One run uploads a temporary PHP script under a random name, asks it for a database dump and the
+list of files, downloads the dump over FTPS, **deletes the script and the dump**, and only then
+downloads the files that changed since the newest complete snapshot. An unchanged file is a
+hardlink to the previous snapshot's copy, so the folder must sit on one file system. Afterwards
+`retention.prune()` removes the snapshots the retention rule no longer keeps.
+
+A snapshot `<dir>/<timestamp>[-<kind>]/` holds `db/dump.sql.gz`, `files/` (`upload/`, `galleries/`,
+`_data/photoedit/originals/`, `local/config/config.inc.php`, `local/config/database.inc.php`),
+`deploy-manifest.json` (a copy of this target's `.state` manifest) and `snapshot.json`: the checkout's
+`git_commit`, `db_started`, `files_started` and `finished`, the dump method (`mysqldump` or `php`),
+the row `counts` and table `prefix` the restore check compares, per-file size, mtime and sha1, and a
+`drift` report (photo rows with no file, and files with no row; the report prints the count).
+
+A run killed during the download leaves `<timestamp>.partial/`; the next run continues it and
+renames it. Each run appends one line to `<dir>/backup.log`: start, end, kind, fetched and linked
+counts, bytes and the result.
+
+**The backup folder is not encrypted.** It holds password hashes and e-mail addresses (the dump) and
+scans of identifiable people. Only its location protects it; keep it out of any synced or shared
+folder you do not control. For the length of a run the temporary script, which can dump the
+database, exists on the host behind a one-time token, an expiry and a random name.
+`pwg-deploy --audit` lists any `*.php` directly in the web root that the manifest does not cover
+(`leftover`); delete such a file over FTP. The dump goes to a random-named directory below the web
+root with a deny-all `.htaccess` until a host probe shows a writable directory outside it
+(`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`).
+
 ## The restore check — does the newest snapshot restore
 
 `pwgdeploy/check.py` imports the newest complete snapshot's `db/dump.sql.gz` into the scratch
@@ -381,8 +417,8 @@ local gallery) is never touched. DDEV must be up, and the command runs from the 
 `.ddev/`.
 
 Run it after the first snapshot and then about monthly, and after any change to the dump method.
-A backup that was never restored has not been tested. The command-line flag is wired into
-`pwg-backup` with task 06 (`check.check_main(snapshot_root)` is the entry it calls).
+A backup that was never restored has not been tested. Run it as `uv run pwg-backup --check
+deploy.local.json`; it reads the backup folder from the credential file and contacts no remote.
 
 ## Testing
 
@@ -390,7 +426,7 @@ A backup that was never restored has not been tested. The command-line flag is w
 cd tools/deploy && uv run pytest
 ```
 
-738 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+805 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

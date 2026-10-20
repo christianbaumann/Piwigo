@@ -7,6 +7,7 @@ was given, and a single ordered call log — the order is the point in several t
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -519,3 +520,116 @@ def _ok(result) -> str:
 
 def _fail(code, message) -> str:
     return json.dumps({"stat": "fail", "err": code, "message": message})
+
+
+class FakeBackupHost:
+    """The remote as pwg-backup sees it: an FTP space and the temporary script on top of it.
+
+    `transport` is a FakeTransport holding every remote file under the FTP root; `client`
+    answers the agent protocol of the script found at the requested URL, honouring its token
+    hash, so a script that was deleted answers 404 like the real host. Photos are seeded with
+    `add_photo()`; the dump the script writes is `dump_bytes`, in the dump directory the
+    uploaded script names.
+    """
+
+    ROOT = "/piwigo"
+    BASE_URL = "https://g.example.test"
+    CONFIG_FILES = ("local/config/config.inc.php", "local/config/database.inc.php")
+
+    def __init__(self, *, interrupt_on_get: str | None = None, fail_get: str | None = None):
+        self.transport = _GettingTransport(self, interrupt_on_get, fail_get)
+        self.client = _AgentClient(self)
+        self.dump_bytes = b"-- dump --"
+        self.dump_method = "mysqldump"
+        self.counts = {"images": 2, "categories": 1, "tags": 3, "users": 2}
+        self.meta: dict[str, tuple[int, int]] = {}
+        self.db_paths: list[str] = []
+        self.actions: list[str] = []
+        self.fail_action: str | None = None
+        self.fail_cleanup_over_ftp = False
+        self.listed_extra: list[dict] = []
+        self.reported_dump_size: int | None = None
+        for relative in self.CONFIG_FILES:
+            self.transport.files[f"{self.ROOT}/{relative}"] = relative.encode()
+
+    def add_photo(self, path: str, content: bytes, mtime: int = 1_700_000_000, *, in_db: bool = True) -> None:
+        self.transport.files[f"{self.ROOT}/{path}"] = content
+        self.meta[path] = (len(content), mtime)
+        if in_db:
+            self.db_paths.append(f"./{path}")
+
+    def change_photo(self, path: str, content: bytes, mtime: int) -> None:
+        self.transport.files[f"{self.ROOT}/{path}"] = content
+        self.meta[path] = (len(content), mtime)
+
+    def scripts(self) -> list[str]:
+        return [p for p in self.transport.files if re.fullmatch(rf"{self.ROOT}/[0-9a-f]{{16}}\.php", p)]
+
+    def dump_files(self) -> list[str]:
+        return [p for p in self.transport.files if "/dump-" in p]
+
+
+class _GettingTransport(FakeTransport):
+    def __init__(self, host, interrupt_on_get, fail_get):
+        super().__init__()
+        self._host = host
+        self._interrupt_on_get = interrupt_on_get
+        self._fail_get = fail_get
+
+    def get(self, remote_path: str, local: Path) -> None:
+        if self._interrupt_on_get and remote_path.endswith(self._interrupt_on_get):
+            self.calls.append(("get-interrupted", remote_path))
+            raise KeyboardInterrupt()
+        if self._fail_get and remote_path.endswith(self._fail_get):
+            self.calls.append(("get-failed", remote_path))
+            raise TransportError(f"fake transport lost the connection on {remote_path}")
+        super().get(remote_path, local)
+
+    def delete(self, remote_path: str) -> None:
+        if self._host.fail_cleanup_over_ftp:
+            self.calls.append(("delete", remote_path))
+            raise TransportError("fake transport refused the delete")
+        super().delete(remote_path)
+
+
+class _AgentClient:
+    def __init__(self, host: FakeBackupHost):
+        self._host = host
+        self.calls: list[tuple[str, dict]] = []
+
+    def get(self, url, *, timeout=None) -> Response:
+        raise AssertionError("the agent is only ever POSTed to")
+
+    def post(self, url, fields, *, timeout=None) -> Response:
+        host = self._host
+        action = fields["action"]
+        self.calls.append((action, dict(fields)))
+        host.actions.append(action)
+        script = f"{host.ROOT}/{url.rsplit('/', 1)[1]}"
+        source = host.transport.files.get(script)
+        if source is None:
+            return Response(url, 404, json.dumps({"error": "not found"}))
+        text = source.decode()
+        digest = re.search(r"AGENT_TOKEN_SHA256', '([0-9a-f]+)'", text).group(1)
+        if hashlib.sha256(fields["token"].encode()).hexdigest() != digest:
+            return Response(url, 403, json.dumps({"error": "forbidden"}))
+        if host.fail_action == action:
+            return Response(url, 500, json.dumps({"error": f"{action} failed"}))
+        directory = re.search(r"AGENT_DUMP_DIR', '([^']+)'", text).group(1)
+        return Response(url, 200, json.dumps(self._answer(action, script, directory)))
+
+    def _answer(self, action: str, script: str, directory: str) -> dict:
+        host = self._host
+        dump_path = f"{directory}/dump.sql.gz"
+        if action == "dump":
+            host.transport.files[f"{host.ROOT}/{dump_path}"] = host.dump_bytes
+            size = host.reported_dump_size if host.reported_dump_size is not None else len(host.dump_bytes)
+            return {"path": dump_path, "size": size, "method": host.dump_method, "counts": host.counts}
+        if action == "list":
+            files = [{"path": p, "size": s, "mtime": m} for p, (s, m) in host.meta.items()]
+            return {"files": files + host.listed_extra, "db_paths": host.db_paths}
+        if action == "cleanup":
+            for path in (f"{host.ROOT}/{dump_path}", script):
+                host.transport.files.pop(path, None)
+            return {"removed": [dump_path, script]}
+        raise AssertionError(action)

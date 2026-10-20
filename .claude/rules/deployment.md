@@ -14,7 +14,8 @@ uv run pwg-deploy --dry-run deploy.local.json    # opens no socket; predicts del
 uv run pwg-deploy --list-files deploy.local.json # the published file set, one path per line
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
-uv run pytest                                    # 738 tests, measured 2026-10-20
+uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
+uv run pytest                                    # 805 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -24,6 +25,24 @@ is taken as given, so `cd tools/deploy` first is the shortest correct form.
 **The target is a sandbox and this tool is never safe against a production install**
 ([decision 0021](../../docs/agents/decisions/0021-remote-instance-is-a-sandbox.md)). It prunes
 without a prompt, overwrites the remote config, and posts to `install.php` unauthenticated.
+
+## `pwg-backup` — what an agent needs
+
+Operator how-to: [README](../../tools/deploy/README.md#backups--pwg-backup). Design and tasks:
+`.agents/changes/2026-10-20-remote-backup/`. `backup.run()` uploads `agent.php` (rendered by
+`agent.render()`, random name, token hash, expiry) over FTPS, dumps, lists, downloads the dump,
+**removes the script before the file download starts**, then builds the snapshot. Exit codes `11`
+(`BackupError`), `12` (`UnsafeRemotePathError`: a listed path outside `upload/`, `galleries/`,
+`_data/photoedit/originals/` or with a `..` segment) and `13` (`AgentLeftoverError`: the script is
+still on the host; delete it over FTP at once). If `cleanup` over HTTP fails, `backup.py` deletes
+the script and the dump files over FTP and checks with `exists()`. `--audit` reports a `*.php`
+directly in the web root that the manifest does not cover as `leftover`.
+
+The dump directory is one function, `backup.dump_dir()`: a random-named directory below the web root
+with a deny-all `.htaccess`, until the host probe (task 01) shows a PHP-writable directory outside
+it. Tested with `FakeBackupHost` (`tests/fakes.py`) and, against the real `agent.php`, in
+`tests/integration/test_backup_ddev.py` (`PWG_DDEV_WEBROOT=<main checkout> uv run pytest -m integration`).
+Never contact the real remote from a test; the first real run is a ledger item in `docs/agents/TESTING.md`.
 
 ## The credential file
 

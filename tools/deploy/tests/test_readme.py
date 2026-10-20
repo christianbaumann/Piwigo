@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from pwgdeploy import albums_cli, cli, config, errors, fileset, preflight
+from pwgdeploy import albums_cli, backup_cli, cli, config, errors, fileset, preflight
 
 README = Path(__file__).resolve().parents[1] / "README.md"
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -102,15 +102,25 @@ def albums_flags() -> set[str]:
     } - BUILTIN_FLAGS
 
 
+def backup_flags() -> set[str]:
+    return {
+        option
+        for action in backup_cli.build_parser()._actions
+        for option in action.option_strings
+    } - BUILTIN_FLAGS
+
+
 def test_every_documented_flag_is_accepted_by_a_parser(readme):
     """[HAPPY] A flag in the README that neither pwg-deploy's nor pwg-albums' argparse
     rejects is an instruction that fails the moment it is followed."""
     documented = documented_flags(readme)
-    known = real_flags() | albums_flags()
+    known = real_flags() | albums_flags() | backup_flags()
     assert len(documented) >= MIN_FLAGS, f"only {len(documented)} flags found in README.md"
     assert albums_flags(), "pwg-albums has no flags; this guard is scanning nothing"
     assert documented <= known, f"documented but unknown: {documented - known}"
     assert albums_flags() <= documented, f"pwg-albums flags undocumented: {albums_flags() - documented}"
+    assert backup_flags(), "pwg-backup has no flags; this guard is scanning nothing"
+    assert backup_flags() <= documented, f"pwg-backup flags undocumented: {backup_flags() - documented}"
 
 
 def test_every_flag_the_tool_accepts_is_documented(readme):

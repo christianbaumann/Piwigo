@@ -8,6 +8,7 @@ dependencies = []                      # stdlib only, on purpose
 [project.scripts]
 pwg-deploy = "pwgdeploy.cli:main"
 pwg-albums = "pwgdeploy.albums_cli:main"
+pwg-backup = "pwgdeploy.backup_cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-randomly>=3"]
