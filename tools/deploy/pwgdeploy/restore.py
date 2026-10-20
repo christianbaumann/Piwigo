@@ -105,6 +105,8 @@ def load_snapshot(backup_dir: Path, name: str) -> LoadedSnapshot:
         raise RestoreError(f"no snapshot {name} in {backup_dir}")
     document = json.loads(document_path.read_text(encoding="utf-8"))
     files = {path: Entry(path=path, **row) for path, row in document["files"].items()}
+    if not files:
+        raise RestoreError(f"snapshot {name} holds no files; restoring it would delete the remote's whole gallery")
     backup.validate_paths([RemoteFile(e.path, e.size, e.mtime) for e in files.values()])
     problems = [f"{backup.DUMP_PATH}: missing"] if not (folder / backup.DUMP_PATH).is_file() else []
     for relative in backup.CONFIG_FILES:

@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("config_json", help="credential file, as for pwg-deploy; needs a 'backup' section")
     parser.add_argument(
-        "--kind", choices=snapshot.KINDS, default=DEFAULT_KIND, help=f"snapshot kind (default {DEFAULT_KIND})"
+        "--kind", choices=snapshot.KINDS, default=None, help=f"snapshot kind (default {DEFAULT_KIND})"
     )
     parser.add_argument(
         "--check",
@@ -62,6 +62,10 @@ def main(
         parser.error("--yes and --dry-run belong to --restore")
     if args.restore and args.check:
         parser.error("--restore and --check are separate runs")
+    if args.restore and args.kind is not None:
+        parser.error("--kind belongs to a backup; a restore takes its own prerestore snapshot")
+    if args.kind is None:
+        args.kind = DEFAULT_KIND
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     started = clock()
@@ -120,7 +124,7 @@ def main(
         _log_failure(backup_dir, _logged_kind(args), started, clock, f"failed {type(error).__name__}")
         print(f"{type(error).__name__}: {error}", file=err)
         if config is not None:
-            _mail_failure(config, args.kind, type(error).__name__, str(error), err, send_mail, clock)
+            _mail_failure(config, _logged_kind(args), type(error).__name__, str(error), err, send_mail, clock)
         return error.exit_code
 
 

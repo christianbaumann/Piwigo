@@ -452,7 +452,7 @@ uv run pwg-backup --restore 2026-10-19T030000 --yes deploy.local.json       # do
 is checked before anything else). It replaces the remote's database, the three backed-up folders and
 the two config files with the snapshot's, and **refuses without `--yes`**. In this order:
 
-1. The snapshot is checked locally: every file it names must be present at its recorded size.
+1. The snapshot is checked locally: every file it names must be present at its recorded size, and a snapshot naming no files is refused (it would delete the remote's whole gallery).
 2. A fresh `prerestore` snapshot of the state being replaced is taken; if that fails nothing else
    happens. The report names it, and so does the error of any later failure: that snapshot is how a
    half-finished restore is undone.
@@ -503,7 +503,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-881 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+884 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

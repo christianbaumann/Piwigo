@@ -342,6 +342,19 @@ def test_a_damaged_snapshot_is_refused_before_the_host_is_contacted(host, cfg, s
     assert host.transport.calls == [] and host.actions == []
 
 
+def test_a_snapshot_without_files_is_refused_so_it_cannot_empty_the_remote(host, cfg, state_dir, yesterday):  # [NEG][BVA]
+    document = cfg.backup.dir / DAILY / snapshot.SNAPSHOT_JSON
+    data = json.loads(document.read_text())
+    data["files"] = {}
+    document.write_text(json.dumps(data))
+    spoil(host, state_dir)
+
+    with pytest.raises(restore.RestoreError, match="holds no files"):
+        do_restore(cfg, host, state_dir)
+
+    assert host.transport.calls == [] and host.actions == []
+
+
 def test_a_snapshot_that_does_not_exist_is_refused(host, cfg, state_dir, yesterday):  # [NEG]
     with pytest.raises(restore.RestoreError, match="no snapshot"):
         do_restore(cfg, host, state_dir, name="2020-01-01T000000")
@@ -438,3 +451,26 @@ def test_the_command_dry_run_opens_no_connection(tmp_path, host, cfg, state_dir,
 def test_flags_without_their_partner_are_usage_errors(tmp_path, host, flags):  # [NEG]
     with pytest.raises(SystemExit):
         invoke(tmp_path, host, *flags)
+
+
+def test_kind_is_a_usage_error_with_restore(tmp_path, host):  # [NEG]
+    with pytest.raises(SystemExit):
+        invoke(tmp_path, host, "--restore", DAILY, "--yes", "--kind", "daily")
+
+
+def test_a_failed_restore_mails_and_names_the_restore_kind(tmp_path, host, cfg, state_dir, yesterday):  # [HAPPY]
+    sent = []
+    path = tmp_path / "deploy.json"
+    mail = {"host": "smtp.example.test", "port": 465, "secure": "ssl", "user": "u", "password": "mailsecret",
+            "sender_email": "noreply@example.test"}
+    path.write_text(json.dumps({**RAW, "backup": {"dir": str(tmp_path / "bk")}, "mail": mail}))
+
+    code = backup_cli.main(
+        [str(path), "--restore", DAILY], stdout=io.StringIO(), stderr=io.StringIO(),
+        transport_factory=lambda c: host.transport, client_factory=lambda c: host.client,
+        state_dir=tmp_path / "state", repo_root=tmp_path, clock=lambda: LATER, git_commit=lambda: "abc123",
+        send_mail=lambda m, message: sent.append(message),
+    )
+
+    assert code == restore.RestoreError.exit_code
+    assert "pwg-backup (restore)" in sent[0].get_content()
