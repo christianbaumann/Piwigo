@@ -490,3 +490,77 @@ def test_the_example_copies_to_a_working_local_credential_file(tmp_path):
 
     local.write_text(json.dumps(valid()), encoding="utf-8")
     assert config.load_file(local) == config.load(valid())
+
+
+# --- backup ----------------------------------------------------------------
+
+
+def test_the_backup_section_is_optional():
+    """[HAPPY] A credential file without it still loads (pwg-deploy, pwg-albums)."""
+    raw = valid()
+    del raw["backup"]
+
+    assert config.load(raw).backup is None
+
+
+def test_the_example_backup_dir_is_expanded(monkeypatch, tmp_path):
+    """[HAPPY]"""
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert config.load(valid()).backup == config.BackupConfig(
+        dir=(tmp_path / "Backups/piwigo-remote").resolve()
+    )
+
+
+@pytest.mark.parametrize("bad", ["Backups", "./Backups", "../x"])
+def test_a_relative_backup_dir_is_refused(bad):
+    """[NEG]"""
+    raw = valid()
+    raw["backup"]["dir"] = bad
+    with pytest.raises(ConfigError, match="backup.dir"):
+        config.load(raw)
+
+
+@pytest.mark.parametrize(
+    "inside", [config.REPOSITORY_ROOT, config.REPOSITORY_ROOT / "tools" / "backups"]
+)
+def test_a_backup_dir_inside_the_repository_is_refused(inside):
+    """[NEG] [BVA] The root itself and a path below it."""
+    assert config.REPOSITORY_ROOT.is_dir()
+    raw = valid()
+    raw["backup"]["dir"] = str(inside)
+    with pytest.raises(ConfigError, match="backup.dir.*repository"):
+        config.load(raw)
+
+
+def test_a_sibling_of_the_repository_is_accepted():
+    """[BVA] Prefix-similar names are not inside."""
+    raw = valid()
+    raw["backup"]["dir"] = str(config.REPOSITORY_ROOT.parent / (config.REPOSITORY_ROOT.name + "-backups"))
+    assert config.load(raw).backup is not None
+
+
+def test_an_unknown_backup_key_is_refused():
+    """[NEG]"""
+    raw = valid()
+    raw["backup"]["notify"] = "x"
+    with pytest.raises(ConfigError, match="notify"):
+        config.load(raw)
+
+
+def test_an_empty_backup_dir_is_refused():
+    """[NEG]"""
+    raw = valid()
+    raw["backup"]["dir"] = " "
+    with pytest.raises(ConfigError, match="backup.dir"):
+        config.load(raw)
+
+
+def test_a_symlink_into_the_repository_is_refused(tmp_path):
+    """[NEG] A path that only looks outside the repository."""
+    link = tmp_path / "elsewhere"
+    link.symlink_to(config.REPOSITORY_ROOT, target_is_directory=True)
+    raw = valid()
+    raw["backup"]["dir"] = str(link / "backups")
+    with pytest.raises(ConfigError, match="backup.dir.*repository"):
+        config.load(raw)

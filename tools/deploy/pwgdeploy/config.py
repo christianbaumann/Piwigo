@@ -48,7 +48,9 @@ MAIL_HOST_FORBIDDEN = re.compile(r"[:/;\s]")
 PLACEHOLDER = "REPLACE_ME"
 
 SECTIONS = ("ftp", "mysql", "admin", "site")
-OPTIONAL_SECTIONS = ("mail",)
+OPTIONAL_SECTIONS = ("mail", "backup")
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 @dataclass(frozen=True)
@@ -96,12 +98,18 @@ class MailConfig:
 
 
 @dataclass(frozen=True)
+class BackupConfig:
+    dir: Path
+
+
+@dataclass(frozen=True)
 class DeployConfig:
     ftp: FtpConfig
     mysql: MysqlConfig
     admin: AdminConfig
     site: SiteConfig
     mail: MailConfig | None = None
+    backup: BackupConfig | None = None
 
 
 def load(raw: Mapping[str, Any]) -> DeployConfig:
@@ -123,6 +131,7 @@ def load(raw: Mapping[str, Any]) -> DeployConfig:
         admin=_admin(raw["admin"]),
         site=_site(raw["site"]),
         mail=_mail(raw["mail"]) if "mail" in raw else None,
+        backup=_backup(raw["backup"]) if "backup" in raw else None,
     )
 
 
@@ -234,6 +243,20 @@ def _mail(raw: Mapping[str, Any]) -> MailConfig:
         sender_email=sender_email,
         sender_name=sender_name,
     )
+
+
+def _backup(raw: Mapping[str, Any]) -> BackupConfig:
+    _reject_unknown_keys(raw, ("dir",), "backup")
+    expanded = Path(_required_string(raw, "dir", "backup")).expanduser()
+    if not expanded.is_absolute():
+        raise ConfigError(f"backup.dir must be an absolute path (or start with ~), got {raw['dir']!r}")
+    resolved = expanded.resolve()
+    if resolved == REPOSITORY_ROOT or REPOSITORY_ROOT in resolved.parents:
+        raise ConfigError(
+            f"backup.dir {str(resolved)!r} is inside the repository; "
+            "a backup must not sit where git or a deploy could reach it"
+        )
+    return BackupConfig(dir=resolved)
 
 
 def _reject_unknown_keys(

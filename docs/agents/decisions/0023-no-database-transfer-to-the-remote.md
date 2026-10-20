@@ -2,6 +2,7 @@
 
 Date: 2026-08-31
 Status: accepted
+Superseded by: [0089](0089-database-export-and-restore-through-a-temporary-token-gated-script.md) (export and restore direction only)
 Implements decision 9 of the FTP deployment plan
 ([`docs/agents/plans/2026-08-31-ftp-deployment-and-remote-install.md`](../plans/2026-08-31-ftp-deployment-and-remote-install.md))
 
