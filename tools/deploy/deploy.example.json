@@ -32,5 +32,8 @@
     "password": "REPLACE_ME",
     "sender_email": "noreply@example.net",
     "sender_name": ""
+  },
+  "backup": {
+    "dir": "~/Backups/piwigo-remote"
   }
 }

@@ -79,6 +79,12 @@ class FakeTransport:
         self.calls.append(("put", remote_path))
         self.files[remote_path] = Path(local).read_bytes()
 
+    def get(self, remote_path: str, local: Path) -> None:
+        self.calls.append(("get", remote_path))
+        if remote_path not in self.files:
+            raise TransportError(f"fake transport has no {remote_path}")
+        Path(local).write_bytes(self.files[remote_path])
+
     def delete(self, remote_path: str) -> None:
         self.calls.append(("delete", remote_path))
         self.files.pop(remote_path, None)
