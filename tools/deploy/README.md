@@ -59,7 +59,7 @@ Any `deploy.*.json` other than the example is git-ignored, in the repository roo
 | | `sender_email` | the From address; use the SMTP mailbox itself, or receivers reject it |
 | | `sender_name` | the From name; `""` means the gallery title |
 | `backup` | `dir` | optional section — the folder backups are written to; `~` is expanded, the result must be absolute and outside this repository |
-| | `dump_dir` | optional — where the temporary script writes the dump, relative to the web root: plain names separated by `/`, optionally one leading `../` for a sibling of the web root (`../backup-tmp`); never absolute, never any other `..`. The folder must be writable by FTP and by PHP. Absent: a random-named folder directly under the web root |
+| | `dump_dir` | optional — where the temporary script writes the dump, relative to the web root: plain names separated by `/`, optionally one leading `../` for a sibling of the web root (`../backup-tmp`); never absolute, never any other `..`. The folder must be writable by FTP and by PHP. Absent: a random-named folder directly under the web root. The example sets `../backup-tmp`, which must exist on your host and be writable; delete the key to get the default |
 | | `notify` | the address a failed `pwg-backup` run mails; when absent, the `admin` section's e-mail address. Needs the `mail` section |
 
 Values are validated locally against the same rules the remote enforces, so a bad table prefix
@@ -511,7 +511,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-908 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+909 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

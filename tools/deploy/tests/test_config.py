@@ -583,7 +583,7 @@ def test_the_dump_dir_defaults_to_none():
 
 @pytest.mark.parametrize(
     "bad",
-    ["", "/var/tmp", "../../x", "a/../b", "..", "../", "a//b", "a/", "./a", "a b", "a\\b", "..x/../y", 5],
+    ["", "/var/tmp", "../../x", "a/../b", "..", "../", "a//b", "a/", "./a", "a b", "a\\b", "a\0b", "..x/../y", 5],
 )
 def test_an_unsafe_dump_dir_is_refused(bad):
     """[NEG][BVA] absolute, two climbs, a climb in the middle, empty segments, odd characters."""

@@ -15,7 +15,7 @@ uv run pwg-deploy --list-files deploy.local.json # the published file set, one p
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
-uv run pytest                                    # 908 tests, measured 2026-10-20
+uv run pytest                                    # 909 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
