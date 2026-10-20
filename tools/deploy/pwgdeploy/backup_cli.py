@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import io
+import smtplib
 import sys
 from datetime import datetime
 from pathlib import Path
 
-from pwgdeploy import backup, check, snapshot
+from pwgdeploy import backup, check, notify, snapshot
 from pwgdeploy.cli import INTERRUPTED_EXIT_CODE, REPO_ROOT, STATE_DIR, ftps_transport, http_client
 from pwgdeploy.config import load_file
 from pwgdeploy.errors import ConfigError, DeployError
@@ -47,19 +49,27 @@ def main(
     repo_root: Path = REPO_ROOT,
     clock=datetime.now,
     git_commit=None,
+    send_mail=notify.send,
 ) -> int:
     args = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     started = clock()
     backup_dir = None
+    config = None
     try:
-        config = load_file(Path(args.config_json))
-        if config.backup is None:
+        loaded = load_file(Path(args.config_json))
+        if loaded.backup is None:
             raise ConfigError("the credential file has no 'backup' section")
+        config = loaded
         backup_dir = config.backup.dir
         if args.check:
-            return check.check_main(backup_dir, out, err)
+            problems = io.StringIO()
+            code = check.check_main(backup_dir, out, problems)
+            err.write(problems.getvalue())
+            if code:
+                _mail_failure(config, args.kind, "check", problems.getvalue(), err, send_mail, clock)
+            return code
 
         def report(label: str, text: str) -> None:
             print(f"  {label:<{LABEL_WIDTH}}{text}", file=out)
@@ -91,6 +101,8 @@ def main(
     except DeployError as error:
         _log_failure(backup_dir, args.kind, started, clock, f"failed {type(error).__name__}")
         print(f"{type(error).__name__}: {error}", file=err)
+        if config is not None:
+            _mail_failure(config, args.kind, type(error).__name__, str(error), err, send_mail, clock)
         return error.exit_code
 
 
@@ -99,3 +111,28 @@ def _log_failure(backup_dir, kind, started, clock, result) -> None:
         backup.append_log(
             backup_dir, backup.format_log_line(started, clock(), kind, "-", "-", "-", result)
         )
+
+
+def _mail_failure(config, kind, step, error_text, err, send_mail, clock) -> None:
+    """Mail the failure; a mail that cannot go out is logged and never changes the exit code."""
+    if config.mail is None:
+        _log_mail_problem(config, kind, clock, "no-mail-section", err, "no mail section in the credential file; no failure mail sent")
+        return
+    try:
+        tail = (config.backup.dir / backup.LOG_FILE).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        tail = []
+    message = notify.failure_mail(
+        config.mail, notify.recipient_of(config), config.site.base_url, kind, step, error_text,
+        tail, notify.secrets_of(config),
+    )
+    try:
+        send_mail(config.mail, message)
+    except (OSError, smtplib.SMTPException) as mail_error:
+        _log_mail_problem(config, kind, clock, "mail-failed", err, f"failure mail not sent: {type(mail_error).__name__}")
+
+
+def _log_mail_problem(config, kind, clock, result, err, text) -> None:
+    print(text, file=err)
+    now = clock()
+    backup.append_log(config.backup.dir, backup.format_log_line(now, now, kind, "-", "-", "-", result))

@@ -29,8 +29,15 @@ def host():
     return h
 
 
-def invoke(tmp_path, host, *args, with_backup=True):
-    raw = {**RAW, **({"backup": {"dir": str(tmp_path / "bk")}} if with_backup else {})}
+MAIL = {
+    "host": "smtp.example.test", "port": 465, "secure": "ssl", "user": "u", "password": "mailsecret",
+    "sender_email": "noreply@example.test",
+}
+
+
+def invoke(tmp_path, host, *args, with_backup=True, mail=None, notify=None, send_mail=None):
+    backup_section = {"dir": str(tmp_path / "bk"), **({"notify": notify} if notify else {})}
+    raw = {**RAW, **({"backup": backup_section} if with_backup else {}), **({"mail": mail} if mail else {})}
     path = tmp_path / "deploy.json"
     path.write_text(json.dumps(raw))
     out, err = io.StringIO(), io.StringIO()
@@ -38,6 +45,7 @@ def invoke(tmp_path, host, *args, with_backup=True):
         [str(path), *args], stdout=out, stderr=err,
         transport_factory=lambda cfg: host.transport, client_factory=lambda cfg: host.client,
         state_dir=tmp_path, repo_root=tmp_path, clock=lambda: NOW, git_commit=lambda: "abc123",
+        **({"send_mail": send_mail} if send_mail else {}),
     )
     return code, out.getvalue(), err.getvalue()
 
@@ -111,3 +119,92 @@ def test_check_runs_the_restore_check_on_the_backup_dir_and_nothing_else(tmp_pat
 def test_a_failing_check_returns_its_exit_code(tmp_path, host, monkeypatch):  # [NEG]
     monkeypatch.setattr(check, "check_main", lambda root, out, err: check.EXIT_CHECK_FAILED)
     assert invoke(tmp_path, host, "--check")[0] == check.EXIT_CHECK_FAILED
+
+
+class Outbox:
+    def __init__(self, fail=None):
+        self.sent, self.fail = [], fail
+
+    def __call__(self, mail, message):
+        if self.fail:
+            raise self.fail
+        self.sent.append((mail, message))
+
+
+def failing_host():
+    h = FakeBackupHost()
+    h.listed_extra = [{"path": "../x", "size": 1, "mtime": 1}]
+    return h
+
+
+def test_a_failed_run_mails_the_admin_address_by_default(tmp_path):  # [HAPPY]
+    outbox = Outbox()
+    code, _, _ = invoke(tmp_path, failing_host(), mail=MAIL, send_mail=outbox)
+
+    assert code == errors.UnsafeRemotePathError.exit_code
+    ((_, message),) = outbox.sent
+    assert message["To"] == "you@example.net"
+    assert "UnsafeRemotePathError" in message["Subject"]
+    assert "failed UnsafeRemotePathError" in message.get_content()
+
+
+def test_backup_notify_overrides_the_recipient(tmp_path):  # [ECP]
+    outbox = Outbox()
+    invoke(tmp_path, failing_host(), mail=MAIL, notify="ops@example.net", send_mail=outbox)
+    assert outbox.sent[0][1]["To"] == "ops@example.net"
+
+
+def test_a_successful_run_sends_no_mail(tmp_path, host):  # [NEG]
+    outbox = Outbox()
+    assert invoke(tmp_path, host, mail=MAIL, send_mail=outbox)[0] == 0
+    assert outbox.sent == []
+
+
+def test_a_killed_run_sends_no_mail(tmp_path):  # [NEG]
+    host = FakeBackupHost(interrupt_on_get="upload/a.jpg")
+    host.add_photo("upload/a.jpg", b"aaa")
+    outbox = Outbox()
+    assert invoke(tmp_path, host, mail=MAIL, send_mail=outbox)[0] == 130
+    assert outbox.sent == []
+
+
+def test_a_failed_send_is_logged_and_keeps_the_exit_code(tmp_path):  # [ERR-path]
+    outbox = Outbox(fail=OSError("refused"))
+    code, _, err = invoke(tmp_path, failing_host(), mail=MAIL, send_mail=outbox)
+
+    assert code == errors.UnsafeRemotePathError.exit_code
+    assert "failure mail not sent" in err
+    assert log_lines(tmp_path)[-1].endswith("mail-failed")
+
+
+def test_a_config_without_a_mail_section_logs_that_no_mail_can_go(tmp_path):  # [NEG]
+    outbox = Outbox()
+    code, _, err = invoke(tmp_path, failing_host(), send_mail=outbox)
+
+    assert code == errors.UnsafeRemotePathError.exit_code
+    assert "no mail section" in err
+    assert log_lines(tmp_path)[-1].endswith("no-mail-section")
+    assert outbox.sent == []
+
+
+def test_a_failing_check_mails_too(tmp_path, host, monkeypatch):  # [HAPPY]
+    def failing_check(root, out, err):
+        print("check failed: table images differs", file=err)
+        return check.EXIT_CHECK_FAILED
+
+    monkeypatch.setattr(check, "check_main", failing_check)
+    outbox = Outbox()
+
+    code, _, err = invoke(tmp_path, host, "--check", mail=MAIL, send_mail=outbox)
+
+    assert code == check.EXIT_CHECK_FAILED
+    assert "table images differs" in err
+    assert "table images differs" in outbox.sent[0][1].get_content()
+    assert "check" in outbox.sent[0][1]["Subject"]
+
+
+def test_a_passing_check_sends_no_mail(tmp_path, host, monkeypatch):  # [NEG]
+    monkeypatch.setattr(check, "check_main", lambda root, out, err: 0)
+    outbox = Outbox()
+    assert invoke(tmp_path, host, "--check", mail=MAIL, send_mail=outbox)[0] == 0
+    assert outbox.sent == []
