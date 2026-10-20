@@ -100,6 +100,7 @@ class MailConfig:
 @dataclass(frozen=True)
 class BackupConfig:
     dir: Path
+    notify: str | None = None
 
 
 @dataclass(frozen=True)
@@ -246,7 +247,7 @@ def _mail(raw: Mapping[str, Any]) -> MailConfig:
 
 
 def _backup(raw: Mapping[str, Any]) -> BackupConfig:
-    _reject_unknown_keys(raw, ("dir",), "backup")
+    _reject_unknown_keys(raw, ("dir", "notify"), "backup")
     expanded = Path(_required_string(raw, "dir", "backup")).expanduser()
     if not expanded.is_absolute():
         raise ConfigError(f"backup.dir must be an absolute path (or start with ~), got {raw['dir']!r}")
@@ -256,7 +257,10 @@ def _backup(raw: Mapping[str, Any]) -> BackupConfig:
             f"backup.dir {str(resolved)!r} is inside the repository; "
             "a backup must not sit where git or a deploy could reach it"
         )
-    return BackupConfig(dir=resolved)
+    notify = raw.get("notify")
+    if notify is not None and (not isinstance(notify, str) or not MAIL_SHAPE.match(notify)):
+        raise ConfigError(f"backup.notify {notify!r} is not shaped like a mail address (xxx@yyy.eee)")
+    return BackupConfig(dir=resolved, notify=notify)
 
 
 def _reject_unknown_keys(

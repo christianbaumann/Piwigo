@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>de.chriss-baumann.pwg-backup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/ABSOLUTE/PATH/TO/uv</string>
+    <string>run</string>
+    <string>--directory</string>
+    <string>/ABSOLUTE/PATH/TO/piwigo/tools/deploy</string>
+    <string>pwg-backup</string>
+    <string>--kind</string>
+    <string>daily</string>
+    <string>/ABSOLUTE/PATH/TO/piwigo/tools/deploy/deploy.local.json</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/ABSOLUTE/PATH/TO/BACKUP/FOLDER/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/ABSOLUTE/PATH/TO/BACKUP/FOLDER/launchd.err.log</string>
+</dict>
+</plist>

@@ -34,6 +34,7 @@
     "sender_name": ""
   },
   "backup": {
-    "dir": "~/Backups/piwigo-remote"
+    "dir": "~/Backups/piwigo-remote",
+    "notify": "you@example.net"
   }
 }

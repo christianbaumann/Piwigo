@@ -59,6 +59,7 @@ Any `deploy.*.json` other than the example is git-ignored, in the repository roo
 | | `sender_email` | the From address; use the SMTP mailbox itself, or receivers reject it |
 | | `sender_name` | the From name; `""` means the gallery title |
 | `backup` | `dir` | optional section — the folder backups are written to; `~` is expanded, the result must be absolute and outside this repository |
+| | `notify` | the address a failed `pwg-backup` run mails; when absent, the `admin` section's e-mail address. Needs the `mail` section |
 
 Values are validated locally against the same rules the remote enforces, so a bad table prefix
 or a quote in the webmaster name fails in milliseconds instead of after a 128 MB upload. Every
@@ -419,6 +420,27 @@ database, exists on the host behind a one-time token, an expiry and a random nam
 root with a deny-all `.htaccess` until a host probe shows a writable directory outside it
 (`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`).
 
+### Failure mail and the daily job
+
+A failed run (any exit but 0 and Ctrl-C) and a failed `--check` send one mail through the
+credential file's `mail` section (`smtplib`: `ssl` connects encrypted, `tls` runs STARTTLS first, 30 s
+timeout) to `backup.notify`, or to `admin.email` when that is absent. Subject: gallery host and the
+failed step (the error class, `check` for the restore check); body: the error and the last ten log
+lines, with the configured passwords replaced. A mail that cannot be sent is printed and logged
+(`mail-failed`) and does not change the exit code; without a `mail` section the run logs
+`no-mail-section` instead.
+
+`launchd/de.chriss-baumann.pwg-backup.plist.example` runs `pwg-backup --kind daily` every day at
+03:30 and catches up after sleep. Copy it to `~/Library/LaunchAgents/de.chriss-baumann.pwg-backup.plist`,
+replace every `/ABSOLUTE/PATH/TO/...` (the `uv` binary from `which uv`, this checkout, the credential
+file, the backup folder, which must exist for the two log files) and load it:
+
+```bash
+plutil -lint ~/Library/LaunchAgents/de.chriss-baumann.pwg-backup.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/de.chriss-baumann.pwg-backup.plist
+launchctl kickstart gui/$(id -u)/de.chriss-baumann.pwg-backup # run it now to see the log
+```
+
 ## The restore check — does the newest snapshot restore
 
 `pwgdeploy/check.py` imports the newest complete snapshot's `db/dump.sql.gz` into the scratch
@@ -440,7 +462,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-823 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+842 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

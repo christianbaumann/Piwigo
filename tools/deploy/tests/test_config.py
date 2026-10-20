@@ -507,9 +507,9 @@ def test_the_example_backup_dir_is_expanded(monkeypatch, tmp_path):
     """[HAPPY]"""
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    assert config.load(valid()).backup == config.BackupConfig(
-        dir=(tmp_path / "Backups/piwigo-remote").resolve()
-    )
+    backup = config.load(valid()).backup
+    assert backup.dir == (tmp_path / "Backups/piwigo-remote").resolve()
+    assert backup.notify == "you@example.net"
 
 
 @pytest.mark.parametrize("bad", ["Backups", "./Backups", "../x"])
