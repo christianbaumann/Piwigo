@@ -70,6 +70,8 @@ def _server_message(error: urllib.error.HTTPError) -> str:
     except (OSError, http.client.HTTPException, ValueError, AttributeError):
         return ""
     message = envelope.get("message") if isinstance(envelope, dict) else None
+    if not isinstance(message, str) and isinstance(envelope, dict):
+        message = envelope.get("error")  # the temporary backup script's refusals
     return message if isinstance(message, str) else ""
 
 

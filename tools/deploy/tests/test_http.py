@@ -164,6 +164,14 @@ def test_a_ws_failure_envelope_adds_the_servers_message():
     assert "The name of an album must not be empty" in str(raised.value)
 
 
+def test_the_backup_scripts_error_field_is_reported_as_the_servers_message():
+    """[HAPPY] agent.php refuses with {"error": ...}; the raised error carries it."""
+    opener = FakeOpener(error=_error_with_body(403, b'{"error":"wrong token"}'))
+
+    with pytest.raises(RemoteHttpError, match="HTTP 403: wrong token"):
+        client(opener).get(URL)
+
+
 def test_an_error_body_that_is_not_a_ws_envelope_keeps_the_plain_message():
     """[NEG] An HTML 404 page, JSON without a message and a JSON non-object all leave
     today's text."""
