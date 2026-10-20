@@ -375,7 +375,7 @@ uv run pytest -m integration
 cd tools/deploy && uv run pytest
 ```
 
-642 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+673 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).
