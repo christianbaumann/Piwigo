@@ -209,6 +209,18 @@ def test_prune_leaves_partial_foreign_folders_and_files(tmp_path):
     assert (tmp_path / "backup.log").read_text() == "log"
 
 
+def test_prune_spares_a_snapshot_named_in_keep(tmp_path):  # [NEG]
+    """The snapshot a restore is about to read must survive the prerestore run's prune."""
+    mon, tue = stamp(2026, 8, 3, 3), stamp(2026, 8, 4, 3)
+    for name in (NEWEST, mon, tue):
+        make_snapshot(tmp_path, name)
+    assert prune(tmp_path, NOW) == [mon], "mon is not due for deletion; the keep case below is vacuous"
+    make_snapshot(tmp_path, mon)
+
+    assert prune(tmp_path, NOW, keep={mon}) == []
+    assert (tmp_path / mon).is_dir()
+
+
 def test_prune_never_deletes_a_file_named_like_a_snapshot(tmp_path):
     make_snapshot(tmp_path, NEWEST)
     lookalike = tmp_path / stamp(2024, 8, 1)

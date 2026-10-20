@@ -442,7 +442,8 @@ def _audit(out, config, state_dir, transport_factory) -> None:
 
     generated = {remote_path(root, name) for name in fileset.GENERATED_REMOTE_PATHS}
     report = audit.compare(
-        files, entries, generated, directories=directories, skipped=audit.AUDIT_SKIP, root=root
+        files, entries, generated, directories=directories, skipped=audit.AUDIT_SKIP, root=root,
+        dump_base=config.backup.dump_dir if config.backup else None,
     )
 
     skipped = " ".join(f"{name}/" for name in report.skipped)
@@ -464,6 +465,12 @@ def _audit(out, config, state_dir, transport_factory) -> None:
         report.leftover_scripts,
         "in the web root the manifest does not cover; a killed pwg-backup leaves its script here, "
         "delete it over FTP",
+    )
+    _report_paths(
+        out,
+        "leftover",
+        report.leftover_dumps,
+        "of a dump directory pwg-backup did not remove; it holds the database, delete it over FTP",
     )
     _report_paths(
         out, "orphans", report.orphans, "on the server the manifest does not cover"

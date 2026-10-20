@@ -19,13 +19,14 @@ database in DDEV and comparing its row counts with the snapshot's.
 ## Work
 
 * [x] Write failing unit tests, then `check.compare(expected_counts, actual_counts) -> list[str]` (pure; one message per differing table, an empty `counts` is itself a failure)
-* [-] `pwg-backup --check`: take `snapshot.latest()`, create database `backup_check` in DDEV (`ddev mysql -uroot`), import the gzipped dump, count `images`, `categories`, `tags`, `users` (with the snapshot's table prefix), drop the database in a `finally`
+* [x] `pwg-backup --check`: take `snapshot.latest()`, create database `backup_check` in DDEV (`ddev mysql -uroot`), import the gzipped dump, count `images`, `categories`, `tags`, `users` (with the snapshot's table prefix), drop the database in a `finally`
   **Note:** Logic done in `pwgdeploy/check.py` (`run_check`, `check_main(snapshot_root)` returns the exit code). The `--check` flag is NOT wired: `backup_cli.py` belongs to task 06, which depends on later work than this task (dependency gap in the task split). Task 06 must call `check.check_main`. Prefix: `prefix` key of `snapshot.json`, default `piwigo_` (the dump answer in the design has no prefix field; task 06 should record it in the meta). Dump path `<snapshot>/db/dump.sql.gz` (`check.DUMP_PATH`, sibling of `files/` per design.md). The streaming runner refuses a dump line starting with `USE`/`CREATE|DROP DATABASE|SCHEMA`, since an import as root could otherwise reach `db`.
+  **Note (integration check 2026-10-20):** wired by task 06 (`backup_cli.py` `--check` -> `check.check_main()`), `prefix` recorded in `snapshot.json` by `backup.run()`; `check.DUMP_PATH` is now imported from `backup.DUMP_PATH` (one definition).
 * [x] Refuse any target database name other than `backup_check`; never touch `db`
   **Note:** `import_and_count` raises `CheckError` for any name but `backup_check`; unit test `test_another_database_name_is_refused`.
 * [x] Also verify every file in the snapshot against its recorded sha1 (`--check` reports the first mismatches by name)
 * [x] Exit non-zero and log on any mismatch; the failure mail of task 07 applies once it exists
-  **Note:** `check_main` returns 1 and prints `check failed: ...` to stderr; the failure mail (task 07) is not wired yet.
+  **Note:** `check_main` returns 1 and prints `check failed: ...` to stderr; the failure mail is wired by task 07 (`backup_cli._mail_failure(..., "check", ...)`). No `backup.log` line is written for a check (open question of the integration check 2026-10-20).
 * [x] README: how and how often to run it
 
 ## Verification

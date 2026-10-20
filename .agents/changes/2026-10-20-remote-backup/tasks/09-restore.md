@@ -59,3 +59,7 @@ remote, after taking a fresh snapshot of the state it replaces.
 * Verified via review, `tests/test_restore.py` and the DDEV integration run (`test_restore_ddev.py`, `test_backup_ddev.py`: 2 passed). Approved.
 * Fixed: a snapshot naming no files is refused (it would have deleted the remote's whole gallery); the failure mail of a restore says `restore` instead of `manual`; `--kind` with `--restore` is a usage error; TESTING.md no longer calls the remote a sandbox.
 * Judged sufficient without a further guard: deletions only under the three folders, validated and printed before any upload; the printed plan plus `--yes` is the confirmation.
+
+## Integration check (2026-10-20)
+
+* Fixed: the `prerestore` snapshot's retention pass could delete the snapshot being restored (one that aged past its window since the last daily run); the restore then stopped with "no snapshot" and the restore point was gone. `backup.run(..., keep=(name,))` and `retention.prune(root, now, keep)` spare it; tests `test_restore.py::test_the_prerestore_prune_never_deletes_the_snapshot_being_restored`, `test_retention.py::test_prune_spares_a_snapshot_named_in_keep` (both red before the fix).

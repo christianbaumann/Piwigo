@@ -11,6 +11,7 @@ from __future__ import annotations
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Iterable
 
 from pwgdeploy.snapshot import parse_name
 
@@ -51,13 +52,14 @@ def select_for_deletion(names: list[str], now: datetime) -> list[str]:
     return sorted(name for name, _, _ in parsed if name not in keep)
 
 
-def prune(root: Path, now: datetime) -> list[str]:
-    """Delete the snapshot folders `select_for_deletion` picks; touch nothing else in `root`."""
+def prune(root: Path, now: datetime, keep: Iterable[str] = ()) -> list[str]:
+    """Delete the snapshot folders `select_for_deletion` picks, except those in `keep`; touch nothing else."""
     root = Path(root)
     if not root.is_dir():
         return []
     names = [child.name for child in root.iterdir() if child.is_dir() and parse_name(child.name)]
-    deleted = select_for_deletion(names, now)
+    spared = set(keep)
+    deleted = [name for name in select_for_deletion(names, now) if name not in spared]
     for name in deleted:
         shutil.rmtree(root / name)
     return deleted

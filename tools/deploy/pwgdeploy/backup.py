@@ -214,7 +214,9 @@ def run(
     report: Report = lambda label, text: None,
     clock: Callable[[], datetime] = datetime.now,
     git_commit: Callable[[], str] | None = None,
+    keep: tuple[str, ...] = (),
 ) -> BackupResult:
+    """`keep`: snapshot names the closing prune must spare (the one a restore is about to read)."""
     if config.backup is None:
         raise ConfigError("the credential file has no 'backup' section")
     backup_dir = config.backup.dir
@@ -268,7 +270,7 @@ def run(
                 _remove_agent(agent_client, transport, script, dump_files)
         return _store(
             config, kind, now, transport, state_dir, report, clock, commit, name, staging,
-            dumped, remote_files, db_paths, db_started, files_started, started,
+            dumped, remote_files, db_paths, db_started, files_started, started, keep,
         )
     finally:
         shutil.rmtree(staging, ignore_errors=True)
@@ -276,7 +278,7 @@ def run(
 
 def _store(
     config, kind, now, transport, state_dir, report, clock, commit, name, staging,
-    dumped, remote_files, db_paths, db_started, files_started, started,
+    dumped, remote_files, db_paths, db_started, files_started, started, keep,
 ) -> BackupResult:
     backup_dir, root = config.backup.dir, config.ftp.remote_root
     for relative in CONFIG_FILES:
@@ -322,7 +324,7 @@ def _store(
         }
 
     folder = snapshot.build(backup_dir, name, plan, fetch, meta=meta, extras=extras)
-    pruned = retention.prune(backup_dir, now)
+    pruned = retention.prune(backup_dir, now, keep)
     report("snapshot", f"{folder.name} ({len(plan.fetch)} fetched, {len(plan.link)} linked)")
     report("retention", f"{len(pruned)} old snapshots removed")
     return BackupResult(

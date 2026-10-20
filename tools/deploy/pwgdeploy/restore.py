@@ -252,6 +252,7 @@ def run(
     before = backup.run(
         config, "prerestore", now, transport, client,
         repo_root=repo_root, state_dir=state_dir, report=report, clock=clock, git_commit=git_commit,
+        keep=(name,),
     )
     report("prerestore", f"{before.name} holds the state being replaced")
     loaded = load_snapshot(config.backup.dir, name)

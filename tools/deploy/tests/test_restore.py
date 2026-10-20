@@ -184,6 +184,33 @@ def test_the_prerestore_snapshot_holds_the_state_just_before_the_restore(host, c
     assert (cfg.backup.dir / DAILY).is_dir(), "the snapshot restored from must survive the run"
 
 
+def test_the_prerestore_prune_never_deletes_the_snapshot_being_restored(host, cfg, state_dir, yesterday):  # [NEG][BVA]
+    """A snapshot that ages past its retention window between the last daily run and the restore.
+
+    `yesterday` and a later daily of the same ISO week; sixteen days on, only the newer one is the
+    week's representative, so the prerestore run's prune would select `yesterday`.
+    """
+    week_later = NOW + timedelta(days=1)
+    backup.run(
+        cfg, "daily", week_later, host.transport, host.client,
+        repo_root=state_dir, state_dir=state_dir, git_commit=lambda: "abc124", clock=lambda: week_later,
+    )
+    restore_time = NOW + timedelta(days=16)
+    names = [DAILY, snapshot.snapshot_name(week_later), snapshot.snapshot_name(restore_time, "prerestore")]
+    assert DAILY in backup.retention.select_for_deletion(names, restore_time), "not due; the case is vacuous"
+    spoil(host, state_dir)
+
+    result = restore.run(
+        cfg, DAILY, restore_time, host.transport, host.client,
+        repo_root=state_dir, state_dir=state_dir, git_commit=lambda: "def456", clock=lambda: restore_time,
+        yes=True,
+    )
+
+    assert result.name == DAILY
+    assert (cfg.backup.dir / DAILY).is_dir()
+    assert host.transport.files[f"{FakeBackupHost.ROOT}/upload/2026/a.jpg"] == b"aaa"
+
+
 def test_the_host_keeps_no_script_and_no_dump_directory(host, cfg, state_dir, yesterday):  # [HAPPY]
     spoil(host, state_dir)
 

@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import Callable, TextIO
 
 from pwgdeploy import snapshot
+from pwgdeploy.backup import DUMP_PATH
 
 CHECK_DATABASE = "backup_check"
-DUMP_PATH = "db/dump.sql.gz"
 DEFAULT_PREFIX = "piwigo_"
 COUNTED_TABLES = ("images", "categories", "tags", "users")
 MAX_REPORTED_FILES = 5

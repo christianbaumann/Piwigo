@@ -403,7 +403,11 @@ One run uploads a temporary PHP script under a random name, asks it for a databa
 list of files, downloads the dump over FTPS, **deletes the script and the dump**, and only then
 downloads the files that changed since the newest complete snapshot. An unchanged file is a
 hardlink to the previous snapshot's copy, so the folder must sit on one file system. Afterwards
-`retention.prune()` removes the snapshots the retention rule no longer keeps.
+`retention.prune()` removes the snapshots the retention rule no longer keeps: `predeploy` and
+`prerestore` snapshots are kept 90 days, `daily` and `manual` ones 14 days; older than 14 days, the
+newest snapshot of each ISO week is kept up to six months, beyond that the newest of each month. The
+newest snapshot is always kept, and so is the one a `--restore` is reading. Nothing else in the folder
+(`.partial` folders, `backup.log`, foreign folders) is touched.
 
 A snapshot `<dir>/<timestamp>[-<kind>]/` holds `db/dump.sql.gz`, `files/` (`upload/`, `galleries/`,
 `_data/photoedit/originals/`, `local/config/config.inc.php`, `local/config/database.inc.php`),
@@ -420,8 +424,10 @@ counts, bytes and the result.
 scans of identifiable people. Only its location protects it; keep it out of any synced or shared
 folder you do not control. For the length of a run the temporary script, which can dump the
 database, exists on the host behind a one-time token, an expiry and a random name.
-`pwg-deploy --audit` lists any `*.php` directly in the web root that the manifest does not cover
-(`leftover`); delete such a file over FTP. The dump goes to a random-named directory below the web
+`pwg-deploy --audit` lists any `*.php` directly in the web root that the manifest does not cover,
+and any file inside a `dump-*` directory of the dump location (`leftover`); delete them over FTP. It
+cannot see a dump location outside the web root (`backup.dump_dir` starting with `../`); check that
+one over FTP after a failed run. The dump goes to a random-named directory below the web
 root with a deny-all `.htaccess` (`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`). With
 `backup.dump_dir` set, each run makes its random-named subdirectory inside that one instead (same
 `.htaccess`, removed again after the run). A leading `../` puts it beside the web root, outside what
@@ -449,6 +455,19 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/de.chriss-baumann.pwg-ba
 launchctl kickstart gui/$(id -u)/de.chriss-baumann.pwg-backup # run it now to see the log
 ```
 
+### Offsite copy
+
+`pwg-backup` keeps its snapshots on this Mac only; losing the Mac loses them. Until an offsite step
+exists (backlog), copy the backup folder by hand to a disk or storage only you control, keeping the
+hardlinks so an unchanged photo is not stored once per snapshot:
+
+```bash
+rsync -aH --delete ~/Backups/piwigo-remote/ /Volumes/<disk>/piwigo-remote/
+```
+
+`-H` keeps the hardlinks; without it every snapshot is a full copy. The folder is not encrypted (see
+above), so never copy it to shared or synced storage you do not control.
+
 ## Restoring a snapshot — `pwg-backup --restore`
 
 ```bash
@@ -462,7 +481,7 @@ the two config files with the snapshot's, and **refuses without `--yes`**. In th
 
 1. The snapshot is checked locally: every file it names must be present at its recorded size, and a snapshot naming no files is refused (it would delete the remote's whole gallery).
 2. A fresh `prerestore` snapshot of the state being replaced is taken; if that fails nothing else
-   happens. The report names it, and so does the error of any later failure: that snapshot is how a
+   happens. Its retention pass spares the snapshot being restored. The report names it, and so does the error of any later failure: that snapshot is how a
    half-finished restore is undone.
 3. A temporary agent lists the host. Files of the snapshot that are missing on the host or differ in
    size or mtime are uploaded; files under `upload/`, `galleries/` and `_data/photoedit/originals/`
@@ -511,7 +530,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-909 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+919 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

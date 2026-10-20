@@ -873,6 +873,16 @@ def test_audit_names_a_php_file_in_the_web_root_as_a_possible_leftover_script(ru
     assert "/piwigo/plugins/x/deep.php" not in leftover_block
 
 
+def test_audit_names_a_dump_directory_left_in_the_web_root(run):
+    """[HAPPY] A dump pwg-backup could not remove holds the database; it is named apart from the orphans."""
+    _audited(run, "/piwigo/dump-0123abcd/dump.sql.gz", "/piwigo/plugins/x/dump-1/y")
+
+    assert "  leftover    1 file of a dump directory" in run.text
+    dump_block = run.text.split("of a dump directory", 1)[1].split("  orphans ", 1)[0]
+    assert "/piwigo/dump-0123abcd/dump.sql.gz" in dump_block
+    assert "/piwigo/plugins/x/dump-1/y" not in dump_block
+
+
 def test_audit_reports_no_leftover_line_when_the_web_root_is_clean(run):
     """[NEG] Silent when empty, so its absence is the all-clear."""
     _audited(run, ORPHAN_REMOTE_PATH)

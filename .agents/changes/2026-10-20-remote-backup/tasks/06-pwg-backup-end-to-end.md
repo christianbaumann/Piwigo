@@ -65,3 +65,7 @@ config into the backup folder, logs it, and leaves nothing behind on the host.
 ## Verification review (2026-10-20)
 
 Approved. Found and fixed: the dump `path` from the script was passed to `transport.get` unvalidated; `backup.validate_dump_path()` now demands exactly `<dump dir>/dump.sql.gz` (exit 12). Added tests: bad dump path never fetched, FTP fallback removes `.htaccess`/`client.cnf`/marker (mutation-checked), token absent from snapshot.json and reports, failed run prunes nothing. `test_albums_ddev::test_a_tree_is_created_once...` is a pre-existing flake (report name is second-resolution; the dry-run and the real run write two `albums-*.json` when they straddle a second, so `(report_file,) = ...` raises ValueError); passes 3 of 4 runs, untouched by this task.
+
+## Integration check (2026-10-20)
+
+* Added: `pwg-deploy --audit` also names every file inside a `dump-*` directory of the dump location as `leftover` (`audit.leftover_dumps()`, prefix from `backup.DUMP_DIR_PREFIX`); before, a dump left under the web root showed only among the orphans. A dump location outside the web root (`backup.dump_dir` `../...`) is not listed by the audit (open question). Tests in `test_audit.py` and `test_cli.py::test_audit_names_a_dump_directory_left_in_the_web_root`.

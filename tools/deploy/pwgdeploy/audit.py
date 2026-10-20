@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Iterable, Mapping
 
 from pwgdeploy import fileset
+from pwgdeploy.backup import DUMP_DIR_PREFIX
 from pwgdeploy.transport import RemoteEntry
 from pwgdeploy.urls import remote_path
 
@@ -42,6 +43,8 @@ class AuditReport:
     skipped: tuple[str, ...] = ()
     leftover_scripts: list[str] = field(default_factory=list)
     """Orphans that are a `*.php` file in the web root itself: where pwg-backup's temporary script sits."""
+    leftover_dumps: list[str] = field(default_factory=list)
+    """Orphans inside a `dump-*` directory of the dump base: a database dump pwg-backup did not remove."""
 
 
 def walk(
@@ -85,6 +88,7 @@ def compare(
     directories: int = 0,
     skipped: tuple[str, ...] = AUDIT_SKIP,
     root: str = "",
+    dump_base: str | None = None,
 ) -> AuditReport:
     """Three buckets, each sorted so two runs of the audit are comparable.
 
@@ -101,6 +105,7 @@ def compare(
         covered=sorted(present & accounted),
         orphans=orphans,
         leftover_scripts=leftover_scripts(orphans, root),
+        leftover_dumps=leftover_dumps(orphans, root, dump_base),
         missing=sorted(recorded - present),
         directories=directories,
         skipped=tuple(skipped),
@@ -118,6 +123,23 @@ def leftover_scripts(orphans: Iterable[str], root: str) -> list[str]:
         for path in orphans
         if "/" not in _relative(path, root) and path.lower().endswith(".php")
     ]
+
+
+def leftover_dumps(orphans: Iterable[str], root: str, base: str | None = None) -> list[str]:
+    """The orphans inside a `dump-*` directory directly below `base` (`backup.dump_dir`; the web root when None).
+
+    A base outside the web root (`../...`) is never listed by the audit, so nothing is found there.
+    """
+    prefix = f"{base.strip('/')}/" if base else ""
+    found = []
+    for path in orphans:
+        relative = _relative(path, root)
+        if not relative.startswith(prefix):
+            continue
+        segments = relative[len(prefix):].split("/")
+        if len(segments) > 1 and segments[0].startswith(DUMP_DIR_PREFIX):
+            found.append(path)
+    return found
 
 
 def _relative(path: str, root: str) -> str:

@@ -15,7 +15,7 @@ uv run pwg-deploy --list-files deploy.local.json # the published file set, one p
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
-uv run pytest                                    # 909 tests, measured 2026-10-20
+uv run pytest                                    # 919 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -39,7 +39,10 @@ they ask for another reaction (a suspicious host, a script to delete by hand). `
 `--seed-tags-only` is a parser error (`NO_BACKUP_CONFLICTS`), like `SEED_ONLY_CONFLICTS`. The risk of
 the temporary script on the host while the snapshot runs is accepted in
 [decision 0089](../../docs/agents/decisions/0089-database-export-and-restore-through-a-temporary-token-gated-script.md);
-a killed run leaves it there, `--audit` reports it as `leftover`.
+a killed run leaves it there, `--audit` reports it as `leftover`, and also every file inside a
+`dump-*` directory of the dump location (`audit.leftover_dumps()`, the prefix read from
+`backup.DUMP_DIR_PREFIX`). A dump location outside the web root (`backup.dump_dir` `../...`) is never
+listed by the audit.
 
 ## `pwg-backup` — what an agent needs
 
@@ -62,8 +65,8 @@ directory and `realpath()` containment works the same outside the web root. Test
 Never contact the real remote from a test; the first real run is a ledger item in `docs/agents/TESTING.md`.
 
 `pwg-backup --restore <snapshot> --yes` is `pwgdeploy/restore.py` (`plan()` is pure; `run()` sequences
-it; `backup_cli.py` only wires flags). It reuses `backup.run()` for the `prerestore` snapshot and
-`backup._remove_agent()` for cleanup, uses two agents (list, then import) because the uploads can
+it; `backup_cli.py` only wires flags). It reuses `backup.run()` for the `prerestore` snapshot (with `keep=` the
+snapshot being restored, so that run's prune spares it) and `backup._remove_agent()` for cleanup, uses two agents (list, then import) because the uploads can
 outlast one agent's expiry, deletes only paths `backup.validate_paths()` accepts, and raises
 `RestoreError` (exit `15`; `restore_main()` wraps every other `DeployError` of the run into it,
 except 12 and 13, so a transport error mid-restore is 15 too). `--dry-run` opens no connection. FTP
@@ -149,9 +152,11 @@ reads the server back to decide what to send.
   [decision 0030](../../docs/agents/decisions/0030-the-audit-is-read-only-and-exists-stays-size-based.md)).
 - **The tracked `galleries/` scans are prune-eligible on purpose**
   ([decision 0026](../../docs/agents/decisions/0026-tracked-gallery-photos-are-prune-eligible.md)),
-  and they are the only published files no later run could put back. `cli._report_gallery_deletions()`
-  names them on their own report line whenever a prune reaches one; the line's absence is the
-  signal that nothing irreplaceable is at stake.
+  and no later run could put them back; since the backup, only a restore of the `predeploy` snapshot
+  can. `cli._report_gallery_deletions()` names them on their own report line whenever a prune reaches
+  one, and the line stays beside the backup
+  ([decision 0090](../../docs/agents/decisions/0090-the-gallery-deletion-report-line-stays-beside-the-backup.md)):
+  its absence is the signal that nothing irreplaceable is at stake.
 - `FtplibTransport.exists()` asks `SIZE`, and a server refuses `SIZE` for a **directory** — it
   will report a directory that is plainly there as "already gone". Deliberately left that way
   (decision 0030): nothing in the tool calls it, and reimplementing it on `list_dir` would be a

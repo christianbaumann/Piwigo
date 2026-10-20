@@ -265,3 +265,28 @@ def test_compare_carries_the_leftover_scripts_beside_the_orphans():  # [HAPPY]
 
     assert report.orphans == ["/piwigo/zz.php"]
     assert report.leftover_scripts == ["/piwigo/zz.php"]
+
+
+# --- leftover dump directories ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("root,base,orphans,expected", [
+    ("/piwigo", None, ["/piwigo/dump-1a2b/dump.sql.gz", "/piwigo/dump-1a2b/.htaccess"],
+     ["/piwigo/dump-1a2b/dump.sql.gz", "/piwigo/dump-1a2b/.htaccess"]),
+    ("", None, ["dump-1a2b/client.cnf"], ["dump-1a2b/client.cnf"]),
+    ("/piwigo", None, ["/piwigo/dump-notes.txt", "/piwigo/plugins/dump-1/x", "/piwigo/a.php"], []),
+    ("/piwigo", "bk/tmp", ["/piwigo/bk/tmp/dump-9f/dump.sql.gz", "/piwigo/dump-1/x"],
+     ["/piwigo/bk/tmp/dump-9f/dump.sql.gz"]),
+    ("/piwigo", "../backup-tmp", ["/piwigo/dump-1/x"], []),
+    ("/piwigo", None, [], []),
+])
+def test_only_files_inside_a_dump_directory_under_the_dump_base_are_leftover_dumps(root, base, orphans, expected):  # [ECP][BVA]
+    assert audit.leftover_dumps(orphans, root, base) == expected
+
+
+def test_compare_carries_the_leftover_dumps_beside_the_orphans():  # [HAPPY]
+    report = audit.compare(["/piwigo/index.php", "/piwigo/dump-ab/dump.sql.gz"], {"/piwigo/index.php": "x"}, [],
+                           root="/piwigo")
+
+    assert report.orphans == ["/piwigo/dump-ab/dump.sql.gz"]
+    assert report.leftover_dumps == ["/piwigo/dump-ab/dump.sql.gz"]
