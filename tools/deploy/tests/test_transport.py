@@ -34,6 +34,8 @@ class ScriptedFtp:
         self.init_kwargs = kwargs
         self.calls = []
         self.stored = {}
+        self.remote_bytes = b"0123456789"
+        self.fail_mid_download = False
         # What MLSD answers per directory: ftplib yields (name, facts) pairs.
         self.listed = dict(listed or {})
 
@@ -70,6 +72,14 @@ class ScriptedFtp:
     def storbinary(self, command, handle, blocksize):
         self._record("storbinary", command, blocksize)
         self.stored[command.split(" ", 1)[1]] = handle.read()
+
+    def retrbinary(self, command, callback, blocksize):
+        self._record("retrbinary", command, blocksize)
+        self._maybe_refuse(command)
+        callback(self.remote_bytes[:5])
+        if self.fail_mid_download:
+            raise ftplib.error_temp("426 connection closed")
+        callback(self.remote_bytes[5:])
 
     def delete(self, path):
         self._record("delete", path)
@@ -288,6 +298,54 @@ def test_put_stores_the_file_bytes_under_the_remote_path(tmp_path):
         "STOR /www/index.php",
         transport.TRANSFER_BLOCKSIZE,
     ) in double.calls
+
+
+def test_get_downloads_the_bytes_to_the_local_path(tmp_path):
+    """[HAPPY]"""
+    subject, double = connected()
+    target = tmp_path / "dump.sql"
+
+    subject.get("/piwigo/dump.sql", target)
+
+    assert target.read_bytes() == double.remote_bytes
+    assert ("retrbinary", "RETR /piwigo/dump.sql", transport.TRANSFER_BLOCKSIZE) in double.calls
+    assert [p.name for p in tmp_path.iterdir()] == ["dump.sql"], "partial file left behind"
+
+
+def test_a_refused_download_leaves_no_file_and_names_the_path(tmp_path):
+    """[NEG]"""
+    subject, _ = connected(refuse=["RETR"])
+    target = tmp_path / "dump.sql"
+
+    with pytest.raises(TransportError, match="/piwigo/dump.sql"):
+        subject.get("/piwigo/dump.sql", target)
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_download_cut_off_midway_leaves_no_file(tmp_path):
+    """[NEG] Half a file must not be mistaken for a finished one."""
+    subject, double = connected()
+    double.fail_mid_download = True
+    target = tmp_path / "dump.sql"
+
+    with pytest.raises(TransportError, match="/piwigo/dump.sql"):
+        subject.get("/piwigo/dump.sql", target)
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_failed_download_keeps_an_existing_file(tmp_path):
+    """[NEG] The old copy survives a failed refresh."""
+    subject, double = connected()
+    double.fail_mid_download = True
+    target = tmp_path / "dump.sql"
+    target.write_bytes(b"old")
+
+    with pytest.raises(TransportError):
+        subject.get("/piwigo/dump.sql", target)
+
+    assert target.read_bytes() == b"old"
 
 
 def test_delete_removes_the_remote_path():

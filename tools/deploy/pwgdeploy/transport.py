@@ -17,6 +17,7 @@ from pwgdeploy.errors import InsecureTransportError, TransportError
 
 CONNECT_TIMEOUT_SECONDS = 30
 TRANSFER_BLOCKSIZE = 1 << 16
+PARTIAL_SUFFIX = ".part"
 
 # What FEAT must advertise before a password is sent. Plain FTP would put it on the wire
 # in clear, and the host offers FTPS, so its absence is a bug or an impostor.
@@ -50,6 +51,9 @@ class Transport(Protocol):
         """mkdir -p. Idempotent: an existing directory is success, not an error."""
 
     def put(self, local: Path, remote_path: str) -> None: ...
+
+    def get(self, remote_path: str, local: Path) -> None:
+        """Download to `local`. A failure leaves nothing at `local`."""
 
     def delete(self, remote_path: str) -> None: ...
 
@@ -140,6 +144,19 @@ class FtplibTransport:
             self._ftp.storbinary(
                 f"STOR {remote_path}", handle, blocksize=TRANSFER_BLOCKSIZE
             )
+
+    def get(self, remote_path: str, local: Path) -> None:
+        local = Path(local)
+        partial = local.with_name(local.name + PARTIAL_SUFFIX)
+        try:
+            with open(partial, "wb") as handle:
+                self._ftp.retrbinary(
+                    f"RETR {remote_path}", handle.write, blocksize=TRANSFER_BLOCKSIZE
+                )
+            partial.replace(local)
+        except ftplib.all_errors as error:
+            partial.unlink(missing_ok=True)
+            raise TransportError(f"download of {remote_path} failed: {error}") from error
 
     def delete(self, remote_path: str) -> None:
         self._ftp.delete(remote_path)

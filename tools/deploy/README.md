@@ -55,6 +55,7 @@ Any `deploy.*.json` other than the example is git-ignored, in the repository roo
 | | `secure` | `ssl` (port 465) or `tls` (STARTTLS, port 587) — nothing else is accepted; a mismatched pair fails on the remote, not here |
 | | `sender_email` | the From address; use the SMTP mailbox itself, or receivers reject it |
 | | `sender_name` | the From name; `""` means the gallery title |
+| `backup` | `dir` | optional section — the folder backups are written to; `~` is expanded, the result must be absolute and outside this repository |
 
 Values are validated locally against the same rules the remote enforces, so a bad table prefix
 or a quote in the webmaster name fails in milliseconds instead of after a 128 MB upload. Every
@@ -374,7 +375,7 @@ uv run pytest -m integration
 cd tools/deploy && uv run pytest
 ```
 
-628 tests, measured 2026-10-19. Everything that decides *what* to do is a pure function and is
+642 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).
