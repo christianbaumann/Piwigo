@@ -554,3 +554,13 @@ def test_an_empty_backup_dir_is_refused():
     raw["backup"]["dir"] = " "
     with pytest.raises(ConfigError, match="backup.dir"):
         config.load(raw)
+
+
+def test_a_symlink_into_the_repository_is_refused(tmp_path):
+    """[NEG] A path that only looks outside the repository."""
+    link = tmp_path / "elsewhere"
+    link.symlink_to(config.REPOSITORY_ROOT, target_is_directory=True)
+    raw = valid()
+    raw["backup"]["dir"] = str(link / "backups")
+    with pytest.raises(ConfigError, match="backup.dir.*repository"):
+        config.load(raw)
