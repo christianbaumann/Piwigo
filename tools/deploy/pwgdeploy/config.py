@@ -48,6 +48,8 @@ MAIL_HOST_FORBIDDEN = re.compile(r"[:/;\s]")
 PLACEHOLDER = "REPLACE_ME"
 
 SECTIONS = ("ftp", "mysql", "admin", "site")
+OUTSIDE_WEB_ROOT = "../"
+DUMP_DIR_SHAPE = re.compile(r"^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$")
 OPTIONAL_SECTIONS = ("mail", "backup")
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -101,6 +103,7 @@ class MailConfig:
 class BackupConfig:
     dir: Path
     notify: str | None = None
+    dump_dir: str | None = None
 
 
 @dataclass(frozen=True)
@@ -246,8 +249,22 @@ def _mail(raw: Mapping[str, Any]) -> MailConfig:
     )
 
 
+def _dump_dir(value: Any) -> str:
+    """A path below the web root, or below a sibling of it (one leading `../`); never absolute."""
+    if not isinstance(value, str) or not value:
+        raise ConfigError("backup.dump_dir must be a non-empty string")
+    rest = value[len(OUTSIDE_WEB_ROOT):] if value.startswith(OUTSIDE_WEB_ROOT) else value
+    segments = rest.split("/")
+    if not DUMP_DIR_SHAPE.match(rest) or any(segment in ("", ".", "..") for segment in segments):
+        raise ConfigError(
+            f"backup.dump_dir {value!r} must be a relative path of plain names, "
+            f"optionally starting with one '{OUTSIDE_WEB_ROOT}' (a sibling of the web root)"
+        )
+    return value
+
+
 def _backup(raw: Mapping[str, Any]) -> BackupConfig:
-    _reject_unknown_keys(raw, ("dir", "notify"), "backup")
+    _reject_unknown_keys(raw, ("dir", "notify", "dump_dir"), "backup")
     expanded = Path(_required_string(raw, "dir", "backup")).expanduser()
     if not expanded.is_absolute():
         raise ConfigError(f"backup.dir must be an absolute path (or start with ~), got {raw['dir']!r}")
@@ -260,7 +277,8 @@ def _backup(raw: Mapping[str, Any]) -> BackupConfig:
     notify = raw.get("notify")
     if notify is not None and (not isinstance(notify, str) or not MAIL_SHAPE.match(notify)):
         raise ConfigError(f"backup.notify {notify!r} is not shaped like a mail address (xxx@yyy.eee)")
-    return BackupConfig(dir=resolved, notify=notify)
+    dump_dir = _dump_dir(raw["dump_dir"]) if "dump_dir" in raw else None
+    return BackupConfig(dir=resolved, notify=notify, dump_dir=dump_dir)
 
 
 def _reject_unknown_keys(

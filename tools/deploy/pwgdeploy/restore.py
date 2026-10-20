@@ -26,7 +26,13 @@ from typing import Callable, Iterable, Mapping
 from pwgdeploy import agent, backup, manifest, snapshot
 from pwgdeploy.agent import AgentClient
 from pwgdeploy.config import DeployConfig
-from pwgdeploy.errors import BackupError, TransportError
+from pwgdeploy.errors import (
+    AgentLeftoverError,
+    DeployError,
+    RestoreError,
+    TransportError,
+    UnsafeRemotePathError,
+)
 from pwgdeploy.http import HttpClient
 from pwgdeploy.snapshot import Entry, RemoteFile
 from pwgdeploy.transport import Transport
@@ -44,10 +50,6 @@ DENY_ALL_HTACCESS = (
 CREATED_MARKER = ".created-by-agent"
 
 Report = Callable[[str, str], None]
-
-
-class RestoreError(BackupError):
-    """The restore was refused or cannot start; shares the backup exit code."""
 
 
 @dataclass(frozen=True)
@@ -169,7 +171,7 @@ def _agent_session(config, transport: Transport, client: HttpClient, clock, repo
     root = config.ftp.remote_root
     token = secrets.token_hex(backup.SCRIPT_TOKEN_BYTES)
     script_name = f"{secrets.token_hex(backup.SCRIPT_NAME_BYTES)}.php"
-    directory = backup.dump_dir()
+    directory = backup.dump_dir(config.backup.dump_dir)
     script = remote_path(root, script_name)
     dump_files = remote_path(root, directory)
     expiry = int(clock().timestamp()) + backup.SCRIPT_LIFETIME_SECONDS
@@ -320,6 +322,10 @@ def restore_main(
             repo_root=repo_root, state_dir=state_dir, yes=yes, dry_run=dry_run,
             report=report, clock=clock, git_commit=git_commit,
         )
+    except (UnsafeRemotePathError, AgentLeftoverError, RestoreError):
+        raise
+    except DeployError as error:
+        raise RestoreError(f"the restore failed: {type(error).__name__}: {error}") from error
     finally:
         if transport is not None:
             transport.close()

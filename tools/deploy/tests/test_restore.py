@@ -79,8 +79,9 @@ def test_without_yes_a_restore_is_refused_but_a_dry_run_is_not():  # [NEG][ECP]
     restore.check_request(DAILY, True, False)
 
 
-def test_a_restore_error_shares_the_backup_exit_code():  # [HAPPY]
-    assert restore.RestoreError.exit_code == BackupError.exit_code
+def test_a_restore_error_has_its_own_exit_code():  # [HAPPY]
+    assert restore.RestoreError.exit_code == 15
+    assert not issubclass(restore.RestoreError, BackupError)
 
 
 def test_the_deny_all_file_matches_the_one_agent_php_writes():  # [HAPPY] structural guard
@@ -190,6 +191,18 @@ def test_the_host_keeps_no_script_and_no_dump_directory(host, cfg, state_dir, ye
 
     assert host.scripts() == []
     assert host.dump_files() == []
+
+
+def test_a_restore_with_a_configured_dump_dir_imports_from_there(host, tmp_path, state_dir, yesterday):  # [HAPPY]
+    cfg = config.load({**RAW, "backup": {"dir": str(tmp_path / "bk"), "dump_dir": "../backup-tmp"}})
+    spoil(host, state_dir)
+
+    do_restore(cfg, host, state_dir)
+
+    puts = [c[1] for c in host.transport.calls if c[0] == "put" and c[1].endswith("/dump.sql.gz")]
+    assert len(puts) == 1, "no dump was uploaded; the claim is vacuous"
+    assert re.fullmatch(rf"{FakeBackupHost.ROOT}/\.\./backup-tmp/dump-[0-9a-f]+/dump\.sql\.gz", puts[0])
+    assert host.imported and host.scripts() == [] and host.dump_files() == []
 
 
 def test_the_order_is_snapshot_then_uploads_then_deletes_then_import_then_config(host, cfg, state_dir, yesterday):  # [ST]
@@ -427,6 +440,26 @@ def test_the_command_refuses_without_yes_and_touches_nothing(tmp_path, host, cfg
     assert code == restore.RestoreError.exit_code
     assert "--yes" in err
     assert host.transport.calls == [] and host.imported == []
+
+
+def test_the_command_wraps_a_failure_after_the_start_into_exit_15(tmp_path, host, cfg, state_dir, yesterday):  # [NEG]
+    spoil(host, state_dir)
+    host.fail_action = "import"
+
+    code, _, err = invoke(tmp_path, host, "--restore", DAILY, "--yes")
+
+    assert code == restore.RestoreError.exit_code == 15
+    assert "RestoreError: the restore failed: AgentError" in err
+    assert host.scripts() == []
+
+
+def test_the_command_keeps_exit_12_for_an_unsafe_listed_path(tmp_path, host, cfg, state_dir, yesterday):  # [NEG]
+    spoil(host, state_dir)
+    host.listed_extra = [{"path": "local/config/database.inc.php", "size": 1, "mtime": 1}]
+
+    code, _, _ = invoke(tmp_path, host, "--restore", DAILY, "--yes")
+
+    assert code == UnsafeRemotePathError.exit_code == 12
 
 
 def test_the_command_refuses_a_partial_folder(tmp_path, host):  # [NEG]

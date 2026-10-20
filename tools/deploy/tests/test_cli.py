@@ -19,7 +19,8 @@ from pwgdeploy import fileset
 from pwgdeploy import preflight
 from pwgdeploy import version as pwgversion
 from pwgdeploy.errors import (
-    BackupError,
+    PredeployBackupError,
+    UnsafeRemotePathError,
     ConfigError,
     InsecureTransportError,
     RemoteHttpError,
@@ -1099,17 +1100,28 @@ def test_an_installed_remote_is_snapshotted_before_the_first_upload(backup_confi
     assert "predeploy" in (backup_dir / "backup.log").read_text()
 
 
+def test_an_unsafe_listed_path_in_the_predeploy_backup_keeps_exit_12(backup_config, repo, tmp_path):
+    """[NEG] 12 and 13 are not wrapped into 14: they need another reaction than a retry."""
+    runner, host = _deployed_site(backup_config, repo, tmp_path)
+    (repo / "index.php").write_text("changed\n")
+    host.listed_extra = [{"path": "local/config/database.inc.php", "size": 1, "mtime": 1}]
+
+    assert runner() == UnsafeRemotePathError.exit_code == 12
+    assert [p for p in host.transport.paths("put") if not _agent_script(p)] == []
+
+
 def test_a_failed_backup_stops_the_deploy_before_any_remote_change(backup_config, repo, tmp_path, backup_dir):
-    """[NEG] BackupError (exit 11), the code of every failed backup run. The only put is the
+    """[NEG] PredeployBackupError (exit 14), the code of a deploy stopped by its backup. The only put is the
     temporary script, which the run removed again; no deployed file was sent, none deleted.
     Anti-vacuity: the changed file would be sent by a deploy that went on."""
     runner, host = _deployed_site(backup_config, repo, tmp_path)
     (repo / "index.php").write_text("changed\n")
     host.fail_action = "dump"
 
-    assert runner() == BackupError.exit_code
+    assert runner() == PredeployBackupError.exit_code
+    assert PredeployBackupError.exit_code == 14
 
-    assert "BackupError: the predeploy backup failed, nothing was deployed" in runner.err.getvalue()
+    assert "PredeployBackupError: the predeploy backup failed, nothing was deployed" in runner.err.getvalue()
     assert [p for p in host.transport.paths("put") if not _agent_script(p)] == []
     assert host.scripts() == []
     assert not [p for p in backup_dir.iterdir() if p.name.endswith("-predeploy")]

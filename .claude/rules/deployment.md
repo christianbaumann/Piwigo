@@ -15,7 +15,7 @@ uv run pwg-deploy --list-files deploy.local.json # the published file set, one p
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
-uv run pytest                                    # 884 tests, measured 2026-10-20
+uv run pytest                                    # 909 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -33,8 +33,9 @@ first. Plugin test suites and the handbook seed remain never-safe-against-a-real
 from `install.php`, decision 0027), so nothing extra is asked. Skipped, with a `backup` report
 line, for `--no-backup`, `--dry-run` and an uninstalled remote. No `backup` section and no
 `--no-backup` is a `ConfigError` before any connection. Any `DeployError` from the run other than
-`BackupError`'s own subclasses (12, 13) is wrapped into `BackupError` (exit 11), so 11 always means
-"the backup stopped this deploy". `--no-backup` beside `--dry-run`, `--audit`, `--list-files` or
+`UnsafeRemotePathError` (12) and `AgentLeftoverError` (13) is wrapped into `PredeployBackupError`
+(exit 14), so 14 always means "the backup stopped this deploy"; 12 and 13 keep their codes because
+they ask for another reaction (a suspicious host, a script to delete by hand). `--no-backup` beside `--dry-run`, `--audit`, `--list-files` or
 `--seed-tags-only` is a parser error (`NO_BACKUP_CONFLICTS`), like `SEED_ONLY_CONFLICTS`. The risk of
 the temporary script on the host while the snapshot runs is accepted in
 [decision 0089](../../docs/agents/decisions/0089-database-export-and-restore-through-a-temporary-token-gated-script.md);
@@ -52,9 +53,11 @@ still on the host; delete it over FTP at once). If `cleanup` over HTTP fails, `b
 the script and the dump files over FTP and checks with `exists()`. `--audit` reports a `*.php`
 directly in the web root that the manifest does not cover as `leftover`.
 
-The dump directory is one function, `backup.dump_dir()`: a random-named directory below the web root
-with a deny-all `.htaccess`, until the host probe (task 01) shows a PHP-writable directory outside
-it. Tested with `FakeBackupHost` (`tests/fakes.py`) and, against the real `agent.php`, in
+The dump directory is one function, `backup.dump_dir(base)`: a random-named directory below the web
+root with a deny-all `.htaccess`, or, with `backup.dump_dir` in the credential file, a random-named
+subdirectory of that path (FTP- and PHP-writable; one leading `../` allowed for a sibling of the web
+root, `config._dump_dir()` is the only validation). `agent.php` resolves it relative to its own
+directory and `realpath()` containment works the same outside the web root. Tested with `FakeBackupHost` (`tests/fakes.py`) and, against the real `agent.php`, in
 `tests/integration/test_backup_ddev.py` (`PWG_DDEV_WEBROOT=<main checkout> uv run pytest -m integration`).
 Never contact the real remote from a test; the first real run is a ledger item in `docs/agents/TESTING.md`.
 
@@ -62,7 +65,8 @@ Never contact the real remote from a test; the first real run is a ledger item i
 it; `backup_cli.py` only wires flags). It reuses `backup.run()` for the `prerestore` snapshot and
 `backup._remove_agent()` for cleanup, uses two agents (list, then import) because the uploads can
 outlast one agent's expiry, deletes only paths `backup.validate_paths()` accepts, and raises
-`RestoreError` (a `BackupError`, exit `11`, no new code). `--dry-run` opens no connection. FTP
+`RestoreError` (exit `15`; `restore_main()` wraps every other `DeployError` of the run into it,
+except 12 and 13, so a transport error mid-restore is 15 too). `--dry-run` opens no connection. FTP
 uploads give restored files a new mtime (no MFMT in `Transport`), so the next backup downloads
 them again. Tested in `tests/test_restore.py` and `tests/integration/test_restore_ddev.py` (imports
 into a scratch database it creates and drops, never `db`).

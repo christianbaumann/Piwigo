@@ -79,9 +79,14 @@ class BackupResult:
     finished: datetime | None = None
 
 
-def dump_dir() -> str:
-    """Where the temporary script writes the dump, relative to the web root or absolute."""
-    return f"{DUMP_DIR_PREFIX}{secrets.token_hex(DUMP_DIR_BYTES)}"
+def dump_dir(base: str | None = None) -> str:
+    """Where the temporary script writes the dump, relative to the web root.
+
+    Without `base` (`backup.dump_dir` in the credential file) a random-named directory under
+    the web root; with it, a random-named subdirectory of `base`.
+    """
+    name = f"{DUMP_DIR_PREFIX}{secrets.token_hex(DUMP_DIR_BYTES)}"
+    return f"{base}/{name}" if base else name
 
 
 def validate_paths(files: list[RemoteFile]) -> None:
@@ -220,7 +225,7 @@ def run(
 
     token = secrets.token_hex(SCRIPT_TOKEN_BYTES)
     script_name = f"{secrets.token_hex(SCRIPT_NAME_BYTES)}.php"
-    directory = dump_dir()
+    directory = dump_dir(config.backup.dump_dir)
     script = remote_path(root, script_name)
     dump_files = remote_path(root, directory)
     expiry = int(started.timestamp()) + SCRIPT_LIFETIME_SECONDS

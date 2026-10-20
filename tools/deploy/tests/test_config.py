@@ -564,3 +564,30 @@ def test_a_symlink_into_the_repository_is_refused(tmp_path):
     raw["backup"]["dir"] = str(link / "backups")
     with pytest.raises(ConfigError, match="backup.dir.*repository"):
         config.load(raw)
+
+
+@pytest.mark.parametrize("good", ["backup-tmp", "../backup-tmp", "tmp/dumps", "../tmp/a.b_c-d"])
+def test_a_dump_dir_below_the_web_root_or_a_sibling_of_it_is_accepted(good):
+    """[ECP]"""
+    raw = valid()
+    raw["backup"]["dump_dir"] = good
+    assert config.load(raw).backup.dump_dir == good
+
+
+def test_the_dump_dir_defaults_to_none():
+    """[HAPPY] None means: a random-named directory directly under the web root."""
+    raw = valid()
+    del raw["backup"]["dump_dir"]
+    assert config.load(raw).backup.dump_dir is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["", "/var/tmp", "../../x", "a/../b", "..", "../", "a//b", "a/", "./a", "a b", "a\\b", "a\0b", "..x/../y", 5],
+)
+def test_an_unsafe_dump_dir_is_refused(bad):
+    """[NEG][BVA] absolute, two climbs, a climb in the middle, empty segments, odd characters."""
+    raw = valid()
+    raw["backup"]["dump_dir"] = bad
+    with pytest.raises(ConfigError, match="backup.dump_dir"):
+        config.load(raw)

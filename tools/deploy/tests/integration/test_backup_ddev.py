@@ -105,14 +105,14 @@ def sandbox():
         box.remove()
 
 
-def make_config(tmp_path, sandbox):
+def make_config(tmp_path, sandbox, dump_dir=None):
     base = json.loads(CONFIG.read_text())["site"]["base_url"]
     return config.load({
         "ftp": {"host": "unused.invalid", "user": "u", "password": "p", "remote_root": f"/{sandbox.name}"},
         "mysql": {"host": "db", "user": "db", "password": "db", "database": "db"},
         "admin": {"username": "w", "password": "p", "email": "w@example.invalid"},
         "site": {"base_url": f"{base}/{sandbox.name}"},
-        "backup": {"dir": str(tmp_path / "backups")},
+        "backup": {"dir": str(tmp_path / "backups"), **({"dump_dir": dump_dir} if dump_dir else {})},
     })
 
 
@@ -211,3 +211,38 @@ def test_two_runs_a_kill_and_a_clean_host(tmp_path, sandbox):
     assert (first.folder / same).stat().st_ino == (second.folder / same).stat().st_ino
     time.sleep(OPCACHE_WAIT_SECONDS)
     assert_host_clean(sandbox, cfg)
+
+
+def test_a_dump_directory_outside_the_web_root_is_used_and_emptied(tmp_path, sandbox):
+    """`backup.dump_dir` = `../<name>`: the sandbox's sibling inside the main checkout stands in for
+    a directory beside the real web root. The user creates the base on the host, so the test does;
+    the run must leave it in place and empty, and remove its own random subdirectory."""
+    base_name = f"agent-test-base-{secrets.token_hex(6)}"
+    base = WEBROOT / base_name
+    base.mkdir()
+    try:
+        cfg = make_config(tmp_path, sandbox, dump_dir=f"../{base_name}")
+        assert cfg.backup.dump_dir == f"../{base_name}"
+        seed_photo(sandbox, "upload/2026/a.jpg", b"first photo", PHOTO_MTIME)
+        seed_photo(sandbox, "galleries/x/b.jpg", b"second photo", PHOTO_MTIME)
+        transport = DdevTransport(sandbox)
+        seen = []
+        original_get = transport.get
+        transport.get = lambda remote, local: (seen.append(remote), original_get(remote, local))[1]
+
+        result = run(cfg, transport, NOW, tmp_path)
+
+        dump_gets = [r for r in seen if r.endswith(backup.DUMP_PATH.rsplit("/", 1)[-1])]
+        assert dump_gets, "the dump was never downloaded"
+        assert all(f"../{base_name}/{backup.DUMP_DIR_PREFIX}" in r for r in dump_gets), dump_gets
+        assert (result.folder / backup.DUMP_PATH).stat().st_size > 0
+        time.sleep(OPCACHE_WAIT_SECONDS)
+        assert_host_clean(sandbox, cfg)
+        assert base.is_dir(), "cleanup removed the configured base directory"
+        assert ddev(f"ls -1A {base_name}").stdout.split() == [], "the base directory is not empty"
+        deadline = time.monotonic() + SYNC_TIMEOUT_SECONDS
+        while list(base.iterdir()) and time.monotonic() < deadline:
+            time.sleep(SYNC_POLL_SECONDS)  # Mutagen reports the container's deletions late
+        assert list(base.iterdir()) == []
+    finally:
+        shutil.rmtree(base, ignore_errors=True)

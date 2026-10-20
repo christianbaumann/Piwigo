@@ -42,7 +42,7 @@ remote, after taking a fresh snapshot of the state it replaces.
 
 ## Deviations
 
-* **Module `pwgdeploy/restore.py`** (pure `plan()`, `run()`, `restore_main()`); `backup_cli.py` only gained `--restore`, `--yes`, `--dry-run` and the delegation. `RestoreError` subclasses `BackupError`: exit code 11, no new code (avoids clashing with tasks 07/08).
+* **Module `pwgdeploy/restore.py`** (pure `plan()`, `run()`, `restore_main()`); `backup_cli.py` only gained `--restore`, `--yes`, `--dry-run` and the delegation. `RestoreError` subclassed `BackupError` (exit 11, no new code). **Superseded by follow-up 2026-10-20:** `RestoreError` is a `DeployError` with exit 15, and `restore_main()` wraps every other `DeployError` of the run into it except 12 and 13.
 * **Two agents, not one:** one lists the host, a second receives the dump and imports. Uploads of a whole gallery can outlast one agent's one-hour expiry. Cleanup helper `backup._remove_agent` is reused.
 * **The dump directory is made by the client** (`makedirs`) with a deny-all `.htaccess` and the `.created-by-agent` marker uploaded before the dump, so the agent's `cleanup` removes the directory too.
 * **mtime:** `Transport` has no MFMT, so restored files get a new mtime on the host; the next backup downloads them again and a second restore re-uploads them. Documented in README and deployment.md, not worked around.
