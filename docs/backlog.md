@@ -1,5 +1,10 @@
 ## ftp deploy
 
+- **Remote backups have no offsite copy.** `pwg-backup` keeps its snapshots on the Mac only
+  (`backup.dir`); losing the Mac loses them until an offsite step exists. Out of scope for v1 by the
+  design of change `.agents/changes/2026-10-20-remote-backup/` (*Offsite copy*); the README's
+  *Offsite copy* section is the manual how-to. Unencrypted by the user's choice, so an offsite target
+  must be one only the user controls.
 - **A plugin schema change can miss the remote silently.** `activate` falls through to `install`
   only when there is no DB row; an existing row goes through `autoupdate_plugin()`, which compares
   the `Version:` header. So a schema change shipped without a version bump never reaches the

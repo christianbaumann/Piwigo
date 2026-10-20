@@ -28,7 +28,7 @@ deploy when that snapshot fails.
 ## Verification
 
 * [x] With a failing backup, the deploy exits with the new code and the remote is unchanged (fake transport: no `put`, no `delete`)
-  **Note:** Verified via `tests/test_cli.py::test_a_failed_backup_stops_the_deploy_before_any_remote_change` (exit 11; the only put is the temporary script, which is gone afterwards).
+  **Note:** Verified via `tests/test_cli.py::test_a_failed_backup_stops_the_deploy_before_any_remote_change` (exit 11 at the time; exit 14 since follow-up 11, asserted by the same test; the only put is the temporary script, which is gone afterwards).
 * [x] With `--no-backup`, the deploy runs as today and the report says the backup was skipped
   **Note:** Verified via `test_no_backup_deploys_as_before_and_says_it_skipped`.
 * [ ] (manual testing required) A real deploy leaves a `*-predeploy` snapshot in the backup folder (hand check). Ledger row added in `docs/agents/TESTING.md`, pending.
