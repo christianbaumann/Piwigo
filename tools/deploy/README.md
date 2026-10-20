@@ -8,9 +8,12 @@ seed of the tag groups and tags `tag-groups.json` names, a `site_update` scan th
 uploaded `galleries/` tree into albums and photos, a persons rescan that rebuilds the person
 index from the face regions in each file, and a photoinfo rescan that reads each photo's date and info text back out of its file.
 
-> **The target is a sandbox instance.** This tool installs a gallery, overwrites a config file
-> and deletes remote paths. It is **never** safe to point at a production install. See
-> [decision 0021](../../docs/agents/decisions/0021-remote-instance-is-a-sandbox.md).
+> **The remote holds state the repository cannot rebuild** (uploaded photos, remote edits, the
+> database). The deploy prunes and overwrites the remote config, so it takes a `predeploy`
+> snapshot of an installed remote first and stops when that fails
+> ([decision 0088](../../docs/agents/decisions/0088-the-remote-holds-state-the-repository-cannot-rebuild.md)).
+> For the temporary script that snapshot uploads, see
+> [decision 0089](../../docs/agents/decisions/0089-database-export-and-restore-through-a-temporary-token-gated-script.md).
 
 ## Prerequisites
 
@@ -85,12 +88,23 @@ reports the plugins already active.
 | `--adopt-remote-state` | upload even when the manifest and the remote disagree about the install |
 | `--allow-version-change` | upload even when the remote runs a different core version |
 | `--prune-tags` | after the rescan, remove the tags each photo's file does not name (see below) |
+| `--no-backup` | skip the predeploy snapshot (see below). Refused beside `--dry-run`, `--audit`, `--list-files`, `--seed-tags-only`, which take none |
 | `--verbose` | name each uploaded path as it goes |
 
 Exit codes are one per failure mode — `3` bad credential file, `4` git, `5` transport, `6` no
 FTPS offered, `7` remote HTTP, `8` `install.php` refused, `9` manifest and remote disagree,
 `10` core versions differ, `11` a backup could not be taken or stored, `12` the backup script listed an
 unsafe path, `13` the backup script could not be removed from the host — and `130` for Ctrl-C.
+
+### The predeploy snapshot
+
+After the preflight and before the first upload, a deploy to an **installed** remote runs the
+`pwg-backup` snapshot with kind `predeploy` (see [Backups](#backups--pwg-backup)) and prints one
+`backup` line. Needs the `backup` section in the credential file; without it the deploy refuses
+(exit `3`, naming the section) unless `--no-backup` is given. A failed snapshot ends the deploy
+with exit `11` before anything on the remote is changed (a leftover script keeps `13`). The
+report says when it was skipped: `--no-backup`, `--dry-run` (no socket is opened), or a first
+deploy onto a remote where `install.php` says nothing is installed yet.
 
 Interrupting is safe. The manifest records completed uploads only, so re-running the same
 command resumes from where it stopped rather than starting over.
@@ -426,7 +440,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-812 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+823 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

@@ -10,11 +10,12 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
-from pwgdeploy import audit, bootstrap, fileset, manifest, preflight, seed, upload, version
+from pwgdeploy import audit, backup, bootstrap, fileset, manifest, preflight, seed, upload, version
 from pwgdeploy.config import DeployConfig, load_file
-from pwgdeploy.errors import DeployError
+from pwgdeploy.errors import BackupError, ConfigError, DeployError
 from pwgdeploy.http import UrllibClient
 from pwgdeploy.transport import FtplibTransport
 from pwgdeploy.urls import remote_path
@@ -22,7 +23,8 @@ from pwgdeploy.urls import remote_path
 PROGRAM = "pwg-deploy"
 DESCRIPTION = (
     "Deploy this Piwigo fork to an FTPS web space and complete its first-run install. "
-    "The target is a sandbox instance; this tool is never safe to point at production."
+    "The remote holds state the repository cannot rebuild, so an installed remote is backed up "
+    "first (see --no-backup). It prunes without a prompt and overwrites the remote config."
 )
 
 LABEL_WIDTH = 12
@@ -51,6 +53,10 @@ STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
 SEED_ONLY_CONFLICTS = ("dry_run", "audit", "list_files", "no_bootstrap")
 # Pruning follows the rescan, which none of these runs.
 PRUNE_TAGS_CONFLICTS = ("seed_tags_only",) + SEED_ONLY_CONFLICTS
+# Modes that take no backup; --no-backup beside one would be silently meaningless.
+NO_BACKUP_CONFLICTS = ("dry_run", "audit", "list_files", "seed_tags_only")
+PREDEPLOY_KIND = "predeploy"
+BACKUP_OK = "ok"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -99,6 +105,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="after the rescan, remove the tags each photo's file does not name",
     )
+    parser.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="do not take the predeploy snapshot of an installed remote (the credential file "
+        "then needs no 'backup' section)",
+    )
     parser.add_argument("--verbose", action="store_true", help="name each uploaded path")
     return parser
 
@@ -124,6 +136,7 @@ def main(
     client_factory=http_client,
     tracked=fileset.verified_tracked_paths,
     clock=time.monotonic,
+    git_commit=None,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -135,6 +148,10 @@ def main(
         clash = [f"--{n.replace('_', '-')}" for n in PRUNE_TAGS_CONFLICTS if getattr(args, n)]
         if clash:
             parser.error(f"--prune-tags cannot be combined with {', '.join(clash)}")
+    if args.no_backup:
+        clash = [f"--{n.replace('_', '-')}" for n in NO_BACKUP_CONFLICTS if getattr(args, n)]
+        if clash:
+            parser.error(f"--no-backup cannot be combined with {', '.join(clash)}")
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     repo_root = Path(repo_root or REPO_ROOT)
@@ -170,11 +187,21 @@ def main(
             state_dir, config.ftp.host, config.ftp.remote_root
         )
 
+        if not args.dry_run and not args.no_backup and config.backup is None:
+            raise ConfigError(
+                "the credential file has no 'backup' section, so no snapshot can be taken "
+                "before this deploy. Add one, or pass --no-backup to deploy without a snapshot"
+            )
+
         _report_target(out, config)
         _report_file_set(out, repo_root, tracked_paths, published)
         _report_manifest(out, state_path)
-        _preflight(
+        remote = _preflight(
             out, args, config, state_path, len(published), client_factory, repo_root
+        )
+        _predeploy_backup(
+            out, args, config, remote, repo_root, state_dir, transport_factory, client_factory,
+            git_commit,
         )
         _upload(
             out, args, config, repo_root, state_dir, transport_factory, tracked_paths
@@ -222,7 +249,7 @@ def _report_manifest(out, state_path: Path) -> None:
 
 def _preflight(
     out, args, config, state_path, file_count, client_factory, repo_root
-) -> None:
+) -> preflight.RemoteState | None:
     """Refuse before uploading when the remote contradicts the manifest or the checkout.
 
     Two guards, in that order: the manifest against the install marker, then this
@@ -235,7 +262,7 @@ def _preflight(
     """
     if args.dry_run:
         _line(out, "preflight", "skipped (--dry-run opens no connection)")
-        return
+        return None
 
     state = preflight.probe(client_factory(config), config)
     warnings = [
@@ -255,6 +282,63 @@ def _preflight(
     verdict = f"installed, {state.version}" if state.installed else "not installed"
     said = " ".join(w for w in warnings if w) or "manifest and remote agree"
     _line(out, "preflight", f"{verdict} — {said}")
+    return state
+
+
+def _predeploy_backup(
+    out, args, config, remote, repo_root, state_dir, transport_factory, client_factory, git_commit
+) -> None:
+    """Snapshot an installed remote before the first upload; a failure stops the deploy.
+
+    Decided from what the preflight already asked: a remote whose install.php says it is not
+    installed holds nothing to lose. A dry run opens no socket, so it takes none. A failed
+    run is logged like pwg-backup's and ends the deploy with exit 11 (BackupError; a failure of
+    another kind inside the backup is wrapped, so 11 always means "stopped by the backup" and the
+    leftover-script code 13 keeps its own), before any put.
+    decision 0088.
+    """
+    if args.dry_run:
+        _line(out, "backup", "skipped (--dry-run opens no connection)")
+        return
+    if args.no_backup:
+        _line(out, "backup", "skipped (--no-backup)")
+        return
+    if not remote.installed:
+        _line(out, "backup", "skipped (first deploy: nothing is installed on the remote yet)")
+        return
+
+    def report(label: str, text: str) -> None:
+        _continuation(out, f"{label}: {text}")
+
+    started = datetime.now()
+    transport = transport_factory(config)
+    transport.connect()
+    try:
+        result = backup.run(
+            config, PREDEPLOY_KIND, started, transport, client_factory(config),
+            repo_root=repo_root, state_dir=state_dir, report=report, git_commit=git_commit,
+        )
+    except BaseException as error:
+        outcome = "interrupted" if isinstance(error, KeyboardInterrupt) else f"failed {type(error).__name__}"
+        backup.append_log(
+            config.backup.dir,
+            backup.format_log_line(started, datetime.now(), PREDEPLOY_KIND, "-", "-", "-", outcome),
+        )
+        if isinstance(error, DeployError) and not isinstance(error, BackupError):
+            raise BackupError(
+                f"the predeploy backup failed, nothing was deployed: {type(error).__name__}: {error}"
+            ) from error
+        raise
+    finally:
+        transport.close()
+    backup.append_log(
+        config.backup.dir,
+        backup.format_log_line(
+            result.started, result.finished, PREDEPLOY_KIND, result.fetched, result.linked,
+            result.bytes_fetched, BACKUP_OK,
+        ),
+    )
+    _line(out, "backup", f"{result.name}, {result.drift_count} drift")
 
 
 def _upload(out, args, config, repo_root, state_dir, transport_factory, tracked_paths):

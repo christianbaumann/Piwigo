@@ -15,16 +15,30 @@ uv run pwg-deploy --list-files deploy.local.json # the published file set, one p
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
-uv run pytest                                    # 812 tests, measured 2026-10-20
+uv run pytest                                    # 823 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
 from any directory — it resolves the repository root from its own file — but the credential path
 is taken as given, so `cd tools/deploy` first is the shortest correct form.
 
-**The target is a sandbox and this tool is never safe against a production install**
-([decision 0021](../../docs/agents/decisions/0021-remote-instance-is-a-sandbox.md)). It prunes
-without a prompt, overwrites the remote config, and posts to `install.php` unauthenticated.
+**The remote holds state the repository cannot rebuild**
+([decision 0088](../../docs/agents/decisions/0088-the-remote-holds-state-the-repository-cannot-rebuild.md),
+which supersedes the sandbox decision 0021). The deploy still prunes without a prompt, overwrites
+the remote config, and posts to `install.php` unauthenticated, so it takes a `predeploy` snapshot
+first. Plugin test suites and the handbook seed remain never-safe-against-a-real-gallery.
+
+**The pre-deploy backup** is `cli._predeploy_backup()`: after `_preflight()`, before `_upload()`,
+`backup.run(..., "predeploy")`. "Blank remote" is the preflight's own answer (`RemoteState.installed`
+from `install.php`, decision 0027), so nothing extra is asked. Skipped, with a `backup` report
+line, for `--no-backup`, `--dry-run` and an uninstalled remote. No `backup` section and no
+`--no-backup` is a `ConfigError` before any connection. Any `DeployError` from the run other than
+`BackupError`'s own subclasses (12, 13) is wrapped into `BackupError` (exit 11), so 11 always means
+"the backup stopped this deploy". `--no-backup` beside `--dry-run`, `--audit`, `--list-files` or
+`--seed-tags-only` is a parser error (`NO_BACKUP_CONFLICTS`), like `SEED_ONLY_CONFLICTS`. The risk of
+the temporary script on the host while the snapshot runs is accepted in
+[decision 0089](../../docs/agents/decisions/0089-database-export-and-restore-through-a-temporary-token-gated-script.md);
+a killed run leaves it there, `--audit` reports it as `leftover`.
 
 ## `pwg-backup` — what an agent needs
 
