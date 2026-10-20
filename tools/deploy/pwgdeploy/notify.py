@@ -4,13 +4,35 @@ from __future__ import annotations
 
 import smtplib
 from email.message import EmailMessage
-from urllib.parse import urlsplit
+import json
+import re
+from urllib.parse import quote, quote_plus, urlsplit
 
 from pwgdeploy.config import DeployConfig, MailConfig
 
 SMTP_TIMEOUT_SECONDS = 30
 LOG_TAIL_LINES = 10
 REDACTED = "[redacted]"
+MIN_SUBSTRING_SECRET_LENGTH = 4
+
+
+def forms_of(secret: str) -> set[str]:
+    """The secret as it appears raw, URL-encoded, JSON-escaped or repr'd."""
+    return {
+        secret, quote(secret, safe=""), quote_plus(secret),
+        json.dumps(secret)[1:-1], repr(secret)[1:-1],
+    }
+
+
+def redact(text: str, secrets: tuple[str, ...]) -> str:
+    """Longest forms first. A secret too short to replace inside words goes only as a whole word."""
+    for secret in sorted((s for s in secrets if s), key=len, reverse=True):
+        for form in sorted(forms_of(secret), key=len, reverse=True):
+            if len(secret) < MIN_SUBSTRING_SECRET_LENGTH:
+                text = re.sub(rf"(?<!\w){re.escape(form)}(?!\w)", REDACTED, text)
+            else:
+                text = text.replace(form, REDACTED)
+    return text
 
 
 def secrets_of(config: DeployConfig) -> tuple[str, ...]:
@@ -35,8 +57,7 @@ def failure_mail(
         f"Step: {step}\nError: {error}\n\n"
         "Last log lines:\n" + "\n".join(log_tail[-LOG_TAIL_LINES:]) + "\n"
     )
-    for secret in secrets:
-        body = body.replace(secret, REDACTED)
+    body = redact(body, secrets)
     message = EmailMessage()
     message["Subject"] = f"pwg-backup failed: {gallery} ({step})"
     message["From"] = f"{mail.sender_name} <{mail.sender_email}>" if mail.sender_name else mail.sender_email

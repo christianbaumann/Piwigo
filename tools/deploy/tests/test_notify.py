@@ -121,3 +121,30 @@ def test_tls_upgrades_with_starttls_before_login():  # [ECP]
     assert conn.timeout == notify.SMTP_TIMEOUT_SECONDS
     assert conn.calls[0] == "starttls"
     assert conn.calls[1][0] == "login"
+
+
+def test_encoded_and_repr_forms_of_a_secret_are_scrubbed():  # [ECP]
+    secret = "p@ss w\"rd'1"
+    forms = [
+        "https://x/?p=" + notify.quote(secret, safe=""), "u=" + notify.quote_plus(secret),
+        repr(secret), notify.json.dumps(secret),
+    ]
+    text = notify.redact("\n".join(forms), (secret,))
+    assert notify.quote(secret, safe="") not in text
+    assert notify.quote_plus(secret) not in text
+    assert "p@ss" not in text and "w\\'rd" not in text and 'w\\"rd' not in text
+
+
+def test_a_short_secret_goes_only_as_a_whole_word():  # [BVA]
+    text = notify.redact("pw=ab; a cabbage abs ab", ("ab",))
+    assert text == f"pw={notify.REDACTED}; a cabbage abs {notify.REDACTED}"
+
+
+def test_a_secret_at_the_minimum_length_goes_inside_words():  # [BVA]
+    secret = "x" * notify.MIN_SUBSTRING_SECRET_LENGTH
+    assert notify.redact(f"a{secret}b", (secret,)) == f"a{notify.REDACTED}b"
+
+
+def test_a_secret_that_contains_a_shorter_one_leaves_no_remainder():  # [ECP]
+    text = notify.redact("tokenlong-secret", ("long-secret", "long"))
+    assert "secret" not in text

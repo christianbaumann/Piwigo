@@ -423,8 +423,8 @@ file, the backup folder, which must exist for the two log files) and load it:
 
 ```bash
 plutil -lint ~/Library/LaunchAgents/de.chriss-baumann.pwg-backup.plist
-launchctl load ~/Library/LaunchAgents/de.chriss-baumann.pwg-backup.plist
-launchctl start de.chriss-baumann.pwg-backup      # run it now to see the log
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/de.chriss-baumann.pwg-backup.plist
+launchctl kickstart gui/$(id -u)/de.chriss-baumann.pwg-backup # run it now to see the log
 ```
 
 ## The restore check — does the newest snapshot restore
@@ -448,7 +448,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-827 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+831 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).
