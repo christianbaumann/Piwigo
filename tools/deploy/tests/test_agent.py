@@ -104,3 +104,9 @@ def test_an_answer_outside_the_protocol_raises(body):
     c, _ = client(200, body)
     with pytest.raises(agent.AgentError):
         c.dump()
+
+
+def test_the_script_never_displays_php_errors():
+    source = agent.render(TOKEN, 1, "d")
+    assert len(source) > MIN_SOURCE_BYTES
+    assert source.index("ini_set('display_errors', '0')") < source.index("define('AGENT_TOKEN_SHA256'")

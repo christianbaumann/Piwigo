@@ -264,3 +264,36 @@ def test_cleanup_removes_the_dump_the_dir_and_the_script(sandbox_factory):
     assert not sandbox.exists(sandbox.script)
     time.sleep(OPCACHE_WAIT_SECONDS)
     assert status_of(sandbox.url) == 404
+
+
+FAILING_MYSQLDUMP = "#!/bin/sh\n[ \"$1\" = --version ] && exit 0\necho partial > \"${@: -2:1}\" 2>/dev/null\nexit 1\n"
+
+
+def test_a_failing_mysqldump_falls_back_to_php_and_leaves_no_secret_behind(sandbox_factory, scratch_db):
+    """[REQ] a mysqldump that exits non-zero must not abort the backup or leave client.cnf."""
+    sandbox = sandbox_factory(SOURCE_DB)
+    sandbox.write("fake-mysqldump", FAILING_MYSQLDUMP.replace("${@: -2:1}", "/dev/null"))
+    sandbox.write("dump/keep.txt", "pre-existing dump dir")
+    sandbox.install_agent(mysqldump=f"{sandbox.path}/fake-mysqldump")
+    sandbox.sync()
+    ddev(f"chmod +x {sandbox.name}/fake-mysqldump")
+    answer = sandbox.client().dump()
+    assert answer["method"] == "php"
+    assert answer["size"] > 0
+    assert not sandbox.exists("dump/client.cnf")
+    assert not sandbox.exists("dump/dump.sql")
+    assert sandbox.exists("dump/.htaccess"), "a pre-existing dump dir must still get the deny-all file"
+    removed = sandbox.client().cleanup()
+    assert sandbox.exists("dump/keep.txt") and not sandbox.exists("dump/dump.sql.gz")
+    assert sandbox.script in removed
+
+
+def test_a_failing_statement_stops_the_import_with_the_database_message(sandbox_factory, scratch_db):
+    import gzip
+
+    target = ready(sandbox_factory, scratch_db)
+    target.write("dump/bad.sql.gz", gzip.compress(b"CREATE TABLE ok (a int);\nINSERT INTO nope VALUES (1);\nCREATE TABLE after (a int);\n"))
+    target.sync()
+    with pytest.raises(RemoteHttpError, match="statement 2 failed.*nope"):
+        target.client().import_dump("dump/bad.sql.gz")
+    assert sql("SHOW TABLES", scratch_db) == "ok"

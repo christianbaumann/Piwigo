@@ -14,6 +14,9 @@
  * deployed: tools/ is not published.
  */
 
+@ini_set('display_errors', '0');
+@ini_set('html_errors', '0');
+
 define('AGENT_TOKEN_SHA256', '@@TOKEN_SHA256@@');
 define('AGENT_EXPIRES', '@@EXPIRES@@');
 define('AGENT_DUMP_DIR', '@@DUMP_DIR@@');
@@ -97,20 +100,31 @@ function agent_query($db, $sql)
 function agent_ensure_dump_dir()
 {
   $dir = agent_dump_dir();
-  if (is_dir($dir))
+  $created = false;
+  if (!is_dir($dir))
   {
-    return $dir;
+    if (!@mkdir($dir, 0700, true))
+    {
+      throw new AgentFailure('dump directory could not be created');
+    }
+    $created = true;
   }
-  if (!@mkdir($dir, 0700, true))
+  if (!is_file($dir.'/.htaccess'))
   {
-    throw new AgentFailure('dump directory could not be created');
+    $written = @file_put_contents(
+      $dir.'/.htaccess',
+      "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n"
+      ."<IfModule !mod_authz_core.c>\nOrder deny,allow\nDeny from all\n</IfModule>\n"
+      );
+    if ($written === false)
+    {
+      throw new AgentFailure('dump directory could not be protected');
+    }
   }
-  file_put_contents(
-    $dir.'/.htaccess',
-    "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n"
-    ."<IfModule !mod_authz_core.c>\nOrder deny,allow\nDeny from all\n</IfModule>\n"
-    );
-  file_put_contents($dir.'/'.AGENT_CREATED_MARKER, '');
+  if ($created)
+  {
+    file_put_contents($dir.'/'.AGENT_CREATED_MARKER, '');
+  }
   return $dir;
 }
 
@@ -143,12 +157,9 @@ function agent_dump_with_mysqldump($dir, $conf)
   }
 
   $defaults = $dir.'/'.AGENT_DEFAULTS_FILE;
-  $lines = "[client]\nuser=\"".addcslashes($conf['db_user'], '"\\')."\"\n"
-    ."password=\"".addcslashes($conf['db_pw'], '"\\')."\"\nhost=\"".addcslashes($host, '"\\')."\"\n"
+  $lines = "[client]\nuser=".agent_option_value($conf['db_user'])."\n"
+    .'password='.agent_option_value($conf['db_pw'])."\nhost=".agent_option_value($host)."\n"
     .($port !== '' ? 'port='.(int) $port."\n" : '');
-  file_put_contents($defaults, $lines);
-  chmod($defaults, 0600);
-
   $plain = $dir.'/'.AGENT_PLAIN_DUMP_FILE;
   $command = escapeshellarg(AGENT_MYSQLDUMP)
     .' --defaults-extra-file='.escapeshellarg($defaults)
@@ -157,23 +168,43 @@ function agent_dump_with_mysqldump($dir, $conf)
     .' '.escapeshellarg($conf['db_base']).' 2>&1';
   $output = array();
   $code = 1;
-  @exec($command, $output, $code);
-  @unlink($defaults);
+  $old_umask = umask(0077);
+  try
+  {
+    file_put_contents($defaults, $lines);
+    @chmod($defaults, 0600);
+    @exec($command, $output, $code);
+  }
+  finally
+  {
+    umask($old_umask);
+    @unlink($defaults);
+  }
 
   if ($code !== 0 or !is_file($plain) or filesize($plain) === 0)
   {
     @unlink($plain);
-    throw new AgentFailure('mysqldump failed');
+    return false;
   }
 
   agent_gzip($plain, $dir.'/'.AGENT_DUMP_FILE);
   unlink($plain);
+  return true;
+}
+
+function agent_option_value($value)
+{
+  return '"'.strtr($value, array('\\' => '\\\\', '"' => '\\"', "\n" => '\\n', "\r" => '\\r')).'"';
 }
 
 function agent_gzip($source, $target)
 {
   $in = fopen($source, 'rb');
   $out = gzopen($target, 'wb6');
+  if (!$in or !$out)
+  {
+    throw new AgentFailure('dump could not be written');
+  }
   while (!feof($in))
   {
     gzwrite($out, fread($in, 1048576));
@@ -185,6 +216,10 @@ function agent_gzip($source, $target)
 function agent_dump_with_php($dir, $db)
 {
   $out = gzopen($dir.'/'.AGENT_DUMP_FILE, 'wb6');
+  if (!$out)
+  {
+    throw new AgentFailure('dump could not be written');
+  }
   gzwrite($out, "SET NAMES ".AGENT_CHARSET.";\nSET FOREIGN_KEY_CHECKS=0;\nSET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n\n");
 
   $tables = array();
@@ -240,18 +275,26 @@ function agent_dump_rows($out, $db, $quoted)
 
 function agent_action_dump()
 {
+  @set_time_limit(0);
   $dir = agent_ensure_dump_dir();
   list($db, $conf, $prefix) = agent_database();
 
-  if (agent_mysqldump_available())
+  $method = 'php';
+  if (agent_mysqldump_available() and agent_dump_with_mysqldump($dir, $conf))
   {
     $method = 'mysqldump';
-    agent_dump_with_mysqldump($dir, $conf);
   }
   else
   {
-    $method = 'php';
-    agent_dump_with_php($dir, $db);
+    try
+    {
+      agent_dump_with_php($dir, $db);
+    }
+    catch (Exception $e)
+    {
+      @unlink($dir.'/'.AGENT_DUMP_FILE);
+      throw $e;
+    }
   }
 
   return array(
@@ -277,7 +320,7 @@ function agent_action_list()
       );
     foreach ($iterator as $file)
     {
-      if ($file->isFile())
+      if ($file->isFile() and !$file->isLink())
       {
         $files[] = array(
           'path' => substr($file->getPathname(), strlen(__DIR__) + 1),
@@ -320,6 +363,7 @@ function agent_action_import()
     throw new AgentFailure('path is not a file inside the dump directory', 403);
   }
 
+  @set_time_limit(0);
   list($db) = agent_database();
   $in = gzopen($real, 'rb');
   if (!$in)
@@ -340,7 +384,12 @@ function agent_action_import()
     $in_quote = agent_quote_state($line, $in_quote);
     if (!$in_quote and substr(rtrim($line), -1) === ';')
     {
-      agent_query($db, $statement);
+      if (mysqli_query($db, $statement) === false)
+      {
+        throw new AgentFailure(
+          'statement '.($statements + 1).' failed: '.mysqli_error($db)
+          );
+      }
       $statements++;
       $statement = '';
     }
