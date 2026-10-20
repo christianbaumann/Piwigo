@@ -59,6 +59,7 @@ Any `deploy.*.json` other than the example is git-ignored, in the repository roo
 | | `sender_email` | the From address; use the SMTP mailbox itself, or receivers reject it |
 | | `sender_name` | the From name; `""` means the gallery title |
 | `backup` | `dir` | optional section — the folder backups are written to; `~` is expanded, the result must be absolute and outside this repository |
+| | `dump_dir` | optional — where the temporary script writes the dump, relative to the web root: plain names separated by `/`, optionally one leading `../` for a sibling of the web root (`../backup-tmp`); never absolute, never any other `..`. The folder must be writable by FTP and by PHP. Absent: a random-named folder directly under the web root |
 | | `notify` | the address a failed `pwg-backup` run mails; when absent, the `admin` section's e-mail address. Needs the `mail` section |
 
 Values are validated locally against the same rules the remote enforces, so a bad table prefix
@@ -95,7 +96,10 @@ reports the plugins already active.
 Exit codes are one per failure mode — `3` bad credential file, `4` git, `5` transport, `6` no
 FTPS offered, `7` remote HTTP, `8` `install.php` refused, `9` manifest and remote disagree,
 `10` core versions differ, `11` a backup could not be taken or stored, `12` the backup script listed an
-unsafe path, `13` the backup script could not be removed from the host — and `130` for Ctrl-C.
+unsafe path, `13` the backup script could not be removed from the host, `14` a deploy was stopped by
+its predeploy snapshot, `15` a restore was refused or failed — and `130` for Ctrl-C. `14` and `15`
+wrap every other failure of that run (a transport error during a restore is `15`, not `5`); `12`
+and `13` are never wrapped, whichever command hit them.
 
 ### The predeploy snapshot
 
@@ -103,7 +107,8 @@ After the preflight and before the first upload, a deploy to an **installed** re
 `pwg-backup` snapshot with kind `predeploy` (see [Backups](#backups--pwg-backup)) and prints one
 `backup` line. Needs the `backup` section in the credential file; without it the deploy refuses
 (exit `3`, naming the section) unless `--no-backup` is given. A failed snapshot ends the deploy
-with exit `11` before anything on the remote is changed (a leftover script keeps `13`). The
+with exit `14` before anything on the remote is changed (an unsafe listed path keeps `12`, a
+leftover script `13`). The
 report says when it was skipped: `--no-backup`, `--dry-run` (no socket is opened), or a first
 deploy onto a remote where `install.php` says nothing is installed yet.
 
@@ -417,8 +422,11 @@ folder you do not control. For the length of a run the temporary script, which c
 database, exists on the host behind a one-time token, an expiry and a random name.
 `pwg-deploy --audit` lists any `*.php` directly in the web root that the manifest does not cover
 (`leftover`); delete such a file over FTP. The dump goes to a random-named directory below the web
-root with a deny-all `.htaccess` until a host probe shows a writable directory outside it
-(`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`).
+root with a deny-all `.htaccess` (`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`). With
+`backup.dump_dir` set, each run makes its random-named subdirectory inside that one instead (same
+`.htaccess`, removed again after the run). A leading `../` puts it beside the web root, outside what
+the web server serves, provided the FTP login may climb there and the PHP user may write there
+(`open_basedir` can forbid it; the first run then fails with exit `11`, nothing is left behind).
 
 ### Failure mail and the daily job
 
@@ -479,8 +487,8 @@ snapshot uploads them all again. Plan for that once after a restore.
 nothing. Because it cannot list the host, it compares the snapshot with the newest *other*
 snapshot (and says so); with none it can only state the snapshot's file count. The real run lists
 the host. A restore appends one `restore` line to `backup.log` (`fetched` is the number of files
-uploaded, `linked` the unchanged ones, `bytes` the uploaded bytes). It exits with the backup codes
-(`11` for a refusal).
+uploaded, `linked` the unchanged ones, `bytes` the uploaded bytes). A refusal or a failure after the
+start exits `15`; an unsafe listed path keeps `12`, a leftover script `13`.
 
 ## The restore check — does the newest snapshot restore
 
@@ -503,7 +511,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-884 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+908 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

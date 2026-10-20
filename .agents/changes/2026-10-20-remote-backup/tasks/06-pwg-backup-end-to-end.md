@@ -50,6 +50,7 @@ config into the backup folder, logs it, and leaves nothing behind on the host.
 
 ## Deviations
 
+* **Superseded by follow-up 2026-10-20 (`backup/followup-11`):** the optional credential key `backup.dump_dir` (relative to the web root, one leading `../` allowed for a sibling of it) makes each run use a random-named subdirectory there; `backup.dump_dir(base)` is still the one function, `config._dump_dir()` validates. Absent, the default below holds. New exit codes 14 and 15 supersede the use of 11 for predeploy and restore (tasks 08, 09).
 * **Dump directory (task 01 probe not run):** default is the design's fallback, a random-named directory below the web root with a deny-all `.htaccess` (`backup.dump_dir()`, `DUMP_DIR_PREFIX`). One function to switch once the probe shows a writable directory outside the web root.
 * **The agent is removed before the file download**, not at the end: dump and list need it, the downloads do not, and a long first run would otherwise outlast the script's expiry (`SCRIPT_LIFETIME_SECONDS` = 1 h) and make `cleanup` answer 403. `finally` still cleans up after any failure; a failing HTTP `cleanup` falls back to FTP deletes and raises `AgentLeftoverError` (exit 13) if the script remains.
 * **`snapshot.build()` got two optional parameters** (task 03's module): `extras` (local files moved into the snapshot before the rename: dump, the two config files, the manifest copy) and `meta` may be a callable (so `finished` is written after the downloads).

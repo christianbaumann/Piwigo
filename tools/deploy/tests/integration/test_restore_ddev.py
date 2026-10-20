@@ -34,7 +34,7 @@ from tests.integration.test_backup_ddev import (
 
 pytestmark = pytest.mark.integration
 
-NOW = datetime(2026, 10, 20, 10, 0, 0)
+NOW = datetime.now().replace(microsecond=0)  # the agent script expires against the real clock
 IMPORT_TIMEOUT_SECONDS = 300
 FIXTURE_MANIFEST = {"index.php": "from-the-snapshot"}
 

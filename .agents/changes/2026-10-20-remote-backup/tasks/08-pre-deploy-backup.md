@@ -37,7 +37,8 @@ deploy when that snapshot fails.
 
 ## Deviations
 
-* **Exit code:** `BackupError` (11) reused, no new code. Its meaning ("a backup run could not be taken or stored") fits. Any other `DeployError` raised inside the predeploy run (e.g. an HTTP failure of the dump, 7) is wrapped into `BackupError`, so 11 always means "the backup stopped this deploy"; 12 and 13 keep their own codes.
+* **Superseded by follow-up 2026-10-20:** a deploy stopped by its predeploy snapshot exits 14 (`PredeployBackupError`); every `DeployError` of the run is wrapped except `UnsafeRemotePathError` (12) and `AgentLeftoverError` (13), which keep their codes. Below is the original decision.
+* **Exit code (original):** `BackupError` (11) reused, no new code. Its meaning ("a backup run could not be taken or stored") fits. Any other `DeployError` raised inside the predeploy run (e.g. an HTTP failure of the dump, 7) is wrapped into `BackupError`, so 11 always means "the backup stopped this deploy"; 12 and 13 keep their own codes.
 * **Blank remote** is decided from the preflight's `RemoteState.installed` (`install.php` answer), no extra request. `_preflight()` now returns that state (None on a dry run).
 * **`--no-backup` is refused** (parser error, `NO_BACKUP_CONFLICTS`) beside `--dry-run`, `--audit`, `--list-files`, `--seed-tags-only`, like `SEED_ONLY_CONFLICTS`; it is allowed with `--no-bootstrap` (the upload still happens). A missing `backup` section is a `ConfigError` (exit 3) raised before any connection, except on a dry run.
 * A dry run prints `backup  skipped (--dry-run ...)`; the run is logged to `backup.log` (success and failure) like `pwg-backup`.

@@ -79,3 +79,19 @@ class AgentLeftoverError(BackupError):
     """The temporary script could not be removed from the host; it is still there and must be deleted by hand."""
 
     exit_code = 13
+
+
+class PredeployBackupError(DeployError):
+    """The snapshot a deploy takes first failed, so nothing was deployed.
+
+    Wraps every failure of that backup except the two that keep their own code (12, 13): an unsafe
+    listed path and a leftover script need a different reaction than "retry or use --no-backup".
+    """
+
+    exit_code = 14
+
+
+class RestoreError(DeployError):
+    """A restore was refused, or failed after it started; wraps everything but 12 and 13."""
+
+    exit_code = 15

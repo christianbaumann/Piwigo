@@ -15,7 +15,13 @@ from pathlib import Path
 
 from pwgdeploy import audit, backup, bootstrap, fileset, manifest, preflight, seed, upload, version
 from pwgdeploy.config import DeployConfig, load_file
-from pwgdeploy.errors import BackupError, ConfigError, DeployError
+from pwgdeploy.errors import (
+    AgentLeftoverError,
+    ConfigError,
+    DeployError,
+    PredeployBackupError,
+    UnsafeRemotePathError,
+)
 from pwgdeploy.http import UrllibClient
 from pwgdeploy.transport import FtplibTransport
 from pwgdeploy.urls import remote_path
@@ -292,9 +298,9 @@ def _predeploy_backup(
 
     Decided from what the preflight already asked: a remote whose install.php says it is not
     installed holds nothing to lose. A dry run opens no socket, so it takes none. A failed
-    run is logged like pwg-backup's and ends the deploy with exit 11 (BackupError; a failure of
-    another kind inside the backup is wrapped, so 11 always means "stopped by the backup" and the
-    leftover-script code 13 keeps its own), before any put.
+    run is logged like pwg-backup's and ends the deploy with exit 14 (PredeployBackupError; every
+    DeployError of the backup is wrapped, so 14 always means "stopped by the backup", except the
+    unsafe-path code 12 and the leftover-script code 13, which keep their own), before any put.
     decision 0088.
     """
     if args.dry_run:
@@ -324,8 +330,10 @@ def _predeploy_backup(
             config.backup.dir,
             backup.format_log_line(started, datetime.now(), PREDEPLOY_KIND, "-", "-", "-", outcome),
         )
-        if isinstance(error, DeployError) and not isinstance(error, BackupError):
-            raise BackupError(
+        if isinstance(error, DeployError) and not isinstance(
+            error, (UnsafeRemotePathError, AgentLeftoverError, PredeployBackupError)
+        ):
+            raise PredeployBackupError(
                 f"the predeploy backup failed, nothing was deployed: {type(error).__name__}: {error}"
             ) from error
         raise

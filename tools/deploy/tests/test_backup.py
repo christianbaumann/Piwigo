@@ -140,6 +140,26 @@ def test_the_dump_dir_is_random_and_prefixed():  # [ECP]
     assert re.fullmatch(rf"{backup.DUMP_DIR_PREFIX}[0-9a-f]+", first)
 
 
+def test_a_configured_base_gets_a_random_subdirectory():  # [ECP]
+    first, second = backup.dump_dir("../backup-tmp"), backup.dump_dir("../backup-tmp")
+    assert first != second
+    assert re.fullmatch(rf"\.\./backup-tmp/{backup.DUMP_DIR_PREFIX}[0-9a-f]+", first)
+
+
+def test_a_run_with_a_configured_dump_dir_dumps_there_and_leaves_nothing(tmp_path, host, state_dir):  # [HAPPY]
+    cfg = config.load({**RAW, "backup": {"dir": str(tmp_path / "bk"), "dump_dir": "../backup-tmp"}})
+    fetched = []
+    original = host.transport.get
+    host.transport.get = lambda remote, local: (fetched.append(remote), original(remote, local))
+
+    run(cfg, host, state_dir)
+
+    dumps = [p for p in fetched if p.endswith("/dump.sql.gz")]
+    assert len(dumps) == 1, "the dump was not fetched; the claim is vacuous"
+    assert re.fullmatch(rf"{host.ROOT}/\.\./backup-tmp/dump-[0-9a-f]+/dump\.sql\.gz", dumps[0])
+    assert host.scripts() == [] and host.dump_files() == []
+
+
 def test_a_log_line_names_times_kind_counts_and_result():  # [HAPPY]
     line = backup.format_log_line(NOW, NOW + timedelta(seconds=5), "daily", 3, 4, 500, "ok")
     assert line == "2026-10-20T10:00:00 2026-10-20T10:00:05 daily fetched=3 linked=4 bytes=500 ok"
