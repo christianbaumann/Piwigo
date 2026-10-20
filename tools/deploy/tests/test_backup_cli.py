@@ -204,6 +204,20 @@ def test_a_failing_check_mails_too(tmp_path, host, monkeypatch):  # [HAPPY]
     assert "manual" not in outbox.sent[0][1]["Subject"]
 
 
+def test_a_check_that_raises_a_deploy_error_is_logged_and_mailed_as_check(tmp_path, host, monkeypatch):  # [ERR]
+    def raising(root, out, err):
+        raise errors.BackupError("snapshot unreadable")
+
+    monkeypatch.setattr(check, "check_main", raising)
+    outbox = Outbox()
+
+    code, _, _ = invoke(tmp_path, host, "--check", mail=MAIL, send_mail=outbox)
+
+    assert code != 0
+    assert log_lines(tmp_path)[0].endswith(" check fetched=- linked=- bytes=- failed BackupError")
+    assert "manual" not in outbox.sent[0][1]["Subject"]
+
+
 def test_a_passing_check_appends_an_ok_check_line_to_the_log(tmp_path, host, monkeypatch):  # [HAPPY]
     monkeypatch.setattr(check, "check_main", lambda root, out, err: 0)
 

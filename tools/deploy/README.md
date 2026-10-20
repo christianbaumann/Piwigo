@@ -427,7 +427,7 @@ folder you do not control. For the length of a run the temporary script, which c
 database, exists on the host behind a one-time token, an expiry and a random name.
 `pwg-deploy --audit` lists any `*.php` directly in the web root that the manifest does not cover,
 and any file inside a `dump-*` directory of the dump location (`leftover`); delete them over FTP. A dump location
-outside the web root (`backup.dump_dir` starting with `../`) is listed on its own and reported the
+outside the web root (`backup.dump_dir` starting with `../`), or below `_data/` or `upload/` which the audit skips, is listed on its own and reported the
 same way; when that directory cannot be listed the audit prints one `dumps ... not checked` line and
 carries on. The dump goes to a random-named directory below the web
 root with a deny-all `.htaccess` (`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`). With
@@ -532,7 +532,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-927 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+929 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

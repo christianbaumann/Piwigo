@@ -483,7 +483,7 @@ def _audit(out, config, state_dir, transport_factory) -> None:
             out,
             "leftover",
             outside_leftovers,
-            "of a dump directory outside the web root (backup.dump_dir) pwg-backup did not remove; "
+            "of a dump directory in backup.dump_dir (not reached by the web-root listing) pwg-backup did not remove; "
             "it holds the database, delete it over FTP",
         )
     _report_paths(
@@ -496,9 +496,12 @@ def _audit(out, config, state_dir, transport_factory) -> None:
 
 
 def _outside_dump_base(config) -> str | None:
-    """`backup.dump_dir` when it is a sibling of the web root, which the web-root listing never reaches."""
+    """`backup.dump_dir` when the web-root listing never reaches it: a sibling (`../`) or below a skipped folder."""
     dump_dir = config.backup.dump_dir if config.backup else None
-    return dump_dir if dump_dir and dump_dir.startswith(OUTSIDE_WEB_ROOT) else None
+    if not dump_dir:
+        return None
+    unreached = dump_dir.startswith(OUTSIDE_WEB_ROOT) or dump_dir.split("/")[0] in audit.AUDIT_SKIP
+    return dump_dir if unreached else None
 
 
 def _plural(count: int, singular: str, plural: str | None = None) -> str:

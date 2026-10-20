@@ -136,7 +136,9 @@ def main(
 
 
 def _logged_kind(args) -> str:
-    return restore.KIND if args.restore else args.kind
+    if args.restore:
+        return restore.KIND
+    return CHECK_KIND if args.check else args.kind
 
 
 def _log_failure(backup_dir, kind, started, clock, result) -> None:

@@ -883,11 +883,11 @@ def test_audit_names_a_dump_directory_left_in_the_web_root(run):
     assert "/piwigo/plugins/x/dump-1/y" not in dump_block
 
 
-def _outside_dump_run(tmp_path, repo, transport):
+def _outside_dump_run(tmp_path, repo, transport, dump_dir="../dumps"):
     import json
 
     path = tmp_path / "deploy.outside.json"
-    path.write_text(json.dumps({**RAW, "backup": {"dir": str(tmp_path / "bk"), "dump_dir": "../dumps"}}), encoding="utf-8")
+    path.write_text(json.dumps({**RAW, "backup": {"dir": str(tmp_path / "bk"), "dump_dir": dump_dir}}), encoding="utf-8")
     return Run(path, repo, tmp_path, transport=transport)
 
 
@@ -900,11 +900,22 @@ def test_audit_names_a_dump_directory_left_in_a_dump_dir_outside_the_web_root(tm
 
     assert outside("--audit") == 0
 
-    assert "  leftover    1 file of a dump directory outside the web root" in outside.text
+    assert "  leftover    1 file of a dump directory in backup.dump_dir" in outside.text
     assert "/piwigo/../dumps/dump-0123abcd/dump.sql.gz" in outside.text
     leftover_block = outside.text.split("  leftover ", 1)[1].split("  orphans ", 1)[0]
     assert "keep.txt" not in leftover_block
     assert "delete" not in transport.names()
+
+
+def test_audit_names_a_dump_directory_below_a_folder_the_web_root_listing_skips(tmp_path, repo):
+    """[ECP] `_data/dumps` is inside the web root but the walk skips `_data`, so it is listed on its own."""
+    transport = FakeTransport()
+    skipped = _outside_dump_run(tmp_path, repo, transport, dump_dir="_data/dumps")
+    transport.files["/piwigo/_data/dumps/dump-0123abcd/dump.sql.gz"] = b"x"
+
+    assert skipped("--audit") == 0
+
+    assert "/piwigo/_data/dumps/dump-0123abcd/dump.sql.gz" in skipped.text
 
 
 def test_audit_says_so_when_the_outside_dump_dir_cannot_be_listed(tmp_path, repo):
