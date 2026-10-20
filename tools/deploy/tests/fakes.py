@@ -549,6 +549,8 @@ class FakeBackupHost:
         self.fail_cleanup_over_ftp = False
         self.listed_extra: list[dict] = []
         self.reported_dump_size: int | None = None
+        self.reported_dump_path: str | None = None
+        self.leave_in_dump_dir: tuple[str, ...] = ()
         for relative in self.CONFIG_FILES:
             self.transport.files[f"{self.ROOT}/{relative}"] = relative.encode()
 
@@ -623,8 +625,11 @@ class _AgentClient:
         dump_path = f"{directory}/dump.sql.gz"
         if action == "dump":
             host.transport.files[f"{host.ROOT}/{dump_path}"] = host.dump_bytes
+            for name in host.leave_in_dump_dir:
+                host.transport.files[f"{host.ROOT}/{directory}/{name}"] = b"x"
             size = host.reported_dump_size if host.reported_dump_size is not None else len(host.dump_bytes)
-            return {"path": dump_path, "size": size, "method": host.dump_method, "counts": host.counts}
+            answered = host.reported_dump_path if host.reported_dump_path is not None else dump_path
+            return {"path": answered, "size": size, "method": host.dump_method, "counts": host.counts}
         if action == "list":
             files = [{"path": p, "size": s, "mtime": m} for p, (s, m) in host.meta.items()]
             return {"files": files + host.listed_extra, "db_paths": host.db_paths}

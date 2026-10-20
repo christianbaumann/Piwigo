@@ -35,6 +35,7 @@ from pwgdeploy.urls import remote_path, site_url
 BACKED_UP_PREFIXES = ("upload/", "galleries/", "_data/photoedit/originals/")
 CONFIG_FILES = ("local/config/config.inc.php", "local/config/database.inc.php")
 DUMP_PATH = "db/dump.sql.gz"
+DUMP_FILE_NAME = "dump.sql.gz"
 MANIFEST_COPY = "deploy-manifest.json"
 STAGING_DIR = ".incoming"
 LOG_FILE = "backup.log"
@@ -96,6 +97,12 @@ def validate_paths(files: list[RemoteFile]) -> None:
         )
         if unsafe:
             raise UnsafeRemotePathError(f"the temporary script listed an unsafe path: {path!r}")
+
+
+def validate_dump_path(answered: object, directory: str) -> None:
+    """The script names the dump it wrote; only the file in the directory this run chose is fetched."""
+    if answered != f"{directory}/{DUMP_FILE_NAME}":
+        raise UnsafeRemotePathError(f"the temporary script named an unexpected dump path: {answered!r}")
 
 
 def normalise_db_path(path: str) -> str:
@@ -234,6 +241,7 @@ def run(
 
             db_started = clock()
             dumped = agent_client.dump()
+            validate_dump_path(dumped["path"], directory)
             dump_local = staging / "dump.sql.gz"
             transport.get(remote_path(root, dumped["path"]), dump_local)
             if dump_local.stat().st_size != dumped["size"]:

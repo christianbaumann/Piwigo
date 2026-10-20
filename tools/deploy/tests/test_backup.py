@@ -338,3 +338,42 @@ def test_old_snapshots_are_pruned_after_a_successful_run(tmp_path, host, state_d
 
     assert result.pruned == ["2020-01-01T000000"]
     assert (root / "2020-01-02T000000").is_dir()
+
+
+@pytest.mark.parametrize("answered", ["local/config/database.inc.php", "../x", "/etc/passwd", "dump-0000/dump.sql.gz"])
+def test_a_dump_path_outside_the_chosen_directory_is_refused_and_never_fetched(tmp_path, host, state_dir, answered):  # [NEG][ECP]
+    host.reported_dump_path = answered
+    with pytest.raises(UnsafeRemotePathError):
+        run(make_config(tmp_path), host, state_dir)
+    assert host.scripts() == [] and host.dump_files() == []
+    assert [c for c in host.transport.calls if c[0] == "get"] == []
+
+
+def test_the_ftp_fallback_also_removes_the_dump_directorys_htaccess_and_defaults_file(tmp_path, host, state_dir):  # [NEG]
+    host.fail_action = "cleanup"
+    host.leave_in_dump_dir = (".htaccess", "client.cnf", ".created-by-agent")
+    assert backup.DUMP_DIR_LEFTOVERS[-1] == ".htaccess"
+    run(make_config(tmp_path), host, state_dir)
+    assert host.dump_files() == [] and host.scripts() == []
+
+
+def test_the_token_reaches_neither_snapshot_json_nor_the_reports(tmp_path, host, state_dir):  # [NEG]
+    reports: list = []
+    result = run(make_config(tmp_path), host, state_dir, reports=reports)
+    token = next(f["token"] for action, f in host.client.calls if action == "dump")
+    assert len(token) >= 32
+    assert token not in (result.folder / "snapshot.json").read_text()
+    assert token not in repr(reports)
+    assert all(token not in path.read_text(errors="ignore") for path in result.folder.rglob("*.json"))
+
+
+def test_a_failed_run_prunes_nothing(tmp_path, host, state_dir):  # [NEG]
+    old = tmp_path / "bk" / "2020-01-01T000000"
+    old.mkdir(parents=True)
+    (old / "snapshot.json").write_text('{"files": {}}')
+    (tmp_path / "bk" / "2020-01-02T000000").mkdir()
+    ((tmp_path / "bk") / "2020-01-02T000000" / "snapshot.json").write_text('{"files": {}}')
+    host.meta["upload/2026/a.jpg"] = (99, 1)
+    with pytest.raises(BackupError):
+        run(make_config(tmp_path), host, state_dir)
+    assert old.is_dir()
