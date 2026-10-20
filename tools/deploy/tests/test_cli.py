@@ -19,6 +19,7 @@ from pwgdeploy import fileset
 from pwgdeploy import preflight
 from pwgdeploy import version as pwgversion
 from pwgdeploy.errors import (
+    BackupError,
     ConfigError,
     InsecureTransportError,
     RemoteHttpError,
@@ -26,7 +27,7 @@ from pwgdeploy.errors import (
     TransportError,
     VersionError,
 )
-from tests.fakes import FakeGallery, FakeTransport
+from tests.fakes import FakeBackupHost, FakeGallery, FakeTransport
 
 BASE_URL = "https://g.example.test"
 
@@ -83,7 +84,10 @@ def repo(tmp_path):
 class Run:
     """One invocation, with both adapters replaced and the output captured."""
 
-    def __init__(self, config_file, repo, tmp_path, transport=None, gallery=None):
+    NO_BACKUP_MODES = {"--dry-run", "--list-files", "--audit", "--seed-tags-only"}
+
+    def __init__(self, config_file, repo, tmp_path, transport=None, gallery=None, backup=False):
+        self.backup = backup
         self.transport = transport if transport is not None else FakeTransport()
         self.gallery = gallery if gallery is not None else FakeGallery(BASE_URL)
         self.out = io.StringIO()
@@ -93,6 +97,10 @@ class Run:
         self._state = tmp_path / "state"
 
     def __call__(self, *flags):
+        # Most cases are about the upload and bootstrap on an installed remote; the backup
+        # has its own cases below and needs a host that serves the temporary script.
+        if not self.backup and not set(flags) & self.NO_BACKUP_MODES:
+            flags = flags + ("--no-backup",)
         return cli.main(
             list(flags) + self._args,
             stdout=self.out,
@@ -102,6 +110,7 @@ class Run:
             transport_factory=lambda config: self.transport,
             client_factory=lambda config: self.gallery,
             tracked=lambda repo_root: list(TRACKED),
+            git_commit=lambda: "abc123",
         )
 
     @property
@@ -1017,3 +1026,154 @@ def test_the_config_file_argument_is_required(run):
         cli.main([], stdout=run.out, stderr=run.err)
 
     assert raised.value.code == 2
+
+
+# --- the snapshot before every deploy (task 08) -------------------------------------------
+
+
+class _Site:
+    """The gallery's pages and the temporary backup script behind one client, as on the host:
+    a POST to a script the host holds goes to the script, everything else to the gallery."""
+
+    def __init__(self, gallery, host):
+        self._gallery, self._host = gallery, host
+
+    def get(self, url, **kwargs):
+        return self._gallery.get(url, **kwargs)
+
+    def post(self, url, fields, **kwargs):
+        if "action" in fields and "token" in fields:
+            return self._host.client.post(url, fields, **kwargs)
+        return self._gallery.post(url, fields, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._gallery, name)
+
+
+@pytest.fixture
+def backup_dir(tmp_path):
+    return tmp_path / "bk"
+
+
+@pytest.fixture
+def backup_config(tmp_path, backup_dir):
+    import json
+
+    path = tmp_path / "deploy.backup.json"
+    path.write_text(json.dumps({**RAW, "ftp": {**RAW["ftp"], "remote_root": FakeBackupHost.ROOT},
+                                "backup": {"dir": str(backup_dir)}}), encoding="utf-8")
+    return path
+
+
+def _deployed_site(backup_config, repo, tmp_path):
+    """A Run against an installed remote: one deploy has filled the manifest and the gallery."""
+    host = FakeBackupHost()
+    host.add_photo("upload/a.jpg", b"aaa")
+    gallery = FakeGallery(BASE_URL)
+    runner = Run(backup_config, repo, tmp_path, transport=host.transport, gallery=_Site(gallery, host), backup=True)
+    assert runner("--no-backup") == 0
+    runner.out.truncate(0)
+    runner.out.seek(0)
+    host.transport.calls.clear()
+    return runner, host
+
+
+def _agent_script(path: str) -> bool:
+    return re.fullmatch(rf"{FakeBackupHost.ROOT}/[0-9a-f]{{16}}\.php", path) is not None
+
+
+def test_an_installed_remote_is_snapshotted_before_the_first_upload(backup_config, repo, tmp_path, backup_dir):
+    """[HAPPY] One predeploy snapshot lands in the folder, and the host saw the temporary
+    script (the backup) before the first deployed file. Anti-vacuity: the changed file
+    guarantees a deployed put."""
+    runner, host = _deployed_site(backup_config, repo, tmp_path)
+    (repo / "index.php").write_text("changed\n")
+
+    assert runner() == 0
+
+    assert [p.name for p in backup_dir.iterdir() if p.name.endswith("-predeploy")]
+    assert re.search(r"backup\s+\S+-predeploy, \d+ drift", runner.text)
+    puts = host.transport.paths("put")
+    assert f"{FakeBackupHost.ROOT}/index.php" in puts
+    assert _agent_script(puts[0])
+    assert "predeploy" in (backup_dir / "backup.log").read_text()
+
+
+def test_a_failed_backup_stops_the_deploy_before_any_remote_change(backup_config, repo, tmp_path, backup_dir):
+    """[NEG] BackupError (exit 11), the code of every failed backup run. The only put is the
+    temporary script, which the run removed again; no deployed file was sent, none deleted.
+    Anti-vacuity: the changed file would be sent by a deploy that went on."""
+    runner, host = _deployed_site(backup_config, repo, tmp_path)
+    (repo / "index.php").write_text("changed\n")
+    host.fail_action = "dump"
+
+    assert runner() == BackupError.exit_code
+
+    assert "BackupError: the predeploy backup failed, nothing was deployed" in runner.err.getvalue()
+    assert [p for p in host.transport.paths("put") if not _agent_script(p)] == []
+    assert host.scripts() == []
+    assert not [p for p in backup_dir.iterdir() if p.name.endswith("-predeploy")]
+    assert "predeploy" in (backup_dir / "backup.log").read_text()
+    assert "failed" in (backup_dir / "backup.log").read_text()
+
+
+def test_no_backup_deploys_as_before_and_says_it_skipped(backup_config, repo, tmp_path, backup_dir):
+    """[HAPPY] The report names the skip; the host is not asked for a script."""
+    runner, host = _deployed_site(backup_config, repo, tmp_path)
+
+    assert runner("--no-backup") == 0
+
+    assert "backup      skipped (--no-backup)" in runner.text
+    assert host.actions == []
+    assert not backup_dir.exists()
+
+
+def test_the_first_deploy_onto_a_blank_remote_takes_no_backup(backup_config, repo, tmp_path, backup_dir):
+    """[ECP] Nothing is installed, so there is nothing to lose; the report says why."""
+    host = FakeBackupHost()
+    runner = Run(backup_config, repo, tmp_path, transport=host.transport,
+                 gallery=_Site(FakeGallery(BASE_URL), host), backup=True)
+
+    assert runner() == 0
+
+    assert "first deploy: nothing is installed" in runner.text
+    assert host.actions == []
+
+
+def test_a_dry_run_takes_no_backup(backup_config, repo, tmp_path):
+    """[ECP] --dry-run opens no socket at all, even beside a configured backup section."""
+    runner, host = _deployed_site(backup_config, repo, tmp_path)
+
+    assert runner("--dry-run") == 0
+
+    assert host.transport.calls == []
+    assert "skipped (--dry-run" in runner.text.split("backup ")[1]
+
+
+def test_a_credential_file_without_a_backup_section_refuses_naming_it(config_file, repo, tmp_path):
+    """[NEG] ConfigError before any connection; --no-backup is the named way out."""
+    runner = Run(config_file, repo, tmp_path, backup=True)
+
+    assert runner() == ConfigError.exit_code
+
+    assert "'backup' section" in runner.err.getvalue()
+    assert "--no-backup" in runner.err.getvalue()
+    assert runner.transport.calls == []
+    assert runner.gallery.calls == []
+
+
+def test_a_dry_run_needs_no_backup_section(config_file, repo, tmp_path):
+    """[ECP] The section is demanded only by a run that would take the snapshot."""
+    runner = Run(config_file, repo, tmp_path, backup=True)
+
+    assert runner("--dry-run") == 0
+
+
+@pytest.mark.parametrize("other", ["--dry-run", "--audit", "--list-files", "--seed-tags-only"])
+def test_no_backup_refuses_a_mode_that_takes_none(run, other, capsys):
+    """[DT] Same convention as --seed-tags-only and --prune-tags: a flag that would be
+    silently meaningless is refused."""
+    with pytest.raises(SystemExit):
+        run(other, "--no-backup")
+
+    assert "--no-backup cannot be combined" in capsys.readouterr().err
