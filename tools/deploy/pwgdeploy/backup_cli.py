@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pwgdeploy import backup, check, snapshot
+from pwgdeploy import backup, check, restore, snapshot
 from pwgdeploy.cli import INTERRUPTED_EXIT_CODE, REPO_ROOT, STATE_DIR, ftps_transport, http_client
 from pwgdeploy.config import load_file
 from pwgdeploy.errors import ConfigError, DeployError
@@ -33,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="restore check: import the newest snapshot's dump into DDEV's scratch database and verify its files",
     )
+    parser.add_argument("--restore", metavar="SNAPSHOT", help="put this snapshot (a folder name) back on the remote")
+    parser.add_argument("--yes", action="store_true", help="confirm --restore, which replaces the remote's database and files")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="with --restore: list what would be uploaded, deleted and imported; contacts nothing"
+    )
     return parser
 
 
@@ -48,7 +53,12 @@ def main(
     clock=datetime.now,
     git_commit=None,
 ) -> int:
-    args = build_parser().parse_args(sys.argv[1:] if argv is None else argv)
+    parser = build_parser()
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    if (args.yes or args.dry_run) and not args.restore:
+        parser.error("--yes and --dry-run belong to --restore")
+    if args.restore and args.check:
+        parser.error("--restore and --check are separate runs")
     out = sys.stdout if stdout is None else stdout
     err = sys.stderr if stderr is None else stderr
     started = clock()
@@ -60,6 +70,14 @@ def main(
         backup_dir = config.backup.dir
         if args.check:
             return check.check_main(backup_dir, out, err)
+
+        if args.restore:
+            return restore.restore_main(
+                config, args.restore, yes=args.yes, dry_run=args.dry_run, out=out,
+                transport_factory=transport_factory, client_factory=client_factory,
+                state_dir=state_dir, repo_root=repo_root, clock=clock, git_commit=git_commit,
+                label_width=LABEL_WIDTH,
+            )
 
         def report(label: str, text: str) -> None:
             print(f"  {label:<{LABEL_WIDTH}}{text}", file=out)
@@ -85,13 +103,17 @@ def main(
         report("done", f"{result.name}, {result.drift_count} drift")
         return 0
     except KeyboardInterrupt:
-        _log_failure(backup_dir, args.kind, started, clock, "interrupted")
+        _log_failure(backup_dir, _logged_kind(args), started, clock, "interrupted")
         print("interrupted; the next run resumes the unfinished snapshot", file=err)
         return INTERRUPTED_EXIT_CODE
     except DeployError as error:
-        _log_failure(backup_dir, args.kind, started, clock, f"failed {type(error).__name__}")
+        _log_failure(backup_dir, _logged_kind(args), started, clock, f"failed {type(error).__name__}")
         print(f"{type(error).__name__}: {error}", file=err)
         return error.exit_code
+
+
+def _logged_kind(args) -> str:
+    return restore.KIND if args.restore else args.kind
 
 
 def _log_failure(backup_dir, kind, started, clock, result) -> None:

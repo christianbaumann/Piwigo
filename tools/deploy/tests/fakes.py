@@ -551,6 +551,10 @@ class FakeBackupHost:
         self.reported_dump_size: int | None = None
         self.reported_dump_path: str | None = None
         self.leave_in_dump_dir: tuple[str, ...] = ()
+        # What agent.php's `import` read, one dump per call; and whether its `cleanup` also
+        # removes the .htaccess and marker of a dump directory the client made itself.
+        self.imported: list[bytes] = []
+        self.cleanup_removes_dir_files = False
         for relative in self.CONFIG_FILES:
             self.transport.files[f"{self.ROOT}/{relative}"] = relative.encode()
 
@@ -633,8 +637,13 @@ class _AgentClient:
         if action == "list":
             files = [{"path": p, "size": s, "mtime": m} for p, (s, m) in host.meta.items()]
             return {"files": files + host.listed_extra, "db_paths": host.db_paths}
+        if action == "import":
+            given = self.calls[-1][1]["path"]
+            host.imported.append(host.transport.files[f"{host.ROOT}/{given}"])
+            return {"statements": len(host.imported[-1].splitlines())}
         if action == "cleanup":
-            for path in (f"{host.ROOT}/{dump_path}", script):
+            extra = (f"{host.ROOT}/{directory}/.htaccess", f"{host.ROOT}/{directory}/.created-by-agent")
+            for path in (f"{host.ROOT}/{dump_path}", script, *(extra if host.cleanup_removes_dir_files else ())):
                 host.transport.files.pop(path, None)
             return {"removed": [dump_path, script]}
         raise AssertionError(action)

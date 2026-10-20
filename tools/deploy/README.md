@@ -405,6 +405,47 @@ database, exists on the host behind a one-time token, an expiry and a random nam
 root with a deny-all `.htaccess` until a host probe shows a writable directory outside it
 (`backup.DUMP_DIR_PREFIX`, `backup.dump_dir()`).
 
+## Restoring a snapshot — `pwg-backup --restore`
+
+```bash
+uv run pwg-backup --restore 2026-10-19T030000 --dry-run deploy.local.json   # what would happen
+uv run pwg-backup --restore 2026-10-19T030000 --yes deploy.local.json       # do it
+```
+
+`--restore` takes the snapshot's folder name from the backup folder (never a `.partial` one; the name
+is checked before anything else). It replaces the remote's database, the three backed-up folders and
+the two config files with the snapshot's, and **refuses without `--yes`**. In this order:
+
+1. The snapshot is checked locally: every file it names must be present at its recorded size.
+2. A fresh `prerestore` snapshot of the state being replaced is taken; if that fails nothing else
+   happens. The report names it, and so does the error of any later failure: that snapshot is how a
+   half-finished restore is undone.
+3. A temporary agent lists the host. Files of the snapshot that are missing on the host or differ in
+   size or mtime are uploaded; files under `upload/`, `galleries/` and `_data/photoedit/originals/`
+   that the snapshot does not hold are **deleted**. The count and the first 50 paths are printed
+   before anything is changed. Nothing outside those three folders is ever deleted, and every path
+   is validated as in a backup.
+4. A second temporary agent receives `db/dump.sql.gz` in a protected directory and imports it
+   (`import`: the dump's `DROP TABLE IF EXISTS` / `CREATE TABLE` / `INSERT` statements run on the
+   host); both agents and the dump are removed afterwards, also after a failure. Two agents because
+   uploading a gallery can outlast one agent's expiry.
+5. `local/config/config.inc.php` and `database.inc.php` are uploaded, and the snapshot's
+   `deploy-manifest.json` is written to `.state/` so the next `pwg-deploy` agrees with the remote
+   ([decision 0027](../../docs/agents/decisions/0027-manifest-and-remote-must-agree-on-installation.md)).
+   A snapshot without a readable manifest leaves the current one in place (the report says so).
+
+Code is not restored (git has it); derivatives and compiled templates are rebuilt on demand. The
+photos are uploaded with FTP, which gives every file a new mtime on the host: the next backup
+sees every restored file as changed and downloads it again, and a second restore of the same
+snapshot uploads them all again. Plan for that once after a restore.
+
+`--dry-run` contacts nothing: it opens no FTP or HTTP connection, takes no snapshot and writes
+nothing. Because it cannot list the host, it compares the snapshot with the newest *other*
+snapshot (and says so); with none it can only state the snapshot's file count. The real run lists
+the host. A restore appends one `restore` line to `backup.log` (`fetched` is the number of files
+uploaded, `linked` the unchanged ones, `bytes` the uploaded bytes). It exits with the backup codes
+(`11` for a refusal).
+
 ## The restore check — does the newest snapshot restore
 
 `pwgdeploy/check.py` imports the newest complete snapshot's `db/dump.sql.gz` into the scratch
@@ -426,7 +467,7 @@ deploy.local.json`; it reads the backup folder from the credential file and cont
 cd tools/deploy && uv run pytest
 ```
 
-812 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
+851 tests, measured 2026-10-20. Everything that decides *what* to do is a pure function and is
 unit-tested; the two adapters that cannot run without the world — FTPS and the remote HTTP
 endpoint — hold no decisions and are covered by hand checks recorded in
 [`docs/agents/TESTING.md`](../../docs/agents/TESTING.md).

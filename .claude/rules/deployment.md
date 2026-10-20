@@ -15,7 +15,7 @@ uv run pwg-deploy --list-files deploy.local.json # the published file set, one p
 uv run pwg-deploy --audit deploy.local.json      # read-only: lists the remote, names orphans
 uv run pwg-deploy --seed-tags-only deploy.ddev.json  # tag-groups.json only, to any install
 uv run pwg-backup deploy.local.json              # snapshot of DB, photos and config to backup.dir
-uv run pytest                                    # 812 tests, measured 2026-10-20
+uv run pytest                                    # 851 tests, measured 2026-10-20
 ```
 
 Stdlib-only at runtime; `uv` fetches the interpreter and pytest and nothing else. The tool works
@@ -43,6 +43,15 @@ with a deny-all `.htaccess`, until the host probe (task 01) shows a PHP-writable
 it. Tested with `FakeBackupHost` (`tests/fakes.py`) and, against the real `agent.php`, in
 `tests/integration/test_backup_ddev.py` (`PWG_DDEV_WEBROOT=<main checkout> uv run pytest -m integration`).
 Never contact the real remote from a test; the first real run is a ledger item in `docs/agents/TESTING.md`.
+
+`pwg-backup --restore <snapshot> --yes` is `pwgdeploy/restore.py` (`plan()` is pure; `run()` sequences
+it; `backup_cli.py` only wires flags). It reuses `backup.run()` for the `prerestore` snapshot and
+`backup._remove_agent()` for cleanup, uses two agents (list, then import) because the uploads can
+outlast one agent's expiry, deletes only paths `backup.validate_paths()` accepts, and raises
+`RestoreError` (a `BackupError`, exit `11`, no new code). `--dry-run` opens no connection. FTP
+uploads give restored files a new mtime (no MFMT in `Transport`), so the next backup downloads
+them again. Tested in `tests/test_restore.py` and `tests/integration/test_restore_ddev.py` (imports
+into a scratch database it creates and drops, never `db`).
 
 ## The credential file
 
