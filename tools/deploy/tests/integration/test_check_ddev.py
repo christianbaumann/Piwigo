@@ -48,9 +48,10 @@ def dump_bytes():
 
 def make(root, dump, counts, extra=None):
     folder = root / "2026-10-20T100000"
-    files = {check.DUMP_PATH: dump, **(extra or {})}
     entries = {}
-    for path, data in files.items():
+    (folder / check.DUMP_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (folder / check.DUMP_PATH).write_bytes(dump)
+    for path, data in (extra or {}).items():
         target = folder / snapshot.FILES_DIR / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)

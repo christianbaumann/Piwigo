@@ -370,7 +370,7 @@ uv run pytest -m integration
 
 ## The restore check — does the newest snapshot restore
 
-`pwgdeploy/check.py` imports the newest complete snapshot's `files/db/dump.sql.gz` into the scratch
+`pwgdeploy/check.py` imports the newest complete snapshot's `db/dump.sql.gz` into the scratch
 database `backup_check` in DDEV (`ddev mysql -uroot`, the dump streamed in from the host), counts
 `images`, `categories`, `tags` and `users` (table prefix: `prefix` in `snapshot.json`, default
 `piwigo_`) against the snapshot's `counts`, and re-hashes every file against its recorded sha1.

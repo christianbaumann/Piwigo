@@ -11,7 +11,6 @@ from __future__ import annotations
 import gzip
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,12 +24,17 @@ DEFAULT_PREFIX = "piwigo_"
 COUNTED_TABLES = ("images", "categories", "tags", "users")
 MAX_REPORTED_FILES = 5
 EXIT_CHECK_FAILED = 1
+FORBIDDEN_LINE = re.compile(rb"\s*(USE\s|(CREATE|DROP)\s+(DATABASE|SCHEMA))", re.IGNORECASE)
 PREFIX_PATTERN = re.compile(r"[A-Za-z0-9_]{0,32}")
 DDEV_MYSQL = ["ddev", "mysql", "-uroot"]
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 # (args, gzipped file streamed into stdin or None, cwd) -> (exit code, stdout, stderr)
 Runner = Callable[[list[str], "Path | None", "Path | None"], "tuple[int, str, str]"]
+
+
+class ForeignDatabase(Exception):
+    """The dump addresses a database itself; imported as root it could reach `db`."""
 
 
 class CheckError(Exception):
@@ -82,7 +86,14 @@ def _subprocess_runner(args: list[str], gz_stdin: Path | None, cwd: Path | None)
     unreadable = ""
     try:
         with gzip.open(gz_stdin, "rb") as source:
-            shutil.copyfileobj(source, process.stdin)
+            for line in source:
+                if FORBIDDEN_LINE.match(line):
+                    raise ForeignDatabase(line[:60].decode(errors="replace").strip())
+                process.stdin.write(line)
+    except ForeignDatabase as error:
+        process.kill()
+        process.communicate()
+        return 1, "", f"the dump selects or creates a database itself ({error}); not imported"
     except (EOFError, OSError) as error:
         unreadable = f"the dump cannot be read to its end: {error}"
     except BrokenPipeError:
@@ -149,7 +160,7 @@ def run_check(
     folder, files = found
     document = _read_meta(folder)
     problems = verify_files(folder, files)
-    dump = folder / snapshot.FILES_DIR / DUMP_PATH
+    dump = folder / DUMP_PATH
     if not dump.is_file():
         return problems + [f"{DUMP_PATH}: missing, nothing to import"]
     actual, import_problems = import_and_count(dump, document.get("prefix", DEFAULT_PREFIX), runner, cwd)

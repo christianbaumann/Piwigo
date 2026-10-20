@@ -37,8 +37,9 @@ def test_compare_empty_expected_counts_is_a_failure():
 def make_snapshot(root, files, meta=None, dump=b"SELECT 1;"):
     folder = root / "2026-10-20T100000"
     entries = {}
-    contents = {**files, check.DUMP_PATH: gzip.compress(dump)}
-    for path, data in contents.items():
+    (folder / check.DUMP_PATH).parent.mkdir(parents=True, exist_ok=True)
+    (folder / check.DUMP_PATH).write_bytes(gzip.compress(dump))
+    for path, data in files.items():
         target = folder / snapshot.FILES_DIR / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
@@ -141,3 +142,18 @@ def test_check_main_exit_codes(tmp_path):
     err = io.StringIO()
     assert check.check_main(tmp_path, io.StringIO(), err, runner=FakeRunner(counts={})) == 1
     assert "check failed" in err.getvalue()
+
+
+def test_the_real_runner_refuses_a_dump_that_selects_a_database(tmp_path):
+    dump = tmp_path / "dump.sql.gz"
+    dump.write_bytes(gzip.compress(b"CREATE TABLE t (a int);\nUSE `db`;\nDROP TABLE t;\n"))
+    code, _, err = check._subprocess_runner(["cat"], dump, None)
+    assert code == 1
+    assert "selects or creates a database" in err and "USE" in err
+
+
+def test_the_real_runner_streams_a_plain_dump(tmp_path):
+    dump = tmp_path / "dump.sql.gz"
+    dump.write_bytes(gzip.compress(b"CREATE TABLE users_t (a int);\nINSERT INTO used VALUES (1);\n"))
+    code, out, _ = check._subprocess_runner(["cat"], dump, None)
+    assert code == 0 and "INSERT INTO used" in out
