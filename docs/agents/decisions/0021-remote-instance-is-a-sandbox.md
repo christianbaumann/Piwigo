@@ -2,6 +2,7 @@
 
 Date: 2026-08-31
 Status: accepted
+Superseded by: [0088](0088-the-remote-holds-state-the-repository-cannot-rebuild.md)
 Implements decision 9 of the FTP deployment plan
 ([`docs/agents/plans/2026-08-31-ftp-deployment-and-remote-install.md`](../plans/2026-08-31-ftp-deployment-and-remote-install.md))
 
