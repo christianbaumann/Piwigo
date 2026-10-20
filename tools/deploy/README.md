@@ -369,6 +369,21 @@ The integration test runs the command against DDEV, with a `deploy.ddev.json` as
 uv run pytest -m integration
 ```
 
+## The restore check — does the newest snapshot restore
+
+`pwgdeploy/check.py` imports the newest complete snapshot's `db/dump.sql.gz` into the scratch
+database `backup_check` in DDEV (`ddev mysql -uroot`, the dump streamed in from the host), counts
+`images`, `categories`, `tags` and `users` (table prefix: `prefix` in `snapshot.json`, default
+`piwigo_`) against the snapshot's `counts`, and re-hashes every file against its recorded sha1.
+It names the import error, each differing table and the first five bad files, exits `1` on any
+problem, and always drops `backup_check`. It refuses any other database name in code; `db` (the
+local gallery) is never touched. DDEV must be up, and the command runs from the checkout holding
+`.ddev/`.
+
+Run it after the first snapshot and then about monthly, and after any change to the dump method.
+A backup that was never restored has not been tested. The command-line flag is wired into
+`pwg-backup` with task 06 (`check.check_main(snapshot_root)` is the entry it calls).
+
 ## Testing
 
 ```bash
