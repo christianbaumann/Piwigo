@@ -36,6 +36,6 @@
   "backup": {
     "dir": "~/Backups/piwigo-remote",
     "notify": "you@example.net",
-    "dump_dir": "../backup-tmp"
+    "dump_dir": "_data/backup-tmp"
   }
 }

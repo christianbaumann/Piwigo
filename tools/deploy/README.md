@@ -59,7 +59,7 @@ Any `deploy.*.json` other than the example is git-ignored, in the repository roo
 | | `sender_email` | the From address; use the SMTP mailbox itself, or receivers reject it |
 | | `sender_name` | the From name; `""` means the gallery title |
 | `backup` | `dir` | optional section — the folder backups are written to; `~` is expanded, the result must be absolute and outside this repository |
-| | `dump_dir` | optional — where the temporary script writes the dump, relative to the web root: plain names separated by `/`, optionally one leading `../` for a sibling of the web root (`../backup-tmp`); never absolute, never any other `..`. The folder must be writable by FTP and by PHP. Absent: a random-named folder directly under the web root. The example sets `../backup-tmp`, which must exist on your host and be writable; delete the key to get the default |
+| | `dump_dir` | optional — where the temporary script writes the dump, relative to the web root: plain names separated by `/`, optionally one leading `../` for a sibling of the web root (`../backup-tmp`); never absolute, never any other `..`. The folder must be writable by FTP and by PHP. Absent: a random-named folder directly under the web root. The example sets `_data/backup-tmp` (created on demand). Leave the key out on all-inkl: the FTP login is confined to the web root, so `../` cannot work there (probed 2026-10-21). `../` works only on hosts whose FTP login reaches the web root's parent |
 | | `notify` | the address a failed `pwg-backup` run mails; when absent, the `admin` section's e-mail address. Needs the `mail` section |
 
 Values are validated locally against the same rules the remote enforces, so a bad table prefix

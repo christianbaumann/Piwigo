@@ -60,7 +60,7 @@ directly in the web root that the manifest does not cover as `leftover`.
 The dump directory is one function, `backup.dump_dir(base)`: a random-named directory below the web
 root with a deny-all `.htaccess`, or, with `backup.dump_dir` in the credential file, a random-named
 subdirectory of that path (FTP- and PHP-writable; one leading `../` allowed for a sibling of the web
-root, `config._dump_dir()` is the only validation). `agent.php` resolves it relative to its own
+root, `config._dump_dir()` is the only validation). On all-inkl leave the key out: the FTP login is confined to the web root, so `../` cannot work (probed 2026-10-21); it suits only hosts whose FTP login reaches the web root's parent. `agent.php` resolves it relative to its own
 directory and `realpath()` containment works the same outside the web root. Tested with `FakeBackupHost` (`tests/fakes.py`) and, against the real `agent.php`, in
 `tests/integration/test_backup_ddev.py` (`PWG_DDEV_WEBROOT=<main checkout> uv run pytest -m integration`).
 Never contact the real remote from a test; the first real run is a ledger item in `docs/agents/TESTING.md`.

@@ -313,4 +313,7 @@ Answered by the user after tasks 01-10 were built:
 | Mail for a failed predeploy snapshot | None: `pwg-deploy` is run by hand and its terminal shows the failure (exit 14); only `pwg-backup` runs mail |
 | `pwg-backup --check` | Appends a `check` line (`ok` or `failed`) to `backup.log`; its failure mail is labelled kind `check` |
 | Audit of `backup.dump_dir` | `pwg-deploy --audit` also lists a `../` dump location and reports leftover `dump-*` files; a listing that fails is reported as not checked |
+| Dump location on the real host (probe 2026-10-21) | FTP is confined to the web root on this host (listing `<root>/..` returns the web root's own entries), so the dump stays in the default protected directory under the web root and `backup.dump_dir` must not point to `../`; the example uses `_data/backup-tmp` |
+| `mysqldump` on the real host (probe 2026-10-21) | Available (`/usr/bin/mysqldump`, 10.19 / MariaDB 10.11.14, runs under `exec()`); PHP 8.4.24, no `open_basedir`, no `disable_functions`, `max_execution_time` 60, `memory_limit` 384M |
+| First run size (probe 2026-10-21) | About 13 GB (`upload/` 13.0 GB in 3976 files, `galleries/` 1.7 MB, `_data/photoedit/originals/` 66 MB in 20 files); database 2.6 MB, 38 tables |
 | `test_albums_ddev` flake | Fixed: the test picks the newest report file |
