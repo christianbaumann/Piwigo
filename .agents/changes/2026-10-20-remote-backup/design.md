@@ -317,3 +317,39 @@ Answered by the user after tasks 01-10 were built:
 | `mysqldump` on the real host (probe 2026-10-21) | Available (`/usr/bin/mysqldump`, 10.19 / MariaDB 10.11.14, runs under `exec()`); PHP 8.4.24, no `open_basedir`, no `disable_functions`, `max_execution_time` 60, `memory_limit` 384M |
 | First run size (probe 2026-10-21) | About 13 GB (`upload/` 13.0 GB in 3976 files, `galleries/` 1.7 MB, `_data/photoedit/originals/` 66 MB in 20 files); database 2.6 MB, 38 tables |
 | `test_albums_ddev` flake | Fixed: the test picks the newest report file |
+
+## Status and handoff (2026-11-03)
+
+Tasks 01-10 and the follow-ups in the table above are implemented, verified and merged on
+master (last code commit `a5446959b`). The `tools/deploy` unit suite and the DDEV integration
+tests for agent, backup, restore and check pass. The host probe ran 2026-10-21; its answers are
+in the `docs/agents/TESTING.md` ledger.
+
+Open, in this order:
+
+1. **Decision pending: `.agents/` and `CLAUDE.md` are published to the remote web space.**
+   `pwgdeploy/fileset.py` `EXCLUDED_PREFIXES` excludes `docs/` and `.claude/` but not these, so
+   every change document (this design included) is on the public host. Recommended: add
+   `.agents/`, `CLAUDE.md` and `AGENTS.md` to the exclusions with a `test_fileset.py` case; the
+   next deploy's prune then removes them from the remote. Waiting for the user's answer.
+2. **First real backup run (the user chose: a subagent runs it).** Prerequisites the user owns:
+   - `tools/deploy/deploy.local.json` needs `"backup": {"dir": "~/Backups/piwigo-remote"}` and
+     **no** `dump_dir` (FTP is confined to the web root on all-inkl). Agents may not read that
+     file; the tool's own error names a missing section.
+   - A narrow allow rule in `.claude/settings.local.json`:
+     `Bash(uv run --directory /Users/christian.baumann/git_repos/_own/piwigo/tools/deploy pwg-backup:*)`
+     (proposed, not yet added; needs the user's yes).
+   Then: run `pwg-backup deploy.local.json` in the background (about 13 GB in 3976 files over
+   FTPS, resumable via `.partial`), run it a second time, and check on the Mac: the second run
+   fetched only changed files, unchanged photos share an inode across both snapshots,
+   `snapshot.json` holds commit, timestamps, `dump_method` `mysqldump` and counts (images 3589,
+   categories 109, tags 190, users 10 at probe time), `pwg-deploy --audit` reports no leftover.
+   Record it in the TESTING.md ledger row of task 06 and tick task 06's `[-]` remote items.
+3. **Remaining hand checks** (ledger rows exist): forced failure mail (task 07), `launchctl
+   bootstrap` of the plist example (task 07), a real deploy leaving a `*-predeploy` snapshot
+   (task 08), a restore of a fresh snapshot plus `pwg-deploy --dry-run` with no state mismatch
+   (task 09), `pwg-backup --check` on the first real snapshot (task 10).
+
+Working conventions used: one worktree per task under `.agents/worktrees/` (git-ignored),
+Sonnet subagents implement and a second Sonnet subagent runs `/verify`, merges on master. DDEV
+serves only the main checkout, so integration tests take `PWG_DDEV_WEBROOT` pointing at it.
