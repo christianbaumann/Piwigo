@@ -1,0 +1,682 @@
+<title>Fotoseite: Bearbeiten-Konzepte</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bitter:wght@600;700&display=swap">
+<style>
+/* Layout: one reading column; each concept = tab with a full-width interactive mockup, then its rationale in two columns */
+:root{
+  --bg:#eef2f0; --surface:#ffffff; --surface-2:#f6f8f7; --ink:#1b2420; --muted:#56635d; --line:#cfd8d4;
+  --accent:#1d6a4e; --accent-ink:#ffffff; --accent-soft:#dcede5;
+  --edit:#a8530a; --edit-soft:#fbecd6; --edit-ink:#5c2c03;
+  --ok:#17733a; --ok-soft:#dff3e5; --danger:#b3261e; --danger-soft:#fbe3e1;
+  --g-ort:#2a67a8; --g-anlass:#9a5600; --g-verein:#74409b; --g-frei:#56635d;
+  --f-display:"Bitter", Georgia, serif;
+  --f-body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --radius:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121816; --surface:#1b2320; --surface-2:#222b28; --ink:#e6ece9; --muted:#9fb0a8; --line:#34413c;
+  --accent:#5cc49b; --accent-ink:#0d1a14; --accent-soft:#1f3a2f;
+  --edit:#f0a253; --edit-soft:#3a2a17; --edit-ink:#fbd9b3;
+  --ok:#6fd394; --ok-soft:#1b3424; --danger:#ff8a80; --danger-soft:#3d1f1d;
+  --g-ort:#7fb2ea; --g-anlass:#e3a654; --g-verein:#c49be3; --g-frei:#a5b4ad;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121816; --surface:#1b2320; --surface-2:#222b28; --ink:#e6ece9; --muted:#9fb0a8; --line:#34413c;
+  --accent:#5cc49b; --accent-ink:#0d1a14; --accent-soft:#1f3a2f;
+  --edit:#f0a253; --edit-soft:#3a2a17; --edit-ink:#fbd9b3;
+  --ok:#6fd394; --ok-soft:#1b3424; --danger:#ff8a80; --danger-soft:#3d1f1d;
+  --g-ort:#7fb2ea; --g-anlass:#e3a654; --g-verein:#c49be3; --g-frei:#a5b4ad;
+  color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:2rem}
+h2{font-size:1.45rem}
+h3{font-size:1.1rem}
+p{margin:0}
+a{color:var(--accent)}
+.prose{max-width:68ch;display:grid;gap:10px}
+.eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.muted{color:var(--muted)}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* today table */
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:.82rem;font-weight:700;white-space:nowrap}
+.p-now{background:var(--danger-soft);color:var(--danger)}
+.p-save{background:var(--accent-soft);color:var(--accent)}
+.p-mode{background:var(--edit-soft);color:var(--edit-ink)}
+
+/* tabs */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;border-bottom:2px solid var(--line)}
+.tab{background:none;border:0;border-bottom:4px solid transparent;margin-bottom:-2px;padding:10px 14px;text-align:left;color:var(--muted);display:grid;gap:2px}
+.tab b{font-family:var(--f-display);font-size:1.1rem;color:var(--ink)}
+.tab[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--ink)}
+.tab[aria-selected="true"] b{color:var(--accent)}
+.concept{display:grid;gap:22px}
+.try{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px}
+.try ol{margin:6px 0 0;padding-left:1.3em;display:grid;gap:2px}
+
+/* mockup shell */
+.mock{border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden;position:relative}
+.mock-bar{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:8px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:.9rem;flex-wrap:wrap}
+.mock-bar .crumb{color:var(--muted)}
+.navbtn{background:none;border:1px solid var(--line);border-radius:var(--radius);padding:4px 10px;color:var(--ink)}
+.mock-body{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;padding:18px}
+@media (max-width:780px){.mock-body{grid-template-columns:minmax(0,1fr)}}
+.sample{font-size:.78rem;color:var(--muted)}
+
+/* banner for concept A */
+.banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:var(--edit-soft);color:var(--edit-ink);border-bottom:3px solid var(--edit);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.banner .grow{flex:1 1 260px;min-width:0}
+.banner strong{font-family:var(--f-display)}
+.mock.is-editing{outline:4px solid var(--edit);outline-offset:-4px}
+
+/* buttons */
+.btn{border-radius:var(--radius);padding:9px 16px;border:2px solid transparent;font-weight:700;min-height:44px}
+.btn-primary{background:var(--accent);color:var(--accent-ink)}
+.btn-edit{background:var(--edit);color:var(--surface)}
+.btn-ghost{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn-danger{background:var(--danger);color:var(--surface)}
+.btn-big{font-size:1.05rem;padding:11px 20px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-weight:700}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* photo stage */
+.stage{position:relative;user-select:none;-webkit-user-select:none;border-radius:4px;overflow:hidden;background:#2a2118;touch-action:auto}
+.stage svg{display:block;width:100%;height:auto}
+.stage.drawing{cursor:crosshair;touch-action:none;outline:4px solid var(--edit);outline-offset:-4px}
+.box{position:absolute;border:2px solid rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(0,0,0,.5);border-radius:3px}
+.box.new{border-style:dashed;border-color:#ffd38a}
+.box .lbl{position:absolute;left:-2px;top:100%;margin-top:3px;background:rgba(15,15,15,.82);color:#fff;font-size:.78rem;padding:1px 6px;border-radius:3px;white-space:nowrap}
+.box .del{position:absolute;right:-12px;top:-12px;width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:#b3261e;color:#fff;font-weight:700;line-height:1;padding:0}
+.draft{position:absolute;border:2px dashed #ffd38a;background:rgba(255,211,138,.15)}
+.stage-hint{position:absolute;left:8px;right:8px;top:8px;background:rgba(20,16,10,.85);color:#fff;padding:8px 12px;border-radius:5px;font-size:.92rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stage-hint .grow{flex:1 1 180px}
+.stage-hint button{background:#fff;color:#1b2420;border:0;border-radius:4px;padding:5px 10px;font-weight:700}
+.picker{position:absolute;z-index:4;width:min(260px,90%);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:10px;display:grid;gap:8px}
+.picker input{font:inherit;padding:8px;border:2px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
+.picker ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:150px;overflow:auto}
+.picker li button{width:100%;text-align:left;background:var(--surface-2);border:0;border-radius:4px;padding:6px 8px;color:var(--ink)}
+.picker li button:hover{background:var(--accent-soft)}
+.picker .pk-actions{display:flex;gap:6px;justify-content:flex-end}
+.picker .pk-actions .btn{min-height:36px;padding:5px 12px}
+
+/* info panel */
+.panel{display:grid;gap:4px;align-content:start;min-width:0}
+.prow{display:grid;gap:4px;padding:10px 12px;border-radius:var(--radius);border:2px solid transparent}
+.prow-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.prow-label{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.prow-val{overflow-wrap:anywhere}
+.prow.open{border-color:var(--edit);background:var(--edit-soft)}
+.prow.open .prow-label{color:var(--edit-ink)}
+.editbtn{background:var(--surface);border:2px solid var(--line);border-radius:var(--radius);padding:4px 12px;font-weight:700;color:var(--ink);min-height:38px}
+.editbtn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.editbtn:disabled{opacity:.4;cursor:not-allowed}
+.status{font-size:.9rem;font-weight:700;color:var(--ok);display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+.status.saving{color:var(--muted)}
+.status.pending{color:var(--edit-ink)}
+.statusline{background:var(--ok-soft);color:var(--ok);font-weight:700;padding:8px 12px;border-radius:var(--radius)}
+.hr{height:1px;background:var(--line);margin:4px 0}
+.field{display:grid;gap:3px}
+.field label{font-size:.85rem;color:var(--muted)}
+.fields{display:flex;gap:8px;flex-wrap:wrap}
+.fields .field{flex:1 1 90px}
+select,input[type=text],input[type=number],textarea{font:inherit;padding:8px;border:2px solid var(--line);border-radius:5px;background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box;min-height:44px}
+textarea{min-height:90px;resize:vertical}
+.empty{font-style:italic;color:var(--muted)}
+
+/* chips */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:4px 10px;font-size:.92rem;font-weight:700;color:var(--surface);background:var(--g-frei);border:2px solid transparent;min-height:34px;box-sizing:border-box}
+.chip.g-ort{background:var(--g-ort)} .chip.g-anlass{background:var(--g-anlass)} .chip.g-verein{background:var(--g-verein)}
+.chip.add{background:var(--surface);color:var(--ink);border:2px dashed var(--line)}
+.chip.add.g-ort{border-color:var(--g-ort);color:var(--g-ort)} .chip.add.g-anlass{border-color:var(--g-anlass);color:var(--g-anlass)} .chip.add.g-verein{border-color:var(--g-verein);color:var(--g-verein)}
+.chip.staged{outline:3px dashed var(--edit);outline-offset:1px}
+.chip .x{background:rgba(0,0,0,.25);border:0;color:inherit;border-radius:50%;width:22px;height:22px;line-height:1;padding:0;font-weight:700}
+.sublabel{font-size:.85rem;color:var(--muted);margin-top:6px}
+.newtag{display:flex;gap:6px;margin-top:6px}
+.newtag input{flex:1;min-width:0}
+
+/* confirm */
+.confirm{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--danger-soft);color:var(--danger);padding:10px 14px;font-weight:700;border-bottom:3px solid var(--danger)}
+.confirm .grow{flex:1 1 220px}
+
+/* history (B) */
+.history{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:.92rem;display:grid;gap:4px}
+.history ul{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.history li{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.history li.undone span{text-decoration:line-through;color:var(--muted)}
+
+/* rationale */
+.why{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:780px){.why{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:grid;gap:8px;align-content:start;min-width:0}
+.card ul{margin:0;padding-left:1.2em;display:grid;gap:4px}
+.plus li::marker{content:"+  ";color:var(--ok);font-weight:700}
+.minus li::marker{content:"–  ";color:var(--danger);font-weight:700}
+.recommend{border:2px solid var(--accent);background:var(--accent-soft)}
+.src li{overflow-wrap:anywhere}
+.tag-src{font-size:.78rem;color:var(--muted)}
+.note{background:var(--surface-2);border-left:4px solid var(--muted);padding:8px 12px;font-size:.92rem;border-radius:0 var(--radius) var(--radius) 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="prose">
+    <span class="eyebrow">Piwigo-Fork · Fotoseite · Brainstorm 2026-10-20</span>
+    <h1>Fotoseite bearbeiten: drei Konzepte zum Ausprobieren</h1>
+    <p>Today the picture page has four edit features with four different save rules. Below are three ways to make them one consistent thing. Each concept has a working mockup (sample photo and data, nothing is sent anywhere), a list of what to try, and the reasoning behind it.</p>
+  </header>
+
+  <section class="prose" style="max-width:none">
+    <h2>What the page does today</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Feature</th><th>How you start</th><th>When it is saved</th><th>How you finish</th></tr></thead>
+        <tbody>
+          <tr><td><b>Datum</b> (photoinfo)</td><td>Click the text (hidden affordance, tooltip only)</td><td><span class="pill p-save">Speichern button</span></td><td>Speichern / Abbrechen, then page reloads</td></tr>
+          <tr><td><b>Info</b> (photoinfo)</td><td>Click the text</td><td><span class="pill p-save">Speichern button</span></td><td>Speichern / Abbrechen, then page reloads</td></tr>
+          <tr><td><b>Personen</b> (persons)</td><td>Button „Personen markieren“ below the info table</td><td><span class="pill p-now">immediately</span> per box after naming; × deletes with no confirm</td><td>Button changes to „Markieren beenden“; reload if anything changed</td></tr>
+          <tr><td><b>Schlagwörter</b> (typetags)</td><td>Nothing to start; „+ name“ badges always shown</td><td><span class="pill p-now">immediately</span> on one click</td><td>Nothing; no reload, no confirmation shown</td></tr>
+          <tr><td><b>Drehen/Zuschneiden</b> (photoedit)</td><td>Toolbar button</td><td><span class="pill p-mode">mode</span> + Speichern</td><td>Speichern / Abbrechen, confirm() if regions get cut</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">So the same page asks the user to learn: click-the-text, a start/stop toggle, instant one-click writes, and a full-screen mode. Every one of them writes into the image file (exiftool), so even the „instant“ ones take a moment and can fail.</p>
+  </section>
+
+  <section class="concept-area" style="display:grid;gap:18px">
+    <div class="tabs" role="tablist" aria-label="Konzepte">
+      <button class="tab" role="tab" id="tab-a" aria-controls="concept-a" aria-selected="true" data-hash="a"><span class="eyebrow">Konzept A</span><b>Ein Bearbeiten-Modus</b><span>one button, one Speichern for everything</span></button>
+      <button class="tab" role="tab" id="tab-b" aria-controls="concept-b" aria-selected="false" data-hash="b"><span class="eyebrow">Konzept B</span><b>Sofort gespeichert, sichtbar</b><span>every step saves itself, with Rückgängig</span></button>
+      <button class="tab" role="tab" id="tab-c" aria-controls="concept-c" aria-selected="false" data-hash="c"><span class="eyebrow">Konzept C</span><b>Bearbeiten pro Abschnitt</b><span>same button and footer on every row</span></button>
+    </div>
+
+    <!-- ============ A ============ -->
+    <div class="concept" id="concept-a" role="tabpanel" aria-labelledby="tab-a">
+      <div class="prose">
+        <p><b>Idea:</b> the page has two states, <i>Ansehen</i> and <i>Bearbeiten</i>. One big button switches to Bearbeiten. Then everything is editable at once: date, info, tags, and drawing faces on the photo. Nothing is written until the user presses <b>Speichern</b> in the orange bar. This is the model of a paper form: fill in, then hand in.</p>
+      </div>
+      <div class="try"><b>Try this</b>
+        <ol>
+          <li>Press <b>Foto bearbeiten</b>. Note the orange frame and the bar on top (two signals for the mode).</li>
+          <li>Change the year, remove the tag „Kirmes“, add „Kirche“, drag a box around the third person's head and name it.</li>
+          <li>Watch the change counter. Press <b>Abbrechen</b> or <b>Nächstes Foto →</b> to see the „lose changes?“ question.</li>
+          <li>Press <b>Speichern</b>.</li>
+        </ol>
+      </div>
+      <div class="mock" id="mock-a">
+        <div class="confirm" data-role="confirm" hidden></div>
+        <div class="banner" data-role="banner" hidden></div>
+        <div class="mock-bar"><span class="crumb">Startseite / Kirmes / <b>Foto 2230</b></span><span class="sample">Beispielfoto und -daten</span><button class="navbtn" data-a="next">Nächstes Foto →</button></div>
+        <div class="mock-body">
+          <div data-role="photo"></div>
+          <div class="panel" data-role="panel"></div>
+        </div>
+      </div>
+      <div class="why">
+        <div class="card"><h3>Pros</h3><ul class="plus">
+          <li>Simplest rule to explain: „Bearbeiten drücken, ändern, Speichern drücken.“</li>
+          <li>The mode is shown twice (frame + bar), as NN/g asks for modes.</li>
+          <li>No accidental writes: a misclick on a tag in view mode does nothing.</li>
+          <li>One reload at the end instead of one per feature.</li>
+        </ul></div>
+        <div class="card"><h3>Cons</h3><ul class="minus">
+          <li>Work can be lost: navigate away, session expires, browser closes. Needs a leave-warning (<code>beforeunload</code>).</li>
+          <li>Speichern runs several file writes in a row (date, info, tags, regions). If one fails, the message must say which part was not saved. Harder to explain than one failure.</li>
+          <li>Two users editing the same photo: the second Speichern overwrites more.</li>
+          <li>Drawing on the photo is active during the whole mode, so zoom and the photo's prev/next click zones are off while editing.</li>
+        </ul></div>
+        <div class="card"><h3>Seen in</h3><p>Form-style „Edit → Save“ pages; Wikimedia Commons (edit, then <i>Publish</i>). Photo apps rarely make the whole info panel one mode.</p></div>
+        <div class="card"><h3>Effect on the code</h3><ul>
+          <li>Largest change. A new shared editor script owns the mode; photoinfo, typetags and persons stop saving on their own and hand their changes to it.</li>
+          <li>typetags and persons need „staged“ changes (kept in the browser until Speichern).</li>
+          <li>Save = sequence of existing ws calls (<code>pwg.photoinfo.setDate</code>, <code>setInfo</code>, <code>typetags.image.addTag/removeTag</code>, <code>pwg.persons.addRegion/deleteRegion</code>), or one new combined method that takes the persons lock once.</li>
+          <li>photoedit stays its own tool (it replaces the file).</li>
+        </ul></div>
+      </div>
+    </div>
+
+    <!-- ============ B ============ -->
+    <div class="concept" id="concept-b" role="tabpanel" aria-labelledby="tab-b" hidden>
+      <div class="prose">
+        <p><b>Idea:</b> keep „it saves by itself“, but make it the rule everywhere and make it visible. Every step is complete in itself: pick a tag, finish a date, name a face. Right after, the row shows <b>✓ Gespeichert · Rückgängig</b>, and a list at the bottom shows the last changes with an undo for each. Marking a person becomes one action („+ Person markieren“, draw, name, done), with no start/stop.</p>
+      </div>
+      <div class="try"><b>Try this</b>
+        <ol>
+          <li>Click „+ Kirche“. See the status on the row. Open „Letzte Änderungen an diesem Foto“ (closed by default), which names who changed what and when. Press Rückgängig. Switch the role in the grey bar: a normal user can undo only their own changes, an administrator can undo everyone's.</li>
+          <li>Press <b>✎ ändern</b> at Datum, change „ca.“ to „vor“: saved at once. Change the year and press Enter or leave the field.</li>
+          <li>Type in Info: the row says „noch nicht gespeichert“ until you leave the field.</li>
+          <li>Press <b>+ Person markieren</b>, drag a box, choose a name. The mode ends by itself. Delete a box with ×, then undo it.</li>
+        </ol>
+      </div>
+      <div class="mock" id="mock-b">
+        <div class="mock-bar"><label for="b-role">Angemeldet als <b>christian</b>, Rolle:</label><select id="b-role" style="width:auto;min-height:34px;padding:3px 6px"><option value="normal">normaler Benutzer</option><option value="admin">Administrator</option></select><span class="crumb">Startseite / Kirmes / <b>Foto 2230</b></span><span class="sample">Beispielfoto und -daten</span><button class="navbtn" type="button">Nächstes Foto →</button></div>
+        <div class="mock-body">
+          <div data-role="photo"></div>
+          <div class="panel" data-role="panel"></div>
+        </div>
+      </div>
+      <div class="why">
+        <div class="card"><h3>Pros</h3><ul class="plus">
+          <li>Closest to today: tags and persons already save at once. Least to learn for current users.</li>
+          <li>Nothing is ever lost by navigating away.</li>
+          <li>Undo instead of confirm dialogs (NN/g, GNOME HIG: users click through confirms; undo is the better net).</li>
+          <li>Each write is small, so a failure names exactly one thing.</li>
+        </ul></div>
+        <div class="card"><h3>Cons</h3><ul class="minus">
+          <li>Autosave of text is what the research warns about: users cannot tell „saved“ from „not saved“ (Primer, saasui). The status text has to carry all the trust.</li>
+          <li>Every keystroke-pause or field-leave writes the image file; many file writes, and „Rückgängig“ is one more.</li>
+          <li>A misclick on a tag is a real write (with undo). Older users may not notice it happened.</li>
+          <li>Undo of a person box creates a new region (new id); undo after somebody else changed the photo is ambiguous.</li>
+        </ul></div>
+        <div class="card"><h3>Seen in</h3><p>Apple Photos captions (type in place), Google Docs-style autosave, Primer's rule „autosave only for toggle-like controls“ fits the tags but not the text fields.</p></div>
+        <div class="card"><h3>Effect on the code</h3><ul>
+          <li>Smallest server change: all ws methods exist.</li>
+          <li>photoinfo: drop Speichern, save on field change/leave, no reload; add the status line.</li>
+          <li>persons: replace the toggle with a one-shot „+ Person markieren“; keep immediate save.</li>
+          <li>New: a per-page change list with undo (client side; undo re-sends the old value).</li>
+        </ul></div>
+      </div>
+    </div>
+
+    <!-- ============ C ============ -->
+    <div class="concept" id="concept-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+      <div class="prose">
+        <p><b>Idea:</b> one pattern, repeated on every row. Each row (Datum, Info, Personen, Schlagwörter, Foto) has the same visible <b>✎ Bearbeiten</b> button. It opens only that row, in orange, with the same footer: <b>Abbrechen</b> and <b>Speichern</b>. While one row is open, the other Bearbeiten buttons are off, so there is never a question of what Speichern will save. Opening Personen makes the photo drawable, with the same orange frame.</p>
+      </div>
+      <div class="try"><b>Try this</b>
+        <ol>
+          <li>Press <b>✎ Bearbeiten</b> at Schlagwörter. Add and remove tags (shown dashed until saved). Press Speichern.</li>
+          <li>Press Bearbeiten at Personen: the photo gets an orange frame. Drag a box round the third head, name it, delete another with ×. Abbrechen restores everything.</li>
+          <li>Open Datum and try to open Info at the same time.</li>
+        </ol>
+      </div>
+      <div class="mock" id="mock-c">
+        <div class="mock-bar"><span class="crumb">Startseite / Kirmes / <b>Foto 2230</b></span><span class="sample">Beispielfoto und -daten</span><button class="navbtn" type="button">Nächstes Foto →</button></div>
+        <div class="mock-body">
+          <div data-role="photo"></div>
+          <div class="panel" data-role="panel"></div>
+        </div>
+      </div>
+      <div class="why">
+        <div class="card"><h3>Pros</h3><ul class="plus">
+          <li>One rule, learned once, used five times: „Bearbeiten → ändern → Speichern“. Matches explicit save for text (Primer, Oracle Alta).</li>
+          <li>Face marking is a bounded mode with a clear start and a big Speichern, like Google Photos (Edit → Done), Flickr, digiKam.</li>
+          <li>Small units: little to lose, and an error belongs to the open row.</li>
+          <li>Visible button instead of „click the text“: better for users who do not hover to discover.</li>
+        </ul></div>
+        <div class="card"><h3>Cons</h3><ul class="minus">
+          <li>Tags take two clicks more than today (Bearbeiten, Speichern) for a single tag.</li>
+          <li>Five Bearbeiten buttons make the panel look busier in view mode.</li>
+          <li>Still a page reload or partial refresh after each Speichern, unless rows update in place.</li>
+        </ul></div>
+        <div class="card"><h3>Seen in</h3><p>Google Photos (People: Edit → Done; date: pencil → dialog → Save), Flickr („Edit tags“ / „Edit people“ → Done), Atlassian inline edit with confirm/cancel next to the field, GOV.UK „Change“ links on summary rows.</p></div>
+        <div class="card"><h3>Effect on the code</h3><ul>
+          <li>Medium. photoinfo already works this way (form + Speichern/Abbrechen); only the trigger becomes a visible button.</li>
+          <li>typetags: badges move into an edit section; Speichern sends the add/remove calls (or one new batch method, so the file is written once).</li>
+          <li>persons: the toggle becomes the row's Bearbeiten; regions are staged and sent on Speichern.</li>
+          <li>A tiny shared script makes sure only one row is open (also stops photoedit and persons fighting, which photoedit's <code>editor.js</code> handles ad hoc today).</li>
+        </ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:12px">
+    <h2>Side by side</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th></th><th>A · Ein Modus</th><th>B · Sofort + Rückgängig</th><th>C · Pro Abschnitt</th></tr></thead>
+        <tbody>
+          <tr><td>Rules to learn</td><td>1</td><td>1 (plus „watch the status“)</td><td>1</td></tr>
+          <tr><td>Clicks to add one tag</td><td>3 (Bearbeiten, tag, Speichern)</td><td>1</td><td>3</td></tr>
+          <tr><td>Risk of losing work</td><td>High (whole session)</td><td>None</td><td>Low (one row)</td></tr>
+          <tr><td>Risk of unnoticed writes</td><td>None</td><td>Medium</td><td>None</td></tr>
+          <tr><td>Clarity of a failed write</td><td>Hard (several parts)</td><td>Good</td><td>Good</td></tr>
+          <tr><td>File writes per visit</td><td>Few, bundled</td><td>Many</td><td>One per row saved</td></tr>
+          <tr><td>Code change</td><td>Large</td><td>Small–medium</td><td>Medium</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="why">
+    <div class="card recommend">
+      <h3>My recommendation: C, with B's status line</h3>
+      <p>The users are mostly older club members working through scanned family photos. The research points the same way on every count: explicit save for text, a clearly bounded mode for faces, one pattern per page, and status shown next to the control rather than in a passing toast. C gives that with the smallest risk of lost or unnoticed changes, and it maps onto the plugins as they are: one row, one ws method, one file write, one error message.</p>
+      <p>From B I would keep the persistent „✓ Gespeichert“ on the row after saving. From A I would keep the double mode signal (orange frame plus colored row) for the Personen row.</p>
+    </div>
+    <div class="card">
+      <h3>Applies to all three</h3>
+      <ul>
+        <li>Drehen/Zuschneiden stays its own full-screen tool: it replaces the file and can cut regions away, so it keeps its confirm step (the only irreversible action here).</li>
+        <li>One wording everywhere: <i>Bearbeiten</i>, <i>Speichern</i>, <i>Abbrechen</i>. Today there is also „Hinzufügen“, „Personen markieren“, „Markieren beenden“.</li>
+        <li>Targets at least 44 px; errors next to the field that caused them (NN/g, older adults).</li>
+        <li>The date keeps typed partial input („ca. 1955“) instead of a calendar picker (NN/g: „Why won't they just let me type the time?“).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Research sources</h2>
+    <p class="muted">„fetched“ = page read in full; „snippet“ = only the search-result excerpt was available.</p>
+    <ul class="src">
+      <li><a href="https://primer.style/ui-patterns/saving" target="_blank" rel="noopener">GitHub Primer: Saving</a> <span class="tag-src">fetched</span> — start with explicit save; do not mix save patterns in one form; autosave only for toggle-like controls; text inputs need explicit save so a misclick is not silently submitted.</li>
+      <li><a href="https://www.nngroup.com/articles/modes/" target="_blank" rel="noopener">NN/g: Modes in User Interfaces</a> <span class="tag-src">fetched</span> — poorly signalled modes cause errors; use at least two visual indicators for an active mode.</li>
+      <li><a href="https://www.nngroup.com/articles/confirmation-dialog/" target="_blank" rel="noopener">NN/g: Confirmation Dialogs</a> <span class="tag-src">fetched</span> — confirm only serious, irreversible actions; undo is the main safety net.</li>
+      <li><a href="https://www.nngroup.com/articles/usability-for-senior-citizens/" target="_blank" rel="noopener">NN/g: Usability for Older Adults</a> <span class="tag-src">fetched</span> — small targets are a major barrier; inflexible inputs punish users; put errors where they are noticed and easy to fix.</li>
+      <li><a href="https://support.google.com/photos/answer/6128838" target="_blank" rel="noopener">Google Photos: label faces</a> <span class="tag-src">fetched</span> — Info → People → Edit → change → Done.</li>
+      <li><a href="https://www.oracle.com/webfolder/ux/middleware/alta/patterns/SaveModel.html" target="_blank" rel="noopener">Oracle Alta: Save Model</a> <span class="tag-src">snippet</span> — explicit save gives an obvious outcome; keep button labels consistent.</li>
+      <li><a href="https://www.saasui.design/blog/saas-autosave-save-states-ux-patterns" target="_blank" rel="noopener">saasui.design: autosave states</a> <span class="tag-src">snippet</span> — „silent autosave is a trust trap“; autosave needs a visible Saving/Saved state.</li>
+      <li><a href="https://support.apple.com/guide/photos/phta4e5a733f/mac" target="_blank" rel="noopener">Apple Photos: Info window</a> <span class="tag-src">snippet</span> — caption typed in place; date via a dialog with an Adjust button.</li>
+      <li>Flickr Help, people and tags (flickrhelp.com, page refused automated access) <span class="tag-src">snippet</span> — „Add people“ / „Edit tags“, each finished with Done.</li>
+      <li><a href="https://docs.digikam.org/en/left_sidebar/people_view.html" target="_blank" rel="noopener">digiKam: People view</a> <span class="tag-src">snippet</span> — face tags stay unconfirmed until the user confirms them.</li>
+      <li><a href="https://www.familysearch.org/help/helpcenter/article/how-do-i-tag-memories-of-my-ancestors-or-relatives-in-family-tree" target="_blank" rel="noopener">FamilySearch: tag memories</a> <span class="tag-src">snippet</span> — draw box, type name with suggestions, save per tag.</li>
+      <li><a href="https://developer.gnome.org/hig/patterns/feedback/dialogs.html" target="_blank" rel="noopener">GNOME HIG: Dialogs</a> <span class="tag-src">snippet</span> — users click through confirmations; prefer undo.</li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event" target="_blank" rel="noopener">MDN: beforeunload</a> <span class="tag-src">snippet</span> — attach only while changes are unsaved; the text cannot be customised.</li>
+      <li><a href="https://atlassian.design/patterns/inline-edit" target="_blank" rel="noopener">Atlassian: Inline edit</a> <span class="tag-src">snippet</span> — confirm/cancel next to the field; covers text, select, date.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+const MONTHS=["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const CATALOG=[{n:"Seffern",g:"ort"},{n:"Sefferweich",g:"ort"},{n:"Kirche",g:"ort"},{n:"Kirmes",g:"anlass"},{n:"Hochzeit",g:"anlass"},{n:"Erstkommunion",g:"anlass"},{n:"Musikverein",g:"verein"},{n:"Feuerwehr",g:"verein"}];
+const KNOWN=["Anna Schmitz","Peter Hoffmann","Maria Thomé","Josef Weber","Katharina Weber","Johann Schmitz","Gertrud Hoffmann"];
+const SAMPLE={date:{q:"ca.",y:"1955",m:""},info:"Kirmes vor der Gastwirtschaft. Links die Blaskapelle.",tags:["Seffern","Kirmes"],
+  regions:[{id:1,x:17,y:19,w:13,h:17,name:"Anna Schmitz"},{id:2,x:53,y:18,w:12,h:16,name:"Peter Hoffmann"}]};
+const MIN_BOX=4;
+let nextId=100;
+const clone=o=>JSON.parse(JSON.stringify(o));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const group=n=>{const t=CATALOG.find(t=>t.n===n);return t?t.g:"frei";};
+const fmtDate=d=>d.y?[d.q,d.m?MONTHS[d.m-1]:"",d.y].filter(Boolean).join(" "):"";
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+
+const PHOTO=`<svg viewBox="0 0 400 280" role="img" aria-label="Beispielfoto: drei Personen vor einem Haus">
+<defs><linearGradient id="SKY" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9c7a6"/><stop offset="1" stop-color="#b9a27c"/></linearGradient></defs>
+<rect width="400" height="280" fill="url(#SKY)"/>
+<rect x="0" y="200" width="400" height="80" fill="#8a7353"/>
+<rect x="250" y="40" width="150" height="165" fill="#a48d68"/><polygon points="240,45 325,0 410,45" fill="#6f5a40"/>
+<rect x="290" y="110" width="30" height="45" fill="#5e4b34"/><rect x="345" y="70" width="28" height="30" fill="#e6d8bb"/>
+<g fill="#4b3b2a"><circle cx="96" cy="78" r="17"/><rect x="72" y="98" width="48" height="122" rx="20"/></g>
+<g fill="#3d3022"><circle cx="230" cy="74" r="16"/><rect x="206" y="93" width="48" height="128" rx="20"/></g>
+<g fill="#55442f"><circle cx="330" cy="92" r="15"/><rect x="308" y="110" width="44" height="110" rx="18"/></g>
+<rect x="0" y="0" width="400" height="280" fill="none" stroke="#efe4cc" stroke-width="10"/>
+</svg>`;
+
+/* ---------- photo stage with face boxes and drawing ---------- */
+function Stage(host){
+  host.innerHTML=`<div class="stage"><div class="pic">${PHOTO}</div><div class="layer"></div><div class="draft" hidden></div><div class="stage-hint" hidden></div><div class="picker" hidden></div></div>`;
+  const st=host.querySelector(".stage"),layer=st.querySelector(".layer"),draft=st.querySelector(".draft"),hint=st.querySelector(".stage-hint"),picker=st.querySelector(".picker");
+  let drawCb=null,start=null,pickerOpen=false,onDelete=null;
+  const pct=e=>{const r=st.getBoundingClientRect();return{x:Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100)),y:Math.max(0,Math.min(100,(e.clientY-r.top)/r.height*100))};};
+  const rectOf=(a,b)=>({x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)});
+  const place=(el,r)=>{el.style.left=r.x+"%";el.style.top=r.y+"%";el.style.width=r.w+"%";el.style.height=r.h+"%";};
+  st.addEventListener("pointerdown",e=>{
+    if(!drawCb||pickerOpen||e.target.closest(".del,.stage-hint,.picker"))return;
+    e.preventDefault();start=pct(e);st.setPointerCapture(e.pointerId);place(draft,{...start,w:0,h:0});draft.hidden=false;
+  });
+  st.addEventListener("pointermove",e=>{if(start)place(draft,rectOf(start,pct(e)));});
+  st.addEventListener("pointerup",e=>{
+    if(!start)return;const r=rectOf(start,pct(e));start=null;
+    if(r.w<MIN_BOX||r.h<MIN_BOX){draft.hidden=true;api.flash("Der Rahmen ist zu klein – ziehen Sie einen größeren auf.");return;}
+    openPicker(r);
+  });
+  layer.addEventListener("click",e=>{const b=e.target.closest(".del");if(b&&onDelete)onDelete(+b.dataset.id);});
+  function openPicker(r){
+    pickerOpen=true;
+    picker.style.left=Math.min(r.x,55)+"%";picker.style.top=Math.min(r.y+r.h+2,60)+"%";
+    picker.innerHTML=`<b>Wer ist das?</b><input type="text" placeholder="Name eingeben" aria-label="Name"><ul></ul><div class="pk-actions"><button class="btn btn-ghost" data-a="cancel">Abbrechen</button></div>`;
+    picker.hidden=false;
+    const inp=picker.querySelector("input"),ul=picker.querySelector("ul");
+    const list=()=>{const q=inp.value.trim().toLowerCase();
+      const hits=KNOWN.filter(n=>!q||n.toLowerCase().includes(q)).slice(0,5);
+      let h=hits.map(n=>`<li><button data-name="${esc(n)}">${esc(n)}</button></li>`).join("");
+      if(q&&!KNOWN.some(n=>n.toLowerCase()===q))h+=`<li><button data-name="${esc(inp.value.trim())}">Neu anlegen: „${esc(inp.value.trim())}“</button></li>`;
+      ul.innerHTML=h;};
+    list();inp.addEventListener("input",list);inp.focus();
+    const done=name=>{pickerOpen=false;picker.hidden=true;draft.hidden=true;if(name&&drawCb)drawCb({...r,name});};
+    picker.onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.a==="cancel")done(null);else done(b.dataset.name);};
+    inp.onkeydown=e=>{if(e.key==="Escape")done(null);if(e.key==="Enter"&&inp.value.trim()){const f=ul.querySelector("button");done(f?f.dataset.name:inp.value.trim());}};
+  }
+  let flashT=null,hintHtml="",hintCancel=null;
+  const api={
+    render(regions,opts={}){
+      onDelete=opts.onDelete||null;
+      layer.innerHTML=regions.map(r=>`<div class="box${r.isNew?" new":""}" style="left:${r.x}%;top:${r.y}%;width:${r.w}%;height:${r.h}%"><span class="lbl">${esc(r.name)}</span>${opts.onDelete?`<button class="del" data-id="${r.id}" aria-label="Markierung ${esc(r.name)} löschen" title="Markierung löschen">×</button>`:""}</div>`).join("");
+    },
+    setDraw(on,text,cb,cancelLabel,onCancel){
+      drawCb=on?cb:null;st.classList.toggle("drawing",!!on);
+      hintHtml=on?text:"";hintCancel=on&&cancelLabel?{label:cancelLabel,fn:onCancel}:null;showHint();
+      if(!on){pickerOpen=false;picker.hidden=true;draft.hidden=true;}
+    },
+    flash(msg){clearTimeout(flashT);hint.hidden=false;hint.innerHTML=`<span class="grow">${esc(msg)}</span>`;flashT=setTimeout(showHint,2600);}
+  };
+  function showHint(){
+    if(!hintHtml){hint.hidden=true;return;}
+    hint.hidden=false;hint.innerHTML=`<span class="grow">${hintHtml}</span>${hintCancel?`<button type="button">${esc(hintCancel.label)}</button>`:""}`;
+    if(hintCancel)hint.querySelector("button").onclick=hintCancel.fn;
+  }
+  return api;
+}
+
+const chip=(n,removable)=>`<span class="chip g-${group(n)}">${esc(n)}${removable?` <button class="x" data-remove="${esc(n)}" aria-label="${esc(n)} entfernen" title="Schlagwort entfernen">×</button>`:""}</span>`;
+const addChip=n=>`<button class="chip add g-${group(n)}" data-add="${esc(n)}" title="Schlagwort hinzufügen">+ ${esc(n)}</button>`;
+const unassigned=tags=>CATALOG.map(t=>t.n).filter(n=>!tags.includes(n));
+const dateForm=(p,d)=>`<div class="fields">
+ <div class="field"><label for="${p}-q">Zusatz</label><select id="${p}-q" data-f="q">${["","ca.","vor","nach"].map(o=>`<option value="${o}"${d.q===o?" selected":""}>${o||"—"}</option>`).join("")}</select></div>
+ <div class="field"><label for="${p}-y">Jahr</label><input id="${p}-y" type="number" inputmode="numeric" data-f="y" value="${esc(d.y)}"></div>
+ <div class="field"><label for="${p}-m">Monat</label><select id="${p}-m" data-f="m"><option value="">—</option>${MONTHS.map((m,i)=>`<option value="${i+1}"${+d.m===i+1?" selected":""}>${m}</option>`).join("")}</select></div></div>`;
+const personsText=rs=>rs.length?rs.map(r=>esc(r.name)).join(", "):`<span class="empty">Noch niemand markiert</span>`;
+
+/* ================= A: one edit mode ================= */
+function ConceptA(root){
+  let saved=clone(SAMPLE),draft=null,status="",confirm=null;
+  const stage=Stage(root.querySelector('[data-role="photo"]'));
+  const panel=root.querySelector('[data-role="panel"]'),banner=root.querySelector('[data-role="banner"]'),conf=root.querySelector('[data-role="confirm"]');
+  const changes=()=>{if(!draft)return[];const c=[];
+    if(!same(draft.date,saved.date))c.push("Datum");if(draft.info!==saved.info)c.push("Info");
+    if(!same([...draft.tags].sort(),[...saved.tags].sort()))c.push("Schlagwörter");
+    if(!same(draft.regions.map(r=>r.id),saved.regions.map(r=>r.id)))c.push("Personen");return c;};
+  function renderBanner(){
+    root.classList.toggle("is-editing",!!draft);
+    banner.hidden=!draft;
+    if(draft){const c=changes();
+      banner.innerHTML=`<span class="grow"><strong>Sie bearbeiten dieses Foto.</strong> Änderungen werden erst mit „Speichern“ übernommen.<br><span>${c.length?`Geändert: ${c.join(", ")}`:"Noch nichts geändert"}</span></span>
+       <button class="btn btn-ghost" data-a="cancel">Abbrechen</button><button class="btn btn-primary btn-big" data-a="save">Speichern</button>`;}
+    conf.hidden=!confirm;
+    if(confirm)conf.innerHTML=`<span class="grow">${esc(confirm.text)}</span><button class="btn btn-ghost" data-a="stay">${esc(confirm.stay)}</button><button class="btn btn-danger" data-a="discard">${esc(confirm.go)}</button>`;
+  }
+  function render(){
+    renderBanner();
+    const d=draft||saved;
+    stage.render(d.regions.map(r=>({...r,isNew:draft&&!saved.regions.some(s=>s.id===r.id)})),draft?{onDelete:id=>{draft.regions=draft.regions.filter(r=>r.id!==id);render();}}:{});
+    stage.setDraw(!!draft,"Ziehen Sie einen Rahmen um ein Gesicht, um eine Person zu markieren.",r=>{draft.regions.push({id:nextId++,x:r.x,y:r.y,w:r.w,h:r.h,name:r.name});render();});
+    if(!draft){
+      panel.innerHTML=`${status?`<div class="statusline" role="status">${esc(status)}</div>`:""}
+       <div class="prow"><span class="prow-label">Datum</span><span class="prow-val">${esc(fmtDate(d.date))||'<span class="empty">kein Datum</span>'}</span></div>
+       <div class="prow"><span class="prow-label">Info</span><span class="prow-val">${esc(d.info)||'<span class="empty">keine Beschreibung</span>'}</span></div>
+       <div class="prow"><span class="prow-label">Personen</span><span class="prow-val">${personsText(d.regions)}</span></div>
+       <div class="prow"><span class="prow-label">Schlagwörter</span><div class="chips">${d.tags.map(n=>chip(n,false)).join("")}</div></div>
+       <div class="row-actions"><button class="btn btn-edit btn-big" data-a="edit">✎ Foto bearbeiten</button><button class="btn btn-ghost" data-a="photoedit">Drehen/Zuschneiden</button></div>
+       <p class="note" data-role="pe" hidden>Drehen/Zuschneiden öffnet das bestehende Vollbild-Werkzeug mit eigenem Speichern/Abbrechen. Es bleibt getrennt, weil es die Bilddatei ersetzt. Nicht Teil dieses Mockups.</p>`;
+      return;
+    }
+    panel.innerHTML=`<div class="prow open"><span class="prow-label">Datum</span>${dateForm("a-date",d.date)}</div>
+     <div class="prow open"><label class="prow-label" for="a-info">Info</label><textarea id="a-info">${esc(d.info)}</textarea></div>
+     <div class="prow open"><span class="prow-label">Personen</span><span class="prow-val">${personsText(d.regions)}</span><span class="muted">Auf dem Foto einen Rahmen ziehen. × an einem Rahmen entfernt ihn.</span></div>
+     <div class="prow open"><span class="prow-label">Schlagwörter</span><div class="chips">${d.tags.map(n=>chip(n,true)).join("")||'<span class="empty">keine</span>'}</div>
+       <span class="sublabel">Hinzufügen:</span><div class="chips">${unassigned(d.tags).map(addChip).join("")}</div>
+       <div class="newtag"><input type="text" id="a-newtag" placeholder="Neues Schlagwort" aria-label="Neues Schlagwort"><button class="btn btn-ghost" data-a="newtag">Hinzufügen</button></div></div>`;
+    panel.querySelectorAll("[data-f]").forEach(el=>el.addEventListener("input",()=>{draft.date[el.dataset.f]=el.value;renderBanner();}));
+    panel.querySelector("#a-info").addEventListener("input",e=>{draft.info=e.target.value;renderBanner();});
+  }
+  root.addEventListener("click",e=>{
+    const b=e.target.closest("[data-a],[data-add],[data-remove]");if(!b||!root.contains(b))return;
+    if(b.dataset.add){draft.tags.push(b.dataset.add);return render();}
+    if(b.dataset.remove){draft.tags=draft.tags.filter(t=>t!==b.dataset.remove);return render();}
+    const a=b.dataset.a;
+    if(a==="edit"){draft=clone(saved);status="";render();}
+    else if(a==="photoedit"){panel.querySelector('[data-role="pe"]').hidden=false;}
+    else if(a==="save"){const c=changes();saved=draft;draft=null;status=c.length?`✓ Gespeichert: ${c.join(", ")}`:"Nichts geändert.";render();}
+    else if(a==="cancel"){if(changes().length){confirm={text:`${changes().length} geänderte Bereiche verwerfen?`,stay:"Weiter bearbeiten",go:"Verwerfen"};renderBanner();}else{draft=null;render();}}
+    else if(a==="stay"){confirm=null;renderBanner();}
+    else if(a==="discard"){confirm=null;draft=null;status="Änderungen verworfen.";render();}
+    else if(a==="next"){if(draft&&changes().length){confirm={text:`Seite verlassen? Ihre Änderungen (${changes().join(", ")}) gehen verloren.`,stay:"Hierbleiben",go:"Verwerfen und weiter"};renderBanner();}
+      else{draft=null;status="(Im Mockup bleibt es dasselbe Foto.)";render();}}
+    else if(a==="newtag"){const i=panel.querySelector("#a-newtag"),v=i.value.trim();if(v&&!draft.tags.includes(v)){draft.tags.push(v);}render();}
+  });
+  render();
+}
+
+/* ================= B: instant + undo ================= */
+function ConceptB(root){
+  const ME="christian";
+  const data=clone(SAMPLE);let open=null,drawing=false;const st={};
+  let isAdmin=false,histOpen=false;
+  const hist=[
+    {label:"„Kirmes“ hinzugefügt",who:"maria.t",when:"gestern, 18:42",undo:()=>{data.tags=data.tags.filter(t=>t!=="Kirmes");},undone:false},
+    {label:"„Peter Hoffmann“ markiert",who:"josef",when:"12.10.2026, 10:05",undo:()=>{data.regions=data.regions.filter(r=>r.id!==2);},undone:false},
+    {label:"Datum: Zusatz „ca.“ gesetzt",who:"maria.t",when:"03.10.2026, 16:20",undo:()=>{data.date.q="";},undone:false}];
+  const mayUndo=h=>h.undo&&!h.undone&&(h.who===ME||isAdmin);
+  root.querySelector("#b-role").addEventListener("change",e=>{isAdmin=e.target.value==="admin";render();});
+  let infoSession=null,infoTimer=null;
+  const now=()=>{const d=new Date();return`heute, ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;};
+  const stage=Stage(root.querySelector('[data-role="photo"]'));const panel=root.querySelector('[data-role="panel"]');
+  function commit(field,label,apply,undo,session){
+    apply();let h=hist[0];
+    if(session&&h&&h.session===session){h.when=now();}
+    else{h={label,who:ME,when:now(),undo,undone:false,session};hist.unshift(h);}
+    st[field]={state:"saving",h};render();
+    setTimeout(()=>{if(st[field]&&st[field].h===h&&st[field].state==="saving"){st[field].state="saved";render();}},650);
+  }
+  function undoEntry(h){if(!h||!mayUndo(h))return;h.undone=true;h.undo();
+    hist.unshift({label:"Rückgängig: "+h.label,who:ME,when:now(),undo:null,undone:false});
+    Object.keys(st).forEach(k=>{if(st[k].h===h)st[k]={state:"undone"};});render();}
+  const statusHtml=f=>{const s=st[f];if(!s)return"";
+    if(s.state==="saving")return`<span class="status saving" role="status">Speichert …</span>`;
+    if(s.state==="pending")return`<span class="status pending" role="status">noch nicht gespeichert</span>`;
+    if(s.state==="undone")return`<span class="status" role="status">↶ Rückgängig gemacht</span>`;
+    return`<span class="status" role="status">✓ Gespeichert <button class="linkbtn" data-undo="${hist.indexOf(s.h)}">Rückgängig</button></span>`;};
+  function renderStage(){
+    stage.render(data.regions,{onDelete:id=>{const r=data.regions.find(x=>x.id===id);const i=data.regions.indexOf(r);
+      commit("persons",`Markierung „${r.name}“ gelöscht`,()=>{data.regions.splice(i,1);},()=>{data.regions.splice(i,0,r);});}});
+    stage.setDraw(drawing,"Ziehen Sie einen Rahmen um <b>ein</b> Gesicht.",r=>{drawing=false;const reg={id:nextId++,x:r.x,y:r.y,w:r.w,h:r.h,name:r.name};
+      commit("persons",`„${r.name}“ markiert`,()=>{data.regions.push(reg);},()=>{data.regions=data.regions.filter(x=>x!==reg);});},"Abbrechen",()=>{drawing=false;render();});
+  }
+  function saveInfo(t){infoTimer=null;const v=t.value;if(v===data.info)return;
+    const old=infoSession.old;commit("info","Info geändert",()=>{data.info=v;},()=>{data.info=old;},infoSession);}
+  function render(){
+    const active=document.activeElement&&document.activeElement.id==="b-info"?{s:document.activeElement.selectionStart,e:document.activeElement.selectionEnd,v:document.activeElement.value}:null;
+    renderStage();
+    const dateBody=open==="date"?`${dateForm("b-date",data.date)}<div class="row-actions"><button class="btn btn-ghost" data-a="close">Fertig</button></div>`
+      :`<span class="prow-val">${esc(fmtDate(data.date))||'<span class="empty">kein Datum</span>'}</span>`;
+    const infoBody=open==="info"?`<textarea id="b-info" aria-label="Info">${esc(active?active.v:data.info)}</textarea><span class="muted">Wird gespeichert, sobald Sie das Feld verlassen.</span><div class="row-actions"><button class="btn btn-ghost" data-a="close">Fertig</button></div>`
+      :`<span class="prow-val">${esc(data.info)||'<span class="empty">keine Beschreibung</span>'}</span>`;
+    panel.innerHTML=`
+     <div class="prow${open==="date"?" open":""}"><div class="prow-head"><span class="prow-label">Datum</span>${statusHtml("date")}${open!=="date"?`<button class="linkbtn" data-open="date">✎ ändern</button>`:""}</div>${dateBody}</div>
+     <div class="prow${open==="info"?" open":""}"><div class="prow-head"><span class="prow-label">Info</span>${statusHtml("info")}${open!=="info"?`<button class="linkbtn" data-open="info">✎ ändern</button>`:""}</div>${infoBody}</div>
+     <div class="prow"><div class="prow-head"><span class="prow-label">Personen</span>${statusHtml("persons")}</div><span class="prow-val">${personsText(data.regions)}</span>
+       <div><button class="btn btn-ghost" data-a="draw" ${drawing?"disabled":""}>+ Person markieren</button></div></div>
+     <div class="prow"><div class="prow-head"><span class="prow-label">Schlagwörter</span>${statusHtml("tags")}</div>
+       <div class="chips">${data.tags.map(n=>chip(n,true)).join("")||'<span class="empty">keine</span>'}</div>
+       <span class="sublabel">Ein Klick fügt hinzu:</span><div class="chips">${unassigned(data.tags).map(addChip).join("")}</div></div>
+     <div class="history"><button class="linkbtn" data-a="hist" aria-expanded="${histOpen}" style="text-align:left">${histOpen?"▾":"▸"} Letzte Änderungen an diesem Foto (${hist.length})</button>${histOpen?`<ul>${hist.slice(0,8).map((h,i)=>`<li class="${h.undone?"undone":""}"><span>${esc(h.label)}<br><small class="muted">${h.who===ME?`${esc(ME)} (Sie)`:esc(h.who)} · ${esc(h.when)}</small></span>${mayUndo(h)?`<button class="linkbtn" data-undo="${i}">Rückgängig</button>`:""}</li>`).join("")}</ul><small class="muted">${isAdmin?"Als Administrator können Sie jede Änderung rückgängig machen.":"Sie können Ihre eigenen Änderungen rückgängig machen."}</small>`:""}</div>`;
+    if(open==="date")panel.querySelectorAll("[data-f]").forEach(el=>{
+      const f=el.dataset.f;const save=()=>{const old=data.date[f],v=el.value;if(old===v)return;
+        commit("date",`Datum: ${f==="y"?"Jahr":f==="m"?"Monat":"Zusatz"} geändert`,()=>{data.date[f]=v;},()=>{data.date[f]=old;});};
+      el.addEventListener("change",save);
+    });
+    if(open==="info"){const t=panel.querySelector("#b-info");
+      if(!infoSession)infoSession={old:data.info};
+      if(active){t.focus();t.setSelectionRange(active.s,active.e);}
+      t.addEventListener("input",()=>{infoTimer=true;st.info={state:"pending"};
+        const head=t.closest(".prow").querySelector(".prow-head");let s=head.querySelector(".status");
+        if(!s){s=document.createElement("span");head.insertBefore(s,head.children[1]);}s.className="status pending";s.textContent="noch nicht gespeichert";});
+      t.addEventListener("blur",()=>{if(infoTimer)saveInfo(t);});}
+  }
+  root.addEventListener("click",e=>{
+    const b=e.target.closest("[data-a],[data-add],[data-remove],[data-open],[data-undo]");if(!b||!root.contains(b))return;
+    if(b.dataset.add){const n=b.dataset.add;return commit("tags",`„${n}“ hinzugefügt`,()=>{data.tags.push(n);},()=>{data.tags=data.tags.filter(t=>t!==n);});}
+    if(b.dataset.remove){const n=b.dataset.remove;return commit("tags",`„${n}“ entfernt`,()=>{data.tags=data.tags.filter(t=>t!==n);},()=>{data.tags.push(n);});}
+    if(b.dataset.open){open=b.dataset.open;infoSession=null;return render();}
+    if(b.dataset.undo!==undefined){return undoEntry(hist[+b.dataset.undo]);}
+    if(b.dataset.a==="close"){open=null;infoSession=null;render();}
+    if(b.dataset.a==="hist"){histOpen=!histOpen;render();}
+    if(b.dataset.a==="draw"){drawing=true;open=null;render();}
+  });
+  render();
+}
+
+/* ================= C: per section ================= */
+function ConceptC(root){
+  const data=clone(SAMPLE);let open=null,draft=null;const saved={};
+  const stage=Stage(root.querySelector('[data-role="photo"]'));const panel=root.querySelector('[data-role="panel"]');
+  const SECTIONS=[["date","Datum"],["info","Info"],["persons","Personen"],["tags","Schlagwörter"],["photo","Foto"]];
+  function renderStage(){
+    const regs=open==="persons"?draft.map(r=>({...r,isNew:!data.regions.some(s=>s.id===r.id)})):data.regions;
+    stage.render(regs,open==="persons"?{onDelete:id=>{draft=draft.filter(r=>r.id!==id);render();}}:{});
+    stage.setDraw(open==="persons","Rahmen um ein Gesicht ziehen. Gespeichert wird erst mit „Speichern“ rechts.",r=>{draft.push({id:nextId++,x:r.x,y:r.y,w:r.w,h:r.h,name:r.name});render();});
+  }
+  const view=k=>{switch(k){
+    case"date":return esc(fmtDate(data.date))||'<span class="empty">kein Datum</span>';
+    case"info":return esc(data.info)||'<span class="empty">keine Beschreibung</span>';
+    case"persons":return personsText(data.regions);
+    case"tags":return`<div class="chips">${data.tags.map(n=>chip(n,false)).join("")||'<span class="empty">keine</span>'}</div>`;
+    case"photo":return'<span class="muted">Drehen oder zuschneiden</span>';}};
+  const edit=k=>{switch(k){
+    case"date":return dateForm("c-date",draft);
+    case"info":return`<textarea id="c-info" aria-label="Info">${esc(draft)}</textarea>`;
+    case"persons":return`<span class="prow-val">${personsText(draft)}</span><span class="muted">Neue Rahmen sind gestrichelt, bis Sie speichern. × entfernt einen Rahmen.</span>`;
+    case"tags":return`<div class="chips">${draft.map(n=>`<span class="chip g-${group(n)}${data.tags.includes(n)?"":" staged"}">${esc(n)} <button class="x" data-remove="${esc(n)}" aria-label="${esc(n)} entfernen">×</button></span>`).join("")||'<span class="empty">keine</span>'}</div>
+      <span class="sublabel">Hinzufügen:</span><div class="chips">${unassigned(draft).map(addChip).join("")}</div>
+      <div class="newtag"><input type="text" id="c-newtag" placeholder="Neues Schlagwort" aria-label="Neues Schlagwort"><button class="btn btn-ghost" data-a="newtag">+</button></div>`;
+    case"photo":return`<p class="note">Hier öffnet sich das bestehende Werkzeug Drehen/Zuschneiden (Vollbild, eigenes Speichern/Abbrechen). Nicht Teil dieses Mockups.</p>`;}};
+  function render(){
+    renderStage();
+    panel.innerHTML=SECTIONS.map(([k,label])=>{const isOpen=open===k;
+      return`<div class="prow${isOpen?" open":""}"><div class="prow-head"><span class="prow-label">${label}</span>
+        ${saved[k]&&!isOpen?`<span class="status" role="status">✓ Gespeichert</span>`:""}
+        ${isOpen?"":`<button class="editbtn" data-open="${k}" ${open?"disabled title=\"Erst den offenen Abschnitt speichern oder abbrechen\"":""}>✎ Bearbeiten</button>`}</div>
+        ${isOpen?edit(k):`<div class="prow-val">${view(k)}</div>`}
+        ${isOpen?`<div class="row-actions"><button class="btn btn-ghost" data-a="cancel">Abbrechen</button>${k==="photo"?"":`<button class="btn btn-primary" data-a="save">Speichern</button>`}</div>`:""}</div>`;}).join("");
+    if(open==="date")panel.querySelectorAll("[data-f]").forEach(el=>el.addEventListener("input",()=>{draft[el.dataset.f]=el.value;}));
+    if(open==="info")panel.querySelector("#c-info").addEventListener("input",e=>{draft=e.target.value;});
+  }
+  root.addEventListener("click",e=>{
+    const b=e.target.closest("[data-a],[data-add],[data-remove],[data-open]");if(!b||!root.contains(b))return;
+    if(b.dataset.open){open=b.dataset.open;saved[open]=false;draft=open==="date"?clone(data.date):open==="info"?data.info:open==="persons"?clone(data.regions):open==="tags"?[...data.tags]:null;render();
+      const f=panel.querySelector(".prow.open select,.prow.open textarea");if(f)f.focus();return;}
+    if(b.dataset.add){draft.push(b.dataset.add);return render();}
+    if(b.dataset.remove){draft=draft.filter(t=>t!==b.dataset.remove);return render();}
+    const a=b.dataset.a;
+    if(a==="newtag"){const v=panel.querySelector("#c-newtag").value.trim();if(v&&!draft.includes(v))draft.push(v);render();}
+    if(a==="cancel"){open=null;draft=null;render();}
+    if(a==="save"){const map={date:"date",info:"info",persons:"regions",tags:"tags"};data[map[open]]=draft;saved[open]=true;open=null;draft=null;render();}
+  });
+  render();
+}
+
+ConceptA(document.getElementById("mock-a"));
+ConceptB(document.getElementById("mock-b"));
+ConceptC(document.getElementById("mock-c"));
+
+/* tabs */
+const tabs=[...document.querySelectorAll(".tab")];
+function show(h){tabs.forEach(t=>{const on=t.dataset.hash===h;t.setAttribute("aria-selected",on);document.getElementById(t.getAttribute("aria-controls")).hidden=!on;});}
+tabs.forEach(t=>t.addEventListener("click",()=>{show(t.dataset.hash);try{history.replaceState(null,"","#"+t.dataset.hash);}catch(e){}}));
+const h=(location.hash||"").slice(1);if(["a","b","c"].includes(h))show(h);
+})();
+</script>
