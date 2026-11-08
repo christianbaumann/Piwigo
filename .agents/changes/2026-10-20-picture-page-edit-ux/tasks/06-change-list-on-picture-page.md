@@ -2,7 +2,7 @@
 id: 06
 dependencies:
 - 01
-status: in-progress
+status: blocked
 owner: s-e4c1
 branch: task/2026-10-20-picture-page-edit-ux-06
 ---
@@ -36,3 +36,7 @@ read-only page shows the new entry types as readable text.
 * [ ] A guest and an account without access to the album see no list
 * [ ] provenance's read-only page shows tag and region entries as text, not JSON
 * [ ] photoinfo and provenance suites pass
+
+## Blocked (2026-11-08)
+
+Docker Desktop stopped because the host disk was full. Committed on the task branch (three commits, HEAD `2347055b6`), not yet rebased or verified. Last runs: provenance unit and integration green, photoinfo unit green, photoinfo integration 270 tests with one failure in `HistoryRecordingTest::testAnotherAccountInBetweenPreventsTheMerge` („Invalid image_id“), which also occurred once on task 04. Suspected cause: `piwigo_user_cache`; if it recurs, invalidate after `attachImage` and make one ws call as the normal account first (`rebuildPermissions()`, as in persons `VisibilityTest`). `pwg.provenance.getHistory` gained optional `fields` and `formatted`, which the task did not name.
