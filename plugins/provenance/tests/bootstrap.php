@@ -8,6 +8,7 @@ require_once PROVENANCE_PATH . 'include/functions.inc.php';
 // unit-tested, and the functions that reach the database are never called
 // unless a test boots the runtime through PiwigoRuntime.
 require_once PROVENANCE_PATH . 'include/history.inc.php';
+require_once PROVENANCE_PATH . 'include/history_text.inc.php';
 
 // Integration-layer support classes (no Piwigo core needed - they talk to
 // ws.php over HTTP and to MariaDB directly).

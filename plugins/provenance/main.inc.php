@@ -33,6 +33,7 @@ define('PROVENANCE_XMP_CONFIG',    PROVENANCE_PATH . 'exiftool/pwgprov.config');
 
 include_once(PROVENANCE_PATH . 'include/functions.inc.php');
 include_once(PROVENANCE_PATH . 'include/history.inc.php');
+include_once(PROVENANCE_PATH . 'include/history_text.inc.php');
 include_once(PROVENANCE_PATH . 'include/exiftool.inc.php');
 
 // The binary is expected on PATH. A host that keeps it elsewhere sets the
@@ -103,6 +104,15 @@ function provenance_add_methods($arr)
       'object_id' => array('type' => WS_TYPE_ID),
       'date_min' => array('flags' => WS_PARAM_OPTIONAL, 'info' => 'YYYY-MM-DD or YYYY-MM-DD HH:MM:SS'),
       'date_max' => array('flags' => WS_PARAM_OPTIONAL, 'info' => 'YYYY-MM-DD or YYYY-MM-DD HH:MM:SS'),
+      'fields' => array(
+        'flags' => WS_PARAM_OPTIONAL,
+        'info' => 'Comma-separated: only these fields, among '.implode(', ', provenance_history_list_fields()),
+        ),
+      'formatted' => array(
+        'flags' => WS_PARAM_OPTIONAL,
+        'type' => WS_TYPE_BOOL,
+        'info' => 'true adds a display entry to each row: text, by, when, own, undone',
+        ),
       'per_page' => array(
         'default' => PROVENANCE_HISTORY_PER_PAGE_DEFAULT,
         'maxValue' => PROVENANCE_HISTORY_PER_PAGE_MAX,

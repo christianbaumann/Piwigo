@@ -182,26 +182,8 @@ function provenance_page_values($row, $label_keys)
  */
 function provenance_page_history_rows($rows)
 {
-  global $conf;
-
-  $user_ids = array();
-  foreach ($rows as $row)
-  {
-    if ($row['performed_by'] !== null)
-    {
-      $user_ids[$row['performed_by']] = true;
-    }
-  }
-
-  $names = array();
-  if (!empty($user_ids))
-  {
-    $names = query2array('
-SELECT '.$conf['user_fields']['id'].' AS id, '.$conf['user_fields']['username'].' AS username
-  FROM '.USERS_TABLE.'
-  WHERE '.$conf['user_fields']['id'].' IN ('.implode(',', array_keys($user_ids)).')
-;', 'id', 'username');
-  }
+  $names = provenance_history_usernames($rows);
+  $t = function ($key) { return l10n($key); };
 
   $field_keys = provenance_history_field_label_keys();
   $source_keys = provenance_history_source_label_keys();
@@ -217,8 +199,8 @@ SELECT '.$conf['user_fields']['id'].' AS id, '.$conf['user_fields']['username'].
     $shaped[] = array(
       'DATE' => format_date($row['occured_on'], array('day', 'month', 'year', 'time')),
       'FIELD' => isset($field_keys[$row['field']]) ? l10n($field_keys[$row['field']]) : $row['field'],
-      'OLD' => (string)$row['old_value'],
-      'NEW' => (string)$row['new_value'],
+      'OLD' => provenance_history_value_text($row['field'], $row['old_value'], $t),
+      'NEW' => provenance_history_value_text($row['field'], $row['new_value'], $t),
       'SOURCE' => isset($source_keys[$row['source']]) ? l10n($source_keys[$row['source']]) : $row['source'],
       'BY' => isset($names[$row['performed_by']]) ? $names[$row['performed_by']] : '',
       );

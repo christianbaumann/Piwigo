@@ -59,5 +59,24 @@ $lang['Admin photo screen'] = 'Foto-Verwaltung';
 $lang['Batch Manager'] = 'Batch-Manager';
 $lang['API'] = 'API';
 $lang['Undone'] = 'Rückgängig gemacht';
+$lang['Date changed: %s → %s'] = 'Datum geändert: %s → %s';
+$lang['Date set: %s'] = 'Datum gesetzt: %s';
+$lang['Date removed: %s'] = 'Datum entfernt: %s';
+$lang['Info added'] = 'Info hinzugefügt';
+$lang['Info changed'] = 'Info geändert';
+$lang['Info removed'] = 'Info entfernt';
+$lang['Tag %s added'] = '„%s“ hinzugefügt';
+$lang['Tag %s removed'] = '„%s“ entfernt';
+$lang['Person %s marked'] = '„%s“ markiert';
+$lang['Person mark %s removed'] = 'Markierung „%s“ entfernt';
+$lang['Person changed: %s → %s'] = 'Markierung geändert: „%s“ → „%s“';
+$lang['%s changed'] = '%s geändert';
+$lang['Photo turned'] = 'Foto gedreht';
+$lang['Photo cropped'] = 'Foto zugeschnitten';
+$lang['Photo turned and cropped'] = 'Foto gedreht und zugeschnitten';
+$lang['today, %s'] = 'heute, %s';
+$lang['yesterday, %s'] = 'gestern, %s';
+$lang['(you)'] = '(Sie)';
+$lang['deleted user'] = 'gelöschter Benutzer';
 
 ?>

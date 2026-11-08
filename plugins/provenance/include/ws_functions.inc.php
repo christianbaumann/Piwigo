@@ -47,6 +47,16 @@ function ws_provenance_getHistory($param, &$service)
     $conditions[] = 'occured_on '.$operator.' "'.pwg_db_real_escape_string($param[$datefield]).'"';
   }
 
+  if (!empty($param['fields']))
+  {
+    $fields = array_filter(array_map('trim', explode(',', $param['fields'])), 'strlen');
+    if (empty($fields) or array_diff($fields, provenance_history_list_fields()))
+    {
+      return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid fields');
+    }
+    $conditions[] = provenance_history_field_condition($fields);
+  }
+
   $history = provenance_fetch_history($param['object'], $param['object_id'], $param['per_page'], $conditions);
   $rows = $history['rows'];
   $total_count = $history['total_count'];
@@ -62,6 +72,11 @@ function ws_provenance_getHistory($param, &$service)
         $rows[$i]['new_value'] = l10n('The file could not be written');
       }
     }
+  }
+
+  if (!empty($param['formatted']))
+  {
+    $rows = provenance_history_display_rows($rows);
   }
 
   return array(

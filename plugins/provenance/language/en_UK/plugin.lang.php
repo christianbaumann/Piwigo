@@ -59,5 +59,24 @@ $lang['Admin photo screen'] = 'Admin photo screen';
 $lang['Batch Manager'] = 'Batch Manager';
 $lang['API'] = 'API';
 $lang['Undone'] = 'Undone';
+$lang['Date changed: %s → %s'] = 'Date changed: %s → %s';
+$lang['Date set: %s'] = 'Date set: %s';
+$lang['Date removed: %s'] = 'Date removed: %s';
+$lang['Info added'] = 'Info added';
+$lang['Info changed'] = 'Info changed';
+$lang['Info removed'] = 'Info removed';
+$lang['%s changed'] = '%s changed';
+$lang['Photo turned'] = 'Photo turned';
+$lang['Photo cropped'] = 'Photo cropped';
+$lang['Photo turned and cropped'] = 'Photo turned and cropped';
+$lang['today, %s'] = 'today, %s';
+$lang['yesterday, %s'] = 'yesterday, %s';
+$lang['(you)'] = '(you)';
+$lang['deleted user'] = 'deleted user';
+$lang['Tag %s added'] = '“%s” added';
+$lang['Tag %s removed'] = '“%s” removed';
+$lang['Person %s marked'] = '“%s” tagged';
+$lang['Person mark %s removed'] = 'Tag “%s” removed';
+$lang['Person changed: %s → %s'] = 'Tag changed: “%s” → “%s”';
 
 ?>
