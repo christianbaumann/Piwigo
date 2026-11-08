@@ -51,6 +51,7 @@ const MARKUP_NAME = '<i>E2E Markup</i>';
 
 /** Saves one box under a name and waits until the server has answered with it. */
 async function tag(picture, box, name, expectedBoxes) {
+  await picture.enterTaggingMode();
   await picture.dragBox(box);
   await picture.typeName(name);
   await picture.pickerInput.press('Enter');
@@ -176,6 +177,7 @@ test.describe('tagging a person', () => {
     expect(PICKER_POSITIONS.length).toBeGreaterThan(1);
 
     for (const box of PICKER_POSITIONS) {
+      await picture.enterTaggingMode();
       await picture.dragBox(box);
       await expect(picture.picker).toBeVisible();
 
@@ -276,6 +278,7 @@ test.describe('tagging a person', () => {
     await picture.pickerInput.press('Enter');
     await expect(picture.savedBoxes).toHaveCount(1);
 
+    await picture.enterTaggingMode();
     await picture.dragBox(SECOND_BOX);
     await picture.typeName(GRACE);
     await picture.pickerInput.press('Enter');
@@ -319,6 +322,7 @@ test.describe('tagging a person', () => {
 
     // A fragment out of the middle of the name, so what comes back is a search
     // hit on the index rather than an echo of what was typed.
+    await picture.enterTaggingMode();
     await picture.dragBox(SECOND_BOX);
     await picture.searchForExisting(ADA.slice(6, 12), ADA);
     await picture.existingPickerOption(ADA).click();
@@ -353,6 +357,7 @@ test.describe('tagging a person', () => {
     await picture.enterTaggingMode();
     await knownButNotOnPhoto(picture, ADA);
 
+    await picture.enterTaggingMode();
     await picture.dragBox(SECOND_BOX);
     await picture.existingPickerOption(ADA).waitFor();
 
@@ -381,6 +386,7 @@ test.describe('tagging a person', () => {
     await knownButNotOnPhoto(picture, ADA);
 
     const fragment = ADA.slice(6, 12);
+    await picture.enterTaggingMode();
     await picture.dragBox(SECOND_BOX);
     // Waits for the create entry, which only the answer to the typed search
     // brings: the list the picker opens with already holds the match.
@@ -440,7 +446,7 @@ test.describe('the tag button', () => {
 
   for (const layout of LAYOUTS) {
     // [ECP] one partition per layout: panel beside the photo, panel below it
-    test(`sits in the information panel below the info list, ${layout.name} layout`, async ({ page }) => {
+    test(`sits in the Personen row of the information list, ${layout.name} layout`, async ({ page }) => {
       await page.setViewportSize(layout.viewport);
       const picture = new PicturePage(page);
       await picture.goto(seeded.picture_path);
@@ -449,12 +455,13 @@ test.describe('the tag button', () => {
       // Anti-vacuity: the layout this case is named for is the one on screen.
       await expect(picture.wideLayout).toHaveCount(layout.wide ? 1 : 0);
 
-      await expect(picture.tagToggleInInfoPanel).toBeVisible();
+      await expect(picture.tagButtonInRow).toBeVisible();
       const list = await picture.standardInfoList.boundingBox();
-      const button = await picture.tagToggleInInfoPanel.boundingBox();
+      const button = await picture.tagButtonInRow.boundingBox();
       expect(list).not.toBeNull();
       expect(button).not.toBeNull();
-      expect(button.y).toBeGreaterThanOrEqual(list.y + list.height);
+      expect(button.y).toBeGreaterThanOrEqual(list.y);
+      expect(button.y + button.height).toBeLessThanOrEqual(list.y + list.height);
     });
   }
 
@@ -507,23 +514,17 @@ test.describe('the tag button', () => {
     await expect(picture.draft).toHaveCount(1);
   });
 
-  // [ST] idle -> tagging -> idle
-  test('its label follows the mode', async ({ page }) => {
+  // [ST] idle -> drawing -> idle
+  test('is off while a box is being drawn and back after Esc', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
-    const tagLabel = await picture.editorConfig.getAttribute('data-persons-str-tag');
-    const doneLabel = await picture.editorConfig.getAttribute('data-persons-str-done');
-    expect(tagLabel).toBeTruthy();
-    expect(doneLabel).toBeTruthy();
-    expect(doneLabel).not.toBe(tagLabel);
-
-    await expect(picture.tagToggle).toHaveValue(tagLabel);
+    await expect(picture.tagButton).toBeEnabled();
     await picture.enterTaggingMode();
-    await expect(picture.tagToggle).toHaveValue(doneLabel);
+    await expect(picture.tagButton).toBeDisabled();
     await picture.exitTaggingMode();
-    await expect(picture.tagToggle).toHaveValue(tagLabel);
+    await expect(picture.tagButton).toBeEnabled();
   });
 });
 
@@ -545,11 +546,11 @@ test.describe('the tag button in every skin', () => {
       const seeded = seed('empty');
       const picture = new PicturePage(page);
       await picture.goto(`${seeded.picture_path}&skin=${skin}`);
-      await expect(picture.tagToggleInInfoPanel).toBeVisible();
+      await expect(picture.tagButtonInRow).toBeVisible();
       // Anti-vacuity: the alignment below is a wide-layout rule.
       await expect(picture.wideLayout).toHaveCount(1);
 
-      const look = await picture.tagToggleLook();
+      const look = await picture.tagButtonLook();
       // Anti-vacuity: the styles were really read, not two empty objects.
       expect(look.toggle.fontFamily).not.toBe('');
       expect(look.toggle.borderTopStyle).not.toBe('');
@@ -582,19 +583,17 @@ test.describe('removing a person', () => {
     restore();
   });
 
-  test('the delete control is reachable only while tagging', async ({ page }) => {
+  test('the x sits beside the name in the row, not on the photo, and needs no drawing', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
-    // Anti-vacuity: there has to be a box carrying the control.
+    // Anti-vacuity: there has to be a region carrying the control.
     expect(seeded.regions.length).toBeGreaterThan(0);
     const first = seeded.regions[0].region_id;
 
-    await expect(picture.deleteButton(first)).toBeHidden();
-
-    await picture.enterTaggingMode();
     await expect(picture.deleteButton(first)).toBeVisible();
+    await expect(picture.box(first).locator('button')).toHaveCount(0);
   });
 
   /**
@@ -633,7 +632,6 @@ test.describe('removing a person', () => {
     const doomed = seeded.regions[0];
     const survivor = seeded.regions[1];
 
-    await picture.enterTaggingMode();
     await picture.deleteButton(doomed.region_id).click();
 
     await expect(picture.box(doomed.region_id)).toHaveCount(0);
@@ -769,17 +767,17 @@ test.describe('the person row while tagging', () => {
   });
 
   /** [BVA] zero faces -> one -> zero */
-  test('the first face unhides the row and deleting the last one hides it', async ({ page }) => {
+  test('the row is there without faces; the first face fills it and deleting the last one empties it', async ({ page }) => {
     seeded = seed('empty');
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
-    // Anti-vacuity: the row is there to be filled, just not shown.
-    await expect(picture.personRow).toHaveCount(1);
-    await expect(picture.personRow).toBeHidden();
+    // Anti-vacuity: the row is there with its button and no names.
+    await expect(picture.personRow).toBeVisible();
+    await expect(picture.tagButtonInRow).toBeVisible();
+    await expect(picture.personRowNames).toHaveText('');
 
-    await picture.enterTaggingMode();
     await tag(picture, FIRST_BOX, ADA, 1);
 
     await expect(picture.personRow).toBeVisible();
@@ -789,7 +787,7 @@ test.describe('the person row while tagging', () => {
     await picture.deleteButton(Number(regionId)).click();
     await expect(picture.savedBoxes).toHaveCount(0);
 
-    await expect(picture.personRow).toBeHidden();
+    await expect(picture.personRow).toBeVisible();
     await expect(picture.personRowNames).toHaveText('');
   });
 
@@ -838,7 +836,6 @@ test.describe('the person row while tagging', () => {
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
 
-    await picture.enterTaggingMode();
     await picture.deleteButton(seeded.regions[0].region_id).click();
     await expect(picture.savedBoxes).toHaveCount(seeded.regions.length - 1);
     await tag(picture, CLEAR_BOX, ADA, seeded.regions.length);
@@ -877,18 +874,16 @@ test.describe('the person row while tagging', () => {
     await tag(picture, FIRST_BOX, ADA, 1);
 
     await expect(picture.personRowNames).toHaveText(MARKUP_NAME);
-    await expect(picture.personRowElements).toHaveCount(0);
+    await expect(picture.personRowNames.locator('i')).toHaveCount(0);
   });
 });
 
 /**
- * Leaving tagging mode.
- *
- * After a change the public page reloads once, which brings back what the live
- * row cannot show: the links to each person's page and core's tag row. Without
- * a change there is nothing to bring back, so nothing reloads.
+ * One drawing is one action: "+ Person markieren", a drag, a name - and the
+ * drawing ends by itself, with the row and the boxes updated in place and no
+ * reload.
  */
-test.describe('leaving tagging mode', () => {
+test.describe('one-shot marking', () => {
   /** @type {ReturnType<typeof seed>} */
   let seeded;
 
@@ -897,73 +892,168 @@ test.describe('leaving tagging mode', () => {
     restore();
   });
 
-  /** [ST] tagging, changed -> left through the toggle -> reloaded */
-  test('leaving through the toggle after a save reloads the page', async ({ page }) => {
+  async function openEmpty(page) {
     seeded = seed('empty');
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
     await picture.markDocument();
+    return picture;
+  }
+
+  /** [HAPPY] */
+  test('one press, a drag and a name save one box; the button is back and the page did not reload', async ({ page }) => {
+    const picture = await openEmpty(page);
 
     await picture.enterTaggingMode();
-    await tag(picture, FIRST_BOX, ADA, 1);
-    // Anti-vacuity: before the reload the name is plain text and not yet a tag on the page.
-    await expect(picture.personRowNames).toHaveText(ADA);
-    await expect(picture.personRowLinks).toHaveCount(0);
-    await expect(picture.tagRow.filter({ hasText: ADA })).toHaveCount(0);
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
 
-    await picture.exitTaggingModeAndAwaitReload();
-
-    expect(await picture.sameDocument()).toBe(false);
-    await expect(picture.personRowLinks).toHaveText([ADA]);
-    await expect(picture.tagRow).toContainText(ADA);
-  });
-
-  /** [ST] tagging, changed -> left with Esc -> reloaded */
-  test('leaving with Esc after a save reloads the page', async ({ page }) => {
-    seeded = seed('empty');
-    const picture = new PicturePage(page);
-    await picture.goto(seeded.picture_path);
-    await picture.waitForPlacement();
-    await picture.markDocument();
-
-    await picture.enterTaggingMode();
-    await tag(picture, FIRST_BOX, ADA, 1);
-    // Anti-vacuity: no draft is open, so Esc means "leave", not "discard".
+    await expect(picture.savedBoxes).toHaveCount(1);
+    await expect(picture.taggingStage).toHaveCount(0);
     await expect(picture.draft).toHaveCount(0);
-
-    await picture.exitTaggingModeWithEscapeAndAwaitReload();
-
-    expect(await picture.sameDocument()).toBe(false);
+    await expect(picture.tagButton).toBeEnabled();
+    await expect(picture.personRowNames).toHaveText(ADA);
+    // The link to the person's page comes with the answer, not with a reload.
     await expect(picture.personRowLinks).toHaveText([ADA]);
+    expect(await picture.sameDocument()).toBe(true);
+    expect(readFileRegions(seeded.photo_id).regions).toHaveLength(1);
   });
 
-  /** [ST] tagging, deleted -> left -> reloaded */
-  test('leaving after a delete reloads the page', async ({ page }) => {
-    seeded = seed('overlay', { drawnByViewer: true });
-    const picture = new PicturePage(page);
-    await picture.goto(seeded.picture_path);
-    await picture.waitForPlacement();
-    const [removed, ...kept] = seeded.regions.map((region) => region.name);
-    // Anti-vacuity: the name to be removed is linked before, so its absence afterwards means something.
-    await expect(picture.personRowLinks.filter({ hasText: removed })).toHaveCount(1);
-    await picture.markDocument();
+  /** [ST] drawing, name chosen -> idle: a second box needs the button again */
+  test('a second box needs the button once more', async ({ page }) => {
+    const picture = await openEmpty(page);
+
+    await tag(picture, FIRST_BOX, ADA, 1);
+    await expect(picture.taggingStage).toHaveCount(0);
+
+    // Dragging with the drawing ended starts nothing.
+    await picture.dragBox(SECOND_BOX);
+    await expect(picture.draft).toHaveCount(0);
+    await expect(picture.picker).toBeHidden();
+
+    await tag(picture, SECOND_BOX, GRACE, 2);
+    await expect(picture.personRowNames).toHaveText(`${ADA}, ${GRACE}`);
+  });
+
+  /** [HAPPY] */
+  test('Esc while a box is drawn cancels it without a request', async ({ page }) => {
+    const picture = await openEmpty(page);
+    const writes = [];
+    page.on('request', (request) => {
+      if (/method=pwg\.persons\.(add|delete)Region/.test(request.url())) {
+        writes.push(request.url());
+      }
+    });
 
     await picture.enterTaggingMode();
-    await picture.deleteButton(seeded.regions[0].region_id).click();
-    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length - 1);
+    await picture.dragBox(FIRST_BOX);
+    await expect(picture.picker).toBeVisible();
+    await expect(picture.draft).toHaveCount(1);
 
-    await picture.exitTaggingModeAndAwaitReload();
+    await picture.pickerInput.press('Escape');
 
-    expect(await picture.sameDocument()).toBe(false);
-    await expect(picture.personRowLinks).toHaveText(kept);
+    await expect(picture.taggingStage).toHaveCount(0);
+    await expect(picture.draft).toHaveCount(0);
+    await expect(picture.picker).toBeHidden();
+    await expect(picture.tagButton).toBeEnabled();
+    expect(writes).toEqual([]);
+    expect(await picture.sameDocument()).toBe(true);
+  });
+
+  /** [HAPPY] Esc before any drag */
+  test('Esc before a drag ends the drawing', async ({ page }) => {
+    const picture = await openEmpty(page);
+
+    await picture.enterTaggingMode();
+    await expect(picture.editorMessage).not.toBeEmpty();
+    await picture.exitTaggingMode();
+
+    await expect(picture.tagButton).toBeEnabled();
+    await expect(picture.editorMessage).toBeEmpty();
+  });
+
+  /** [ST] the save is on its way when Esc ends the drawing: the box still lands */
+  test('Esc while the save is pending still adopts the box when the answer lands', async ({ page }) => {
+    const picture = await openEmpty(page);
+    const release = await holdSaves(page);
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    const saving = page.waitForRequest(/method=pwg\.persons\.addRegion/);
+    await picture.pickerInput.press('Enter');
+    await saving;
+
+    await expect(picture.rowStatus).toHaveClass(/pwg-row-status--saving/);
+    await picture.exitTaggingMode();
+    // The button stays off while a write is on its way.
+    await expect(picture.tagButton).toBeDisabled();
+
+    release();
+
+    await expect(picture.savedBoxes).toHaveCount(1);
+    await expect(picture.draft).toHaveCount(0);
+    await expect(picture.tagButton).toBeEnabled();
+    await expect(picture.personRowNames).toHaveText(ADA);
+    expect(await picture.sameDocument()).toBe(true);
+  });
+
+  /** [NEG] a refused save leaves the box to retry, with one red status */
+  test('a refused save keeps the box and shows one red status', async ({ page }) => {
+    const picture = await openEmpty(page);
+    setExiftool('missing');
+
+    await picture.enterTaggingMode();
+    await picture.dragBox(FIRST_BOX);
+    await picture.typeName(ADA);
+    await picture.pickerInput.press('Enter');
+
+    await expect(picture.rowStatus).toHaveClass(/pwg-row-status--error/);
+    await expect(picture.rowStatus).not.toHaveClass(/pwg-row-status--saved/);
+    await expect(picture.rowStatus).toContainText('Nicht gespeichert');
+    await expect(picture.draft).toHaveCount(1);
+    await expect(picture.taggingStage).toHaveCount(1);
+
+    await picture.exitTaggingMode();
+    await expect(picture.draft).toHaveCount(0);
+    expect(await picture.sameDocument()).toBe(true);
+  });
+
+  /** [NEG] the file write of the person tag failed: one red status, never green beside red */
+  test('a partly written save shows one red status and no green one', async ({ page }) => {
+    const picture = await openEmpty(page);
+    await page.route(/method=pwg\.persons\.addRegion/, async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      data.result.tags_written = false;
+      data.result.tags_message = 'keine Schreibrechte';
+      await route.fulfill({ response, json: data });
+    });
+
+    await tag(picture, FIRST_BOX, ADA, 1);
+
+    await expect(picture.rowStatus).toHaveClass(/pwg-row-status--error/);
+    await expect(picture.rowStatus).not.toHaveClass(/pwg-row-status--saved/);
+    await expect(picture.rowStatus).toContainText('keine Schreibrechte');
+  });
+
+  /** [HAPPY] the status of a good save */
+  test('a saved box says so on the row', async ({ page }) => {
+    const picture = await openEmpty(page);
+
+    await tag(picture, FIRST_BOX, ADA, 1);
+
+    await expect(picture.rowStatus).toHaveClass(/pwg-row-status--saved/);
+    await expect(picture.rowStatus).toHaveText('✓ Gespeichert');
   });
 
   /**
    * [NEG] A page core rendered straight from a form post - a comment does that -
-   * is reloaded with a GET. A plain reload would post the form again.
+   * is never navigated: nothing reloads, so no form is sent again.
    */
-  test('leaving after a save on a posted page sends no form again', async ({ page }) => {
+  test('a save on a posted page sends no navigation', async ({ page }) => {
     seeded = seed('empty');
     const picture = new PicturePage(page);
     await picture.gotoByPost(seeded.picture_path);
@@ -977,22 +1067,16 @@ test.describe('leaving tagging mode', () => {
       }
     });
 
-    await picture.enterTaggingMode();
     await tag(picture, FIRST_BOX, ADA, 1);
-    await picture.exitTaggingModeAndAwaitReload();
 
-    expect(await picture.sameDocument()).toBe(false);
-    expect(navigations).toEqual(['GET']);
+    expect(navigations).toEqual([]);
+    expect(await picture.sameDocument()).toBe(true);
   });
 
-  /** [ST] the first save is still on its way when the mode is left */
-  test('leaving while the first save is pending reloads once it lands', async ({ page }) => {
-    seeded = seed('empty');
-    const picture = new PicturePage(page);
+  /** [ST] starting a drawing while a save is pending is not possible */
+  test('the button is off while a save is on its way', async ({ page }) => {
+    const picture = await openEmpty(page);
     const release = await holdSaves(page);
-    await picture.goto(seeded.picture_path);
-    await picture.waitForPlacement();
-    await picture.markDocument();
 
     await picture.enterTaggingMode();
     await picture.dragBox(FIRST_BOX);
@@ -1001,141 +1085,71 @@ test.describe('leaving tagging mode', () => {
     await picture.pickerInput.press('Enter');
     await saving;
 
-    await picture.exitTaggingMode();
-    // Anti-vacuity: nothing reloads before the answer is in.
-    expect(await picture.sameDocument()).toBe(true);
-
-    const loaded = page.waitForEvent('load');
+    await expect(picture.tagButton).toBeDisabled();
     release();
-    await loaded;
+    await expect(picture.tagButton).toBeEnabled();
+  });
+});
 
-    await expect(picture.personRowLinks).toHaveText([ADA]);
+/** Deleting from the Personen row. */
+test.describe('deleting from the Personen row', () => {
+  /** @type {ReturnType<typeof seed>} */
+  let seeded;
+
+  test.beforeEach(() => {
+    seeded = seed('overlay', { drawnByViewer: true });
   });
 
-  /** [ST] an earlier save landed, a later one is still on its way when the mode is left */
-  test('leaving while a later save is pending waits for it', async ({ page }) => {
-    seeded = seed('empty');
+  test.afterEach(() => {
+    restore();
+  });
+
+  /** [HAPPY] */
+  test('the x removes the name and its box in place, with a saved status', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
     await picture.markDocument();
+    const [removed, ...kept] = seeded.regions.map((region) => region.name);
 
-    await picture.enterTaggingMode();
-    await tag(picture, FIRST_BOX, ADA, 1);
+    await picture.deleteButton(seeded.regions[0].region_id).click();
 
-    const release = await holdSaves(page);
-    await picture.dragBox(SECOND_BOX);
-    await picture.typeName(GRACE);
-    const saving = page.waitForRequest(/method=pwg\.persons\.addRegion/);
-    await picture.pickerInput.press('Enter');
-    await saving;
-
-    await picture.exitTaggingMode();
-    // Anti-vacuity: a change is already in, yet the page waits for the second one.
-    expect(await picture.sameDocument()).toBe(true);
-
-    const loaded = page.waitForEvent('load');
-    release();
-    await loaded;
-
-    await expect(picture.personRowLinks).toHaveText([ADA, GRACE]);
-  });
-
-  /** [ST] left and entered again before the answer: the new box is not the saved one */
-  test('a save answered after the mode was re-entered leaves the new box a draft', async ({ page }) => {
-    seeded = seed('empty');
-    const picture = new PicturePage(page);
-    const release = await holdSaves(page);
-    await picture.goto(seeded.picture_path);
-    await picture.waitForPlacement();
-
-    await picture.enterTaggingMode();
-    await picture.dragBox(FIRST_BOX);
-    await picture.typeName(ADA);
-    const saving = page.waitForRequest(/method=pwg\.persons\.addRegion/);
-    const answered = page.waitForResponse(/method=pwg\.persons\.addRegion/);
-    await picture.pickerInput.press('Enter');
-    await saving;
-
-    await picture.exitTaggingMode();
-    await picture.enterTaggingMode();
-    await picture.dragBox(SECOND_BOX);
-    // Anti-vacuity: a new box is waiting for its name when the old answer lands.
-    await expect(picture.draft).toHaveCount(1);
-
-    release();
-    await answered;
-
-    await expect(picture.personRowNames).toHaveText(ADA);
-    await expect(picture.draft).toHaveCount(1);
-    await expect(picture.savedBoxes).toHaveCount(0);
-    await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
-  });
-
-  /** [ST] tagging, unchanged -> left -> not reloaded */
-  test('leaving without a change does not reload', async ({ page }) => {
-    seeded = seed('overlay');
-    const picture = new PicturePage(page);
-    await picture.goto(seeded.picture_path);
-    await picture.waitForPlacement();
-    await picture.markDocument();
-
-    await picture.enterTaggingMode();
-    await picture.exitTaggingMode();
-
+    await expect(picture.savedBoxes).toHaveCount(seeded.regions.length - 1);
+    await expect(picture.personRowLinks).toHaveText(kept);
+    await expect(picture.personRowNames).not.toContainText(removed);
+    await expect(picture.rowStatus).toHaveClass(/pwg-row-status--saved/);
     expect(await picture.sameDocument()).toBe(true);
   });
 
-  /** [NEG] a refused save is no change */
-  test('leaving after a refused save does not reload', async ({ page }) => {
-    seeded = seed('empty');
+  /** [HAPPY] */
+  test('pointing at a name shows its box, focusing it does too', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
-    await picture.markDocument();
+    const first = seeded.regions[0];
 
-    // After the page is loaded, so the editor is offered and only the save fails.
-    setExiftool('missing');
+    await expect(picture.box(first.region_id)).not.toHaveClass(/person-box-highlight/);
+    await picture.nameEntry(first.name).hover();
+    await expect(picture.box(first.region_id)).toHaveClass(/person-box-highlight/);
+    await expect(picture.box(seeded.regions[1].region_id)).not.toHaveClass(/person-box-highlight/);
 
-    await picture.enterTaggingMode();
-    await picture.dragBox(FIRST_BOX);
-    await picture.typeName(ADA);
-    await picture.pickerInput.press('Enter');
-    // Anti-vacuity: the save really was attempted and refused.
-    await expect(picture.editorMessage).toHaveClass(/persons-editor-error/);
+    await page.mouse.move(0, 0);
+    await expect(picture.box(first.region_id)).not.toHaveClass(/person-box-highlight/);
 
-    await picture.exitTaggingMode();
-
-    expect(await picture.sameDocument()).toBe(true);
+    await picture.nameEntry(first.name).locator('.persons-name-delete').focus();
+    await expect(picture.box(first.region_id)).toHaveClass(/person-box-highlight/);
   });
 
-  /**
-   * [ERR] Characterization: records today's flag, read off editor.js (write()
-   * sets `changed` on success and never resets it); no requirement confirms it.
-   * One save that went through is enough for the reload.
-   */
-  test('[ST] leaving after a save and a later refused save reloads', async ({ page }) => {
-    seeded = seed('empty');
+  /** [HAPPY] a box drawn on this page, by this account, gets its x without a reload */
+  test('a box just added shows its x at once', async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(seeded.picture_path);
     await picture.waitForPlacement();
-    await picture.markDocument();
 
-    await picture.enterTaggingMode();
-    await tag(picture, FIRST_BOX, ADA, 1);
+    await tag(picture, CLEAR_BOX, ADA, seeded.regions.length + 1);
 
-    setExiftool('missing');
-    await picture.dragBox(SECOND_BOX);
-    await picture.typeName(GRACE);
-    await picture.pickerInput.press('Enter');
-    // Anti-vacuity: the later save really was attempted and refused.
-    await expect(picture.editorMessage).toHaveClass(/persons-editor-error/);
-    await expect(picture.savedBoxes).toHaveCount(1);
-
-    await picture.exitTaggingModeAndAwaitReload();
-
-    expect(await picture.sameDocument()).toBe(false);
-    await expect(picture.personRowLinks).toHaveText([ADA]);
+    await expect(picture.deleteButtonOf(ADA)).toBeVisible();
+    await expect(picture.deleteButtonOf(ADA)).toHaveAttribute('title', /.+/);
   });
 });
 
@@ -1161,7 +1175,6 @@ test.describe('a face the normal account did not draw', () => {
     await picture.waitForPlacement();
     expect(seeded.regions.length).toBeGreaterThan(0);
 
-    await picture.enterTaggingMode();
     for (const region of seeded.regions) {
       // Anti-vacuity: the box itself is there, only its control is not.
       await expect(picture.box(region.region_id)).toHaveCount(1);
@@ -1201,8 +1214,8 @@ test.describe('an install without exiftool', () => {
 
     // Anti-vacuity: the button is on the page at all - it is the *disabled*
     // state being asserted, not the absent one.
-    await expect(picture.tagToggle).toHaveCount(1);
-    await expect(picture.tagToggle).toBeDisabled();
-    await expect(picture.tagToggle).toHaveAttribute('title', /.+/);
+    await expect(picture.tagButton).toHaveCount(1);
+    await expect(picture.tagButton).toBeDisabled();
+    await expect(picture.tagButton).toHaveAttribute('title', /.+/);
   });
 });

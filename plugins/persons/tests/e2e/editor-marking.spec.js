@@ -39,6 +39,7 @@ const NARROW_AT_EDGE = { left: 0.01, top: 0.3, w: 0.06, h: 0.2 };
 const BOX_OVER_LABEL = { left: 0.1, top: 0.42, w: 0.25, h: 0.2 };
 
 async function tagAs(picture, box, name, expectedBoxes) {
+  await picture.enterTaggingMode();
   await picture.dragBox(box);
   await picture.typeName(name);
   await picture.pickerInput.press('Enter');
@@ -60,38 +61,13 @@ for (const { role, state } of ROLES) {
       restore();
     });
 
-    test('[HAPPY] the delete control of a box another box lies over is still on top and works', async ({ page }) => {
-      const picture = new PicturePage(page);
-      await picture.goto(seeded.picture_path);
-      await picture.waitForPlacement();
-      await picture.enterTaggingMode();
-
-      await tagAs(picture, BOX_A, NAME_A, 1);
-      await tagAs(picture, BOX_OVER_A_CORNER, NAME_B, 2);
-
-      const control = picture.deleteButtonOf(NAME_A);
-      // Anti-vacuity: the later box really lies over the earlier box's corner.
-      const [first, second] = await picture.savedRegionIds();
-      const corner = await picture.boxRect(Number(first));
-      const over = await picture.boxRect(Number(second));
-      expect(over.left).toBeLessThan(corner.left + corner.width);
-      expect(over.top).toBeLessThan(corner.top);
-      expect(over.top + over.height).toBeGreaterThan(corner.top);
-
-      expect(await picture.isTopmostAtCentre(control)).toBe(true);
-      await control.click({ timeout: 2000 });
-
-      await expect(picture.savedBoxes).toHaveCount(1);
-      expect(await picture.savedNames()).toEqual([NAME_B]);
-    });
-
     test('[HAPPY] a drag starting inside a saved frame draws a new frame', async ({ page }) => {
       const picture = new PicturePage(page);
       await picture.goto(seeded.picture_path);
       await picture.waitForPlacement();
-      await picture.enterTaggingMode();
       await tagAs(picture, BOX_A, NAME_A, 1);
 
+      await picture.enterTaggingMode();
       await picture.dragBox(BOX_INSIDE_A);
       await expect(picture.draft).toHaveCount(1);
       await expect(picture.picker).toBeVisible();
@@ -103,8 +79,8 @@ for (const { role, state } of ROLES) {
         .toEqual([NAME_A, NAME_B]);
     });
 
-    test('[ERR] the name label and the x of a frame stay clickable while tagging', async ({ page }) => {
-      // Characterization of today's behaviour (a mousedown on either leaves the click to the control); no requirement confirms it.
+    test('[ERR] the name label of a frame stays clickable while drawing', async ({ page }) => {
+      // Characterization of today's behaviour (a mousedown on the label leaves the click to it); no requirement confirms it.
       const picture = new PicturePage(page);
       await picture.goto(seeded.picture_path);
       await picture.waitForPlacement();
@@ -126,13 +102,14 @@ for (const { role, state } of ROLES) {
         const picture = new PicturePage(page);
         await picture.goto(seeded.picture_path);
         await picture.waitForPlacement();
-        await picture.enterTaggingMode();
         await tagAs(picture, NARROW_AT_EDGE, LONG_NAME, 1);
         await tagAs(picture, BOX_OVER_LABEL, NAME_B, 2);
 
         if (!tagging) {
           await picture.goto(seeded.picture_path);
           await picture.waitForPlacement();
+        } else {
+          await picture.enterTaggingMode();
         }
 
         const [regionId] = await picture.savedRegionIds();
@@ -159,7 +136,6 @@ for (const { role, state } of ROLES) {
       const picture = new PicturePage(page);
       await picture.goto(seeded.picture_path);
       await picture.waitForPlacement();
-      await picture.enterTaggingMode();
       await tagAs(picture, BOX_A, KNOWN, 1);
       await picture.deleteButtonOf(KNOWN).click();
       await expect(picture.savedBoxes).toHaveCount(0);
@@ -167,6 +143,7 @@ for (const { role, state } of ROLES) {
       expect(personCounts()[KNOWN]).toBeDefined();
 
       const fragment = KNOWN.slice(0, -2);
+      await picture.enterTaggingMode();
       await picture.dragBox(BOX_A);
       await expect(picture.picker).toBeVisible();
       await picture.pickerInput.fill(fragment);
@@ -183,11 +160,11 @@ for (const { role, state } of ROLES) {
       const picture = new PicturePage(page);
       await picture.goto(seeded.picture_path);
       await picture.waitForPlacement();
-      await picture.enterTaggingMode();
       await tagAs(picture, BOX_A, KNOWN, 1);
       await picture.deleteButtonOf(KNOWN).click();
       await expect(picture.savedBoxes).toHaveCount(0);
 
+      await picture.enterTaggingMode();
       await picture.dragBox(BOX_A);
       await expect(picture.picker).toBeVisible();
       await picture.pickerInput.fill(KNOWN.toLowerCase());
@@ -202,9 +179,8 @@ for (const { role, state } of ROLES) {
       const picture = new PicturePage(page);
       await picture.goto(seeded.picture_path);
       await picture.waitForPlacement();
-      await picture.enterTaggingMode();
       await tagAs(picture, BOX_A, NAME_A, 1);
-      await expect(picture.personRow).toBeVisible();
+      await expect(picture.personRowNames).toHaveText(NAME_A);
 
       const [regionId] = await picture.savedRegionIds();
       await picture.deleteRegionBehindThePage(Number(regionId));
@@ -217,7 +193,7 @@ for (const { role, state } of ROLES) {
       await expect(picture.savedBoxes).toHaveCount(0);
       await expect(picture.editorMessage).toHaveText(germanTextOf('PERSONS_MARK_GONE'));
       await expect(picture.editorMessage).not.toHaveClass(/persons-editor-error/);
-      await expect(picture.personRow).toBeHidden();
+      await expect(picture.personRowNames).toHaveText('');
     });
   });
 }
@@ -225,22 +201,16 @@ for (const { role, state } of ROLES) {
 test.describe('a box nobody drew, as an administrator who is not the webmaster', () => {
   test.use({ storageState: path.join(STATE, 'auth-administrator.json') });
 
-  test('[HAPPY] its delete control stays on top of a box drawn over it', async ({ page }) => {
+  test('[HAPPY] its x is in the row, and it removes the box', async ({ page }) => {
     const seededOverlay = seed('overlay');
     try {
       const picture = new PicturePage(page);
       await picture.goto(seededOverlay.picture_path);
       await picture.waitForPlacement();
-      await picture.enterTaggingMode();
 
       const jane = seededOverlay.regions[0];
-      await picture.dragBox({ left: 0.3, top: 0.25, w: 0.15, h: 0.15 });
-      await picture.typeName(NAME_B);
-      await picture.pickerInput.press('Enter');
-      await expect(picture.savedBoxes).toHaveCount(seededOverlay.regions.length + 1);
-
       const control = picture.deleteButton(jane.region_id);
-      expect(await picture.isTopmostAtCentre(control)).toBe(true);
+      await expect(control).toBeVisible();
       await control.click({ timeout: 2000 });
       await expect(picture.box(jane.region_id)).toHaveCount(0);
     } finally {
@@ -250,7 +220,7 @@ test.describe('a box nobody drew, as an administrator who is not the webmaster',
 });
 
 test.describe('a box nobody drew, as the normal account', () => {
-  test('[NEG] has no delete control, and a box drawn over it has its own', async ({ page }) => {
+  test('[NEG] has no x in the row, and a box drawn over it has its own', async ({ page }) => {
     const seededOverlay = seed('overlay');
     try {
       const picture = new PicturePage(page);

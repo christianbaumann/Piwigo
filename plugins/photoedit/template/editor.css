@@ -17,7 +17,9 @@
 #photoedit-controls,
 .photoedit-active #imageToolBar .actionButtons > *,
 .photoedit-active #persons-overlay,
-.photoedit-active #persons-editor {
+.photoedit-active #persons-editor,
+.photoedit-active #persons-tag-add,
+.photoedit-active .persons-name-delete {
 	display: none;
 }
 

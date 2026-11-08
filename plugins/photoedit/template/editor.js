@@ -273,11 +273,8 @@
 				return;
 			}
 			/* The persons editor draws on the same photo and owns Escape while it
-			   tags; leave it first. It reloads the page if it saved anything. */
-			var personsToggle = document.getElementById('persons-tag-toggle');
-			if (personsToggle && document.querySelector('#persons-stage.persons-tagging')) {
-				personsToggle.click();
-			}
+			   draws; asking it to cancel ends the drawing without a request. */
+			document.dispatchEvent(new CustomEvent('persons:cancel'));
 			/* Fit first: the frame is drawn on the fitted photo. */
 			var fit = document.getElementById('zoomFit');
 			if (fit) {

@@ -255,7 +255,7 @@ final class RoleMatrixTest extends TestCase
 
         return self::level(array(
             'content' => array('stage' => strpos($page, 'id="persons-stage"') !== false),
-            'control' => array('tag toggle' => strpos($page, 'id="persons-tag-toggle"') !== false),
+            'control' => array('tag button' => strpos($page, 'id="persons-tag-add"') !== false),
             'write' => array('addRegion' => self::accepted($save)
                 && $this->regionIdOf(self::ADDED) !== null),
             ));
@@ -524,13 +524,16 @@ final class RoleMatrixTest extends TestCase
         return $id === null ? null : (int)$id;
     }
 
+    /** Whether the Personen row offers the x for a region: the ids it lists as deletable. */
     private function boxHasDelete(string $markup, int $regionId): bool
     {
-        if (!preg_match('#<div class="person-box[^"]*" data-person-region="' . $regionId . '".*?</div>#s', $markup, $box))
+        if (!preg_match('#<div class="person-box[^"]*" data-person-region="' . $regionId . '"#', $markup))
         {
             return false;
         }
 
-        return strpos($box[0], 'class="person-box-delete"') !== false;
+        preg_match_all('#data-persons-deletable="([0-9,]*)"#', $markup, $found);
+
+        return in_array((string)$regionId, explode(',', implode(',', $found[1])), true);
     }
 }

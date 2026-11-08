@@ -67,24 +67,43 @@ function persons_assign_overlay($image_id, $image)
 
     $box['URL'] = persons_person_gallery_url($row);
 
-    // Only an action the server would accept is offered (decision 0065).
-    $box['DELETABLE'] = persons_may_delete_region($row['drawn_by'], $user['id'], is_admin());
-
     $boxes[] = $box;
 
-    if ($row['region_type'] == 'Face' and !isset($names[$row['name']]))
+    if ($row['region_type'] == 'Face')
     {
-      $names[$row['name']] = array(
-        'NAME' => $row['name'],
-        'URL'  => $box['URL'],
-        );
+      if (!isset($names[$row['name']]))
+      {
+        $names[$row['name']] = array(
+          'NAME'      => $row['name'],
+          'URL'       => $box['URL'],
+          'REGIONS'   => array(),
+          'DELETABLE' => array(),
+          );
+      }
+
+      $names[$row['name']]['REGIONS'][] = $box['ID'];
+
+      // Only an action the server would accept is offered (decision 0065).
+      if (persons_may_delete_region($row['drawn_by'], $user['id'], is_admin()))
+      {
+        $names[$row['name']]['DELETABLE'][] = $box['ID'];
+      }
     }
   }
+
+  foreach ($names as &$name)
+  {
+    $name['REGIONS_CSV'] = implode(',', $name['REGIONS']);
+    $name['DELETABLE_CSV'] = implode(',', $name['DELETABLE']);
+  }
+  unset($name);
 
   load_language('plugin.lang', PERSONS_PATH);
 
   $template->assign(array(
     'PERSONS_PATH'        => PERSONS_PATH,
+    'PERSONS_NAMES_TPL'   => realpath(PERSONS_PATH.'template/persons_names.tpl'),
+    'PERSONS_CONTROLS_TPL' => realpath(PERSONS_PATH.'template/persons_controls.tpl'),
     'PERSONS_BOXES'       => array_values($boxes),
     'PERSONS_NAMES'       => array_values($names),
     'PERSONS_STALE_TITLE' => l10n(PERSONS_STALE_TITLE),

@@ -1,15 +1,19 @@
 /**
  * The person tagging editor on the public picture page.
  *
- * Everything here is switched on by one mode toggle. Outside tagging mode the
- * page behaves exactly as overlay.js left it: the overlay takes no pointer
- * events, so the theme's click-to-navigate handler and the <area> map keep the
- * whole photo to themselves.
+ * "+ Person markieren" in the Personen row starts one action: draw a box, name
+ * it, done. The drawing state ends by itself once the name is chosen, and on
+ * Esc. Outside it the page behaves exactly as overlay.js left it: the overlay
+ * takes no pointer events, so the theme's click-to-navigate handler and the
+ * <area> map keep the whole photo to themselves.
  *
- * Entering the mode is what makes the photo a drawing surface, which is also
- * why the map is taken off the image while it lasts - three consumers of the
- * same click cannot all be right, and the drawn box is the one the user asked
- * for.
+ * Drawing is what makes the photo a drawing surface, which is also why the map
+ * is taken off the image while it lasts - three consumers of the same click
+ * cannot all be right, and the drawn box is the one the user asked for.
+ *
+ * A region is deleted with the x beside its name in the Personen row. Every
+ * write updates the row and the boxes in place from the web service's answer;
+ * the page is never reloaded.
  *
  * ---------------------------------------------------------------------------
  * The one piece of region math that has to live in the browser.
@@ -46,22 +50,23 @@
 		var config = document.getElementById('persons-editor');
 		var stage = document.getElementById('persons-stage');
 		var overlay = document.getElementById('persons-overlay');
-		var toggle = document.getElementById('persons-tag-toggle');
+		var addButton = document.getElementById('persons-tag-add');
+		var namesEl = document.getElementById('persons-names');
 		var message = document.getElementById('persons-editor-message');
 		var image = document.getElementById('theMainImage');
-		/* Absent when the row is switched off and on the admin tagging screen. */
-		var personRow = document.getElementById('Persons');
 
-		if (!config || !stage || !overlay || !toggle || !message || !image) {
+		if (!config || !stage || !overlay || !addButton || !namesEl || !message || !image) {
 			return;
 		}
+
+		var status = addButton.parentNode.querySelector('.pwg-row-status');
+		/* Disabled in the markup when the server cannot write into image files. */
+		var canWrite = !addButton.disabled;
 
 		var imageId = Number(config.getAttribute('data-persons-image'));
 		var token = config.getAttribute('data-persons-token');
 		var rotation = Number(config.getAttribute('data-persons-rotation')) || 0;
 		var minFraction = Number(config.getAttribute('data-persons-min-fraction'));
-		/* Set only where a reload has something to update - see exit(). */
-		var reloadOnExit = config.hasAttribute('data-persons-reload-on-exit');
 
 		function str(name) {
 			return config.getAttribute('data-persons-str-' + name) || '';
@@ -77,11 +82,10 @@
 		var listedFor = '';
 		var searchSeq = 0;
 		var searching = 0;
-		/* Whether a save or a delete went through. Never reset: on the page that
-		   reads it, leaving the mode after a change starts a fresh document. */
-		var changed = false;
-		/* Writes sent and not yet answered; the page is not left under one. */
+		/* Writes sent and not yet answered. */
 		var pending = 0;
+		/* The faces in the Personen row: id, name, url, deletable. */
+		var faces = facesFromRow();
 
 		/* ── the picker ──────────────────────────────────────────────── */
 
@@ -288,12 +292,52 @@
 			message.classList.toggle('persons-editor-error', !!failed);
 		}
 
+		var STATUS_STATES = ['saving', 'saved', 'dirty', 'error'];
+
+		function showStatus(state, text) {
+			if (!status) {
+				return;
+			}
+			STATUS_STATES.forEach(function (name) {
+				status.classList.toggle('pwg-row-status--' + name, name === state);
+			});
+			status.textContent = text;
+		}
+
+		function showFailure(reason) {
+			showStatus('error', str('not-saved').replace('%s', reason));
+		}
+
+		function updateButton() {
+			addButton.disabled = !canWrite || tagging || pending > 0;
+		}
+
 		function removeDraft() {
 			if (draft) {
 				draft.el.remove();
 				draft = null;
 			}
 			closePicker();
+		}
+
+		/** The faces the server rendered into the row, read back from its markup. */
+		function facesFromRow() {
+			var result = [];
+			Array.prototype.forEach.call(namesEl.querySelectorAll('.persons-name'), function (entry) {
+				var label = entry.querySelector('.persons-name-label');
+				var deletable = (entry.getAttribute('data-persons-deletable') || '').split(',');
+				(entry.getAttribute('data-persons-regions') || '').split(',').forEach(function (id) {
+					if (id !== '') {
+						result.push({
+							id: Number(id),
+							name: label.textContent,
+							url: label.getAttribute('href') || '',
+							deletable: deletable.indexOf(id) !== -1
+						});
+					}
+				});
+			});
+			return result;
 		}
 
 		/** display-space corner fractions -> what the API stores. */
@@ -337,47 +381,37 @@
 		}
 
 		/**
-		 * The live row has plain-text names and core's tag row is not touched
-		 * at all, so after a change, with tagging mode left and no write still
-		 * on its way, the page is loaded again.
-		 *
-		 * A GET of the page's own URL rather than reload(): core renders the
-		 * page straight from a comment post, and a reload would post it again.
-		 */
-		function reloadAfterChange() {
-			if (!changed || !reloadOnExit || pending > 0) {
-				return false;
-			}
-			window.location.replace(window.location.href.split('#')[0]);
-			return true;
-		}
-
-		/**
-		 * One write and everything around it. A refused write arrives in the
-		 * resolved promise, not the rejected one: PwgError answers HTTP 200
-		 * with stat:"fail". An answer that lands after the mode was left
-		 * finishes the reload exit() had to put off.
+		 * One write and everything around it, including the row's status. A
+		 * refused write arrives in the resolved promise, not the rejected one:
+		 * PwgError answers HTTP 200 with stat:"fail". An answer that lands after
+		 * drawing ended still updates the row and the boxes.
 		 */
 		function write(method, params, onSuccess, onRefused) {
 			pending++;
+			updateButton();
+			showStatus('saving', str('saving'));
 
 			return post(method, params).then(function (data) {
 				if (data.stat !== 'ok') {
 					if (onRefused && onRefused(data)) {
 						return;
 					}
+					showFailure(data.message || str('failed'));
 					say(str('failed') + ' ' + (data.message || ''), true);
 					return;
 				}
-				changed = true;
 				onSuccess(data);
+				if (data.result && data.result.tags_written === false) {
+					showStatus('error', str('write').replace('%s', data.result.tags_message || ''));
+				} else {
+					showStatus('saved', str('saved'));
+				}
 			}).catch(function () {
+				showFailure(str('failed'));
 				say(str('failed'), true);
 			}).then(function () {
 				pending--;
-				if (!tagging) {
-					reloadAfterChange();
-				}
+				updateButton();
 			});
 		}
 
@@ -393,86 +427,114 @@
 		 *
 		 * The box keeps the geometry the user drew rather than being re-derived
 		 * from the response: they are the same region, and re-deriving it would
-		 * need a second copy of the display conversion in this file. The label is
-		 * plain text - the link to the person's gallery page is core's index URL,
-		 * built server-side, and it appears on the next load of the page.
+		 * need a second copy of the display conversion in this file.
 		 */
-		function adopt(regionId, name) {
+		function adopt(region, name) {
 			var el = draft.el;
 			draft = null;
 
 			el.classList.remove('person-draft');
-			el.setAttribute('data-person-region', regionId);
+			el.setAttribute('data-person-region', region.id);
 
-			var label = document.createElement('span');
+			var label = document.createElement(region.url ? 'a' : 'span');
 			label.className = 'person-box-label';
+			if (region.url) {
+				label.setAttribute('href', region.url);
+			}
 			label.textContent = name;
 			el.appendChild(label);
+		}
 
-			var remove = document.createElement('button');
-			remove.type = 'button';
-			remove.className = 'person-box-delete';
-			remove.textContent = '×';
-			el.appendChild(remove);
+		/** Removes the boxes whose region the server no longer lists. */
+		function dropBoxesNotIn(regions) {
+			var ids = regions.map(function (region) { return region.id; });
+			Array.prototype.forEach.call(overlay.querySelectorAll('.person-box[data-person-region]'), function (el) {
+				if (ids.indexOf(Number(el.getAttribute('data-person-region'))) === -1) {
+					el.remove();
+				}
+			});
 		}
 
 		/**
 		 * Rebuilds the Personen row from the region list both write methods
 		 * answer with - the rule persons_assign_overlay() renders it by: faces
-		 * only, each name once, in the order the list comes in. Plain text: the
-		 * links are core's index URLs, built server-side, and come back with the
-		 * next load of the page.
+		 * only, each name once, in the order the list comes in.
 		 *
 		 * One known difference: the server leaves out a face whose box cannot be
 		 * drawn (centre off the photo, no size), the API list does not. Such a
 		 * name shows here until the next load. Accepted - it needs a file tagged
-		 * elsewhere with a broken region, and only lasts until "Done".
+		 * elsewhere with a broken region.
 		 */
 		function renderPersonRow(regions) {
-			var names = [];
-			regions.forEach(function (region) {
-				if (region.type === 'Face' && names.indexOf(region.name) === -1) {
-					names.push(region.name);
+			faces = regions.filter(function (region) {
+				return region.type === 'Face';
+			}).map(function (region) {
+				return { id: region.id, name: region.name, url: region.url || '', deletable: !!region.deletable };
+			});
+			renderNames();
+		}
+
+		function renderNames() {
+			var order = [];
+			var byName = {};
+			faces.forEach(function (face) {
+				if (!byName[face.name]) {
+					byName[face.name] = [];
+					order.push(face.name);
 				}
+				byName[face.name].push(face);
 			});
 
-			renderNames(names);
-		}
+			namesEl.textContent = '';
+			order.forEach(function (name, index) {
+				var group = byName[name];
+				var url = group[0].url;
+				var deletable = group.filter(function (face) { return face.deletable; });
 
-		function renderNames(names) {
-			if (!personRow) {
-				return;
-			}
-
-			personRow.querySelector('dd').textContent = names.join(', ');
-			personRow.hidden = names.length === 0;
-		}
-
-		/** The row from the boxes still on the page, for an answer that carries no list. */
-		function renderPersonRowFromBoxes() {
-			var names = [];
-			Array.prototype.forEach.call(
-				overlay.querySelectorAll('.person-box[data-person-region] .person-box-label'),
-				function (label) {
-					if (names.indexOf(label.textContent) === -1) {
-						names.push(label.textContent);
-					}
+				if (index > 0) {
+					namesEl.appendChild(document.createTextNode(', '));
 				}
-			);
-			renderNames(names);
+
+				var entry = document.createElement('span');
+				entry.className = 'persons-name';
+				entry.setAttribute('data-persons-regions', group.map(function (face) { return face.id; }).join(','));
+				entry.setAttribute('data-persons-deletable', deletable.map(function (face) { return face.id; }).join(','));
+
+				var label = document.createElement(url ? 'a' : 'span');
+				label.className = 'persons-name-label';
+				if (url) {
+					label.setAttribute('href', url);
+				}
+				label.textContent = name;
+				entry.appendChild(label);
+
+				if (deletable.length) {
+					var remove = document.createElement('button');
+					remove.type = 'button';
+					remove.className = 'persons-name-delete';
+					remove.title = str('remove');
+					remove.setAttribute('aria-label', str('remove'));
+					entry.appendChild(remove);
+				}
+
+				namesEl.appendChild(entry);
+			});
 		}
 
 		/**
 		 * On a refused save the drawn box stays exactly where it was so the user
-		 * can retry or cancel it - it is never silently dropped.
+		 * can retry or cancel it - it is never silently dropped. Where drawing
+		 * was cancelled while the save was on its way, nobody can retry: the box
+		 * goes.
 		 */
 		function commit(name) {
-			if (!draft || name === '') {
+			if (!draft || draft.saving || name === '') {
 				return;
 			}
 
 			var stored = toStored(draft.box);
 			var saving = draft;
+			saving.saving = true;
 
 			say('');
 
@@ -486,24 +548,33 @@
 				type: 'Face',
 				pwg_token: token
 			}, function (data) {
-				renderPersonRow(data.result.regions);
-
-				/* The mode was left, or another box drawn, before the answer
-				   came: the box is no longer there to adopt. */
-				if (draft !== saving) {
-					return;
-				}
-
 				var known = knownRegionIds();
 				var added = data.result.regions.filter(function (region) {
 					return known.indexOf(region.id) === -1;
 				});
 
+				renderPersonRow(data.result.regions);
+				dropBoxesNotIn(data.result.regions);
+
+				/* The draft was removed before the answer came: the box is no
+				   longer there to adopt. */
+				if (draft !== saving) {
+					return;
+				}
+
 				closePicker();
 				/* The highest unknown id: the new row is inserted last, and any
 				   other unknown id is a region somebody else added since this
 				   page loaded. */
-				adopt(added.length ? added[added.length - 1].id : 0, name);
+				adopt(added.length ? added[added.length - 1] : { id: 0, url: '' }, name);
+				exit();
+			}).then(function () {
+				if (draft === saving) {
+					saving.saving = false;
+					if (!tagging) {
+						removeDraft();
+					}
+				}
 			});
 		}
 
@@ -525,7 +596,7 @@
 
 		overlay.addEventListener('mousedown', function (event) {
 			/* A drag inside a frame draws a new one; only the name and the x keep their click. */
-			if (!tagging || event.button !== 0 || event.target.closest('.person-box-label, .person-box-delete')) {
+			if (!tagging || event.button !== 0 || event.target.closest('.person-box-label') || (draft && draft.saving)) {
 				return;
 			}
 
@@ -577,45 +648,84 @@
 
 		/* ── deleting ────────────────────────────────────────────────── */
 
-		overlay.addEventListener('click', function (event) {
-			var button = event.target.closest('.person-box-delete');
-			if (!tagging || !button) {
+		namesEl.addEventListener('click', function (event) {
+			var button = event.target.closest('.persons-name-delete');
+			if (!button) {
 				return;
 			}
 
-			event.preventDefault();
-			event.stopPropagation();
-
-			var box = button.closest('.person-box');
-			var regionId = Number(box.getAttribute('data-person-region'));
+			var entry = button.closest('.persons-name');
+			var deletable = entry.getAttribute('data-persons-deletable').split(',');
+			/* One press removes one region; a name with several boxes needs one per box. */
+			var regionId = Number(deletable[deletable.length - 1]);
 			if (!regionId) {
 				return;
 			}
 
+			clearHighlight();
 			say('');
 
 			write('pwg.persons.deleteRegion', { region_id: regionId, pwg_token: token }, function (data) {
-				box.remove();
 				renderPersonRow(data.result.regions);
+				dropBoxesNotIn(data.result.regions);
 			}, function (data) {
 				/* 404: gone already, or no longer visible - the server answers both alike. */
 				if (Number(data.err) !== NOT_FOUND) {
 					return false;
 				}
-				box.remove();
-				renderPersonRowFromBoxes();
-				changed = true;
+				faces = faces.filter(function (face) { return face.id !== regionId; });
+				renderNames();
+				var box = overlay.querySelector('.person-box[data-person-region="' + regionId + '"]');
+				if (box) {
+					box.remove();
+				}
 				say(str('gone'), false);
+				showStatus('saved', str('saved'));
 				return true;
 			});
 		});
 
-		/* ── the mode ────────────────────────────────────────────────── */
+		/* Pointing at or focusing a name shows its box(es). */
+
+		function highlightBoxesOf(entry) {
+			(entry.getAttribute('data-persons-regions') || '').split(',').forEach(function (id) {
+				var box = overlay.querySelector('.person-box[data-person-region="' + id + '"]');
+				if (box) {
+					box.classList.add('person-box-highlight');
+				}
+			});
+		}
+
+		function clearHighlight() {
+			Array.prototype.forEach.call(overlay.querySelectorAll('.person-box-highlight'), function (el) {
+				el.classList.remove('person-box-highlight');
+			});
+		}
+
+		function highlightFrom(event) {
+			clearHighlight();
+			var entry = event.target.closest ? event.target.closest('.persons-name') : null;
+			if (entry && namesEl.contains(entry)) {
+				highlightBoxesOf(entry);
+			}
+		}
+
+		namesEl.addEventListener('mouseover', highlightFrom);
+		namesEl.addEventListener('focusin', highlightFrom);
+		namesEl.addEventListener('mouseleave', clearHighlight);
+		namesEl.addEventListener('focusout', clearHighlight);
+
+		/* ── drawing state ───────────────────────────────────────────── */
 
 		function enter() {
+			if (tagging || !canWrite) {
+				return;
+			}
+
 			tagging = true;
 			stage.classList.add('persons-tagging');
-			toggle.value = str('done');
+			updateButton();
+			say(str('draw'));
 
 			/* The map would consume the mousedown that starts a drag. Taken off
 			   for the duration and put back on the way out, so navigation is
@@ -626,16 +736,21 @@
 			}
 		}
 
+		/** Ends drawing. A box whose save is on its way stays until the answer lands. */
 		function exit() {
-			if (reloadAfterChange()) {
+			if (!tagging) {
 				return;
 			}
 
 			tagging = false;
 			stage.classList.remove('persons-tagging');
-			toggle.value = str('tag');
-			removeDraft();
+			if (!draft || !draft.saving) {
+				removeDraft();
+			} else {
+				closePicker();
+			}
 			say('');
+			updateButton();
 
 			if (savedUsemap !== null) {
 				image.setAttribute('usemap', savedUsemap);
@@ -643,13 +758,10 @@
 			}
 		}
 
-		toggle.addEventListener('click', function () {
-			if (tagging) {
-				exit();
-			} else {
-				enter();
-			}
-		});
+		addButton.addEventListener('click', enter);
+
+		/* Another editor on the same photo (photoedit) asks drawing to end. */
+		document.addEventListener('persons:cancel', exit);
 
 		input.addEventListener('input', searchSoon);
 
@@ -678,11 +790,7 @@
 				return;
 			}
 
-			if (draft) {
-				removeDraft();
-			} else {
-				exit();
-			}
+			exit();
 		});
 
 		window.addEventListener('resize', positionPicker);

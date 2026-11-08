@@ -221,45 +221,48 @@ final class PicturePageSourceTest extends TestCase
     public function testTheTagButtonIsRenderedForALoggedInVisitor(): void
     {
         $withoutRegions = $this->markup($this->page());
-        $this->assertStringContainsString('id="persons-tag-toggle"', $withoutRegions);
+        $this->assertStringContainsString('id="persons-tag-add"', $withoutRegions);
 
         $this->seed($this->twoFaces());
         $withRegions = $this->markup($this->page());
-        $this->assertStringContainsString('id="persons-tag-toggle"', $withRegions);
+        $this->assertStringContainsString('id="persons-tag-add"', $withRegions);
     }
 
     /**
-     * [HAPPY] The editor sits in the information panel, in a row of its own
-     * after <dl id="standard"> - below the person row it fills - and no longer
-     * inside the stage over the photo.
+     * [HAPPY] The button sits in the Personen row, inside <dl id="standard">,
+     * with the row's status line; the editor's configuration is rendered once
+     * and no longer inside the stage over the photo.
      */
-    public function testTheEditorRowSitsInTheInfoPanelAfterTheStandardList(): void
+    public function testTheButtonSitsInThePersonenRow(): void
     {
         $markup = $this->markup($this->page());
 
-        $panelAt = strpos($markup, '<div id="imageInfos"');
-        $this->assertNotFalse($panelAt, 'anti-vacuity: the theme rendered no information panel');
-        $listAt = strpos($markup, '<dl id="standard"', $panelAt);
+        $listAt = strpos($markup, '<dl id="standard"');
         $this->assertNotFalse($listAt, 'anti-vacuity: the standard info list is gone');
         $listCloseAt = strpos($markup, '</dl>', $listAt);
         $this->assertNotFalse($listCloseAt, 'anti-vacuity: the standard info list is never closed');
 
-        $rowAt = strpos($markup, '<div id="PersonsTagging" class="imageInfoTable">');
-        $this->assertNotFalse($rowAt, 'the editor row was not rendered');
-        $this->assertGreaterThan($listCloseAt, $rowAt, 'the editor row must follow the standard info list');
-
+        $this->assertSame(1, substr_count($markup, 'id="persons-tag-add"'), 'the button must be rendered once');
+        $buttonAt = strpos($markup, 'id="persons-tag-add"');
+        $this->assertGreaterThan($listAt, $buttonAt);
+        $this->assertLessThan($listCloseAt, $buttonAt, 'the button must be inside the Personen row');
         $this->assertMatchesRegularExpression(
-            '#<div id="PersonsTagging" class="imageInfoTable">\s*<div id="persons-editor"#',
+            '#<input type="button" id="persons-tag-add"[^>]*>\s*<p class="pwg-row-status" role="status"></p>#',
             $markup,
-            'the editor is not the content of its row'
+            'the button must be an input button with the shared status line after it'
         );
-        $this->assertSame(1, substr_count($markup, 'id="persons-editor"'), 'the editor must be rendered once, and no longer in the stage');
+        $this->assertSame(1, substr_count($markup, 'id="persons-editor"'), 'the editor must be rendered once');
+    }
 
-        $this->assertMatchesRegularExpression(
-            '#<input type="button" id="persons-tag-toggle"#',
-            $markup,
-            'the toggle must be an input button, which the theme\'s skin styles'
-        );
+    /** [DT] With the row switched off the names and the button move into the editor. */
+    public function testWithoutTheRowTheButtonSitsInTheEditor(): void
+    {
+        $this->setDisplayKey(false);
+        $markup = $this->markup($this->page());
+
+        $this->assertStringNotContainsString('id="Persons"', $markup);
+        $this->assertSame(1, substr_count($markup, 'id="persons-tag-add"'));
+        $this->assertMatchesRegularExpression('#<div id="persons-editor".*?id="persons-tag-add"#s', $markup);
     }
 
     /**
@@ -273,8 +276,8 @@ final class PicturePageSourceTest extends TestCase
 
         $overlayAt = strpos($markup, 'id="persons-overlay"');
         $this->assertNotFalse($overlayAt, 'anti-vacuity: the overlay was not rendered');
-        $rowAt = strpos($markup, 'id="PersonsTagging"');
-        $this->assertNotFalse($rowAt, 'anti-vacuity: the editor row was not rendered');
+        $rowAt = strpos($markup, 'id="persons-editor"');
+        $this->assertNotFalse($rowAt, 'anti-vacuity: the editor was not rendered');
 
         $this->assertSame(1, substr_count($markup, 'id="persons-editor-message"'));
         $messageAt = strpos($markup, 'id="persons-editor-message"');
@@ -303,21 +306,11 @@ final class PicturePageSourceTest extends TestCase
         );
     }
 
-    /**
-     * [HAPPY] The public editor is told to reload the page when tagging mode
-     * ends after a change - the reload is what brings the links and core's tag
-     * row up to date.
-     */
-    public function testThePublicEditorReloadsOnExit(): void
+    /** [NEG] The editor no longer reloads the page; the flag is gone. */
+    public function testThePublicEditorDoesNotReload(): void
     {
-        $markup = $this->markup($this->page());
-
-        $this->assertMatchesRegularExpression(
-            '#<div id="persons-editor"[^>]*\sdata-persons-reload-on-exit[\s=>]#',
-            $markup
-        );
+        $this->assertStringNotContainsString('data-persons-reload-on-exit', $this->markup($this->page()));
     }
-
 
     // ── the person row ────────────────────────────────────────────────────
 
@@ -340,7 +333,7 @@ final class PicturePageSourceTest extends TestCase
         $row = $this->row($markup);
         $this->assertStringContainsString(self::JANE, $row);
         $this->assertStringContainsString(self::JOHN, $row);
-        $this->assertSame(2, substr_count($row, '<a href='), 'each name links to its tag gallery page');
+        $this->assertSame(2, substr_count($row, '<a class="persons-name-label" href='), 'each name links to its tag gallery page');
         $this->assertDoesNotMatchRegularExpression('#<div id="Persons"[^>]*\shidden[\s>]#', $row, 'a row with names must be visible');
     }
 
@@ -361,13 +354,11 @@ final class PicturePageSourceTest extends TestCase
     }
 
     /**
-     * [ECP] A photo with no face still gets the row, hidden and empty.
+     * [ECP] A photo with no face still gets the row, empty but for its button.
      *
-     * The editor fills and unhides it when the first face on the photo is
-     * saved; without an element to patch, that face would only show after a
-     * reload.
+     * The row carries the button that starts the first mark, so it is shown.
      */
-    public function testAPhotoWithNoFaceCarriesAHiddenEmptyPersonRow(): void
+    public function testAPhotoWithNoFaceCarriesAnEmptyPersonRow(): void
     {
         $markup = $this->markup($this->page());
 
@@ -380,8 +371,8 @@ final class PicturePageSourceTest extends TestCase
         $this->assertGreaterThan($listAt, $rowAt);
         $this->assertLessThan(strpos($markup, '</dl>', $listAt), $rowAt, 'the row was rendered outside <dl id="standard">');
 
-        $this->assertMatchesRegularExpression('#<div id="Persons"[^>]*\shidden[\s>]#', $markup, 'an empty row must be hidden');
-        $this->assertMatchesRegularExpression('#<dd>\s*</dd>#', $this->row($markup), 'an empty row must list nobody');
+        $this->assertDoesNotMatchRegularExpression('#<div id="Persons"[^>]*\shidden[\s>]#', $markup, 'the row holds the button and must be shown');
+        $this->assertMatchesRegularExpression('#<span id="persons-names"></span>#', $this->row($markup), 'an empty row must list nobody');
     }
 
     /**
@@ -494,7 +485,7 @@ final class PicturePageSourceTest extends TestCase
     /** The rendered person row, or '' when it is absent. */
     private function row(string $markup): string
     {
-        return preg_match('#<div id="Persons".*?</div>#s', $markup, $m) ? $m[0] : '';
+        return preg_match('#<div id="Persons".*?</dd>#s', $markup, $m) ? $m[0] : '';
     }
 
     private function setDisplayKey(bool $on): void

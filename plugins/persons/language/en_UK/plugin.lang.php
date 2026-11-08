@@ -3,7 +3,12 @@
 $lang['Persons'] = 'Persons';
 $lang['Region may be out of date: the image was resized since it was tagged'] = 'Region may be out of date: the image was cropped since it was tagged';
 $lang['Tag people'] = 'Tag people';
-$lang['Done tagging'] = 'Done tagging';
+$lang['+ Mark a person'] = '+ Mark a person';
+$lang['Drag a box around a face - Esc cancels'] = 'Drag a box around a face - Esc cancels';
+$lang['Saving …'] = 'Saving …';
+$lang['✓ Saved'] = '✓ Saved';
+$lang['Not saved: %s'] = 'Not saved: %s';
+$lang['Saved, but not written into the image file: %s'] = 'Saved, but not written into the image file: %s';
 $lang['Who is this?'] = 'Who is this?';
 $lang['Create'] = 'Create';
 $lang['Enter commits - Esc cancels'] = 'Enter commits - Esc cancels';

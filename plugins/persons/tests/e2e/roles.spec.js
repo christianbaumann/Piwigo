@@ -65,7 +65,7 @@ test.describe('as a guest', () => {
     // Anti-vacuity: the page that came back is the login form, not a broken photo page.
     await expect(picture.loginForm).toBeVisible();
     await expect(picture.boxes).toHaveCount(0);
-    await expect(picture.tagToggle).toHaveCount(0);
+    await expect(picture.tagButton).toHaveCount(0);
   });
 });
 
@@ -84,7 +84,6 @@ for (const { role, state, deletesOthers } of ROLES) {
       await expect(picture.savedBoxes).toHaveCount(SEEDED_BOXES);
 
       // persons.delete-region on a region somebody else put there
-      await picture.enterTaggingMode();
       const others = picture.deleteButton(seeded.regions[0].region_id);
       if (deletesOthers) {
         await expect(others).toBeVisible();
@@ -93,6 +92,7 @@ for (const { role, state, deletesOthers } of ROLES) {
       }
 
       // persons.add-region: edit
+      await picture.enterTaggingMode();
       await picture.dragBox(CLEAR_BOX);
       await picture.typeName(MIA);
       await picture.pickerInput.press('Enter');
@@ -103,6 +103,7 @@ for (const { role, state, deletesOthers } of ROLES) {
       await expect(picture.savedBoxes).toHaveCount(SEEDED_BOXES);
 
       // persons.name-list: the person, now on no photo, is offered by the picker
+      await picture.enterTaggingMode();
       await picture.dragBox(CLEAR_BOX);
       await picture.searchForExisting(MIA_FRAGMENT, MIA);
       await expect(picture.existingPickerOption(MIA)).toBeVisible();

@@ -45,10 +45,6 @@ function persons_picture_overlay()
 
   persons_assign_overlay($image_id, $image);
 
-  // Only this page has the information list a reload brings up to date; the
-  // admin tagging screen shares the editor template and leaves this unset.
-  $template->assign('PERSONS_RELOAD_ON_EXIT', true);
-
   $template->set_prefilter('picture', 'persons_picture_prefilter');
 }
 
@@ -79,7 +75,7 @@ function persons_picture_prefilter($content)
   $stage = '<div id="persons-stage">'
     .PERSONS_TPL_INJECT_POINT
     .persons_template_include('public_overlay.tpl')
-    .($has_row ? '' : persons_template_include('public_editor.tpl'))
+    .($has_row ? '' : "{assign var='persons_force_controls' value=true}".persons_template_include('public_editor.tpl'))
     .'</div>';
 
   $content = str_replace(PERSONS_TPL_INJECT_POINT, $stage, $content);

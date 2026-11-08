@@ -1,41 +1,96 @@
 /*
  * The tagging editor on the public picture page.
  *
- * Apart from the toggle's row, everything here is scoped to
- * #persons-stage.persons-tagging, the class editor.js sets while the mode
- * lasts. Outside it the page keeps the read-only behaviour overlay.css defines:
+ * Apart from the Personen row, everything here is scoped to
+ * #persons-stage.persons-tagging, the class editor.js sets while a box is
+ * being drawn. Outside it the page keeps the read-only behaviour overlay.css defines:
  * boxes revealed on hover, no pointer events, no controls.
  */
 
-/* Under the photo on the admin tagging screen; the picture page overrides it below. */
+/* Under the photo on the admin tagging screen; empty on the picture page. */
 #persons-editor {
 	margin: 6px 0;
 	text-align: right;
 }
 
+#persons-editor:empty {
+	display: none;
+}
+
 /*
- * In the picture page's information panel, after <dl id="standard">. The
- * button itself is left to the skin's INPUT[type="button"] rules, and the row
- * carries the list's class, so it gets the list's padding in every skin.
- * Narrow layout: centred like the list; wide layout: in line with the dd
- * text, which the theme indents by a 10px dd margin.
+ * Admin tagging screen and the fallback without a Personen row: the names and
+ * the button under the photo. On the picture page they sit in the Personen row.
  */
-#PersonsTagging #persons-editor {
-	text-align: center;
+.persons-editor-row {
+	text-align: right;
 }
 
-.wide #PersonsTagging #persons-editor {
-	margin: 10px 0 10px 10px;
-	text-align: left;
-}
-
-#persons-tag-toggle {
+.persons-tag-add {
 	cursor: pointer;
 }
 
-#persons-tag-toggle[disabled] {
+.persons-tag-add[disabled] {
 	cursor: not-allowed;
 	opacity: 0.5;
+}
+
+/* Names, each with the x for a region the viewer may delete (decision 0065). */
+#persons-names:empty {
+	display: none;
+}
+
+.persons-name-delete {
+	margin: 0 0 0 0.25em;
+	padding: 0 0.3em;
+	border: 0;
+	background: none;
+	color: inherit;
+	font-size: 1em;
+	line-height: 1.2;
+	cursor: pointer;
+	opacity: 0.7;
+}
+
+.persons-name-delete::before {
+	content: "\00d7";
+}
+
+.persons-name-delete:hover,
+.persons-name-delete:focus {
+	opacity: 1;
+}
+
+/* The box of the name the pointer or focus is on. */
+.person-box.person-box-highlight {
+	opacity: 1;
+	border-color: #fc0;
+}
+
+.person-box-highlight .person-box-label {
+	opacity: 1;
+}
+
+/* row status (the same few lines as plugins/photoinfo/template/info.css) */
+.pwg-row-status {
+	margin: 0.3em 0 0;
+}
+
+.pwg-row-status:empty {
+	display: none;
+}
+
+.pwg-row-status--saving,
+.pwg-row-status--dirty {
+	opacity: 0.8;
+}
+
+.pwg-row-status--saved {
+	color: #1e7b34;
+}
+
+.pwg-row-status--error {
+	color: #c0182c;
+	font-weight: bold;
 }
 
 /*
@@ -103,37 +158,6 @@
 	border-style: dashed;
 	border-color: #fff;
 	opacity: 1;
-}
-
-/*
- * The delete affordance exists in the markup at all times so the editor has
- * something to bind to, and is only reachable while tagging.
- */
-.person-box-delete {
-	display: none;
-	position: absolute;
-	right: -1px;
-	top: -1px;
-	padding: 0 5px;
-	border: 0;
-	background: rgba(0, 0, 0, 0.7);
-	color: #fff;
-	font-size: 0.9em;
-	line-height: 1.4;
-	cursor: pointer;
-	pointer-events: auto;
-}
-
-#persons-stage.persons-tagging .person-box[data-person-region] .person-box-delete {
-	display: block;
-}
-
-/*
- * Above every box, whichever was drawn later; above the labels too, since the
- * x sits on the box corner a neighbour's label may reach.
- */
-#persons-stage.persons-tagging .person-box-delete {
-	z-index: 4;
 }
 
 /*

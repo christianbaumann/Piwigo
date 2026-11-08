@@ -3,7 +3,12 @@
 $lang['Persons'] = 'Personen';
 $lang['Region may be out of date: the image was resized since it was tagged'] = 'Der Bereich ist womöglich veraltet: das Bild wurde nach der Markierung zugeschnitten';
 $lang['Tag people'] = 'Personen markieren';
-$lang['Done tagging'] = 'Markieren beenden';
+$lang['+ Mark a person'] = '+ Person markieren';
+$lang['Drag a box around a face - Esc cancels'] = 'Ziehen Sie einen Rahmen um ein Gesicht - Esc bricht ab';
+$lang['Saving …'] = 'Speichert …';
+$lang['✓ Saved'] = '✓ Gespeichert';
+$lang['Not saved: %s'] = 'Nicht gespeichert: %s';
+$lang['Saved, but not written into the image file: %s'] = 'Gespeichert, aber nicht in die Bilddatei geschrieben: %s';
 $lang['Who is this?'] = 'Wer ist das?';
 $lang['Create'] = 'Anlegen';
 $lang['Enter commits - Esc cancels'] = 'Enter übernimmt - Esc bricht ab';

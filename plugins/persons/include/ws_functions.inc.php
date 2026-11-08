@@ -148,6 +148,8 @@ function persons_announce_regions_changed($image_id, $added, $removed, $answer)
  */
 function persons_regions_payload($image_id)
 {
+  global $user;
+
   $image = pwg_db_fetch_assoc(pwg_query(
     'SELECT width, height, rotation FROM '.IMAGES_TABLE.' WHERE id = '.(int)$image_id.';'
     ));
@@ -174,6 +176,8 @@ function persons_regions_payload($image_id)
       'h'         => (float)$row['area_h'],
       'type'      => $row['region_type'],
       'source'    => $row['source'],
+      'url'       => persons_person_gallery_url($row),
+      'deletable' => persons_may_delete_region($row['drawn_by'], $user['id'], is_admin()),
       'stale'     => persons_region_is_stale(
                        $row['applied_w'], $row['applied_h'], $image['width'], $image['height']),
       );

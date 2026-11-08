@@ -32,10 +32,10 @@ class PicturePage {
     /** The theme's zoom control, hidden in edit mode. */
     this.zoomFitButton = page.locator('#zoomFit');
 
-    /** The persons plugin's overlay and its tagging toggle, hidden in edit mode. */
+    /** The persons plugin's overlay and its "+ Person markieren" button, hidden in edit mode. */
     this.personsOverlay = page.locator('#persons-overlay');
-    this.personsEditor = page.locator('#persons-editor');
-    this.personsTagToggle = page.locator('#persons-tag-toggle');
+    this.personsEditor = page.locator('#persons-tag-add');
+    this.personsTagButton = page.locator('#persons-tag-add');
     /** The persons stage only while its tagging mode is on. */
     this.personsTagging = page.locator('#persons-stage.persons-tagging');
     this.personsPickerInput = page.locator('#persons-picker-input');
@@ -259,18 +259,6 @@ class PicturePage {
       window.addEventListener('beforeunload', clear);
       window.addEventListener('pagehide', clear);
     });
-  }
-
-  /**
-   * Clicks the edit button where it is expected to reload the page instead of
-   * opening edit mode, and waits for the reload. The load event is listened for
-   * before the click, so a reload over before the click resolves is not missed.
-   */
-  async clickEditAndAwaitReload() {
-    const loaded = this.page.waitForEvent('load');
-    await this.editButton.click();
-    await loaded;
-    await this.waitForPhoto();
   }
 
   /**

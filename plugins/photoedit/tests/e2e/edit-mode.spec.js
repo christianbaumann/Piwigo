@@ -144,15 +144,16 @@ test('[ST] Escape leaves edit mode', async ({ page }) => {
   await expect(picture.editMode).toHaveCount(0);
 });
 
-test('[ST] entering edit mode ends persons tagging first', async ({ page }) => {
+test('[ST] entering edit mode ends persons drawing first', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
-  await picture.personsTagToggle.click();
+  await picture.personsTagButton.click();
   await expect(picture.personsTagging).toHaveCount(1);
 
   await picture.editButton.click();
 
   await expect(picture.personsTagging).toHaveCount(0);
+  await expect(picture.personsPickerInput).toBeHidden();
   await expect(picture.editMode).toHaveCount(1);
 });
 
@@ -185,25 +186,23 @@ test('[ST] the navigation arrows stay visible in edit mode and leave the page', 
 });
 
 /**
- * [ERR] Characterization: records today's hand-over, read off both editor.js
- * files (photoedit leaves persons' tagging first; persons reloads on leaving
- * after a change); no requirement confirms it. Edit mode does not open, and
- * after the reload the button has to be clicked again.
+ * [ST] A person marked on this page ends the drawing by itself, and edit mode
+ * opens afterwards without a reload (persons no longer reloads the page).
  */
-test('[ST] entering edit mode after a tagging change reloads instead of opening', async ({ page }) => {
+test('[ST] entering edit mode after marking a person opens it without a reload', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
-  await picture.personsTagToggle.click();
+  await picture.personsTagButton.click();
   await expect(picture.personsTagging).toHaveCount(1);
   // A name seed.php --restore deletes the person of, as it does a save's regions.
   await picture.tagPerson(PERSON_BOX, fixture.kept_name);
+  await expect(picture.personsTagging).toHaveCount(0);
   await picture.markDocument();
 
-  await picture.clickEditAndAwaitReload();
+  await picture.editButton.click();
 
-  expect(await picture.sameDocument()).toBe(false);
-  await expect(picture.editMode).toHaveCount(0);
-  await expect(picture.editButton).toBeVisible();
+  await expect(picture.editMode).toHaveCount(1);
+  expect(await picture.sameDocument()).toBe(true);
 });
 
 test('[ST] on a narrow screen the controls stay reachable in the collapsed menu', async ({ page }) => {

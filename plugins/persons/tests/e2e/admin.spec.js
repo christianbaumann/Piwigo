@@ -216,7 +216,7 @@ test.describe('the admin tagging screen', () => {
     await screen.photoScreenLink.click();
     await screen.waitForPlacement();
 
-    await expect(screen.tagToggle).toHaveCount(1);
+    await expect(screen.tagButton).toHaveCount(1);
   });
 });
 
@@ -247,6 +247,6 @@ test.describe('a normal account on the admin screen', () => {
 
     expect(response?.status()).toBe(401);
     await expect(screen.stage).toHaveCount(0);
-    await expect(screen.tagToggle).toHaveCount(0);
+    await expect(screen.tagButton).toHaveCount(0);
   });
 });

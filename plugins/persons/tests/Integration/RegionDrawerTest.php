@@ -307,16 +307,19 @@ final class RegionDrawerTest extends TestCase
         return $markup;
     }
 
+    /** Whether the Personen row offers the x for a region: the ids it lists as deletable. */
     private function boxHasDelete(string $markup, int $regionId): bool
     {
-        $found = preg_match(
-            '#<div class="person-box[^"]*" data-person-region="' . $regionId . '".*?</div>#s',
-            $markup,
-            $box
+        $this->assertSame(
+            1,
+            preg_match('#<div class="person-box[^"]*" data-person-region="' . $regionId . '"#', $markup),
+            "the page rendered no box for region $regionId"
         );
-        $this->assertSame(1, $found, "the page rendered no box for region $regionId");
+        $this->assertStringNotContainsString('person-box-delete', $markup, 'the x belongs in the row, not on the photo');
 
-        return strpos($box[0], 'class="person-box-delete"') !== false;
+        preg_match_all('#data-persons-deletable="([0-9,]*)"#', $markup, $found);
+
+        return in_array((string)$regionId, explode(',', implode(',', $found[1])), true);
     }
 
     /** @return string[] the names the file itself carries, in file order */

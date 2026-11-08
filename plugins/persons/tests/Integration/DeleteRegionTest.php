@@ -68,6 +68,31 @@ final class DeleteRegionTest extends TestCase
         $this->assertFalse($region['stale'], 'a region written against this very image is not stale');
     }
 
+    /**
+     * [DT] The answer says per region whether the caller may delete it
+     * (decision 0065), so the page shows the x without a reload: a region the
+     * normal account drew yes, one nobody drew no.
+     */
+    public function testTheAnswerSaysWhichRegionsTheCallerMayDelete(): void
+    {
+        $this->add(self::JANE, 0.25, 0.25, 0.2, 0.2);
+        $this->add(self::JOHN, 0.75, 0.75, 0.2, 0.2);
+        $this->db->query('UPDATE piwigo_person_region SET drawn_by = NULL WHERE id = ' . $this->regionId(self::JANE));
+
+        $res = $this->ws->call('pwg.persons.getRegions', array('image_id' => $this->image['id']));
+        $this->assertSame('ok', $res['json']['stat'], $res['body']);
+
+        $byName = array();
+        foreach ($res['json']['result']['regions'] as $region)
+        {
+            $byName[$region['name']] = $region;
+        }
+        $this->assertCount(2, $byName, 'anti-vacuity: both regions came back');
+        $this->assertFalse($byName[self::JANE]['deletable'], 'nobody drew it');
+        $this->assertTrue($byName[self::JOHN]['deletable'], 'the caller drew it');
+        $this->assertArrayHasKey('url', $byName[self::JOHN]);
+    }
+
     /** [HAPPY] Deleting one of two boxes leaves the other in the file. */
     public function testDeletingOneRegionLeavesTheOther(): void
     {

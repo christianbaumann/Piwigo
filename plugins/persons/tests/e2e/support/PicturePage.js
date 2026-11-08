@@ -32,12 +32,12 @@ class PicturePage {
     /** Core's information list the person row sits in. */
     this.infoList = page.locator('#standard');
     this.personRow = page.locator('#standard #Persons');
-    /** The names cell of that row, without its label. */
-    this.personRowNames = page.locator('#standard #Persons dd');
-    /** Any element inside that cell; the live row holds plain text only. */
-    this.personRowElements = page.locator('#standard #Persons dd *');
-    /** The links in that cell; only a server-rendered row has them. */
-    this.personRowLinks = page.locator('#standard #Persons dd a');
+    /** The names in that row, without its label, button and status. */
+    this.personRowNames = page.locator('#standard #Persons #persons-names');
+    /** One entry per distinct name. */
+    this.personRowEntries = page.locator('#standard #Persons #persons-names .persons-name');
+    /** The links in the names. */
+    this.personRowLinks = page.locator('#standard #Persons #persons-names a');
     /** Core's tag row. Every person is also a tag, so a tagged name lands here too. */
     this.tagRow = page.locator('#standard #Tags');
     /** The login form a guest is sent to instead of the photo (decision 0055). */
@@ -64,9 +64,12 @@ class PicturePage {
 
     /* ── the editor ─────────────────────────────────────────────────── */
 
-    this.tagToggle = page.locator('#persons-tag-toggle');
-    /** The toggle where it belongs: its own row in the theme's information panel. */
-    this.tagToggleInInfoPanel = page.locator('#imageInfos #PersonsTagging #persons-tag-toggle');
+    /** "+ Person markieren": starts one drawing. */
+    this.tagButton = page.locator('#persons-tag-add');
+    /** The button where it belongs: the Personen row in the theme's information panel. */
+    this.tagButtonInRow = page.locator('#imageInfos #standard #Persons #persons-tag-add');
+    /** The Personen row's status line. */
+    this.rowStatus = page.locator('#Persons .pwg-row-status, .persons-editor-row .pwg-row-status');
     /** The element carrying the editor's labels and configuration. */
     this.editorConfig = page.locator('#persons-editor');
     /** The theme's information list the editor row follows. */
@@ -777,12 +780,12 @@ class PicturePage {
    * Also the horizontal edges of the toggle, the panel and the info list's
    * first dd, for the overflow and the alignment check.
    */
-  async tagToggleLook() {
+  async tagButtonLook() {
     return this.page.evaluate(() => {
       const PROPS = ['backgroundColor', 'backgroundImage', 'color', 'borderTopColor',
         'borderTopStyle', 'borderTopWidth', 'fontFamily', 'fontSize'];
-      const toggle = document.getElementById('persons-tag-toggle');
-      const row = document.getElementById('PersonsTagging');
+      const toggle = document.getElementById('persons-tag-add');
+      const row = toggle.parentElement;
       const probe = document.createElement('input');
       probe.type = 'button';
       probe.value = 'probe';
@@ -872,21 +875,36 @@ class PicturePage {
     });
   }
 
-  /** @param {number} regionId */
+  /**
+   * The x beside the name in the Personen row for one region: present only
+   * where the viewer may delete that region (decision 0065).
+   *
+   * @param {number} regionId
+   */
   deleteButton(regionId) {
-    return this.box(regionId).locator('.person-box-delete');
+    return this.page.locator(
+      `xpath=//*[@id="persons-names"]//*[contains(concat(",", @data-persons-deletable, ","), ",${regionId},")]/button[contains(@class, "persons-name-delete")]`
+    );
   }
 
   /**
-   * The delete control of the saved box labelled with a name - for a box
-   * whose id the spec cannot know, because the browser just created it.
+   * The x of the name in the row - for a region whose id the spec cannot know,
+   * because the browser just created it.
    *
    * @param {string} name
    */
   deleteButtonOf(name) {
-    return this.savedBoxes
+    return this.page
+      .locator('#persons-names .persons-name')
       .filter({ has: this.page.getByText(name, { exact: true }) })
-      .locator('.person-box-delete');
+      .locator('.persons-name-delete');
+  }
+
+  /** The Personen row's entry for a name. @param {string} name */
+  nameEntry(name) {
+    return this.page
+      .locator('#persons-names .persons-name')
+      .filter({ has: this.page.getByText(name, { exact: true }) });
   }
 
   /**
@@ -977,39 +995,17 @@ class PicturePage {
     });
   }
 
-  /** Turns the photo into a drawing surface, and waits until it really is one. */
+  /** Presses "+ Person markieren" and waits until the photo really is a drawing surface. */
   async enterTaggingMode() {
-    await this.tagToggle.click();
+    if ((await this.taggingStage.count()) > 0) {
+      return;
+    }
+    await this.tagButton.click();
     await this.taggingStage.waitFor();
   }
 
-  /** Leaves tagging mode through the toggle, and waits until the mode is really off. */
+  /** Ends drawing with Esc - with or without a draft - and waits until the state is off. */
   async exitTaggingMode() {
-    await this.tagToggle.click();
-    await this.taggingStage.waitFor({ state: 'detached' });
-  }
-
-  /**
-   * Leaves tagging mode through the toggle and waits for the page to reload.
-   *
-   * The load event is listened for before the click, so a reload that is
-   * already over by the time the click resolves is not missed.
-   */
-  async exitTaggingModeAndAwaitReload() {
-    const loaded = this.page.waitForEvent('load');
-    await this.tagToggle.click();
-    await loaded;
-  }
-
-  /** Leaves tagging mode with Esc - only valid with no draft open - and waits for the page to reload. */
-  async exitTaggingModeWithEscapeAndAwaitReload() {
-    const loaded = this.page.waitForEvent('load');
-    await this.page.keyboard.press('Escape');
-    await loaded;
-  }
-
-  /** Leaves tagging mode with Esc - only valid with no draft open - and waits until it is off. */
-  async exitTaggingModeWithEscape() {
     await this.page.keyboard.press('Escape');
     await this.taggingStage.waitFor({ state: 'detached' });
   }
