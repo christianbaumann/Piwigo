@@ -34,15 +34,16 @@ const SAVES = [
 ];
 
 for (const save of SAVES) {
-  test(`[HAPPY] an administrator saves "${save.shown}" and finds exactly that in the row after the reload`, async ({ page }) => {
+  test(`[HAPPY] an administrator saves "${save.shown}" and finds exactly that in the row, without a reload`, async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(fixture.picture_path);
-    await picture.dateView.click();
+    await picture.openDateEditor();
 
     await picture.fillDate(save.start[0], save.start[1], save.start[2]);
     await picture.qualifyDate(save.qualifier, save.end);
-    await picture.saveDateAndWaitForReload();
+    await picture.dateDoneButton.click();
 
+    await expect(picture.dateStatus).toHaveText('✓ Gespeichert');
     await expect(picture.dateView).toHaveText(save.shown);
     expect(readDate(fixture.image_id)['XMP-pwginfo:DateEDTF']).toBe(save.edtf);
     expect(readRow(fixture.image_id).photoinfo_date_qualifier).toBe(save.qualifier);
@@ -52,7 +53,7 @@ for (const save of SAVES) {
 test('[ST] the qualifier waits for a year, and only "zwischen" shows the second date', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
-  await picture.dateView.click();
+  await picture.openDateEditor();
 
   await expect(picture.dateQualifier).toBeDisabled();
   await expect(picture.dateEnd).toBeHidden();
@@ -79,7 +80,7 @@ test('[ST] the qualifier waits for a year, and only "zwischen" shows the second 
 test('[ST] switching away from "zwischen" clears the second date', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
-  await picture.dateView.click();
+  await picture.openDateEditor();
   await picture.fillDate('1965', '', '');
   await picture.qualifyDate('between', { year: '1970', month: '5', day: '2' });
 
@@ -95,7 +96,7 @@ for (const end of [{ year: '1964', month: '', day: '' }, { year: '', month: '', 
   test(`[NEG] a range ending "${end.year}" is refused before anything is sent`, async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(fixture.picture_path);
-    await picture.dateView.click();
+    await picture.openDateEditor();
     let requests = 0;
     page.on('request', (request) => {
       if (request.url().includes('ws.php')) {
@@ -105,7 +106,7 @@ for (const end of [{ year: '1964', month: '', day: '' }, { year: '', month: '', 
 
     await picture.fillDate('1965', '', '');
     await picture.qualifyDate('between', end);
-    await picture.dateSaveButton.click();
+    await picture.dateDoneButton.click();
 
     await expect(picture.dateMessage).not.toBeEmpty();
     await expect(picture.dateForm).toBeVisible();
@@ -117,16 +118,18 @@ for (const end of [{ year: '1964', month: '', day: '' }, { year: '', month: '', 
 test('[ST] the empty option turns a saved range back into an exact date', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
-  await picture.dateView.click();
+  await picture.openDateEditor();
   await picture.fillDate('1965', '', '');
   await picture.qualifyDate('between', { year: '1970', month: '', day: '' });
-  await picture.saveDateAndWaitForReload();
+  await picture.dateDoneButton.click();
+  await expect(picture.dateStatus).toHaveText('✓ Gespeichert');
 
-  await picture.dateView.click();
+  await picture.openDateEditor();
   await expect(picture.dateQualifier).toHaveValue('between');
   await expect(picture.dateEndYear).toHaveValue('1970');
   await picture.dateQualifier.selectOption('');
-  await picture.saveDateAndWaitForReload();
+  await picture.dateDoneButton.click();
+  await expect(picture.dateStatus).toHaveText('✓ Gespeichert');
 
   await expect(picture.dateView).toHaveText('1965');
   const row = readRow(fixture.image_id);
@@ -135,18 +138,19 @@ test('[ST] the empty option turns a saved range back into an exact date', async 
   expect(readDate(fixture.image_id)['XMP-pwginfo:DateEDTF']).toBe('1965');
 });
 
-test('[ST] a range the file does not take reopens with its qualifier and end', async ({ page }) => {
+test('[ST] a range the file does not take stays red, and reopens with its qualifier and end', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
   makeReadOnly(fixture.image_id);
-  await picture.dateView.click();
+  await picture.openDateEditor();
   await picture.fillDate('1965', '', '');
   await picture.qualifyDate('between', { year: '1970', month: '5', day: '' });
 
-  await picture.dateSaveButton.click();
-  await expect(picture.dateMessage).not.toBeEmpty();
-  await picture.dateCancelButton.click();
-  await picture.dateView.click();
+  await picture.dateDoneButton.click();
+  await expect(picture.dateStatus).toContainText('Nicht gespeichert:');
+  await picture.dateDoneButton.click();
+  await expect(picture.dateForm).toBeHidden();
+  await picture.openDateEditor();
 
   expect(readRow(fixture.image_id).photoinfo_date_qualifier).toBe('between');
   await expect(picture.dateQualifier).toHaveValue('between');

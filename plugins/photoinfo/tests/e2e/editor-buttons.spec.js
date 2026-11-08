@@ -5,14 +5,11 @@ const { seed, restore } = require('./support/seed');
 const { SKINS, MIN_SKINS } = require('../../../persons/tests/e2e/support/skins');
 
 /**
- * Cancel in the date and info editors is a quiet secondary control: no fill,
- * no border, in every skin. Save keeps whatever the skin makes of a submit
- * button, so a rule that quiets Cancel cannot reach it. Decision O8 of the
- * handbook third pass: under newspaper Cancel was blue and read as the main
- * button.
+ * The date and info editors have no Cancel; their Done keeps whatever the
+ * skin makes of a submit button, so a rule that restyles buttons in the
+ * editor cannot reach it.
  */
 
-const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const EDITORS = /** @type {const} */ (['date', 'info']);
 
 /** @type {ReturnType<typeof seed>} */
@@ -42,22 +39,20 @@ test('[ERR] the skin parameter takes effect: newspaper and clear paint a submit 
 });
 
 for (const skin of SKINS) {
-  test(`[ECP] ${skin}: Abbrechen has no fill and no border, Speichern keeps the skin's submit look`, async ({ page }) => {
+  test(`[ECP] ${skin}: Fertig keeps the skin's submit look and there is no Abbrechen`, async ({ page }) => {
     const picture = new PicturePage(page);
     await picture.goto(`${fixture.picture_path}&skin=${skin}`);
 
     for (const editor of EDITORS) {
+      // The date editor closes when focus leaves it, which would shift the next click.
+      await picture.goto(`${fixture.picture_path}&skin=${skin}`);
       const look = await picture.editorButtonLook(editor);
       // Anti-vacuity: the styles were really read, not empty objects.
       expect(look.probe.borderTopWidth, editor).not.toBe('');
       expect(look.probe.backgroundColor, editor).not.toBe('');
 
-      if (look.cancel !== null) {
-        expect(look.cancel.backgroundColor, editor).toBe(TRANSPARENT);
-        expect(look.cancel.backgroundImage, editor).toBe('none');
-        expect(look.cancel.borderTopWidth, editor).toBe('0px');
-      } else {
-        expect(editor, 'only the info editor has no Cancel').toBe('info');
+      // Neither editor has a Cancel: Done is the only button.
+      expect(look.cancel, editor).toBeNull();
       }
       expect(look.save, editor).toEqual(look.probe);
     }

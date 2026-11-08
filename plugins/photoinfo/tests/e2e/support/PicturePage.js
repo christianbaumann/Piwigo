@@ -31,8 +31,9 @@ class PicturePage {
     this.dateEndYear = page.locator('#photoinfo-date-form input[name=end_year]');
     this.dateEndMonth = page.locator('#photoinfo-date-form select[name=end_month]');
     this.dateEndDay = page.locator('#photoinfo-date-form select[name=end_day]');
-    this.dateSaveButton = page.locator('#photoinfo-date-form input[type=submit]');
-    this.dateCancelButton = page.locator('#photoinfo-date-form .photoinfo-cancel');
+    this.dateEditButton = page.locator('#photoinfo-date-edit');
+    this.dateDoneButton = page.locator('#photoinfo-date-form .photoinfo-done');
+    this.dateStatus = page.locator('#photoinfo-date-status');
     this.dateMessage = page.locator('#photoinfo-date-form .photoinfo-message');
     this.coreDateRow = page.locator('#datecreate');
 
@@ -134,19 +135,24 @@ class PicturePage {
    * @param {'date'|'info'} editor
    */
   async editorButtonLook(editor) {
-    const view = editor === 'date' ? this.dateView : this.infoView;
+    const view = editor === 'date' ? this.dateEditButton : this.infoEditLink;
     const form = editor === 'date' ? this.dateForm : this.infoForm;
     await view.click();
     await form.waitFor({ state: 'visible' });
+    // The pointer must not hover the button being read.
+    await this.page.mouse.move(0, 0);
     return form.evaluate((el) => {
       const PROPS = ['backgroundColor', 'backgroundImage', 'borderTopWidth', 'color'];
       const cancel = el.querySelector('.photoinfo-cancel');
-      const save = el.querySelector('input[type=submit]');
+      const save = el.querySelector('input[type=submit], .photoinfo-done');
       const probe = document.createElement('input');
       probe.type = 'submit';
       probe.value = 'probe';
       el.closest('.imageInfo').parentNode.appendChild(probe);
       const look = (button) => {
+        if (!button) {
+          return null;
+        }
         const style = window.getComputedStyle(button);
         return Object.fromEntries(PROPS.map((prop) => [prop, style[prop]]));
       };
@@ -197,12 +203,23 @@ class PicturePage {
     }
   }
 
-  /** Clicks the date's Save and waits for the page the save reloads. */
-  async saveDateAndWaitForReload() {
-    await Promise.all([
-      this.page.waitForEvent('load'),
-      this.dateSaveButton.click(),
-    ]);
+  /** Opens the date editor with its edit button. */
+  async openDateEditor() {
+    await this.dateEditButton.click();
+    await this.dateForm.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * Marks the document, so a later read of the mark shows the page was not
+   * reloaded in between.
+   */
+  async markDocument() {
+    await this.page.evaluate(() => { window.__notReloaded = true; });
+  }
+
+  /** @return {Promise<boolean>} whether the mark set by markDocument() survived */
+  async documentIsMarked() {
+    return this.page.evaluate(() => window.__notReloaded === true);
   }
 }
 

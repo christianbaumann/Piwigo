@@ -3,15 +3,12 @@
   display: none !important;
 }
 
-#photoinfo-info-view,
-#photoinfo-date-view {
+#photoinfo-info-view {
   cursor: pointer;
 }
 
 #photoinfo-info-view:hover,
-#photoinfo-info-view:focus,
-#photoinfo-date-view:hover,
-#photoinfo-date-view:focus {
+#photoinfo-info-view:focus {
   text-decoration: underline dotted;
 }
 
@@ -68,12 +65,15 @@
   font-weight: bold;
 }
 
+#PhotoDate .photoinfo-edit,
 #PhotoInfo .photoinfo-edit,
+#PhotoDate .photoinfo-edit:hover,
 #PhotoInfo .photoinfo-edit:hover {
   background: none;
   border: 0;
   box-shadow: none;
   color: inherit;
+  padding: 0;
   text-decoration: underline;
   cursor: pointer;
 }

@@ -1,9 +1,10 @@
 /*
- * Click-to-edit for the Datum row on the picture page. A date's month needs a
+ * Editor for the Datum row on the picture page, opened by its edit button. A date's month needs a
  * year and its day a month, so the controls are enabled in that order; the day
  * list follows the month and leap years. The qualifier needs a year too, and
- * only "zwischen" shows the range end, which has controls of its own. A
- * successful save reloads the page.
+ * only "zwischen" shows the range end, which has controls of its own. All parts
+ * are saved as one value when focus leaves the form or on Done; the row text
+ * and the row status are updated in place, the page is not reloaded.
  */
 (function () {
   var view = document.getElementById('photoinfo-date-view');
@@ -17,7 +18,9 @@
   var qualifier = form.elements.qualifier;
   var endBlock = form.querySelector('.photoinfo-date-end');
   var message = form.querySelector('.photoinfo-message');
-  var saveButton = form.querySelector('input[type=submit]');
+  var editButton = document.getElementById('photoinfo-date-edit');
+  var doneButton = form.querySelector('.photoinfo-done');
+  var status = document.getElementById('photoinfo-date-status');
   var minYear = parseInt(form.dataset.minYear, 10);
   var maxYear = parseInt(form.dataset.maxYear, 10);
   var placeholder = form.dataset.placeholder;
@@ -124,15 +127,21 @@
 
   function openEditor() {
     view.hidden = true;
+    editButton.hidden = true;
     form.hidden = false;
     start.year.focus();
   }
 
   function closeEditor() {
-    reset();
     message.textContent = '';
     form.hidden = true;
     view.hidden = false;
+    editButton.hidden = false;
+  }
+
+  function showStatus(kind, text) {
+    status.className = 'pwg-row-status pwg-row-status--' + kind;
+    status.textContent = text;
   }
 
   function yearError() {
@@ -169,44 +178,82 @@
     }
     updateQualifier();
   });
-  view.addEventListener('click', openEditor);
-  view.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openEditor();
-    }
-  });
-  form.querySelector('.photoinfo-cancel').addEventListener('click', closeEditor);
+  editButton.addEventListener('click', openEditor);
 
-  form.addEventListener('submit', function (event) {
-    event.preventDefault();
-    message.textContent = '';
-
+  /** The value the form holds now, in the shape of `saved`. */
+  function current() {
     var from = start.values();
-    var to = isRange() ? end.values() : EMPTY;
-    var error = validate(from, to);
+    var kind = from.year === '' || qualifier.disabled ? '' : qualifier.value;
+    var to = from.year === '' || !isRange() ? EMPTY : end.values();
+    return { qualifier: kind, start: from, end: to };
+  }
+
+  function same(a, b) {
+    return a.qualifier === b.qualifier
+      && a.start.year === b.start.year
+      && a.start.month === b.start.month && a.start.day === b.start.day
+      && a.end.year === b.end.year && a.end.month === b.end.month && a.end.day === b.end.day;
+  }
+
+  function markDirty() {
+    if (saving) {
+      return;
+    }
+    if (same(current(), saved)) {
+      status.className = 'pwg-row-status';
+      status.textContent = '';
+    } else {
+      showStatus('dirty', form.dataset.statusDirty);
+    }
+  }
+
+  var saving = false;
+
+  function showDate(text) {
+    if (text === '') {
+      view.innerHTML = '';
+      var span = document.createElement('span');
+      span.className = 'photoinfo-placeholder';
+      span.textContent = placeholder;
+      view.appendChild(span);
+    } else {
+      view.textContent = text;
+    }
+  }
+
+  /** Sends the form as one value unless it is unchanged or incomplete; closes the editor when `close` and it worked. */
+  function save(close) {
+    if (saving) {
+      return;
+    }
+    message.textContent = '';
+    var value = current();
+    if (same(value, saved)) {
+      if (close) {
+        closeEditor();
+      }
+      return;
+    }
+    var error = validate(value.start, value.end);
     if (error !== '') {
       message.textContent = error;
       return;
     }
-    // No start clears the date, whatever else is chosen.
-    var kind = from.year === '' || qualifier.disabled ? '' : qualifier.value;
-    if (from.year === '') {
-      to = EMPTY;
-    }
 
-    saveButton.disabled = true;
+    saving = true;
+    doneButton.disabled = true;
+    showStatus('saving', form.dataset.statusSaving);
 
     var body = new URLSearchParams();
     body.set('method', 'pwg.photoinfo.setDate');
     body.set('image_id', form.dataset.imageId);
-    body.set('qualifier', kind);
-    body.set('year', from.year);
-    body.set('month', from.month);
-    body.set('day', from.day);
-    body.set('end_year', to.year);
-    body.set('end_month', to.month);
-    body.set('end_day', to.day);
+    body.set('qualifier', value.qualifier);
+    body.set('year', value.start.year);
+    body.set('month', value.start.month);
+    body.set('day', value.start.day);
+    body.set('end_year', value.end.year);
+    body.set('end_month', value.end.month);
+    body.set('end_day', value.end.day);
     body.set('pwg_token', form.dataset.token);
 
     fetch(form.dataset.wsUrl, { method: 'POST', body: body, credentials: 'same-origin' })
@@ -215,28 +262,38 @@
         if (json.stat !== 'ok') {
           throw new Error(json.message || '');
         }
-        if (!json.result.written) {
-          // The date is saved; only the file did not take it.
-          saved = { qualifier: kind, start: from, end: to };
-          if (json.result.date === '') {
-            view.innerHTML = '';
-            var span = document.createElement('span');
-            span.className = 'photoinfo-placeholder';
-            span.textContent = placeholder;
-            view.appendChild(span);
-          } else {
-            view.textContent = json.result.date;
+        // The date is saved even when only the file did not take it.
+        saved = value;
+        showDate(json.result.date);
+        saving = false;
+        doneButton.disabled = false;
+        if (json.result.written) {
+          showStatus('saved', form.dataset.statusSaved);
+          if (close) {
+            closeEditor();
           }
-          message.textContent = form.dataset.errorWrite.replace('%s', json.result.message_l10n);
-          saveButton.disabled = false;
-          return;
+        } else {
+          showStatus('error', form.dataset.statusFailed.replace('%s', json.result.message_l10n));
         }
-        window.location.reload();
       })
       .catch(function (error) {
-        message.textContent = form.dataset.errorSave + (error.message ? ': ' + error.message : '');
-        saveButton.disabled = false;
+        saving = false;
+        doneButton.disabled = false;
+        showStatus('error', form.dataset.statusFailed.replace('%s', error.message || form.dataset.errorSave));
       });
+  }
+
+  form.addEventListener('input', markDirty);
+  form.addEventListener('change', markDirty);
+  // Focus moving between the form's own controls is not leaving it.
+  form.addEventListener('focusout', function (event) {
+    if (!event.relatedTarget || !form.contains(event.relatedTarget)) {
+      save(true);
+    }
+  });
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    save(true);
   });
 
   reset();

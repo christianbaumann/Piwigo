@@ -5,8 +5,9 @@
 {if $PHOTOINFO.EDITABLE}
 {combine_css path=$PHOTOINFO.PATH|cat:'template/info.css'}
 {combine_script id='photoinfo_date' load='footer' path=$PHOTOINFO.PATH|cat:'template/date.js'}
-		<div id="photoinfo-date-view" role="button" tabindex="0" title="{'Click to edit'|@translate}">{if isset($PHOTOINFO.DATE_TEXT)}{$PHOTOINFO.DATE_TEXT}{else}<span class="photoinfo-placeholder">{'Click to add a date'|@translate}</span>{/if}</div>
-		<form id="photoinfo-date-form" hidden data-image-id="{$PHOTOINFO.IMAGE_ID}" data-ws-url="{$PHOTOINFO.WS_URL}" data-token="{$PHOTOINFO.TOKEN}" data-min-year="{$PHOTOINFO.MIN_YEAR}" data-max-year="{$PHOTOINFO.MAX_YEAR}" data-placeholder="{'Click to add a date'|@translate|escape}" data-error-year="{'The year must lie between %d and %d'|@translate|escape}" data-error-end="{'The end must not lie before the start'|@translate|escape}" data-error-end-missing="{'A range needs an end year'|@translate|escape}" data-error-save="{'The date could not be saved'|@translate|escape}" data-error-write="{'Saved, but not written into the image file: %s'|@translate|escape}">
+		<div id="photoinfo-date-view">{if isset($PHOTOINFO.DATE_TEXT)}{$PHOTOINFO.DATE_TEXT}{else}<span class="photoinfo-placeholder">{'Click to add a date'|@translate}</span>{/if}</div>
+		<button type="button" id="photoinfo-date-edit" class="photoinfo-edit">{'✎ edit'|@translate}</button>
+		<form id="photoinfo-date-form" hidden data-image-id="{$PHOTOINFO.IMAGE_ID}" data-ws-url="{$PHOTOINFO.WS_URL}" data-token="{$PHOTOINFO.TOKEN}" data-min-year="{$PHOTOINFO.MIN_YEAR}" data-max-year="{$PHOTOINFO.MAX_YEAR}" data-placeholder="{'Click to add a date'|@translate|escape}" data-error-year="{'The year must lie between %d and %d'|@translate|escape}" data-error-end="{'The end must not lie before the start'|@translate|escape}" data-error-end-missing="{'A range needs an end year'|@translate|escape}" data-error-save="{'The date could not be saved'|@translate|escape}" data-status-saving="{'Saving …'|@translate|escape}" data-status-saved="{'✓ Saved'|@translate|escape}" data-status-dirty="{'not saved yet'|@translate|escape}" data-status-failed="{'Not saved: %s'|@translate|escape}">
 			<select name="qualifier" aria-label="{'Qualifier'|@translate}">
 				<option value="">—</option>
 {foreach from=$PHOTOINFO.QUALIFIERS key=value item=label}
@@ -37,11 +38,11 @@
 				</select>
 			</div>
 			<div class="photoinfo-actions">
-				<input type="submit" value="{'Save'|@translate}">
-				<input type="button" class="photoinfo-cancel" value="{'Cancel'|@translate}">
+				<input type="submit" class="photoinfo-done" value="{'Done'|@translate}">
 			</div>
 			<p class="photoinfo-message" role="status"></p>
 		</form>
+		<p id="photoinfo-date-status" class="pwg-row-status" role="status"></p>
 {else}
 		<a href="{$PHOTOINFO.DATE_URL}" rel="nofollow">{$PHOTOINFO.DATE_TEXT}</a>
 {/if}
