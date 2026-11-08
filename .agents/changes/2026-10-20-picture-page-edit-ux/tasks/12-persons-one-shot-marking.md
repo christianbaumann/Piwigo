@@ -1,9 +1,9 @@
 ---
 id: 12
 dependencies: []
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-12
 ---
 
 # Task 12: Personen row: one-shot marking, delete from the row
