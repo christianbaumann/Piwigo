@@ -208,6 +208,51 @@ final class HistoryRecordingTest extends TestCase
         $this->assertSame('Per API', $rows[0]['new_value']);
     }
 
+    /** [HAPPY] pwg.images.setInfo called from the Batch Manager's page (unit mode) records batch_manager. */
+    public function testSetInfoFromTheBatchManagerPageRecordsItsSource(): void
+    {
+        $res = $this->webmaster->call('pwg.images.setInfo', array(
+            'image_id' => $this->image['id'], 'single_value_mode' => 'replace', 'comment' => 'Aus dem Batch Manager',
+            'pwg_token' => $this->webmaster->token(),
+        ), Config::baseUrl() . '/admin.php?page=batch_manager&mode=unit');
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+
+        $rows = $this->entries('info');
+        $this->assertCount(1, $rows);
+        $this->assertSame('batch_manager', $rows[0]['source']);
+        $this->assertSame('Aus dem Batch Manager', $rows[0]['new_value']);
+    }
+
+    /**
+     * [HAPPY] The Batch Manager's global date over a whole set (setSelected / whole_set) records
+     * one date entry per photo of the set, each with that photo's own old value.
+     */
+    public function testTheBatchDateOverAWholeSetRecordsEveryPhoto(): void
+    {
+        $other = $this->fixture->createTestImage();
+        $this->fixture->attachImage($other['id'], $this->albumId);
+        $this->setDate($this->webmaster, '1965', '', '', 'circa');
+        $this->setDateOf($this->webmaster, $other['id'], '1980', '6', '');
+
+        $this->webmaster->postPage('/admin.php?page=batch_manager&mode=global', array(
+            'pwg_token' => $this->webmaster->token(),
+            'setSelected' => 1, 'whole_set' => $this->image['id'] . ',' . $other['id'],
+            'selectAction' => 'date_creation', 'date_creation' => '1970-02-03', 'submit' => 1,
+        ));
+
+        $mine = $this->entries('date');
+        $this->assertCount(2, $mine, 'anti-vacuity: the action must have recorded for the first photo');
+        $this->assertSame('ca. 1965 (1965~)', $mine[1]['old_value']);
+        $this->assertSame('3. Februar 1970 (1970-02-03)', $mine[1]['new_value']);
+        $this->assertSame('batch_manager', $mine[1]['source']);
+
+        $theirs = $this->entriesOf($other['id'], 'date');
+        $this->assertCount(2, $theirs);
+        $this->assertStringEndsWith('(1980-06)', $theirs[1]['old_value']);
+        $this->assertSame('3. Februar 1970 (1970-02-03)', $theirs[1]['new_value']);
+        $this->assertSame('batch_manager', $theirs[1]['source']);
+    }
+
     private function clientAs(string $role): WsClient
     {
         $client = new WsClient();
@@ -224,8 +269,13 @@ final class HistoryRecordingTest extends TestCase
 
     private function setDate(WsClient $client, string $year, string $month, string $day, string $qualifier = ''): array
     {
+        return $this->setDateOf($client, $this->image['id'], $year, $month, $day, $qualifier);
+    }
+
+    private function setDateOf(WsClient $client, int $imageId, string $year, string $month, string $day, string $qualifier = ''): array
+    {
         $res = $client->call('pwg.photoinfo.setDate', array(
-            'image_id' => $this->image['id'], 'qualifier' => $qualifier,
+            'image_id' => $imageId, 'qualifier' => $qualifier,
             'year' => $year, 'month' => $month, 'day' => $day,
             'end_year' => '', 'end_month' => '', 'end_day' => '',
             'pwg_token' => $client->token(),
@@ -253,8 +303,13 @@ final class HistoryRecordingTest extends TestCase
     /** @return array the photo's entries, oldest first, optionally of one field */
     private function entries(?string $field = null): array
     {
+        return $this->entriesOf($this->image['id'], $field);
+    }
+
+    private function entriesOf(int $imageId, ?string $field): array
+    {
         $result = $this->db->query("SELECT id, field, old_value, new_value, source, performed_by FROM piwigo_provenance_history"
-            . " WHERE object = 'photo' AND object_id = " . $this->image['id']
+            . " WHERE object = 'photo' AND object_id = " . $imageId
             . ($field === null ? '' : " AND field = '" . $field . "'") . ' ORDER BY id');
         $rows = array();
         while ($row = $result->fetch_assoc())

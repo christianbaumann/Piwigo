@@ -14,13 +14,18 @@ class WsClient
         @unlink($this->cookieFile);
     }
 
-    public function call(string $method, array $params = array()): array
+    public function call(string $method, array $params = array(), ?string $referer = null): array
     {
         $params['method'] = $method;
-        $body = $this->request('/ws.php?format=json', array(
+        $options = array(
             CURLOPT_POST => 1,
             CURLOPT_POSTFIELDS => http_build_query($params),
-        ));
+        );
+        if ($referer !== null)
+        {
+            $options[CURLOPT_REFERER] = $referer;
+        }
+        $body = $this->request('/ws.php?format=json', $options);
 
         return array('body' => $body, 'json' => json_decode($body, true));
     }
