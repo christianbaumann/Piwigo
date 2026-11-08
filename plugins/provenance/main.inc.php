@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Provenance
-Version: 1.0.0
+Version: 1.1.0
 Description: Records where a scan came from - physical album, owner, scan date and notes - entered at album level, copied down onto its photos, and written into the image files.
 Plugin URI: https://github.com/christianbaumann/Piwigo
 Author: Christian Baumann
@@ -110,8 +110,7 @@ function provenance_add_methods($arr)
         ),
       ),
     'Reads the provenance audit trail of one album or photo, newest first.',
-    PROVENANCE_PATH . 'include/ws_functions.inc.php',
-    array('admin_only' => true)
+    PROVENANCE_PATH . 'include/ws_functions.inc.php'
   );
 
   $service->addMethod(

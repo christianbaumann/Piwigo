@@ -84,6 +84,9 @@ function provenance_history_sources()
   return array(
     'album_edit', 'photo_edit', 'apply', 'inherit', 'writeback', 'truncation',
     PROVENANCE_HISTORY_SOURCE_MOVE, PROVENANCE_HISTORY_SOURCE_ALBUM_DELETE,
+    PROVENANCE_HISTORY_SOURCE_PICTURE_PAGE, PROVENANCE_HISTORY_SOURCE_ADMIN_PHOTO,
+    PROVENANCE_HISTORY_SOURCE_BATCH_MANAGER, PROVENANCE_HISTORY_SOURCE_API,
+    PROVENANCE_HISTORY_SOURCE_UNDO,
     );
 }
 
@@ -118,6 +121,28 @@ define('PROVENANCE_HISTORY_SOURCE_MOVE', 'move');
 
 /** History source for a write an album deletion caused. */
 define('PROVENANCE_HISTORY_SOURCE_ALBUM_DELETE', 'album_delete');
+
+/** History source for a picture-page edit (date, info, tag, region, photo edit). */
+define('PROVENANCE_HISTORY_SOURCE_PICTURE_PAGE', 'picture_page');
+
+/** History source for an edit made on the admin photo screen. */
+define('PROVENANCE_HISTORY_SOURCE_ADMIN_PHOTO', 'admin_photo');
+
+/** History source for an edit made in the Batch Manager. */
+define('PROVENANCE_HISTORY_SOURCE_BATCH_MANAGER', 'batch_manager');
+
+/** History source for an edit made by a direct API call. */
+define('PROVENANCE_HISTORY_SOURCE_API', 'api');
+
+/** History source for an entry that reverses an earlier one (undoes_id names it). */
+define('PROVENANCE_HISTORY_SOURCE_UNDO', 'undo');
+
+/** History fields the picture-page edit paths write, with the photo's own value as object. */
+define('PROVENANCE_HISTORY_FIELD_DATE', 'date');
+define('PROVENANCE_HISTORY_FIELD_INFO', 'info');
+define('PROVENANCE_HISTORY_FIELD_TAG', 'tag');
+define('PROVENANCE_HISTORY_FIELD_REGION', 'region');
+define('PROVENANCE_HISTORY_FIELD_PHOTO', 'photo');
 
 /**
  * What a move or an association may do. Keep is first so a UI renders it as the
@@ -1069,6 +1094,11 @@ function provenance_history_field_label_keys()
       PROVENANCE_HISTORY_FIELD_FILE       => 'File caption',
       PROVENANCE_HISTORY_FIELD_FILE_ERROR => 'File error',
       PROVENANCE_IPTC_CAPTION_TAG         => 'IPTC caption',
+      PROVENANCE_HISTORY_FIELD_DATE       => 'Date',
+      PROVENANCE_HISTORY_FIELD_INFO       => 'Info',
+      PROVENANCE_HISTORY_FIELD_TAG        => 'Tag',
+      PROVENANCE_HISTORY_FIELD_REGION     => 'Person',
+      PROVENANCE_HISTORY_FIELD_PHOTO      => 'Photo edit',
       )
     );
 }
@@ -1089,5 +1119,10 @@ function provenance_history_source_label_keys()
     'truncation'   => 'Shortened for IPTC',
     PROVENANCE_HISTORY_SOURCE_MOVE         => 'Moved',
     PROVENANCE_HISTORY_SOURCE_ALBUM_DELETE => 'Album deleted',
+    PROVENANCE_HISTORY_SOURCE_PICTURE_PAGE => 'Picture page',
+    PROVENANCE_HISTORY_SOURCE_ADMIN_PHOTO  => 'Admin photo screen',
+    PROVENANCE_HISTORY_SOURCE_BATCH_MANAGER => 'Batch Manager',
+    PROVENANCE_HISTORY_SOURCE_API          => 'API',
+    PROVENANCE_HISTORY_SOURCE_UNDO         => 'Undone',
     );
 }

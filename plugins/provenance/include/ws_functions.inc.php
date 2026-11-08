@@ -20,6 +20,16 @@ function ws_provenance_getHistory($param, &$service)
     return new PwgError(WS_ERR_INVALID_PARAM, 'Invalid object');
   }
 
+  if (is_a_guest())
+  {
+    return new PwgError(401, 'Access denied');
+  }
+
+  if (!provenance_may_read_history($param['object'], $param['object_id']))
+  {
+    return new PwgError(WS_ERR_INVALID_PARAM, 'Unknown object');
+  }
+
   $conditions = array();
 
   foreach (array('date_min' => '>=', 'date_max' => '<=') as $datefield => $operator)
@@ -40,6 +50,19 @@ function ws_provenance_getHistory($param, &$service)
   $history = provenance_fetch_history($param['object'], $param['object_id'], $param['per_page'], $conditions);
   $rows = $history['rows'];
   $total_count = $history['total_count'];
+
+  // exiftool's message names server paths; only administrators read it.
+  if (!is_admin())
+  {
+    load_language('plugin.lang', PROVENANCE_PATH);
+    foreach ($rows as $i => $row)
+    {
+      if ($row['field'] === PROVENANCE_HISTORY_FIELD_FILE_ERROR)
+      {
+        $rows[$i]['new_value'] = l10n('The file could not be written');
+      }
+    }
+  }
 
   return array(
     'paging' => array(

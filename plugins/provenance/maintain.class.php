@@ -50,9 +50,11 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
   `new_value` text DEFAULT NULL,
   `source` ' . $this->enum(provenance_history_sources()) . ' NOT NULL,
   `performed_by` mediumint(8) unsigned DEFAULT NULL,
+  `undoes_id` int(10) unsigned DEFAULT NULL,
   `occured_on` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `object_lookup` (`object`, `object_id`, `occured_on`)
+  KEY `object_lookup` (`object`, `object_id`, `occured_on`),
+  KEY `undoes_lookup` (`undoes_id`)
 ) DEFAULT CHARSET=utf8mb4
 ;');
 
@@ -61,6 +63,7 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
     // which is where a new source value has to reach an existing column - a
     // CREATE TABLE IF NOT EXISTS never touches one.
     $this->widen_source_enum();
+    $this->add_undoes_column();
 
     $this->add_display_info_key();
   }
@@ -168,6 +171,22 @@ CREATE TABLE IF NOT EXISTS `' . $this->history_table . '` (
 ALTER TABLE `' . $this->history_table . '`
   MODIFY `source` ' . $this->enum(provenance_history_sources()) . ' NOT NULL
 ;');
+  }
+
+  /**
+   * Adds the column an undo entry names its target in, and its index, to a
+   * table an earlier version created. Additive and idempotent: a plugin
+   * version that does not know the column keeps inserting without it.
+   */
+  private function add_undoes_column()
+  {
+    $this->add_column($this->history_table, 'undoes_id', 'int(10) unsigned DEFAULT NULL');
+
+    $index = pwg_query('SHOW INDEX FROM `' . $this->history_table . '` WHERE Key_name = "undoes_lookup";');
+    if (pwg_db_num_rows($index) === 0)
+    {
+      pwg_query('ALTER TABLE `' . $this->history_table . '` ADD KEY `undoes_lookup` (`undoes_id`);');
+    }
   }
 
   /**

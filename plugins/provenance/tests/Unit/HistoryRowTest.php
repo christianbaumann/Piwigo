@@ -40,9 +40,68 @@ final class HistoryRowTest extends TestCase
                 'new_value'    => 'Bernd',
                 'source'       => 'album_edit',
                 'performed_by' => self::ACTOR,
+                'undoes_id'    => null,
             ),
             provenance_history_row($this->change(), self::ACTOR)
         );
+    }
+
+    /** [HAPPY] An undo entry carries the id of the entry it reverses. */
+    public function testUndoesIdIsCarriedIntoTheRow(): void
+    {
+        $row = provenance_history_row(
+            $this->change(array('source' => PROVENANCE_HISTORY_SOURCE_UNDO, 'undoes_id' => '41')),
+            self::ACTOR
+        );
+
+        $this->assertSame(41, $row['undoes_id']);
+        $this->assertContains('undoes_id', provenance_history_insert_columns());
+    }
+
+    /** [ECP] Absent, zero and null undoes_id all mean "undoes nothing". */
+    public function testNoUndoesIdMeansNull(): void
+    {
+        foreach (array(array(), array('undoes_id' => null), array('undoes_id' => 0)) as $extra)
+        {
+            $this->assertNull(provenance_history_row($this->change($extra), self::ACTOR)['undoes_id']);
+        }
+    }
+
+    /** [NEG] A negative undoes_id is refused rather than stored as a huge unsigned number. */
+    public function testNegativeUndoesIdIsRefused(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        provenance_history_row($this->change(array('undoes_id' => -1)), self::ACTOR);
+    }
+
+    /** [HAPPY] Every new field and edit-path source is accepted by the row shaper. */
+    public function testPictureEditFieldsAndSourcesAreAccepted(): void
+    {
+        $sources = array(
+            PROVENANCE_HISTORY_SOURCE_PICTURE_PAGE, PROVENANCE_HISTORY_SOURCE_ADMIN_PHOTO,
+            PROVENANCE_HISTORY_SOURCE_BATCH_MANAGER, PROVENANCE_HISTORY_SOURCE_API,
+            PROVENANCE_HISTORY_SOURCE_UNDO,
+        );
+        $fields = array(
+            PROVENANCE_HISTORY_FIELD_DATE, PROVENANCE_HISTORY_FIELD_INFO, PROVENANCE_HISTORY_FIELD_TAG,
+            PROVENANCE_HISTORY_FIELD_REGION, PROVENANCE_HISTORY_FIELD_PHOTO,
+        );
+        $this->assertCount(5, array_unique($sources));
+        $this->assertCount(5, array_unique($fields));
+
+        foreach ($sources as $source)
+        {
+            $this->assertNotNull(
+                provenance_history_row($this->change(array('object' => 'photo', 'source' => $source)), self::ACTOR)
+            );
+        }
+        foreach ($fields as $field)
+        {
+            $this->assertSame(
+                $field,
+                provenance_history_row($this->change(array('object' => 'photo', 'field' => $field)), self::ACTOR)['field']
+            );
+        }
     }
 
     /** [NEG] An unchanged value writes nothing. The trail records changes, not saves. */

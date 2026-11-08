@@ -89,7 +89,7 @@ final class PluginActivationTest extends TestCase
     {
         $expected = array(
             'id', 'object', 'object_id', 'field', 'old_value', 'new_value',
-            'source', 'performed_by', 'occured_on',
+            'source', 'performed_by', 'undoes_id', 'occured_on',
             );
 
         $result = $this->db->query('SHOW COLUMNS FROM `' . self::HISTORY_TABLE . '`');

@@ -50,5 +50,14 @@ $lang['File write-back'] = 'File write-back';
 $lang['Shortened for IPTC'] = 'Shortened for IPTC';
 $lang['Moved'] = 'Moved';
 $lang['Album deleted'] = 'Album deleted';
+$lang['Info'] = 'Info';
+$lang['Tag'] = 'Tag';
+$lang['Person'] = 'Person';
+$lang['Photo edit'] = 'Photo edit';
+$lang['Picture page'] = 'Picture page';
+$lang['Admin photo screen'] = 'Admin photo screen';
+$lang['Batch Manager'] = 'Batch Manager';
+$lang['API'] = 'API';
+$lang['Undone'] = 'Undone';
 
 ?>

@@ -93,7 +93,7 @@ final class RoleMatrixTest extends TestCase
         'provenance.history' => array(
             'probe' => 'probeHistory',
             'methods' => array('pwg.provenance.getHistory'),
-            'levels' => array('guest' => 'none', 'normal' => 'see*', 'admin' => 'see', 'webmaster' => 'see'),
+            'levels' => array('guest' => 'none', 'normal' => 'see', 'admin' => 'see', 'webmaster' => 'see'),
             ),
         'core.zoom' => array(
             'probe' => 'probeZoom',

@@ -50,5 +50,14 @@ $lang['File write-back'] = 'In die Datei geschrieben';
 $lang['Shortened for IPTC'] = 'Für IPTC gekürzt';
 $lang['Moved'] = 'Verschoben';
 $lang['Album deleted'] = 'Album gelöscht';
+$lang['Info'] = 'Info';
+$lang['Tag'] = 'Schlagwort';
+$lang['Person'] = 'Person';
+$lang['Photo edit'] = 'Bildbearbeitung';
+$lang['Picture page'] = 'Bildseite';
+$lang['Admin photo screen'] = 'Foto-Verwaltung';
+$lang['Batch Manager'] = 'Batch-Manager';
+$lang['API'] = 'API';
+$lang['Undone'] = 'Rückgängig gemacht';
 
 ?>
