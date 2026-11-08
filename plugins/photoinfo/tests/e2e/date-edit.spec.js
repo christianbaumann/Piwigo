@@ -6,6 +6,7 @@ const { seed, readDate, readRow, makeReadOnly, restore } = require('./support/se
 const { germanTextOf } = require('./support/lang');
 
 const SAVED = '✓ Gespeichert';
+const NO_DATE = 'Noch kein Datum';
 
 /**
  * Editing the date on the picture page. Validation and the file's tags in
@@ -114,6 +115,13 @@ test('[HAPPY] a mouse click on Done right after typing saves the changed value o
   expect(saves).toBe(1);
 });
 
+test('[HAPPY] a photo without a date reads "Noch kein Datum" on load', async ({ page }) => {
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+
+  await expect(picture.datePlaceholder).toHaveText(NO_DATE);
+});
+
 test('[ST] the month waits for a year and the day for a month', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
@@ -201,7 +209,7 @@ test('[ST] emptying the year clears a saved date', async ({ page }) => {
 
   expect(readRow(fixture.image_id).date_creation).toBeNull();
   expect(readDate(fixture.image_id)['XMP-photoshop:DateCreated']).toBeNull();
-  await expect(picture.datePlaceholder).toBeVisible();
+  await expect(picture.datePlaceholder).toHaveText(NO_DATE);
   await expect(picture.dateView).not.toContainText('1965');
 });
 
