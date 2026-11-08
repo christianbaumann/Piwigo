@@ -2,7 +2,7 @@
 id: 04
 dependencies:
 - 01
-status: in-progress
+status: blocked
 owner: s-e4c1
 branch: task/2026-10-20-picture-page-edit-ux-04
 ---
@@ -36,3 +36,7 @@ change-log entry; persons itself gains no provenance dependency.
 * [ ] `pwg.persons.rescan` writes nothing
 * [ ] persons works unchanged with photoinfo deactivated
 * [ ] persons and photoinfo integration suites pass
+
+## Blocked (2026-11-08)
+
+Docker Desktop stopped because the host disk was full. Code is on the task branch (rebased, HEAD `55288b617`); the worktree is kept. Review of the HEAD commit passed, but the full photoinfo and persons integration suites have not run on it. Before merging: rerun both, and fix `persons_stored_region()` for a missing index row (`$row` false reads array offsets; fall back to the request values or skip the announcement). Persons unit fails only `CleanCheckoutTest` in a worktree (git cannot resolve the worktree `.git` inside the container; it passes on the main checkout).
