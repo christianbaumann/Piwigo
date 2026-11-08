@@ -1,30 +1,28 @@
 # Status: picture-page edit UX
 
-Paused 2026-11-03. Repo `master` at `a5446959b` when paused.
+Paused 2026-11-08 (session s-e4c1). The task files' frontmatter holds each task's status.
 
-## Done
+## State
 
-- Brainstorm finished, Konzept B chosen. The user answered every open question; see `design.md`, including *Implementation details (agreed while splitting tasks)*.
-- `design.md`: the problem, sources, data flow and all key decisions.
-- `prototype/picture-edit-concepts.html`: clickable mockups of A, B and C. Konzept B includes the role switch and the collapsed change list.
-  - Published privately at https://claude.ai/artifact/GAwQasqYbQw96PrUJLesfa.
-  - The prototype differs from the design in two ways: it saves each date field separately, and it puts the × on the boxes in the photo. **`design.md` wins on both.**
-- `tasks/01`–`14` were written, and the user confirmed the split.
+- Done and on `master`: 01, 02, 03, 05, 09, 10, 11.
+- Blocked, branches and worktrees kept: 04, 06, 12. Each task file has a *Blocked* section saying what to rerun.
+- Not started: 07 (needs 06), 08 (needs 04, 07), 13, 14.
 
-## Not done
+## Why it paused
 
-- **Nothing is committed.** The whole change folder is untracked. Commit it first, on `master` (the user's working rule).
-- No task has started. No production or test code has changed for this change.
+The host disk filled up (1.3 GiB free of 926 GiB) and Docker Desktop stopped, so no suite can run.
 
-## Next steps
+## To resume
 
-1. Commit `.agents/changes/2026-10-20-picture-page-edit-ux/`.
-2. Start wave 1, which can run in parallel: tasks 01, 09, 10, 11, 12.
-3. Wave 2: 02, 03, 04, 05, 06. Then 07, then 08, then 13, then 14. The `dependencies` frontmatter in each task file is the source of truth.
+1. Free disk space, restart Docker Desktop, `ddev start`.
+2. Work through 04, 06, 12 per their *Blocked* sections, then 07, 08, 13, 14.
+3. `plugins/typetags` on `master` is two commits ahead of its origin (c48112b, 6419cf9), unpushed. A fresh clone fails until they are pushed. Task 13 also touches this submodule.
 
-## Notes for the next agent
+## Testing a worktree
 
-- Decision numbers 0088–0090 were taken by other work after the tasks were written. Tasks 01, 07 and 14 take the next free number when they commit: check `ls docs/agents/decisions | tail`.
-- Tasks 11 and 13 change the `plugins/typetags` submodule. Commit inside it, push to `christianbaumann/Piwigo-Colored-Tags`, then bump the pointer.
-- When several agents share the install, take the suite lock around integration and E2E runs: `flock /tmp/pwg-suite.lock`.
-- Since decision 0088 the remote is no longer a sandbox. That does not affect this change, but never point plugin suites or the handbook seed at the remote.
+DDEV serves only the main checkout. `.agents/worktrees/.tools-s-e4c1/` (git-ignored) holds `wt-setup` and `wt-test`, which serve a worktree with PHP's built-in server in the web container under the suite lock; `BRIEF.md` there explains them. E2E traces make a worktree large: task 12's reached 1.8 GB.
+
+## Notes
+
+- `.agents/worktrees/.tools-s-e4c1/` also holds `VERIFY.md`, the verifier brief.
+- After merging a task that changes a prefilter's code (11, 06), the main checkout needs `_data/templates_c` cleared once, and the remote the manual purge.
