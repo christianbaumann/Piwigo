@@ -95,6 +95,25 @@ test('[ST] leaving the date group saves once; moving inside it, or an unchanged 
   await expect(picture.dateStatus).toHaveText(SAVED);
 });
 
+test('[HAPPY] a mouse click on Done right after typing saves the changed value once', async ({ page }) => {
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+  let saves = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('ws.php') && (request.postData() || '').includes('pwg.photoinfo.setDate')) {
+      saves++;
+    }
+  });
+  await picture.openDateEditor();
+
+  await picture.dateYear.fill('1972');
+  await picture.dateDoneButton.click();
+
+  await expect(picture.dateStatus).toHaveText(SAVED);
+  await expect(picture.dateView).toHaveText('1972');
+  expect(saves).toBe(1);
+});
+
 test('[ST] the month waits for a year and the day for a month', async ({ page }) => {
   const picture = new PicturePage(page);
   await picture.goto(fixture.picture_path);
