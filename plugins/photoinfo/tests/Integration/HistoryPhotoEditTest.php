@@ -9,6 +9,10 @@ use PHPUnit\Framework\TestCase;
  */
 final class HistoryPhotoEditTest extends TestCase
 {
+    private const READ_ONLY = 0555;
+    private const WRITABLE = 0755;
+    private const ORIGINALS_DIR = PIWIGO_ROOT . '_data/photoedit/originals';
+
     private Db $db;
     private FixtureBuilder $fixture;
     private WsClient $ws;
@@ -34,6 +38,10 @@ final class HistoryPhotoEditTest extends TestCase
 
     protected function tearDown(): void
     {
+        if (is_dir(self::ORIGINALS_DIR))
+        {
+            chmod(self::ORIGINALS_DIR, self::WRITABLE);
+        }
         $this->fixture->destroyTestImages();
         $this->fixture->destroyTestAlbums();
     }
@@ -85,12 +93,21 @@ final class HistoryPhotoEditTest extends TestCase
         $this->assertSame(array(), $this->entries());
     }
 
-    /** [NEG] An edit photoedit reports as not written (ok false) writes nothing. */
+    /** [NEG] An edit whose write fails (backup directory read-only) answers failure and writes nothing. */
     public function testAFailedEditWritesNothing(): void
     {
-        PiwigoRuntime::boot();
+        if (!is_dir(self::ORIGINALS_DIR))
+        {
+            mkdir(self::ORIGINALS_DIR, self::WRITABLE, true);
+        }
+        chmod(self::ORIGINALS_DIR, self::READ_ONLY);
+        clearstatcache();
+        $this->assertFalse(is_writable(self::ORIGINALS_DIR),
+            'anti-vacuity: the directory is still writable (running as root?)');
 
-        $this->assertNull(photoinfo_record_photo_edit($this->image['id'], array('turns' => 1, 'crop_px' => null), false));
+        $res = $this->apply(array('turns' => 1));
+
+        $this->assertSame('fail', $res['json']['stat'], $res['body']);
         $this->assertSame(array(), $this->entries());
     }
 
