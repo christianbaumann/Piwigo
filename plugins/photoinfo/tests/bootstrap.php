@@ -10,6 +10,7 @@ require_once PIWIGO_ROOT . 'include/ws_core.inc.php';
 define('PROVENANCE_PATH', PIWIGO_ROOT . 'plugins/provenance/');
 require_once PROVENANCE_PATH . 'include/functions.inc.php';
 require_once PROVENANCE_PATH . 'include/history.inc.php';
+require_once PROVENANCE_PATH . 'include/history_text.inc.php';
 require_once PHOTOINFO_PATH . 'include/functions.inc.php';
 require_once PHOTOINFO_PATH . 'include/history_tags.inc.php';
 

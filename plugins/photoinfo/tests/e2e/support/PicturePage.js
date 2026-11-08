@@ -37,6 +37,11 @@ class PicturePage {
     this.dateMessage = page.locator('#photoinfo-date-form .photoinfo-message');
     this.coreDateRow = page.locator('#datecreate');
 
+    this.history = page.locator('#photoinfo-history');
+    this.historySummary = page.locator('#photoinfo-history > summary');
+    this.historyEntries = page.locator('#photoinfo-history-list li');
+    this.historyCount = page.locator('#photoinfo-history-count');
+
     // typetags' field for a new tag, and the Tags row its answer lands in
     this.newTagField = page.locator('#typetags-new-tag input[name="tag_name"]');
     this.newTagButton = page.locator('#typetags-new-tag button[type="submit"]');

@@ -39,6 +39,7 @@ final class RoleMatrixTest extends TestCase
     /** function => expected level per role, in ROLES order: guest, generic, normal, admin, webmaster. */
     private const MATRIX = array(
         'photoinfo.rows' => array(self::NONE, self::SEE, self::SEE, self::SEE, self::SEE),
+        'photoinfo.history-list' => array(self::NONE, self::SEE, self::SEE, self::SEE, self::SEE),
         'photoinfo.edit-date' => array(self::NONE, self::EDIT, self::EDIT, self::EDIT, self::EDIT),
         'photoinfo.edit-info' => array(self::NONE, self::EDIT, self::EDIT, self::EDIT, self::EDIT),
         'photoinfo.core-screens' => array(self::NONE, self::NONE, self::NONE, self::EDIT, self::EDIT),
@@ -52,6 +53,7 @@ final class RoleMatrixTest extends TestCase
      */
     private const METHODS = array(
         'photoinfo.rows' => array(),
+        'photoinfo.history-list' => array(),
         'photoinfo.edit-date' => array('pwg.photoinfo.setDate'),
         'photoinfo.edit-info' => array('pwg.photoinfo.setInfo'),
         'photoinfo.core-screens' => array('pwg.images.setInfo', 'pwg.tags.rename'),
@@ -172,6 +174,19 @@ final class RoleMatrixTest extends TestCase
 
         return $this->observe(array(
             'content' => $this->containsAll($page, array(self::DATE_ROW, self::DATE_SHOWN, self::INFO_ROW, self::COMMENT)),
+            ));
+    }
+
+    /** The change list under the info rows: content only, for every logged-in account. */
+    private function probeHistoryList(string $role): string
+    {
+        $this->db->query('INSERT INTO piwigo_provenance_history (object, object_id, field, old_value, new_value, source)'
+            . " VALUES ('photo', " . $this->image['id'] . ", 'tag', NULL, '{\"id\":5,\"name\":\"Kirche\"}', 'picture_page')");
+
+        $page = $this->picturePage($role);
+
+        return $this->observe(array(
+            'content' => $this->containsAll($page, array('id="PhotoHistory"', '„Kirche“ hinzugefügt')),
             ));
     }
 

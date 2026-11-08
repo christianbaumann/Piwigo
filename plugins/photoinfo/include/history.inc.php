@@ -11,6 +11,9 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
  * values from the file and are not edits (design "What gets a row").
  */
 
+/** Entries the picture page's change list shows before "alle anzeigen". */
+define('PHOTOINFO_HISTORY_LIST_SIZE', 8);
+
 /** Seconds within which one account's next info save joins its previous entry. */
 define('PHOTOINFO_INFO_MERGE_SECONDS', 600);
 

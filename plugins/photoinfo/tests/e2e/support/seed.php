@@ -14,6 +14,7 @@
  *   php tests/e2e/support/seed.php --read-date=<id>    the photo's date tags
  *   php tests/e2e/support/seed.php --read-only=<id>    makes the photo's file unwritable, so a save's file write fails
  *   php tests/e2e/support/seed.php --writable=<id>     makes it writable again
+ *   php tests/e2e/support/seed.php --seed-history=<id> three change-log entries for the photo (--restore removes them with it)
  *   php tests/e2e/support/seed.php --track-tag=<name> records a tag the browser created, for --restore
  *   php tests/e2e/support/seed.php --restore
  *
@@ -31,7 +32,7 @@ function fail(string $message): void
     exit(1);
 }
 
-$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:', 'writable:', 'track-tag:'));
+$args = getopt('', array('scenario::', 'restore', 'read-file:', 'read-row:', 'read-date:', 'read-only:', 'writable:', 'seed-history:', 'track-tag:'));
 
 $db = new Db();
 $builder = new FixtureBuilder($db);
@@ -42,6 +43,24 @@ try
     {
         $file = PIWIGO_ROOT . ltrim((string)$builder->imageRow((int)$args['read-file'])['path'], './');
         echo json_encode(FixtureBuilder::readFileTags($file)), "\n";
+        exit(0);
+    }
+
+    if (isset($args['seed-history']))
+    {
+        $imageId = (int)$args['seed-history'];
+        $entries = array(
+            array('tag', null, '{"id":5,"name":"Kirche"}'),
+            array('date', 'ca. 1955 (1955~)', 'vor 1960 (../1960)'),
+            array('region', null, '{"name":"Anna Schmitz","box":[0.1,0.1,0.2,0.2],"drawn_by":null}'),
+            );
+        foreach ($entries as list($field, $old, $new))
+        {
+            $quote = fn (?string $value) => $value === null ? 'NULL' : "'" . $db->escape($value) . "'";
+            $db->query('INSERT INTO piwigo_provenance_history (object, object_id, field, old_value, new_value, source)'
+                . " VALUES ('photo', $imageId, '$field', " . $quote($old) . ', ' . $quote($new) . ", 'picture_page')");
+        }
+        echo json_encode(array('seeded' => count($entries))), "\n";
         exit(0);
     }
 

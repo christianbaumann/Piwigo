@@ -77,3 +77,20 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+#photoinfo-history summary {
+  cursor: pointer;
+}
+
+#photoinfo-history-list {
+  margin: 0.4em 0;
+  padding-left: 1.2em;
+}
+
+.photoinfo-history-meta {
+  opacity: 0.75;
+}
+
+.photoinfo-history-undone .photoinfo-history-text {
+  text-decoration: line-through;
+}

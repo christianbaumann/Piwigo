@@ -28,5 +28,9 @@ $lang['Saving …'] = 'Saving …';
 $lang['✓ Saved'] = '✓ Saved';
 $lang['not saved yet'] = 'not saved yet';
 $lang['Not saved: %s'] = 'Not saved: %s';
+$lang['Recent changes'] = 'Recent changes';
+$lang['Recent changes to this photo'] = 'Recent changes to this photo';
+$lang['No changes recorded'] = 'No changes recorded';
+$lang['Show all'] = 'Show all';
 
 ?>

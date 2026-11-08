@@ -53,6 +53,15 @@ function readRow(imageId) {
 }
 
 /**
+ * Three change-log entries for the photo, none by an account.
+ *
+ * @param {number} imageId
+ */
+function seedHistory(imageId) {
+  run(`--seed-history=${imageId}`);
+}
+
+/**
  * Makes the photo's file unwritable, so the next save's file write fails.
  *
  * @param {number} imageId
@@ -85,4 +94,5 @@ function trackTag(name) {
   return run(`--track-tag=${name}`);
 }
 
-module.exports = { seed, readFile, readDate, readRow, makeReadOnly, makeWritable, restore, trackTag };
+module.exports = {
+  seedHistory, seed, readFile, readDate, readRow, makeReadOnly, makeWritable, restore, trackTag };

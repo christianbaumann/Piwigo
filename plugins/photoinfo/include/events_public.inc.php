@@ -78,6 +78,12 @@ function photoinfo_picture_rows()
     $rows['TOKEN'] = get_pwg_token();
   }
 
+  $history = photoinfo_picture_history((int)$current['id']);
+  if ($history !== null)
+  {
+    $rows['HISTORY'] = $history;
+  }
+
   $template->assign('PHOTOINFO', $rows);
 
   $template->set_prefilter('picture', 'photoinfo_picture_prefilter');
@@ -106,6 +112,7 @@ function photoinfo_picture_prefilter($content)
     PHOTOINFO_TPL_ROW_ANCHOR,
     photoinfo_template_include('public_date.tpl')
       .photoinfo_template_include('public_info.tpl')
+      .photoinfo_template_include('public_history.tpl')
       .PHOTOINFO_TPL_ROW_ANCHOR,
     $content
     );
@@ -129,4 +136,42 @@ function photoinfo_date_fields($date)
   }
 
   return $fields;
+}
+
+/**
+ * The photo's last changes for the list under the info rows, or null when the
+ * account may not read them (a guest, or a photo it cannot see) or provenance
+ * is not loaded. The list reads what pwg.provenance.getHistory answers.
+ *
+ * @param int $image_id
+ * @return array|null total, rows (each: text, by, when, own, undone), all_url, per_page
+ */
+function photoinfo_picture_history($image_id)
+{
+  if (!function_exists('provenance_may_read_history') or !provenance_may_read_history('photo', $image_id))
+  {
+    return null;
+  }
+
+  $history = provenance_fetch_history(
+    'photo',
+    $image_id,
+    PHOTOINFO_HISTORY_LIST_SIZE,
+    array(provenance_history_field_condition(provenance_history_list_fields()))
+    );
+
+  $entries = array();
+  foreach (provenance_history_display_rows($history['rows']) as $row)
+  {
+    $entries[] = $row['display'];
+  }
+
+  return array(
+    'TOTAL' => $history['total_count'],
+    'ROWS' => $entries,
+    'ALL_URL' => make_index_url(array('section' => provenance_page_section('photo', $image_id))),
+    'PER_PAGE' => PHOTOINFO_HISTORY_LIST_SIZE,
+    'FIELDS' => implode(',', provenance_history_list_fields()),
+    'IMAGE_ID' => $image_id,
+    );
 }

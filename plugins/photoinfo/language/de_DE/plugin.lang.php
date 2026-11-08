@@ -28,5 +28,9 @@ $lang['Saving …'] = 'Speichert …';
 $lang['✓ Saved'] = '✓ Gespeichert';
 $lang['not saved yet'] = 'noch nicht gespeichert';
 $lang['Not saved: %s'] = 'Nicht gespeichert: %s';
+$lang['Recent changes'] = 'Letzte Änderungen';
+$lang['Recent changes to this photo'] = 'Letzte Änderungen an diesem Foto';
+$lang['No changes recorded'] = 'Keine Änderungen aufgezeichnet';
+$lang['Show all'] = 'alle anzeigen';
 
 ?>

@@ -1,0 +1,108 @@
+/* The list of a photo's last changes. It opens collapsed and reads
+   pwg.provenance.getHistory when opened and after any save the page makes.
+   The rows' own scripts (photoinfo, typetags, persons, photoedit) are not
+   touched: a save is recognised by the ws method it calls, on fetch() and on
+   jQuery's ajax alike. */
+(function () {
+  'use strict';
+
+  var details = document.getElementById('photoinfo-history');
+  if (!details) {
+    return;
+  }
+
+  var list = document.getElementById('photoinfo-history-list');
+  var count = document.getElementById('photoinfo-history-count');
+  var empty = document.getElementById('photoinfo-history-empty');
+  var all = document.getElementById('photoinfo-history-all');
+  var perPage = parseInt(details.dataset.perPage, 10);
+  var SAVE_METHOD = /(^|[?&=])(pwg\.photoinfo\.set(Date|Info)|typetags\.image\.(addTag|removeTag|addNewTag)|pwg\.persons\.(addRegion|deleteRegion)|pwg\.photoedit\.apply)(&|$)/;
+  var REFRESH_DELAY_MS = 300;
+  var timer = null;
+
+  function item(entry) {
+    var li = document.createElement('li');
+    if (entry.undone) {
+      li.className = 'photoinfo-history-undone';
+    }
+    var text = document.createElement('span');
+    text.className = 'photoinfo-history-text';
+    text.textContent = entry.text;
+    var meta = document.createElement('span');
+    meta.className = 'photoinfo-history-meta';
+    meta.textContent = (entry.by ? entry.by + ' · ' : '') + entry.when;
+    var action = document.createElement('span');
+    action.className = 'photoinfo-history-action';
+    li.appendChild(text);
+    li.appendChild(document.createTextNode(' — '));
+    li.appendChild(meta);
+    li.appendChild(action);
+    return li;
+  }
+
+  function show(json) {
+    var rows = json.result.histories;
+    var total = json.result.paging.total_count;
+    list.textContent = '';
+    rows.forEach(function (row) {
+      list.appendChild(item(row.display));
+    });
+    count.textContent = total;
+    empty.hidden = total > 0;
+    all.hidden = total <= perPage;
+  }
+
+  function refresh() {
+    var query = new URLSearchParams();
+    query.set('method', 'pwg.provenance.getHistory');
+    query.set('object', 'photo');
+    query.set('object_id', details.dataset.imageId);
+    query.set('per_page', perPage);
+    query.set('fields', details.dataset.fields);
+    query.set('formatted', 'true');
+    return nativeFetch(details.dataset.wsUrl + '&' + query.toString(), { credentials: 'same-origin' })
+      .then(function (response) { return response.json(); })
+      .then(function (json) {
+        if (json.stat === 'ok') {
+          show(json);
+        }
+      })
+      .catch(function () { /* the list keeps what it showed */ });
+  }
+
+  function refreshSoon() {
+    clearTimeout(timer);
+    timer = setTimeout(refresh, REFRESH_DELAY_MS);
+  }
+
+  function bodyText(body) {
+    if (body === undefined || body === null) {
+      return '';
+    }
+    return typeof body === 'string' ? body : (body instanceof URLSearchParams ? body.toString() : '');
+  }
+
+  var nativeFetch = window.fetch.bind(window);
+  window.fetch = function (url, init) {
+    var request = String(url) + '&' + bodyText(init && init.body);
+    var promise = nativeFetch.apply(window, arguments);
+    if (SAVE_METHOD.test(request)) {
+      promise.then(refreshSoon, function () {});
+    }
+    return promise;
+  };
+
+  if (window.jQuery) {
+    window.jQuery(document).ajaxSuccess(function (event, xhr, settings) {
+      if (SAVE_METHOD.test(String(settings.url) + '&' + bodyText(settings.data))) {
+        refreshSoon();
+      }
+    });
+  }
+
+  details.addEventListener('toggle', function () {
+    if (details.open) {
+      refresh();
+    }
+  });
+}());

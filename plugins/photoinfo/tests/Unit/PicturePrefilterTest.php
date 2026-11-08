@@ -38,7 +38,7 @@ final class PicturePrefilterTest extends TestCase
         $out = photoinfo_picture_prefilter(self::pictureTemplate());
 
         $this->assertStringNotContainsString('class="imageComment"', $out);
-        $this->assertSame(1, substr_count($out, photoinfo_template_include('public_info.tpl') . PHOTOINFO_TPL_ROW_ANCHOR));
+        $this->assertSame(1, substr_count($out, photoinfo_template_include('public_info.tpl') . photoinfo_template_include('public_history.tpl') . PHOTOINFO_TPL_ROW_ANCHOR));
     }
 
     /** [NEG] A sub-template without the row anchor is left alone. */
@@ -71,6 +71,6 @@ final class PicturePrefilterTest extends TestCase
 
         $this->assertStringNotContainsString('id="datecreate"', $out);
         $this->assertSame(1, substr_count($out,
-            photoinfo_template_include('public_date.tpl') . photoinfo_template_include('public_info.tpl') . PHOTOINFO_TPL_ROW_ANCHOR));
+            photoinfo_template_include('public_date.tpl') . photoinfo_template_include('public_info.tpl') . photoinfo_template_include('public_history.tpl') . PHOTOINFO_TPL_ROW_ANCHOR));
     }
 }
