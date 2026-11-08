@@ -82,6 +82,33 @@ function persons_with_tag_writes($answer, $tag_writes)
 }
 
 /**
+ * The box of the newest region a user drew on a photo for a person, as the index holds it.
+ *
+ * @param int $image_id
+ * @param string $name
+ * @param int $drawn_by
+ * @return array name (the person's stored spelling), box (x, y, w, h)
+ */
+function persons_stored_region($image_id, $name, $drawn_by)
+{
+  $row = pwg_db_fetch_assoc(pwg_query('
+SELECT p.name, r.area_x, r.area_y, r.area_w, r.area_h
+  FROM '.PERSONS_REGION_TABLE.' AS r
+  JOIN '.PERSONS_TABLE.' AS p ON p.id = r.person_id
+  WHERE r.image_id = '.(int)$image_id.'
+    AND p.name = "'.pwg_db_real_escape_string($name).'"
+    AND r.drawn_by = '.(int)$drawn_by.'
+  ORDER BY r.id DESC
+  LIMIT 1
+;'));
+
+  return array(
+    'name' => $row['name'],
+    'box'  => array((float)$row['area_x'], (float)$row['area_y'], (float)$row['area_w'], (float)$row['area_h']),
+    );
+}
+
+/**
  * Says that a user added or deleted regions, then lets a listener add to the answer.
  *
  * Fired from addRegion and deleteRegion only - never from a rescan, a reindex,
@@ -360,9 +387,12 @@ function ws_persons_addRegion($params, &$service)
     return new PwgError(500, $outcome['message']);
   }
 
+  // The box as stored: persons_prepare_region_for_write() clips it to the photo.
+  $stored = persons_stored_region($params['image_id'], $name, $user['id']);
+
   $added = array(array(
-    'name'     => $name,
-    'box'      => array($region['x'], $region['y'], $region['w'], $region['h']),
+    'name'     => $stored['name'],
+    'box'      => $stored['box'],
     'drawn_by' => (int)$user['id'],
     ));
 

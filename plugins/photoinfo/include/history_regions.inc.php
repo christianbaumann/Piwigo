@@ -39,6 +39,8 @@ function photoinfo_regions_changed($image_id, $added, $removed)
     return;
   }
 
+  $source = photoinfo_referer_contains('admin.php') ? 'ADMIN_PHOTO' : 'PICTURE_PAGE';
+
   $ids = array();
   foreach (array(array($added, false), array($removed, true)) as $pair)
   {
@@ -46,7 +48,7 @@ function photoinfo_regions_changed($image_id, $added, $removed)
     {
       $value = provenance_history_encode_region($region['name'], $region['box'], $region['drawn_by']);
       $id = photoinfo_history_insert($image_id, PROVENANCE_HISTORY_FIELD_REGION,
-        $pair[1] ? $value : null, $pair[1] ? null : $value, 'PICTURE_PAGE');
+        $pair[1] ? $value : null, $pair[1] ? null : $value, $source);
       if ($id !== null)
       {
         $ids[] = $id;

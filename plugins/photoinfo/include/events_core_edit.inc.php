@@ -309,11 +309,20 @@ function photoinfo_not_written_text($message)
  */
 function photoinfo_core_edit_source()
 {
-  $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
-
-  return strpos($referer, 'admin.php?page=batch_manager') !== false
+  return photoinfo_referer_contains('admin.php?page=batch_manager')
     ? 'BATCH_MANAGER'
     : 'API';
+}
+
+/**
+ * @param string $needle
+ * @return bool whether the request's Referer contains it
+ */
+function photoinfo_referer_contains($needle)
+{
+  $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+
+  return strpos($referer, $needle) !== false;
 }
 
 /**

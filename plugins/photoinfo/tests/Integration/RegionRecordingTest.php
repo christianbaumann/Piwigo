@@ -82,6 +82,65 @@ final class RegionRecordingTest extends TestCase
         $this->assertSame($added[0]['new_value'], $rows[1]['old_value']);
     }
 
+    /** [ECP] The entry holds the box as stored: one running off the photo's edge is clipped. */
+    public function testTheEntryHoldsTheStoredBoxNotTheRequestedOne(): void
+    {
+        $name = $this->personName('Gerda');
+        $res = $this->ws->call('pwg.persons.addRegion', array(
+            'image_id' => $this->image['id'], 'name' => $name,
+            'x' => 0.9, 'y' => 0.5, 'w' => 0.4, 'h' => 0.2,
+            'pwg_token' => $this->ws->token(),
+        ));
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+
+        $stored = $this->db->query('SELECT area_x, area_y, area_w, area_h FROM piwigo_person_region WHERE image_id = '
+            . $this->image['id'])->fetch_assoc();
+        $box = json_decode($this->entries()[0]['new_value'], true)['box'];
+        $this->assertNotEquals(0.4, (float)$stored['area_w'], 'anti-vacuity: the box was not clipped');
+        $this->assertEqualsWithDelta(
+            array((float)$stored['area_x'], (float)$stored['area_y'], (float)$stored['area_w'], (float)$stored['area_h']),
+            $box, 1e-9);
+    }
+
+    /** [DT] The source is admin_photo for a request from an admin.php page, picture_page otherwise. */
+    public function testTheSourceFollowsTheReferer(): void
+    {
+        $this->addRegion($this->personName('Hanna'), 0.15, 'http://localhost/admin.php?page=plugin&section=persons');
+        $this->addRegion($this->personName('Ida'), 0.55, 'http://localhost/picture.php?/1/category/1');
+
+        $rows = $this->entries();
+        $this->assertCount(2, $rows);
+        $this->assertSame('admin_photo', $rows[0]['source']);
+        $this->assertSame('picture_page', $rows[1]['source']);
+    }
+
+    /** [HAPPY] An administrator deleting a region another account drew keeps that drawer in the old value. */
+    public function testDeletingAnotherAccountsRegionKeepsItsDrawer(): void
+    {
+        $normal = new WsClient();
+        list($username, $password) = Config::credentials(TestUsers::NORMAL);
+        $normal->login($username, $password);
+        $name = $this->personName('Jana');
+        $res = $normal->call('pwg.persons.addRegion', array(
+            'image_id' => $this->image['id'], 'name' => $name,
+            'x' => 0.25, 'y' => 0.5, 'w' => 0.2, 'h' => 0.2, 'pwg_token' => $normal->token(),
+        ));
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $drawer = (int)$this->db->scalar("SELECT id FROM piwigo_users WHERE username = '"
+            . $this->db->escape(Config::credentials(TestUsers::NORMAL)[0]) . "'");
+        $this->assertNotSame($this->webmasterId(), $drawer);
+
+        $del = $this->ws->call('pwg.persons.deleteRegion', array(
+            'region_id' => $this->regionId($name), 'pwg_token' => $this->ws->token(),
+        ));
+        $this->assertSame('ok', $del['json']['stat'] ?? null, $del['body']);
+
+        $rows = $this->entries();
+        $this->assertCount(2, $rows);
+        $this->assertSame($drawer, json_decode($rows[1]['old_value'], true)['drawn_by']);
+        $this->assertSame($this->webmasterId(), $rows[1]['performed_by']);
+    }
+
     /** [NEG] A refused delete (unknown region) writes nothing and carries no history_id. */
     public function testARefusedDeleteWritesNothing(): void
     {
@@ -166,13 +225,13 @@ final class RegionRecordingTest extends TestCase
         return $name;
     }
 
-    private function addRegion(string $name, float $x): array
+    private function addRegion(string $name, float $x, ?string $referer = null): array
     {
         $res = $this->ws->call('pwg.persons.addRegion', array(
             'image_id' => $this->image['id'], 'name' => $name,
             'x' => $x, 'y' => 0.5, 'w' => 0.2, 'h' => 0.2,
             'pwg_token' => $this->ws->token(),
-        ));
+        ), $referer);
         $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
         return $res;
     }
