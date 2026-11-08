@@ -13,9 +13,9 @@ class PicturePage {
     this.infoView = page.locator('#photoinfo-info-view');
     this.infoForm = page.locator('#photoinfo-info-form');
     this.infoTextarea = page.locator('#photoinfo-info-form textarea');
-    this.saveButton = page.locator('#photoinfo-info-form input[type=submit]');
-    this.cancelButton = page.locator('#photoinfo-info-form .photoinfo-cancel');
-    this.infoMessage = page.locator('#photoinfo-info-form .photoinfo-message');
+    this.infoEditLink = page.locator('#photoinfo-info-edit');
+    this.infoDoneButton = page.locator('#photoinfo-info-form input[type=submit]');
+    this.infoStatus = page.locator('#PhotoInfo .pwg-row-status');
     this.coreDescription = page.locator('.imageComment');
 
     this.dateRow = page.locator('#PhotoDate');
@@ -126,7 +126,7 @@ class PicturePage {
 
   /**
    * Opens the date or the info editor and reads how the browser paints its
-   * Cancel and Save, and a probe submit button put next to the editor's info
+   * Cancel (null where the editor has none) and Save/Done, and a probe submit button put next to the editor's info
    * row - outside it, so a rule scoped to the editor shows up as a difference -
    * for the moment of the reading: the probe is what the skin makes of a plain
    * submit.
@@ -150,7 +150,7 @@ class PicturePage {
         const style = window.getComputedStyle(button);
         return Object.fromEntries(PROPS.map((prop) => [prop, style[prop]]));
       };
-      const result = { cancel: look(cancel), save: look(save), probe: look(probe) };
+      const result = { cancel: cancel ? look(cancel) : null, save: look(save), probe: look(probe) };
       probe.remove();
       return result;
     });
@@ -202,14 +202,6 @@ class PicturePage {
     await Promise.all([
       this.page.waitForEvent('load'),
       this.dateSaveButton.click(),
-    ]);
-  }
-
-  /** Clicks Save and waits for the page the save reloads. */
-  async saveAndWaitForReload() {
-    await Promise.all([
-      this.page.waitForEvent('load'),
-      this.saveButton.click(),
     ]);
   }
 }

@@ -52,9 +52,13 @@ for (const skin of SKINS) {
       expect(look.probe.borderTopWidth, editor).not.toBe('');
       expect(look.probe.backgroundColor, editor).not.toBe('');
 
-      expect(look.cancel.backgroundColor, editor).toBe(TRANSPARENT);
-      expect(look.cancel.backgroundImage, editor).toBe('none');
-      expect(look.cancel.borderTopWidth, editor).toBe('0px');
+      if (look.cancel !== null) {
+        expect(look.cancel.backgroundColor, editor).toBe(TRANSPARENT);
+        expect(look.cancel.backgroundImage, editor).toBe('none');
+        expect(look.cancel.borderTopWidth, editor).toBe('0px');
+      } else {
+        expect(editor, 'only the info editor has no Cancel').toBe('info');
+      }
       expect(look.save, editor).toEqual(look.probe);
     }
   });

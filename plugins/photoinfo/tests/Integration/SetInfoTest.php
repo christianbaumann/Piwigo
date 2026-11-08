@@ -139,6 +139,21 @@ final class SetInfoTest extends TestCase
         $this->assertNull(FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info']);
     }
 
+    /** [HAPPY] The answer carries the text as the picture page displays it, so the row can update without a reload. */
+    public function testTheAnswerCarriesTheDisplayedText(): void
+    {
+        $res = $this->setInfo($this->ws, "erste Zeile\nzweite <b>Zeile</b>");
+
+        $html = $res['json']['result']['info_html'] ?? null;
+        $this->assertIsString($html, $res['body']);
+        $this->assertStringContainsString('erste Zeile', $html);
+        $this->assertStringContainsString('zweite &lt;b&gt;Zeile&lt;/b&gt;', $html, 'markup is escaped, the row shows text');
+        $this->assertStringContainsString('<br', $html, 'a line break is displayed as one');
+
+        $res = $this->setInfo($this->ws, '');
+        $this->assertSame('', $res['json']['result']['info_html'] ?? null, $res['body']);
+    }
+
     /** [ECP] Markup stays in the stored text and the info tag, and leaves the caption. */
     public function testMarkupStaysOutOfTheCaption(): void
     {

@@ -22,5 +22,11 @@ $lang['The end must not lie before the start'] = 'The end must not lie before th
 $lang['A range needs an end year'] = 'A range needs an end year';
 $lang['Photo Info: '] = 'Photo Info: ';
 $lang['File is missing or not writable'] = 'File is missing or not writable';
+$lang['Done'] = 'Done';
+$lang['✎ edit'] = '✎ edit';
+$lang['Saving …'] = 'Saving …';
+$lang['✓ Saved'] = '✓ Saved';
+$lang['not saved yet'] = 'not saved yet';
+$lang['Not saved: %s'] = 'Not saved: %s';
 
 ?>

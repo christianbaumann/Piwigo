@@ -22,5 +22,11 @@ $lang['The end must not lie before the start'] = 'Das Ende darf nicht vor dem An
 $lang['A range needs an end year'] = 'Ein Zeitraum braucht ein Endjahr';
 $lang['Photo Info: '] = 'Fotoinfo: ';
 $lang['File is missing or not writable'] = 'Die Datei fehlt oder ist nicht beschreibbar';
+$lang['Done'] = 'Fertig';
+$lang['✎ edit'] = '✎ ändern';
+$lang['Saving …'] = 'Speichert …';
+$lang['✓ Saved'] = '✓ Gespeichert';
+$lang['not saved yet'] = 'noch nicht gespeichert';
+$lang['Not saved: %s'] = 'Nicht gespeichert: %s';
 
 ?>

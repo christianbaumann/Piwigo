@@ -48,6 +48,7 @@ UPDATE '.IMAGES_TABLE.'
   return array(
     'image_id' => (int)$image['id'],
     'info' => $info,
+    'info_html' => nl2br(htmlspecialchars($info, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
     'written' => $result['ok'],
     'message' => $result['message'],
     'message_l10n' => photoinfo_l10n_reason($result['message']),

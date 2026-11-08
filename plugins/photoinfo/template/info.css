@@ -44,3 +44,36 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* row status */
+.pwg-row-status {
+  margin: 0.3em 0 0;
+}
+
+.pwg-row-status:empty {
+  display: none;
+}
+
+.pwg-row-status--saving,
+.pwg-row-status--dirty {
+  opacity: 0.8;
+}
+
+.pwg-row-status--saved {
+  color: #1e7b34;
+}
+
+.pwg-row-status--error {
+  color: #c0182c;
+  font-weight: bold;
+}
+
+#PhotoInfo .photoinfo-edit,
+#PhotoInfo .photoinfo-edit:hover {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
