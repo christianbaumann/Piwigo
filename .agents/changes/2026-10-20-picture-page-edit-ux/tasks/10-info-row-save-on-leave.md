@@ -1,9 +1,9 @@
 ---
 id: 10
 dependencies: []
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-10
 ---
 
 # Task 10: Info row saves on leaving the field, without reload
