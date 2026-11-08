@@ -1,9 +1,9 @@
 ---
 id: 09
 dependencies: []
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-09
 ---
 
 # Task 09: Datum row saves as one value, without reload
