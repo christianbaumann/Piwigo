@@ -103,6 +103,31 @@ final class ReadOnlyPageTest extends TestCase
         $this->assertSame(count(self::ALBUM_VALUES) + 1, $this->historyRowCount($page));
     }
 
+    /** [HAPPY] Tag, region and photo-edit entries show as names and words, never as their JSON. */
+    public function testNewEntryTypesShowAsTextNotJson(): void
+    {
+        $entries = array(
+            array('tag', 'NULL', "'" . '{"id":5,"name":"Kirche"}' . "'"),
+            array('region', "'" . '{"name":"Anna Schmitz","box":[0.1,0.1,0.2,0.2],"drawn_by":null}' . "'", 'NULL'),
+            array('photo', 'NULL', "'" . '{"turns":1,"crop":null}' . "'"),
+        );
+        foreach ($entries as list($field, $old, $new))
+        {
+            $this->db->query(sprintf(
+                "INSERT INTO %s (object, object_id, field, old_value, new_value, source) VALUES ('photo', %d, '%s', %s, %s, 'picture_page')",
+                self::HISTORY_TABLE, $this->imageId, $field, $old, $new
+            ));
+        }
+
+        $page = $this->pageContent($this->normal->fetchPage('/index.php?/provenance/photo/' . $this->imageId));
+
+        $this->assertStringContainsString('>Kirche<', $page);
+        $this->assertStringContainsString('>Anna Schmitz<', $page);
+        $this->assertStringContainsString('>Foto gedreht<', $page);
+        $this->assertStringNotContainsString('&quot;name&quot;', $page);
+        $this->assertStringNotContainsString('&quot;turns&quot;', $page);
+    }
+
     /**
      * [NEG] A failed write's raw exiftool message (it names server paths) reaches only
      * administrators; a normal account sees that the write failed, not why.
