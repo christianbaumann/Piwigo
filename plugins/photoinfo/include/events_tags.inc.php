@@ -191,6 +191,8 @@ function photoinfo_photoedit_end($image, $transform, $ok)
 
   try
   {
+    photoinfo_record_photo_edit($image_id, $transform, $ok);
+
     if (!$ok or $tags_before === null or photoinfo_tag_ids_of($image_id) === $tags_before)
     {
       return;
