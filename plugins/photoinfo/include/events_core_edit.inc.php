@@ -232,7 +232,7 @@ function ws_photoinfo_images_setInfo($params, &$service)
   $tags_written = array();
   if (photoinfo_tag_ids_of($before['id']) !== $tags_before)
   {
-    photoinfo_record_tag_changes($before['id'], $tags_before, photoinfo_tag_history_setinfo_source());
+    photoinfo_record_tag_changes($before['id'], $tags_before, photoinfo_core_edit_source());
     photoinfo_assign_freitext($max_tag_id, array($before['id']));
     $tags_written = photoinfo_write_tags(array($before['id']));
   }

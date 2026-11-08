@@ -139,19 +139,6 @@ function photoinfo_tag_history_answer($image_id, $before, $source)
 }
 
 /**
- * The history source of a pwg.images.setInfo call: the Batch Manager's unit
- * mode calls it from its own page, anything else is the API.
- *
- * @return string 'BATCH_MANAGER' or 'API'
- */
-function photoinfo_tag_history_setinfo_source()
-{
-  $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
-
-  return strpos($referer, 'admin.php?page=batch_manager') !== false ? 'BATCH_MANAGER' : 'API';
-}
-
-/**
  * The photos the Batch Manager's current submit acts on, as its page reads them.
  *
  * @return int[]

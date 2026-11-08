@@ -140,6 +140,23 @@ final class TagHistoryTest extends TestCase
         }
     }
 
+    /** [ECP] The same call with the Batch Manager as Referer is the Batch Manager's unit mode. */
+    public function testSetInfoFromTheBatchManagerPageIsBatchManagerSourced(): void
+    {
+        $kirche = $this->tag('Kirche');
+
+        $res = $this->ws->call('pwg.images.setInfo', array(
+            'image_id' => $this->image['id'], 'tag_ids' => (string)$kirche,
+            'single_value_mode' => 'replace', 'multiple_value_mode' => 'replace',
+            'pwg_token' => $this->ws->token(),
+            ), '/admin.php?page=batch_manager&mode=unit');
+
+        $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+        $entries = $this->entries($this->image['id']);
+        $this->assertCount(1, $entries);
+        $this->assertSame(PROVENANCE_HISTORY_SOURCE_BATCH_MANAGER, $entries[0]['source']);
+    }
+
     /** [HAPPY] The photo properties screen: the difference, from the admin photo screen. */
     public function testAPropertiesSaveWritesTheDifference(): void
     {
