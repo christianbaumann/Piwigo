@@ -53,7 +53,6 @@ for (const skin of SKINS) {
 
       // Neither editor has a Cancel: Done is the only button.
       expect(look.cancel, editor).toBeNull();
-      }
       expect(look.save, editor).toEqual(look.probe);
     }
   });
