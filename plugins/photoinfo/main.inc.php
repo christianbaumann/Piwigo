@@ -51,6 +51,8 @@ add_event_handler('picture_modify_before_update', 'photoinfo_picture_modify_befo
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
 add_event_handler('loc_end_picture_modify', 'photoinfo_picture_modify_after_save',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
+add_event_handler('loc_begin_element_set_global', 'photoinfo_begin_element_set_global',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
 add_event_handler('element_set_global_action', 'photoinfo_element_set_global_action',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/events_core_edit.inc.php');
 add_event_handler('ws_add_methods', 'photoinfo_wrap_core_methods',

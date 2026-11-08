@@ -49,6 +49,37 @@ function photoinfo_picture_modify_after_save()
   $photoinfo_core_edit_before = null;
 
   photoinfo_report_core_edit(photoinfo_apply_core_edit($before['id'], $before));
+  photoinfo_record_edit($before, photoinfo_core_edit_snapshot($before['id']), 'ADMIN_PHOTO');
+}
+
+/**
+ * loc_begin_element_set_global: before the Batch Manager runs an action. For
+ * "Set creation date" it remembers the selected photos' dates, which the
+ * action overwrites before element_set_global_action fires.
+ */
+function photoinfo_begin_element_set_global()
+{
+  global $photoinfo_batch_before;
+
+  $photoinfo_batch_before = array();
+  if (!isset($_POST['submit']) or !isset($_POST['selectAction']) or $_POST['selectAction'] != 'date_creation')
+  {
+    return;
+  }
+
+  // The same two sources as the Batch Manager's own collection.
+  $ids = isset($_POST['setSelected'])
+    ? (isset($_POST['whole_set']) ? explode(',', $_POST['whole_set']) : array())
+    : (isset($_POST['selection']) ? $_POST['selection'] : array());
+
+  foreach (array_unique(array_filter($ids, function ($id) { return is_string($id) and ctype_digit($id); })) as $image_id)
+  {
+    $snapshot = photoinfo_core_edit_snapshot($image_id);
+    if ($snapshot !== null)
+    {
+      $photoinfo_batch_before[$snapshot['id']] = $snapshot;
+    }
+  }
 }
 
 /**
@@ -63,6 +94,8 @@ function photoinfo_picture_modify_after_save()
  */
 function photoinfo_element_set_global_action($action, $collection)
 {
+  global $photoinfo_batch_before;
+
   if ($action != 'date_creation')
   {
     return;
@@ -80,6 +113,15 @@ function photoinfo_element_set_global_action($action, $collection)
   foreach ($to_write as $image_id)
   {
     photoinfo_report_core_edit(photoinfo_write_core_edit($image_id));
+  }
+
+  foreach ($collection as $image_id)
+  {
+    if (isset($photoinfo_batch_before[$image_id]))
+    {
+      photoinfo_record_edit($photoinfo_batch_before[$image_id], photoinfo_core_edit_snapshot($image_id),
+        'BATCH_MANAGER');
+    }
   }
 }
 
@@ -185,6 +227,7 @@ function ws_photoinfo_images_setInfo($params, &$service)
 
   // Core can answer an error after it saved the row; what it saved is still synced.
   $written = photoinfo_apply_core_edit($before['id'], $before);
+  photoinfo_record_edit($before, photoinfo_core_edit_snapshot($before['id']), photoinfo_core_edit_source());
   $tags_written = array();
   if (photoinfo_tag_ids_of($before['id']) !== $tags_before)
   {
@@ -257,13 +300,29 @@ function photoinfo_not_written_text($message)
 }
 
 /**
+ * The history source of a pwg.images.setInfo call: the Batch Manager's unit
+ * mode calls it from its own page, anything else is the API.
+ *
+ * @return string 'BATCH_MANAGER' or 'API', as photoinfo_history_source() reads it
+ */
+function photoinfo_core_edit_source()
+{
+  $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+
+  return strpos($referer, 'admin.php?page=batch_manager') !== false
+    ? 'BATCH_MANAGER'
+    : 'API';
+}
+
+/**
  * @param int $image_id
- * @return array|null id, date_creation and comment; null for no such photo
+ * @return array|null id, date_creation, comment and the plugin's date columns;
+ *   null for no such photo
  */
 function photoinfo_core_edit_snapshot($image_id)
 {
   $query = '
-SELECT id, date_creation, comment
+SELECT id, date_creation, comment, '.implode(', ', array_keys(photoinfo_image_columns())).'
   FROM '.IMAGES_TABLE.'
   WHERE id = '.(int)$image_id.'
 ;';

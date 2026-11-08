@@ -9,6 +9,7 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
  */
 
 include_once(PHOTOINFO_PATH.'include/date.inc.php');
+include_once(PHOTOINFO_PATH.'include/history.inc.php');
 
 /** The plugin photoinfo writes through: its exiftool runner, lock and caption slots. */
 define('PHOTOINFO_REQUIRED_PLUGIN', 'provenance');

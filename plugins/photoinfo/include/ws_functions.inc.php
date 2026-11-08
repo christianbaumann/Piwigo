@@ -42,11 +42,14 @@ UPDATE '.IMAGES_TABLE.'
 
   pwg_activity('photo', $image['id'], 'edit');
 
+  $history_id = photoinfo_record_info($image['id'], $image['comment'], $info, 'PICTURE_PAGE');
+
   $image['comment'] = $info;
   $result = photoinfo_write_file($image, PHOTOINFO_WRITE_INFO);
 
   return array(
     'image_id' => (int)$image['id'],
+    'history_id' => $history_id,
     'info' => $info,
     'info_html' => nl2br(htmlspecialchars($info, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
     'written' => $result['ok'],
@@ -99,10 +102,14 @@ function ws_photoinfo_setDate($params, &$service)
 
   pwg_activity('photo', $image['id'], 'edit');
 
+  $history_id = photoinfo_record_date($image['id'], photoinfo_dating_from_row($image), $dating,
+    'PICTURE_PAGE');
+
   $result = photoinfo_write_file(array_merge($image, $columns), PHOTOINFO_WRITE_DATE);
 
   return array(
     'image_id' => (int)$image['id'],
+    'history_id' => $history_id,
     'date' => photoinfo_dating_display($dating),
     'edtf' => photoinfo_dating_edtf($dating),
     'written' => $result['ok'],
