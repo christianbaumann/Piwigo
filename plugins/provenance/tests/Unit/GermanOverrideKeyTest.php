@@ -139,6 +139,26 @@ final class GermanOverrideKeyTest extends TestCase
                 "{\'The tag was not saved\'|@translate|escape:html}",
                 1,
             ),
+            'Saving the tag ...' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Saving the tag ...\'|@translate|escape:html}",
+                1,
+            ),
+            'Tag saved' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Tag saved\'|@translate|escape:html}",
+                1,
+            ),
+            'Tag not saved yet' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Tag not saved yet\'|@translate|escape:html}",
+                1,
+            ),
+            'Tag not saved' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Tag not saved\'|@translate|escape:html}",
+                1,
+            ),
             'Session expired - please sign in again' => array(
                 'plugins/typetags/include/events_public.inc.php',
                 "{\'Session expired - please sign in again\'|@translate|escape:html}",
