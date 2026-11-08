@@ -1,7 +1,7 @@
 ---
 id: 12
 dependencies: []
-status: in-progress
+status: blocked
 owner: s-e4c1
 branch: task/2026-10-20-picture-page-edit-ux-12
 ---
@@ -39,3 +39,7 @@ the × for regions the viewer may delete; the page never reloads.
 * [ ] A normal account sees × only on names of boxes it drew; an administrator on all
 * [ ] Starting Drehen/Zuschneiden while drawing ends drawing cleanly
 * [ ] persons and photoedit E2E suites pass
+
+## Blocked (2026-11-08)
+
+Docker Desktop stopped because the host disk was full. Committed on the task branch (`fe4d26b09`), not verified. Persons integration green (226 tests, 1 skipped). Persons E2E first full run: 164 passed, 27 failed; the fixes for those are committed but never run. Photoedit E2E was never run. For task 14: `handbuch/tools/shoot.js` lines 653, 665, 679 click `#persons-tag-toggle`, now `#persons-tag-add`.
