@@ -9,7 +9,9 @@ require_once PIWIGO_ROOT . 'include/ws_core.inc.php';
 // The pure layers: photoinfo's own, and provenance's, which it composes with.
 define('PROVENANCE_PATH', PIWIGO_ROOT . 'plugins/provenance/');
 require_once PROVENANCE_PATH . 'include/functions.inc.php';
+require_once PROVENANCE_PATH . 'include/history.inc.php';
 require_once PHOTOINFO_PATH . 'include/functions.inc.php';
+require_once PHOTOINFO_PATH . 'include/history_tags.inc.php';
 
 // Integration-layer support classes (no Piwigo core needed - they talk to the
 // gallery over HTTP and to MariaDB directly).

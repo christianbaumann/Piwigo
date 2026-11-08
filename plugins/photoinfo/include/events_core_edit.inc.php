@@ -2,6 +2,7 @@
 defined('PHOTOINFO_PATH') or die('Hacking attempt!');
 
 include_once(PHOTOINFO_PATH.'include/writer.inc.php');
+include_once(PHOTOINFO_PATH.'include/history_tags.inc.php');
 
 /*
  * Core's own screens that save a photo's date or description, kept in agreement
@@ -231,6 +232,7 @@ function ws_photoinfo_images_setInfo($params, &$service)
   $tags_written = array();
   if (photoinfo_tag_ids_of($before['id']) !== $tags_before)
   {
+    photoinfo_record_tag_changes($before['id'], $tags_before, photoinfo_tag_history_setinfo_source());
     photoinfo_assign_freitext($max_tag_id, array($before['id']));
     $tags_written = photoinfo_write_tags(array($before['id']));
   }

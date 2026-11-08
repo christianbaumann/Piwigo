@@ -2,6 +2,7 @@
 defined('PHOTOINFO_PATH') or die('Hacking attempt!');
 
 include_once(PHOTOINFO_PATH.'include/events_core_edit.inc.php');
+include_once(PHOTOINFO_PATH.'include/history_tags.inc.php');
 
 /*
  * Every path that changes a photo's tags writes them into its file. Core and
@@ -63,6 +64,7 @@ function photoinfo_tags_picture_modify_after_save()
 
   if (photoinfo_tag_ids_of($before['id']) !== $before['tags'])
   {
+    photoinfo_record_tag_changes($before['id'], $before['tags'], 'ADMIN_PHOTO');
     photoinfo_assign_freitext($before['max_tag_id'], array($before['id']));
     photoinfo_report_tag_writes(photoinfo_write_tags(array($before['id'])));
   }
@@ -74,9 +76,16 @@ function photoinfo_tags_picture_modify_after_save()
  */
 function photoinfo_tags_begin_element_set_global()
 {
-  global $photoinfo_max_tag_id_before;
+  global $photoinfo_max_tag_id_before, $photoinfo_batch_tags_before;
 
   $photoinfo_max_tag_id_before = photoinfo_max_tag_id();
+
+  $photoinfo_batch_tags_before = null;
+  if (isset($_POST['submit']) and isset($_POST['selectAction'])
+    and in_array($_POST['selectAction'], array('add_tags', 'del_tags')))
+  {
+    $photoinfo_batch_tags_before = photoinfo_tag_ids_by_image(photoinfo_tag_history_posted_collection());
+  }
 }
 
 /**
@@ -89,10 +98,14 @@ function photoinfo_tags_begin_element_set_global()
 function photoinfo_tags_element_set_global_action($action, $collection)
 {
   // Core refuses either action without a tag, and then changes nothing.
-  global $photoinfo_max_tag_id_before;
+  global $photoinfo_max_tag_id_before, $photoinfo_batch_tags_before;
 
   if (in_array($action, array('add_tags', 'del_tags')) and !empty($_POST[$action]))
   {
+    foreach ((array)$photoinfo_batch_tags_before as $image_id => $tags_before)
+    {
+      photoinfo_record_tag_changes($image_id, $tags_before, 'BATCH_MANAGER');
+    }
     if ($action == 'add_tags' and isset($photoinfo_max_tag_id_before))
     {
       photoinfo_assign_freitext($photoinfo_max_tag_id_before, $collection);
@@ -253,6 +266,7 @@ function ws_photoinfo_typetags_addNewTag($params, &$service)
   return array_merge(
     $result,
     typetags_tag_badge($result['tag_id']),
+    photoinfo_tag_history_answer($params['image_id'], $tags_before, 'PICTURE_PAGE'),
     photoinfo_photo_tag_write_answer($params['image_id'], $tags_before)
     );
 }
@@ -303,7 +317,8 @@ function photoinfo_call_and_write_photo($method, $params, &$service)
     return $result;
   }
 
-  $answer = photoinfo_photo_tag_write_answer($params['image_id'], $tags_before);
+  $history = photoinfo_tag_history_answer($params['image_id'], $tags_before, 'PICTURE_PAGE');
+  $answer = array_merge($history, photoinfo_photo_tag_write_answer($params['image_id'], $tags_before));
 
   return is_array($result) ? array_merge($result, $answer) : $answer;
 }
