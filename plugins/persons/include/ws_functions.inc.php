@@ -82,6 +82,36 @@ function persons_with_tag_writes($answer, $tag_writes)
 }
 
 /**
+ * Says that a user added or deleted regions, then lets a listener add to the answer.
+ *
+ * Fired from addRegion and deleteRegion only - never from a rescan, a reindex,
+ * an upload merge or photoedit's region adjustment, which rebuild or move
+ * regions rather than edit them. Persons does not know who listens.
+ *
+ * persons_regions_changed (notification): $image_id, $added, $removed - each a
+ *   list of array('name', 'box' => array(x, y, w, h), 'drawn_by' => int|null).
+ * persons_regions_answer (filter): $answer, $image_id - a listener may add
+ *   keys (photoinfo adds history_id); the existing keys stay as they are.
+ *
+ * @param int $image_id
+ * @param array $added
+ * @param array $removed
+ * @param array|PwgError $answer
+ * @return array|PwgError
+ */
+function persons_announce_regions_changed($image_id, $added, $removed, $answer)
+{
+  trigger_notify('persons_regions_changed', (int)$image_id, $added, $removed);
+
+  if (!is_array($answer))
+  {
+    return $answer;
+  }
+
+  return trigger_change('persons_regions_answer', $answer, (int)$image_id);
+}
+
+/**
  * One image's regions in the shape the picture page renders from.
  *
  * Coordinates are handed over exactly as stored - normalized, centre origin,
@@ -330,7 +360,14 @@ function ws_persons_addRegion($params, &$service)
     return new PwgError(500, $outcome['message']);
   }
 
-  return persons_with_tag_writes(persons_regions_payload($params['image_id']), $outcome['tag_writes']);
+  $added = array(array(
+    'name'     => $name,
+    'box'      => array($region['x'], $region['y'], $region['w'], $region['h']),
+    'drawn_by' => (int)$user['id'],
+    ));
+
+  return persons_announce_regions_changed($params['image_id'], $added, array(),
+    persons_with_tag_writes(persons_regions_payload($params['image_id']), $outcome['tag_writes']));
 }
 
 /**
@@ -388,7 +425,14 @@ SELECT r.image_id, r.area_x, r.area_y, r.area_w, r.area_h, r.drawn_by, p.name
     return new PwgError(500, $outcome['message']);
   }
 
-  return persons_with_tag_writes(persons_regions_payload($region['image_id']), $outcome['tag_writes']);
+  $removed = array(array(
+    'name'     => $region['name'],
+    'box'      => array($matcher['x'], $matcher['y'], $matcher['w'], $matcher['h']),
+    'drawn_by' => $region['drawn_by'] === null ? null : (int)$region['drawn_by'],
+    ));
+
+  return persons_announce_regions_changed($region['image_id'], array(), $removed,
+    persons_with_tag_writes(persons_regions_payload($region['image_id']), $outcome['tag_writes']));
 }
 
 /**

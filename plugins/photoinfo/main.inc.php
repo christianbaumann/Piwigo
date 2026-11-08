@@ -80,6 +80,12 @@ add_event_handler('photoedit_begin', 'photoinfo_photoedit_begin',
 add_event_handler('photoedit_end', 'photoinfo_photoedit_end',
   EVENT_HANDLER_PRIORITY_NEUTRAL + 10, $photoinfo_tags_file);
 
+// A region added or deleted by a user is a change-log entry (persons announces, photoinfo records).
+add_event_handler('persons_regions_changed', 'photoinfo_regions_changed',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/history_regions.inc.php');
+add_event_handler('persons_regions_answer', 'photoinfo_regions_answer',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PHOTOINFO_PATH . 'include/history_regions.inc.php');
+
 // A replaced or uploaded file and the gallery are merged field by field (decision 0084).
 // After persons' handler, which indexes the file's regions and so settles the person tags first.
 add_event_handler('loc_end_add_uploaded_file', 'photoinfo_uploaded_file',
