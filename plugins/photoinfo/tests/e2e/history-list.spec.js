@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
 const { PicturePage } = require('./support/PicturePage');
-const { seed, seedHistory, restore } = require('./support/seed');
+const { seed, seedHistory, readRow, restore } = require('./support/seed');
 
 /**
  * The collapsed list of a photo's last changes. The wording of each entry is
@@ -56,4 +56,22 @@ test('[ST] a save on the page adds its entry to the open list without a reload',
   await expect(picture.historyEntries.first()).toContainText('Info hinzugefügt');
   await expect(picture.historyCount).toHaveText('1');
   expect(await page.evaluate(() => window.__notReloaded)).toBe(true);
+});
+
+test('[ST] Rückgängig on the browser-made entry restores the text and marks the entry undone', async ({ page }) => {
+  const picture = new PicturePage(page);
+  await picture.goto(fixture.picture_path);
+  await picture.historySummary.click();
+  await picture.infoEditLink.click();
+  await picture.infoTextarea.fill('Die Taufe im Garten');
+  await picture.infoDoneButton.click();
+  await expect(picture.historyEntries).toHaveCount(1);
+  expect(readRow(fixture.image_id).comment).toBe('Die Taufe im Garten');
+
+  await picture.historyUndoButtons.click();
+
+  await expect(picture.historyEntries).toHaveCount(2);
+  await expect(picture.historyUndoButtons).toHaveCount(0);
+  await expect(picture.historyEntries.nth(1)).toHaveClass(/photoinfo-history-undone/);
+  expect(readRow(fixture.image_id).comment).toBeFalsy();
 });

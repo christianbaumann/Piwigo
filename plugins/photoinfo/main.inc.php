@@ -143,6 +143,18 @@ function photoinfo_add_methods($arr)
   );
 
   $service->addMethod(
+    'pwg.photoinfo.undo',
+    'ws_photoinfo_undo',
+    array(
+      'history_id' => array('type' => WS_TYPE_ID),
+      'pwg_token' => array(),
+      ),
+    'Undoes one date, info or tag entry of a photo\'s change list and writes the result into the image file. Own entries for any logged-in account, any entry for an administrator, on a photo the account can see; refused when the value changed since.',
+    PHOTOINFO_PATH . 'include/ws_functions.inc.php',
+    array('post_only' => true)
+  );
+
+  $service->addMethod(
     'pwg.photoinfo.rescan',
     'ws_photoinfo_rescan',
     array(

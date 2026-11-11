@@ -41,6 +41,7 @@ class PicturePage {
     this.historySummary = page.locator('#photoinfo-history > summary');
     this.historyEntries = page.locator('#photoinfo-history-list li');
     this.historyCount = page.locator('#photoinfo-history-count');
+    this.historyUndoButtons = page.locator('#photoinfo-history-list .photoinfo-undo');
 
     // typetags' field for a new tag, and the Tags row its answer lands in
     this.newTagField = page.locator('#typetags-new-tag input[name="tag_name"]');

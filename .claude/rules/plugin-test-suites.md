@@ -431,7 +431,7 @@ its own copied photos: `pwg.images.syncMetadata` with their ids, and `admin.php?
 limited to the fixture's album (`cat`), never the whole gallery.
 
 `tests/Integration/RoleMatrixTest.php` is photoinfo's executable role matrix: one row per function
-(`photoinfo.rows`, `history-list`, `edit-date`, `edit-info`, `core-screens`, `tag-keywords`, `rescan-prune`) and role
+(`photoinfo.rows`, `history-list`, `undo`, `edit-date`, `edit-info`, `core-screens`, `tag-keywords`, `rescan-prune`) and role
 (guest, generic, normal, admin, webmaster), its expected levels typed from the target matrix of the
 [role test coverage design](../../.agents/changes/2026-10-12-role-test-coverage/design.md). A probe
 reads the page part (content, control) and the ws part of one function as one role; a call counts as
@@ -442,7 +442,7 @@ so a control shown beside a refused call (or the reverse) is `INCONSISTENT`. `co
 `typetags.image.addTag`, `removeTag` and `addNewTag`, reading the three keyword fields and the marker
 back with `readKeywords()`, so it needs typetags active. The guest rows assume `guest_access` off and
 refuse to start while a `guest_access` config row exists. Its guard case asks `reflection.getMethodList`
-for every `pwg.photoinfo.` method (lower bound 4, measured 2026-10-12) and fails naming any that no
+for every `pwg.photoinfo.` method (lower bound 5, measured 2026-11-11) and fails naming any that no
 row declares, and any declared method the install does not offer. The wrapped core and typetags
 methods are declared but not enforced by the guard. The private / granted `[BVA]` cases stay in
 `SetDateTest` and `SetInfoTest`, for normal, generic and (private) admin.

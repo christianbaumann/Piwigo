@@ -23,8 +23,8 @@ final class RoleMatrixTest extends TestCase
 {
     /** The prefix of the methods the guard holds to a row. */
     private const GUARD_PREFIX = 'pwg.photoinfo.';
-    /** Methods under the prefix, measured 2026-10-12: setInfo, setDate, rescan, pruneTags. */
-    private const MIN_GUARDED_METHODS = 4;
+    /** Methods under the prefix, measured 2026-11-11: setInfo, setDate, undo, rescan, pruneTags. */
+    private const MIN_GUARDED_METHODS = 5;
     /** Every page answer is longer than this, the 401 page (867 bytes) included. */
     private const MIN_RESPONSE_BYTES = 500;
 
@@ -40,6 +40,7 @@ final class RoleMatrixTest extends TestCase
     private const MATRIX = array(
         'photoinfo.rows' => array(self::NONE, self::SEE, self::SEE, self::SEE, self::SEE),
         'photoinfo.history-list' => array(self::NONE, self::SEE, self::SEE, self::SEE, self::SEE),
+        'photoinfo.undo' => array(self::NONE, self::EDIT, self::EDIT, self::EDIT, self::EDIT),
         'photoinfo.edit-date' => array(self::NONE, self::EDIT, self::EDIT, self::EDIT, self::EDIT),
         'photoinfo.edit-info' => array(self::NONE, self::EDIT, self::EDIT, self::EDIT, self::EDIT),
         'photoinfo.core-screens' => array(self::NONE, self::NONE, self::NONE, self::EDIT, self::EDIT),
@@ -54,6 +55,7 @@ final class RoleMatrixTest extends TestCase
     private const METHODS = array(
         'photoinfo.rows' => array(),
         'photoinfo.history-list' => array(),
+        'photoinfo.undo' => array('pwg.photoinfo.undo'),
         'photoinfo.edit-date' => array('pwg.photoinfo.setDate'),
         'photoinfo.edit-info' => array('pwg.photoinfo.setInfo'),
         'photoinfo.core-screens' => array('pwg.images.setInfo', 'pwg.tags.rename'),
@@ -187,6 +189,33 @@ final class RoleMatrixTest extends TestCase
 
         return $this->observe(array(
             'content' => $this->containsAll($page, array('id="PhotoHistory"', '„Kirche“ hinzugefügt')),
+            ));
+    }
+
+    /**
+     * Rückgängig on the viewer's own entry of the change list, and the method
+     * behind it. The entry is written into the log as the role's account would
+     * have saved it (a guest has none: its entry has no account).
+     */
+    private function probeUndo(string $role): string
+    {
+        $this->fixture->setComment($this->image['id'], 'Neu');
+        $account = $role === self::GUEST ? 'NULL' : (int)$this->db->scalar(
+            "SELECT id FROM piwigo_users WHERE username = '" . $this->db->escape(Config::credentials($role)[0]) . "'");
+        $this->db->query('INSERT INTO piwigo_provenance_history (object, object_id, field, old_value, new_value, source, performed_by)'
+            . " VALUES ('photo', " . $this->image['id'] . ", 'info', 'Alt', 'Neu', 'picture_page', $account)");
+        $entry = $this->db->insertId();
+        $page = $this->picturePage($role);
+        $before = $this->fileHash();
+
+        $res = $this->call($role, 'pwg.photoinfo.undo', array('history_id' => $entry));
+        $row = $this->fixture->imageRow($this->image['id'])['comment'];
+
+        return $this->observe(array(
+            'control' => $this->containsAll($page, array('data-history-id="' . $entry . '"')),
+            'pwg.photoinfo.undo' => $this->outcome($res,
+                $row === 'Alt' and FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info'] === 'Alt',
+                $row === 'Neu' and $this->fileHash() === $before),
             ));
     }
 

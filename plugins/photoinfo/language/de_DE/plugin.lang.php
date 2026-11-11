@@ -32,5 +32,10 @@ $lang['Recent changes'] = 'Letzte Änderungen';
 $lang['Recent changes to this photo'] = 'Letzte Änderungen an diesem Foto';
 $lang['No changes recorded'] = 'Keine Änderungen aufgezeichnet';
 $lang['Show all'] = 'alle anzeigen';
+$lang['Undo not allowed'] = 'Das darfst du nicht rückgängig machen';
+$lang['Already undone'] = 'Wurde schon rückgängig gemacht';
+$lang['Changed meanwhile by %s'] = 'Wurde inzwischen von %s geändert';
+$lang['someone else'] = 'jemand anderem';
+$lang['Undo'] = 'Rückgängig';
 
 ?>

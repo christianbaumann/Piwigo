@@ -94,3 +94,8 @@
 .photoinfo-history-undone .photoinfo-history-text {
   text-decoration: line-through;
 }
+
+.photoinfo-undo-error {
+  margin-left: 0.5em;
+  color: #c00;
+}

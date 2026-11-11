@@ -171,9 +171,10 @@ function photoinfo_history_available()
  * @param string|null $old
  * @param string|null $new
  * @param string $source as above
+ * @param int|null $undoes_id the entry an undo entry undoes
  * @return int|null the new entry's id, null when nothing changed
  */
-function photoinfo_history_insert($image_id, $field, $old, $new, $source)
+function photoinfo_history_insert($image_id, $field, $old, $new, $source, $undoes_id = null)
 {
   $written = provenance_record_changes(array(array(
     'object' => 'photo',
@@ -182,6 +183,7 @@ function photoinfo_history_insert($image_id, $field, $old, $new, $source)
     'old' => $old,
     'new' => $new,
     'source' => photoinfo_history_source($source),
+    'undoes_id' => $undoes_id,
     )));
 
   // One row went in with one statement, so the connection's last id is its.

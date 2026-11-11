@@ -16,11 +16,54 @@
   var empty = document.getElementById('photoinfo-history-empty');
   var all = document.getElementById('photoinfo-history-all');
   var perPage = parseInt(details.dataset.perPage, 10);
+  var undoFields = details.dataset.undoFields.split(',');
+  var isAdmin = details.dataset.isAdmin === '1';
   var SAVE_METHOD = /(^|[?&=])(pwg\.photoinfo\.set(Date|Info)|typetags\.image\.(addTag|removeTag|addNewTag)|pwg\.persons\.(addRegion|deleteRegion)|pwg\.photoedit\.apply)(&|$)/;
   var REFRESH_DELAY_MS = 300;
   var timer = null;
 
-  function item(entry) {
+  function undoable(row) {
+    return !row.undone && !row.undoes_id && undoFields.indexOf(row.field) >= 0 &&
+      (row.display.own || isAdmin);
+  }
+
+  function undo(row, action, button) {
+    var body = new URLSearchParams();
+    body.set('history_id', row.id);
+    body.set('pwg_token', details.dataset.token);
+    button.disabled = true;
+    nativeFetch(details.dataset.wsUrl + '&method=pwg.photoinfo.undo', {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: body
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (json) {
+        if (json.stat === 'ok') {
+          document.dispatchEvent(new CustomEvent('photoinfo:undone', { detail: json.result }));
+          return refresh();
+        }
+        button.disabled = false;
+        action.querySelector('.photoinfo-undo-error').textContent = json.message;
+      })
+      .catch(function () { button.disabled = false; });
+  }
+
+  function undoControl(row, action) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'photoinfo-undo';
+    button.textContent = details.dataset.undoLabel;
+    var error = document.createElement('span');
+    error.className = 'photoinfo-undo-error';
+    button.addEventListener('click', function () { undo(row, action, button); });
+    action.appendChild(document.createTextNode(' '));
+    action.appendChild(button);
+    action.appendChild(error);
+  }
+
+  function item(row) {
+    var entry = row.display;
     var li = document.createElement('li');
     if (entry.undone) {
       li.className = 'photoinfo-history-undone';
@@ -37,6 +80,9 @@
     li.appendChild(document.createTextNode(' — '));
     li.appendChild(meta);
     li.appendChild(action);
+    if (undoable(row)) {
+      undoControl(row, action);
+    }
     return li;
   }
 
@@ -45,7 +91,7 @@
     var total = json.result.paging.total_count;
     list.textContent = '';
     rows.forEach(function (row) {
-      list.appendChild(item(row.display));
+      list.appendChild(item(row));
     });
     count.textContent = total;
     empty.hidden = total > 0;

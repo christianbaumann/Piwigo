@@ -167,6 +167,30 @@ function ws_photoinfo_rescan($params, &$service)
  */
 function photoinfo_ws_image($params)
 {
+  $refusal = photoinfo_ws_guard($params);
+  if ($refusal !== null)
+  {
+    return $refusal;
+  }
+
+  $image = photoinfo_image_row($params['image_id']);
+  if ($image === null or !photoinfo_image_visible($image['id']))
+  {
+    return new PwgError(404, 'Invalid image_id');
+  }
+
+  return $image;
+}
+
+/**
+ * The checks every saving method starts with: not a guest, a valid token,
+ * provenance present.
+ *
+ * @param array $params pwg_token
+ * @return PwgError|null
+ */
+function photoinfo_ws_guard($params)
+{
   // Core already refuses a guest while guest_access is off; this holds when it is on.
   if (is_a_guest())
   {
@@ -183,13 +207,55 @@ function photoinfo_ws_image($params)
     return new PwgError(500, PHOTOINFO_REQUIRES_PROVENANCE_MESSAGE);
   }
 
-  $image = photoinfo_image_row($params['image_id']);
-  if ($image === null or !photoinfo_image_visible($image['id']))
+  return null;
+}
+
+/**
+ * Undoes one date, info or tag entry of a photo's change list.
+ *
+ * Own entries for every logged-in account, any entry for an administrator,
+ * and only on a photo the caller can see. Refused when the entry is undone
+ * already, is an undo or a photo entry, or when the value changed since.
+ *
+ * @param array $params history_id, pwg_token
+ * @param object $service
+ * @return array|PwgError
+ */
+function ws_photoinfo_undo($params, &$service)
+{
+  global $user;
+
+  $refusal = photoinfo_ws_guard($params);
+  if ($refusal !== null)
   {
-    return new PwgError(404, 'Invalid image_id');
+    return $refusal;
   }
 
-  return $image;
+  $entry = photoinfo_undo_entry($params['history_id']);
+  $image = $entry === null ? null : photoinfo_image_row($entry['object_id']);
+  if ($image === null or !photoinfo_image_visible($image['id']))
+  {
+    return new PwgError(404, 'Invalid history_id');
+  }
+
+  $undoable_here = in_array($entry['field'], photoinfo_history_undo_fields(), true);
+  $is_current = (!$undoable_here
+    or photoinfo_history_is_current(photoinfo_undo_current($entry, $image), photoinfo_undo_expected($entry)));
+
+  $refusal = photoinfo_history_undo_refusal($entry,
+    photoinfo_history_may_undo($entry['performed_by'], $user['id'], is_admin()), $is_current);
+  if ($refusal !== null)
+  {
+    return new PwgError($refusal == PHOTOINFO_UNDO_NOT_ALLOWED ? 403 : 409, photoinfo_undo_refusal_text($refusal, $entry));
+  }
+
+  $answer = $undoable_here ? photoinfo_undo_apply($entry, $image) : photoinfo_undo_refusal_text(PHOTOINFO_UNDO_NOT_ALLOWED, $entry);
+  if (is_string($answer))
+  {
+    return new PwgError(403, $answer);
+  }
+
+  return $answer;
 }
 
 /**

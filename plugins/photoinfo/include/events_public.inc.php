@@ -144,7 +144,7 @@ function photoinfo_date_fields($date)
  * is not loaded. The list reads what pwg.provenance.getHistory answers.
  *
  * @param int $image_id
- * @return array|null total, rows (each: text, by, when, own, undone), all_url, per_page
+ * @return array|null total, rows (each: id, text, by, when, own, undone, undoable), all_url, per_page
  */
 function photoinfo_picture_history($image_id)
 {
@@ -163,7 +163,10 @@ function photoinfo_picture_history($image_id)
   $entries = array();
   foreach (provenance_history_display_rows($history['rows']) as $row)
   {
-    $entries[] = $row['display'];
+    $entries[] = $row['display'] + array(
+      'id' => $row['id'],
+      'undoable' => photoinfo_history_offers_undo($row, $row['display']['own'], is_admin()),
+      );
   }
 
   return array(
@@ -172,6 +175,9 @@ function photoinfo_picture_history($image_id)
     'ALL_URL' => make_index_url(array('section' => provenance_page_section('photo', $image_id))),
     'PER_PAGE' => PHOTOINFO_HISTORY_LIST_SIZE,
     'FIELDS' => implode(',', provenance_history_list_fields()),
+    'UNDO_FIELDS' => implode(',', photoinfo_history_undo_fields()),
+    'IS_ADMIN' => is_admin(),
+    'TOKEN' => get_pwg_token(),
     'IMAGE_ID' => $image_id,
     );
 }
