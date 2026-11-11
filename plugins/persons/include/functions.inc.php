@@ -1556,3 +1556,22 @@ function persons_split_raw_tags($raw)
 
   return $split;
 }
+
+/**
+ * @param array|false|null $row the index row, or nothing when the query found none
+ * @param string $name
+ * @param array $requested_box
+ * @return array name, box (x, y, w, h); the request's own values without a row
+ */
+function persons_stored_region_from_row($row, $name, $requested_box)
+{
+  if (!is_array($row))
+  {
+    return array('name' => $name, 'box' => $requested_box);
+  }
+
+  return array(
+    'name' => $row['name'],
+    'box'  => array((float)$row['area_x'], (float)$row['area_y'], (float)$row['area_w'], (float)$row['area_h']),
+    );
+}

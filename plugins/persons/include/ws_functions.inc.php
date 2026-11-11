@@ -87,9 +87,10 @@ function persons_with_tag_writes($answer, $tag_writes)
  * @param int $image_id
  * @param string $name
  * @param int $drawn_by
+ * @param array $requested_box x, y, w, h as the request gave them, used when the index holds no row
  * @return array name (the person's stored spelling), box (x, y, w, h)
  */
-function persons_stored_region($image_id, $name, $drawn_by)
+function persons_stored_region($image_id, $name, $drawn_by, $requested_box)
 {
   $row = pwg_db_fetch_assoc(pwg_query('
 SELECT p.name, r.area_x, r.area_y, r.area_w, r.area_h
@@ -102,10 +103,7 @@ SELECT p.name, r.area_x, r.area_y, r.area_w, r.area_h
   LIMIT 1
 ;'));
 
-  return array(
-    'name' => $row['name'],
-    'box'  => array((float)$row['area_x'], (float)$row['area_y'], (float)$row['area_w'], (float)$row['area_h']),
-    );
+  return persons_stored_region_from_row($row, $name, $requested_box);
 }
 
 /**
@@ -388,7 +386,8 @@ function ws_persons_addRegion($params, &$service)
   }
 
   // The box as stored: persons_prepare_region_for_write() clips it to the photo.
-  $stored = persons_stored_region($params['image_id'], $name, $user['id']);
+  $stored = persons_stored_region($params['image_id'], $name, $user['id'],
+    array($region['x'], $region['y'], $region['w'], $region['h']));
 
   $added = array(array(
     'name'     => $stored['name'],
