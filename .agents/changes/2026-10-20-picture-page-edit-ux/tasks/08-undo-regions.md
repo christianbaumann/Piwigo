@@ -3,9 +3,9 @@ id: 08
 dependencies:
 - 04
 - 07
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-08
 ---
 
 # Task 08: Undo for region entries
