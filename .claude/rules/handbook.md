@@ -52,8 +52,10 @@ shows actually changed; otherwise revert the churn.
 
 The seed's own tag group (`DEMO_TAG_GROUP` in `seed.php`, for shot 28) is a coloured group. The
 picture page offers every coloured tag as a `+` badge (shots 11 and 15) and the admin tag list shows
-every tag (shot 12), so its two tags also appear in those three shots of a run. Those three were committed without them (2026-10-13). A re-shoot that changes one
-of them for another reason carries the two demo badges; that is demo content and acceptable.
+every tag (shot 12), so its two tags also appear in those three shots of a run. Those three were committed without them (2026-10-13), but 11 and 15 were re-taken 2026-11-11
+because the picture page changed (decision 0093) and carry them, so a re-shoot that changes one of
+them for another reason carries the demo badges; that is demo content and acceptable. The date and
+info editor shots (24, 25) put the fields back before closing, because the editors save on leaving.
 
 `seed.php` inserts and deletes rows, writes image files and rewrites their metadata. Like the
 plugin suites, it refuses to run without the install's `persons_throwaway_install` marker and is
