@@ -2,9 +2,9 @@
 id: 14
 dependencies:
 - 13
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-14
 ---
 
 # Task 14: Handbook, screenshots and the save-model decision
