@@ -159,6 +159,11 @@ final class GermanOverrideKeyTest extends TestCase
                 "{\'↶ Undone\'|@translate|escape:html}",
                 1,
             ),
+            'Reload the page to see the restored tag' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\\'Reload the page to see the restored tag\\'|@translate|escape:html}",
+                1,
+            ),
             'Tag not saved yet' => array(
                 'plugins/typetags/include/events_public.inc.php',
                 "{\'Tag not saved yet\'|@translate|escape:html}",

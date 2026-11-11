@@ -47,6 +47,7 @@ $lang['Tag saved'] = '✓ Gespeichert';
 $lang['Tag not saved yet'] = 'noch nicht gespeichert';
 $lang['Undo'] = 'Rückgängig';
 $lang['↶ Undone'] = '↶ Rückgängig gemacht';
+$lang['Reload the page to see the restored tag'] = 'Seite neu laden, um das wiederhergestellte Schlagwort zu sehen';
 $lang['Tag not saved'] = 'Nicht gespeichert';
 $lang['Session expired - please sign in again'] = 'Sitzung abgelaufen – bitte neu anmelden';
 $lang['Invalid tag name'] = 'Ungültiger Schlagwortname';

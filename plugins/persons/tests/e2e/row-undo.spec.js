@@ -16,6 +16,10 @@ const ADA = 'E2E Editor Ada';
 const BOX = { left: 0.25, top: 0.3, w: 0.2, h: 0.25 };
 /** How far a restored box may sit from the drawn one, in CSS pixels. */
 const BOX_TOLERANCE_PX = 2;
+/** How far a restored box may sit from the red block on a turned photo, as a fraction: the derivative is resampled. */
+const BLOCK_TOLERANCE = 0.02;
+/** Fewer red pixels than this means the block was not found, and the comparison would be vacuous. */
+const MIN_RED_PIXELS = 100;
 
 async function tag(picture, box, name, expectedBoxes) {
   await picture.enterTaggingMode();
@@ -82,6 +86,31 @@ test.describe('Rückgängig on the Personen row', () => {
     expect(Math.abs(restored.height - drawn.height)).toBeLessThanOrEqual(BOX_TOLERANCE_PX);
     expect(readFileRegions(seeded.photo_id).regions).toHaveLength(1);
   });
+
+  for (const rotation of [3, 1]) {
+    test(`[HAPPY] a deleted mark comes back on the face of a rotation code ${rotation} photo`, async ({ page }) => {
+      const seeded = seed('marked-empty', { rotation });
+      const picture = new PicturePage(page);
+      await picture.goto(seeded.picture_path);
+      await picture.waitForPlacement();
+      const block = await picture.redBlockFractions();
+      expect(block.pixels).toBeGreaterThan(MIN_RED_PIXELS);
+
+      await tag(picture, block, ADA, 1);
+      await picture.deleteButtonOf(ADA).click();
+      await expect(picture.savedBoxes).toHaveCount(0);
+      await expect(picture.rowStatus).toHaveText(SAVED_WITH_UNDO);
+      await picture.rowUndo.click();
+
+      await expect(picture.savedBoxes).toHaveCount(1);
+      const [regionId] = await picture.savedRegionIds();
+      const restored = await picture.boxFractions(Number(regionId));
+      for (const key of ['left', 'top', 'w', 'h']) {
+        expect(Math.abs(restored[key] - block[key]), `${key}: ${restored[key]} vs ${block[key]}`)
+          .toBeLessThanOrEqual(BLOCK_TOLERANCE);
+      }
+    });
+  }
 
   test('[ST] an undo started in the change list updates the row and the boxes', async ({ page }) => {
     const { picture } = await openEmpty(page);
