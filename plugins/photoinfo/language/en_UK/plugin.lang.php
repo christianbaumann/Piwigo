@@ -36,6 +36,7 @@ $lang['Undo not allowed'] = 'You may not undo this';
 $lang['Already undone'] = 'Has been undone already';
 $lang['Changed meanwhile by %s'] = 'Has been changed by %s since';
 $lang['someone else'] = 'someone else';
+$lang['Persons is switched off'] = 'Persons is switched off, so this cannot be undone';
 $lang['Undo'] = 'Undo';
 
 ?>

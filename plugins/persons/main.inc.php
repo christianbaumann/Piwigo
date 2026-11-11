@@ -65,6 +65,10 @@ add_event_handler('photoedit_end', 'persons_photoedit_end', EVENT_HANDLER_PRIORI
 add_event_handler('loc_end_add_uploaded_file', 'persons_uploaded_file',
   EVENT_HANDLER_PRIORITY_NEUTRAL, PERSONS_PATH . 'include/events_upload.inc.php');
 
+// photoinfo's Rückgängig on a region entry asks persons to remove or restore the box.
+add_event_handler('persons_undo_region', 'persons_undo_region',
+  EVENT_HANDLER_PRIORITY_NEUTRAL, PERSONS_PATH . 'include/events_undo.inc.php');
+
 // No tag tool takes a person's tag off a photo where the person is marked, or
 // deletes it: the API (also typetags' x), the properties page, the Batch Manager.
 $persons_tag_guard_file = PERSONS_PATH . 'include/tag_guard.inc.php';

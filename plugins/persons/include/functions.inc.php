@@ -1558,6 +1558,37 @@ function persons_split_raw_tags($raw)
 }
 
 /**
+ * The index row an undone region entry names: same person name, box within
+ * PERSONS_REGION_MATCH_EPSILON. A person renamed or a box moved since is not found.
+ *
+ * @param array[] $rows index rows: name, area_x, area_y, area_w, area_h, drawn_by
+ * @param array $region name, box (x, y, w, h)
+ * @return array|null the first matching row
+ */
+function persons_find_region_row($rows, $region)
+{
+  if (!isset($region['box']) or count($region['box']) !== 4)
+  {
+    return null;
+  }
+
+  list($x, $y, $w, $h) = array_values($region['box']);
+  $matcher = array('name' => $region['name'], 'x' => $x, 'y' => $y, 'w' => $w, 'h' => $h);
+
+  foreach ($rows as $row)
+  {
+    $candidate = array('name' => $row['name'], 'x' => $row['area_x'], 'y' => $row['area_y'],
+      'w' => $row['area_w'], 'h' => $row['area_h']);
+    if (persons_region_matches($candidate, $matcher))
+    {
+      return $row;
+    }
+  }
+
+  return null;
+}
+
+/**
  * @param array|false|null $row the index row, or nothing when the query found none
  * @param string $name
  * @param array $requested_box

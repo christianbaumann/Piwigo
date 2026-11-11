@@ -219,18 +219,14 @@ final class UndoTest extends TestCase
         $this->assertSame(self::ENTRY_INFO, $this->fixture->imageRow($this->image['id'])['comment']);
     }
 
-    /** [NEG] Region entries have no undo yet, and a photo entry never has one. */
-    public function testRegionAndPhotoEntriesAreRefused(): void
+    /** [NEG] A photo entry never has an undo (region entries do: UndoRegionTest). */
+    public function testPhotoEntriesAreRefused(): void
     {
-        $userId = $this->userId(TestUsers::NORMAL);
-        foreach (array(PROVENANCE_HISTORY_FIELD_REGION, PROVENANCE_HISTORY_FIELD_PHOTO) as $field)
-        {
-            $id = $this->insertEntry($field, null, '{"x":1}', $userId);
+        $id = $this->insertEntry(PROVENANCE_HISTORY_FIELD_PHOTO, null, '{"x":1}', $this->userId(TestUsers::NORMAL));
 
-            $res = $this->undo(TestUsers::NORMAL, $id);
+        $res = $this->undo(TestUsers::NORMAL, $id);
 
-            $this->assertRefused($res, 403, 'Das darfst du nicht rückgängig machen', $field);
-        }
+        $this->assertRefused($res, 403, 'Das darfst du nicht rückgängig machen', PROVENANCE_HISTORY_FIELD_PHOTO);
     }
 
     /** @return array[] role => owner of the entry => may undo */

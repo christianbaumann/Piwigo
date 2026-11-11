@@ -125,7 +125,7 @@ final class UndoRuleTest extends TestCase
             '[NEG] undone, own' => array(array('undone' => true) + $plain, true, true, false),
             '[NEG] an undo entry, as an administrator' => array(array('undoes_id' => 3) + $plain, true, true, false),
             '[NEG] a photo entry' => array(array('field' => PROVENANCE_HISTORY_FIELD_PHOTO) + $plain, true, true, false),
-            '[NEG] a region entry, until its undo exists' => array(array('field' => PROVENANCE_HISTORY_FIELD_REGION) + $plain, true, true, false),
+            '[HAPPY] a region entry' => array(array('field' => PROVENANCE_HISTORY_FIELD_REGION) + $plain, true, false, true),
         );
     }
 

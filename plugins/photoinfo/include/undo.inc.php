@@ -9,8 +9,9 @@ defined('PHOTOINFO_PATH') or die('Hacking attempt!');
  * inverse through the same functions as the original write (file write and
  * lock included), then appends an entry with undoes_id set and source undo.
  *
- * A region entry is task 08's: photoinfo_undo_apply() has one branch per field
- * and region has none yet.
+ * A region entry is undone by persons, asked through the persons_undo_region
+ * event (photoinfo_undo_region()); without persons active nobody answers and
+ * the undo is refused.
  */
 
 /** The refusals, as the language-file keys their texts live under. */
@@ -19,6 +20,11 @@ define('PHOTOINFO_UNDO_ALREADY_UNDONE', 'Already undone');
 define('PHOTOINFO_UNDO_CHANGED_SINCE', 'Changed meanwhile by %s');
 /** Names the account that changed a value when no entry says who. */
 define('PHOTOINFO_UNDO_SOMEONE_ELSE', 'someone else');
+define('PHOTOINFO_UNDO_NO_PERSONS', 'Persons is switched off');
+/** The actions persons_undo_region answers; persons names them the same. */
+define('PHOTOINFO_UNDO_REGION_STATE', 'state');
+define('PHOTOINFO_UNDO_REGION_REMOVE', 'remove');
+define('PHOTOINFO_UNDO_REGION_RESTORE', 'restore');
 
 /**
  * The fields the change list offers Rückgängig for. A field joins when its
@@ -28,7 +34,8 @@ define('PHOTOINFO_UNDO_SOMEONE_ELSE', 'someone else');
  */
 function photoinfo_history_undo_fields()
 {
-  return array(PROVENANCE_HISTORY_FIELD_DATE, PROVENANCE_HISTORY_FIELD_INFO, PROVENANCE_HISTORY_FIELD_TAG);
+  return array(PROVENANCE_HISTORY_FIELD_DATE, PROVENANCE_HISTORY_FIELD_INFO, PROVENANCE_HISTORY_FIELD_TAG,
+    PROVENANCE_HISTORY_FIELD_REGION);
 }
 
 /**
@@ -171,6 +178,9 @@ function photoinfo_undo_current($entry, $image)
         return false;
       }
       return in_array($tag['id'], photoinfo_tag_ids_of($image['id']), true) ? $tag['id'] : null;
+    case PROVENANCE_HISTORY_FIELD_REGION:
+      $answer = photoinfo_undo_ask_persons($image['id'], PHOTOINFO_UNDO_REGION_STATE, $entry);
+      return $answer === null ? null : $answer['present'];
   }
 
   return false;
@@ -188,6 +198,10 @@ function photoinfo_undo_expected($entry)
   {
     $tag = provenance_history_decode_tag($entry['new_value']);
     return $tag === null ? null : $tag['id'];
+  }
+  if ($entry['field'] == PROVENANCE_HISTORY_FIELD_REGION)
+  {
+    return $entry['new_value'] !== null;
   }
 
   return provenance_history_normalize($entry['new_value']);
@@ -221,6 +235,14 @@ function photoinfo_undo_changed_by($entry)
     $tag = provenance_history_decode_tag($entry['new_value'] !== null ? $entry['new_value'] : $entry['old_value']);
     $where = $tag === null ? '' : '
     AND (new_value LIKE "{\"id\":'.(int)$tag['id'].',%" OR old_value LIKE "{\"id\":'.(int)$tag['id'].',%")';
+  }
+
+  if ($entry['field'] == PROVENANCE_HISTORY_FIELD_REGION)
+  {
+    $region = provenance_history_decode_region($entry['new_value'] !== null ? $entry['new_value'] : $entry['old_value']);
+    $prefix = photoinfo_like_prefix('{"name":'.json_encode($region === null ? '' : $region['name'], JSON_UNESCAPED_UNICODE).',');
+    $where = '
+    AND (new_value LIKE "'.$prefix.'%" OR old_value LIKE "'.$prefix.'%")';
   }
 
   $rows = query2array('
@@ -263,6 +285,11 @@ function photoinfo_undo_refusal_text($refusal, $entry)
 
   if ($refusal == PHOTOINFO_UNDO_CHANGED_SINCE)
   {
+    if ($entry['field'] == PROVENANCE_HISTORY_FIELD_REGION
+      and photoinfo_undo_ask_persons($entry['object_id'], PHOTOINFO_UNDO_REGION_STATE, $entry) === null)
+    {
+      return l10n(PHOTOINFO_UNDO_NO_PERSONS);
+    }
     return sprintf(l10n($refusal), photoinfo_undo_changed_by($entry));
   }
 
@@ -287,6 +314,8 @@ function photoinfo_undo_apply($entry, $image)
       return photoinfo_undo_info($entry, $image);
     case PROVENANCE_HISTORY_FIELD_TAG:
       return photoinfo_undo_tag($entry, $image);
+    case PROVENANCE_HISTORY_FIELD_REGION:
+      return photoinfo_undo_region($entry, $image);
   }
 
   return l10n(PHOTOINFO_UNDO_NOT_ALLOWED);
@@ -410,5 +439,75 @@ function photoinfo_undo_answer($image, $history_id, $result)
     'written' => $result['ok'],
     'message' => $result['message'],
     'message_l10n' => photoinfo_l10n_reason($result['message']),
+    );
+}
+
+/**
+ * A literal as the start of a double-quoted LIKE pattern: the wildcards and the
+ * escape character taken literally, then the string escaped.
+ *
+ * @param string $text
+ * @return string
+ */
+function photoinfo_like_prefix($text)
+{
+  return pwg_db_real_escape_string(str_replace(array('\\', '%', '_'), array('\\\\', '\\%', '\\_'), $text));
+}
+
+/**
+ * Asks persons about, or to change, the region an entry names.
+ *
+ * @param int $image_id
+ * @param string $action PHOTOINFO_UNDO_REGION_STATE, PHOTOINFO_UNDO_REGION_REMOVE or PHOTOINFO_UNDO_REGION_RESTORE
+ * @param array $entry
+ * @return array|null persons' answer, null when persons is not active or the entry holds no region
+ */
+function photoinfo_undo_ask_persons($image_id, $action, $entry)
+{
+  global $user;
+
+  $region = provenance_history_decode_region($entry['new_value'] !== null ? $entry['new_value'] : $entry['old_value']);
+  if ($region === null)
+  {
+    return null;
+  }
+
+  $answer = trigger_change('persons_undo_region', null, (int)$image_id, $action, $region, (int)$user['id'], is_admin());
+
+  return is_array($answer) ? $answer : null;
+}
+
+/**
+ * Takes a box off the photo that the entry added, or puts back one it
+ * removed with its original drawer. persons does the change; the one undo
+ * entry is written here, since persons_apply_change() announces nothing.
+ *
+ * @param array $entry
+ * @param array $image
+ * @return array|string
+ */
+function photoinfo_undo_region($entry, $image)
+{
+  $added = $entry['new_value'] !== null;
+  $answer = photoinfo_undo_ask_persons($image['id'],
+    $added ? PHOTOINFO_UNDO_REGION_REMOVE : PHOTOINFO_UNDO_REGION_RESTORE, $entry);
+
+  if ($answer === null)
+  {
+    return photoinfo_undo_refusal_text(PHOTOINFO_UNDO_NO_PERSONS, $entry);
+  }
+  if (!$answer['ok'])
+  {
+    return $answer['forbidden'] ? photoinfo_undo_refusal_text(PHOTOINFO_UNDO_NOT_ALLOWED, $entry) : $answer['message'];
+  }
+
+  pwg_activity('photo', $image['id'], 'edit');
+
+  return array(
+    'image_id' => (int)$image['id'],
+    'history_id' => photoinfo_undo_record($entry),
+    'written' => true,
+    'message' => '',
+    'message_l10n' => '',
     );
 }
