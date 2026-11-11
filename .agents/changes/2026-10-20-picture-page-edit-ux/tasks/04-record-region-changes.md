@@ -2,7 +2,7 @@
 id: 04
 dependencies:
 - 01
-status: blocked
+status: in-progress
 owner: s-e4c1
 branch: task/2026-10-20-picture-page-edit-ux-04
 ---
