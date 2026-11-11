@@ -431,7 +431,7 @@ its own copied photos: `pwg.images.syncMetadata` with their ids, and `admin.php?
 limited to the fixture's album (`cat`), never the whole gallery.
 
 `tests/Integration/RoleMatrixTest.php` is photoinfo's executable role matrix: one row per function
-(`photoinfo.rows`, `edit-date`, `edit-info`, `core-screens`, `tag-keywords`, `rescan-prune`) and role
+(`photoinfo.rows`, `history-list`, `edit-date`, `edit-info`, `core-screens`, `tag-keywords`, `rescan-prune`) and role
 (guest, generic, normal, admin, webmaster), its expected levels typed from the target matrix of the
 [role test coverage design](../../.agents/changes/2026-10-12-role-test-coverage/design.md). A probe
 reads the page part (content, control) and the ws part of one function as one role; a call counts as
