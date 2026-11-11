@@ -310,7 +310,8 @@ function provenance_history_display_rows($rows)
   $older = function ($occured_on) { return format_date($occured_on, array('day', 'month', 'year')); };
   $names = provenance_history_usernames($rows);
   $viewer = isset($user['id']) ? (int)$user['id'] : null;
-  $now = date('Y-m-d H:i:s');
+  // occured_on is the database's clock; PHP's may run in another time zone.
+  list($now) = pwg_db_fetch_row(pwg_query('SELECT NOW();'));
 
   foreach ($rows as $i => $row)
   {
