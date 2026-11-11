@@ -7,9 +7,9 @@ dependencies:
 - 10
 - 11
 - 12
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-13
 ---
 
 # Task 13: „Rückgängig“ in each row's status
