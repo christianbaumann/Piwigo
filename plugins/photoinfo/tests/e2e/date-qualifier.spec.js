@@ -43,7 +43,7 @@ for (const save of SAVES) {
     await picture.qualifyDate(save.qualifier, save.end);
     await picture.dateDoneButton.click();
 
-    await expect(picture.dateStatus).toHaveText('✓ Gespeichert');
+    await expect(picture.dateStatus).toHaveText(/^✓ Gespeichert( · Rückgängig)?$/);
     await expect(picture.dateView).toHaveText(save.shown);
     expect(readDate(fixture.image_id)['XMP-pwginfo:DateEDTF']).toBe(save.edtf);
     expect(readRow(fixture.image_id).photoinfo_date_qualifier).toBe(save.qualifier);
@@ -122,14 +122,14 @@ test('[ST] the empty option turns a saved range back into an exact date', async 
   await picture.fillDate('1965', '', '');
   await picture.qualifyDate('between', { year: '1970', month: '', day: '' });
   await picture.dateDoneButton.click();
-  await expect(picture.dateStatus).toHaveText('✓ Gespeichert');
+  await expect(picture.dateStatus).toHaveText(/^✓ Gespeichert( · Rückgängig)?$/);
 
   await picture.openDateEditor();
   await expect(picture.dateQualifier).toHaveValue('between');
   await expect(picture.dateEndYear).toHaveValue('1970');
   await picture.dateQualifier.selectOption('');
   await picture.dateDoneButton.click();
-  await expect(picture.dateStatus).toHaveText('✓ Gespeichert');
+  await expect(picture.dateStatus).toHaveText(/^✓ Gespeichert( · Rückgängig)?$/);
 
   await expect(picture.dateView).toHaveText('1965');
   const row = readRow(fixture.image_id);

@@ -1,7 +1,10 @@
 /*
  * Click-to-edit for the Info row on the picture page. The text is saved when
  * the field is left or on "Done", never on a timer, and the row updates from
- * the web service's answer without reloading the page.
+ * the web service's answer without reloading the page. A save that returned a
+ * history entry offers Undo on the status; an undo started here or in the
+ * change list arrives as the photoinfo:undone event, whose answer carries the
+ * restored text.
  */
 (function () {
   var view = document.getElementById('photoinfo-info-view');
@@ -12,16 +15,43 @@
     return;
   }
 
-  var STATES = ['saving', 'saved', 'dirty', 'error'];
+  var STATES = ['saving', 'saved', 'dirty', 'error', 'undone'];
   var textarea = form.querySelector('textarea');
   var saved = textarea.value;
   var inflight = null;
 
-  function showStatus(state, text) {
+  function showStatus(state, text, historyId) {
     STATES.forEach(function (name) {
       status.classList.toggle('pwg-row-status--' + name, name === state);
     });
     status.textContent = text;
+    if (historyId) {
+      status.appendChild(document.createTextNode(' · '));
+      var undoButton = document.createElement('button');
+      undoButton.type = 'button';
+      undoButton.className = 'pwg-row-undo';
+      undoButton.textContent = form.dataset.undoLabel;
+      undoButton.addEventListener('click', function () { undo(undoButton, historyId); });
+      status.appendChild(undoButton);
+    }
+  }
+
+  function undo(button, historyId) {
+    button.disabled = true;
+    var body = new URLSearchParams();
+    body.set('method', 'pwg.photoinfo.undo');
+    body.set('history_id', historyId);
+    body.set('pwg_token', form.dataset.token);
+    fetch(form.dataset.wsUrl, { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (response) { return response.json(); })
+      .then(function (json) {
+        if (json.stat === 'ok') {
+          document.dispatchEvent(new CustomEvent('photoinfo:undone', { detail: json.result }));
+        } else {
+          showStatus('error', json.message || form.dataset.errorSave);
+        }
+      })
+      .catch(function () { showStatus('error', form.dataset.errorSave); });
   }
 
   function clearStatus() {
@@ -101,7 +131,7 @@
         } else if (isDirty()) {
           showStatus('dirty', form.dataset.textDirty);
         } else {
-          showStatus('saved', form.dataset.textSaved);
+          showStatus('saved', form.dataset.textSaved, json.result.history_id);
         }
         return true;
       })
@@ -117,6 +147,23 @@
     inflight = (inflight || Promise.resolve()).then(send);
     return inflight;
   }
+
+  document.addEventListener('photoinfo:undone', function (event) {
+    var result = event.detail;
+    if (result.field !== 'info' || String(result.image_id) !== form.dataset.imageId) {
+      return;
+    }
+    saved = result.info;
+    textarea.value = saved;
+    showText(result.info_html);
+    trackDirty();
+    closeEditor();
+    if (result.written === false) {
+      showStatus('error', form.dataset.errorWrite.replace('%s', result.message_l10n));
+    } else {
+      showStatus('undone', form.dataset.textUndone);
+    }
+  });
 
   editButton.addEventListener('click', openEditor);
   view.addEventListener('click', openEditor);

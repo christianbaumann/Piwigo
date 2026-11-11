@@ -292,9 +292,10 @@
 			message.classList.toggle('persons-editor-error', !!failed);
 		}
 
-		var STATUS_STATES = ['saving', 'saved', 'dirty', 'error'];
+		var STATUS_STATES = ['saving', 'saved', 'dirty', 'error', 'undone'];
 
-		function showStatus(state, text) {
+		/* A save that came back with a history entry id (photoinfo is active) offers Undo. */
+		function showStatus(state, text, historyId) {
 			if (!status) {
 				return;
 			}
@@ -302,6 +303,28 @@
 				status.classList.toggle('pwg-row-status--' + name, name === state);
 			});
 			status.textContent = text;
+			if (historyId) {
+				var undoButton = document.createElement('button');
+				undoButton.type = 'button';
+				undoButton.className = 'pwg-row-undo';
+				undoButton.textContent = str('undo');
+				undoButton.addEventListener('click', function () { undo(undoButton, historyId); });
+				status.appendChild(document.createTextNode(' · '));
+				status.appendChild(undoButton);
+			}
+		}
+
+		function undo(button, historyId) {
+			button.disabled = true;
+			post('pwg.photoinfo.undo', { history_id: historyId, pwg_token: token }).then(function (data) {
+				if (data.stat === 'ok') {
+					document.dispatchEvent(new CustomEvent('photoinfo:undone', { detail: data.result }));
+				} else {
+					showStatus('error', data.message || str('failed'));
+				}
+			}).catch(function () {
+				showStatus('error', str('failed'));
+			});
 		}
 
 		function showFailure(reason) {
@@ -358,6 +381,15 @@
 			return region;
 		}
 
+		/** What toStored() turned into the stored box, back to display fractions: left, top, w, h. */
+		function toDisplay(region) {
+			var turns = rotation > 0 ? rotation % 4 : 0;
+			for (var turn = 0; turn < turns; turn++) {
+				region = { x: region.y, y: 1 - region.x, w: region.h, h: region.w };
+			}
+			return { left: region.x - region.w / 2, top: region.y - region.h / 2, w: region.w, h: region.h };
+		}
+
 		function place(el, box) {
 			el.style.left = (box.left * 100) + '%';
 			el.style.top = (box.top * 100) + '%';
@@ -404,7 +436,7 @@
 				if (data.result && data.result.tags_written === false) {
 					showStatus('error', str('write').replace('%s', data.result.tags_message || ''));
 				} else {
-					showStatus('saved', str('saved'));
+					showStatus('saved', str('saved'), data.result && data.result.history_id);
 				}
 			}).catch(function () {
 				showFailure(str('failed'));
@@ -443,6 +475,28 @@
 			}
 			label.textContent = name;
 			el.appendChild(label);
+		}
+
+		/** Draws the boxes of listed faces the photo does not show yet (an undone delete brings one back). */
+		function addBoxesNotShown(regions) {
+			var known = knownRegionIds();
+			regions.forEach(function (region) {
+				if (region.type !== 'Face' || known.indexOf(region.id) !== -1) {
+					return;
+				}
+				var el = document.createElement('div');
+				el.className = 'person-box';
+				el.setAttribute('data-person-region', region.id);
+				place(el, toDisplay(region));
+				var label = document.createElement(region.url ? 'a' : 'span');
+				label.className = 'person-box-label';
+				if (region.url) {
+					label.setAttribute('href', region.url);
+				}
+				label.textContent = region.name;
+				el.appendChild(label);
+				overlay.appendChild(el);
+			});
 		}
 
 		/** Removes the boxes whose region the server no longer lists. */
@@ -683,6 +737,31 @@
 				showStatus('saved', str('saved'));
 				return true;
 			});
+		});
+
+		/* An undo of a region entry, started here or in the change list: re-read the photo's faces. */
+		document.addEventListener('photoinfo:undone', function (event) {
+			var result = event.detail;
+			if (result.field !== 'region' || Number(result.image_id) !== imageId) {
+				return;
+			}
+			fetch(WS_URL + '&method=pwg.persons.getRegions&image_id=' + imageId, { credentials: 'same-origin' })
+				.then(function (response) { return response.json(); })
+				.then(function (data) {
+					if (data.stat === 'ok') {
+						renderPersonRow(data.result.regions);
+						dropBoxesNotIn(data.result.regions);
+						addBoxesNotShown(data.result.regions);
+					}
+				}).catch(function () {
+					/* the row keeps what it showed; the status below still tells what happened */
+				}).then(function () {
+					if (result.written === false) {
+						showStatus('error', str('write').replace('%s', result.message_l10n || ''));
+					} else {
+						showStatus('undone', str('undone'));
+					}
+				});
 		});
 
 		/* Pointing at or focusing a name shows its box(es). */

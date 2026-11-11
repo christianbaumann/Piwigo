@@ -80,12 +80,24 @@
 }
 
 .pwg-row-status--saving,
-.pwg-row-status--dirty {
+.pwg-row-status--dirty,
+.pwg-row-status--undone {
 	opacity: 0.8;
 }
 
 .pwg-row-status--saved {
 	color: #1e7b34;
+}
+
+.pwg-row-undo {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-decoration: underline;
+	cursor: pointer;
 }
 
 .pwg-row-status--error {

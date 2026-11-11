@@ -2,7 +2,8 @@
    pwg.provenance.getHistory when opened and after any save the page makes.
    The rows' own scripts (photoinfo, typetags, persons, photoedit) are not
    touched: a save is recognised by the ws method it calls, on fetch() and on
-   jQuery's ajax alike. */
+   jQuery's ajax alike. An undo, from here or from a row, is announced by the
+   photoinfo:undone event on document. */
 (function () {
   'use strict';
 
@@ -14,6 +15,7 @@
   var list = document.getElementById('photoinfo-history-list');
   var count = document.getElementById('photoinfo-history-count');
   var empty = document.getElementById('photoinfo-history-empty');
+  var warning = document.getElementById('photoinfo-history-warning');
   var all = document.getElementById('photoinfo-history-all');
   var perPage = parseInt(details.dataset.perPage, 10);
   var undoFields = details.dataset.undoFields.split(',');
@@ -40,8 +42,9 @@
       .then(function (response) { return response.json(); })
       .then(function (json) {
         if (json.stat === 'ok') {
+          // The rows listen too, and so does the refresh below.
           document.dispatchEvent(new CustomEvent('photoinfo:undone', { detail: json.result }));
-          return refresh();
+          return;
         }
         button.disabled = false;
         action.querySelector('.photoinfo-undo-error').textContent = json.message;
@@ -145,6 +148,14 @@
       }
     });
   }
+
+  // An undo started in this list or in a row: the list shows its entry.
+  document.addEventListener('photoinfo:undone', function (event) {
+    // The undo is done; only the image file kept the old value.
+    warning.textContent = event.detail.written === false
+      ? details.dataset.writeFailed.replace('%s', event.detail.message_l10n || '') : '';
+    refreshSoon();
+  });
 
   details.addEventListener('toggle', function () {
     if (details.open) {

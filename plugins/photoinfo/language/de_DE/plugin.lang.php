@@ -38,5 +38,6 @@ $lang['Changed meanwhile by %s'] = 'Wurde inzwischen von %s geändert';
 $lang['someone else'] = 'jemand anderem';
 $lang['Persons is switched off'] = 'Personen ist ausgeschaltet, das lässt sich nicht rückgängig machen';
 $lang['Undo'] = 'Rückgängig';
+$lang['↶ Undone'] = '↶ Rückgängig gemacht';
 
 ?>

@@ -52,7 +52,8 @@
 }
 
 .pwg-row-status--saving,
-.pwg-row-status--dirty {
+.pwg-row-status--dirty,
+.pwg-row-status--undone {
   opacity: 0.8;
 }
 
@@ -98,4 +99,15 @@
 .photoinfo-undo-error {
   margin-left: 0.5em;
   color: #c00;
+}
+
+.pwg-row-undo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }

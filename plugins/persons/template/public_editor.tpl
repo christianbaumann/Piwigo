@@ -16,6 +16,8 @@
 	data-persons-str-saved="{'✓ Saved'|@translate|escape}"
 	data-persons-str-not-saved="{'Not saved: %s'|@translate|escape}"
 	data-persons-str-write="{'Saved, but not written into the image file: %s'|@translate|escape}"
+	data-persons-str-undo="{'Undo'|@translate|escape}"
+	data-persons-str-undone="{'↶ Undone'|@translate|escape}"
 	data-persons-str-remove="{'Remove this person from the photo'|@translate|escape}">
 {* Without the Personen row (switched off, or the admin screen) the names and the button sit here. *}
 {if empty($display_info.persons) or !empty($persons_force_controls)}

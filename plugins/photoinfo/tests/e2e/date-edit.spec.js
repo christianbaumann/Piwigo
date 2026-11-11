@@ -5,7 +5,8 @@ const { statePath } = require('./support/accounts');
 const { seed, readDate, readRow, makeReadOnly, restore } = require('./support/seed');
 const { germanTextOf } = require('./support/lang');
 
-const SAVED = '✓ Gespeichert';
+/** The saved status; a save that wrote a history entry also offers Rückgängig. */
+const SAVED = /^✓ Gespeichert( · Rückgängig)?$/;
 const NO_DATE = 'Noch kein Datum';
 
 /**

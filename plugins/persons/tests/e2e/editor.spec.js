@@ -1046,7 +1046,7 @@ test.describe('one-shot marking', () => {
     await tag(picture, FIRST_BOX, ADA, 1);
 
     await expect(picture.rowStatus).toHaveClass(/pwg-row-status--saved/);
-    await expect(picture.rowStatus).toHaveText('✓ Gespeichert');
+    await expect(picture.rowStatus).toHaveText(/^✓ Gespeichert( · Rückgängig)?$/);
   });
 
   /**

@@ -149,6 +149,16 @@ final class GermanOverrideKeyTest extends TestCase
                 "{\'Tag saved\'|@translate|escape:html}",
                 1,
             ),
+            'Undo' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'Undo\'|@translate|escape:html}",
+                1,
+            ),
+            '↶ Undone' => array(
+                'plugins/typetags/include/events_public.inc.php',
+                "{\'↶ Undone\'|@translate|escape:html}",
+                1,
+            ),
             'Tag not saved yet' => array(
                 'plugins/typetags/include/events_public.inc.php',
                 "{\'Tag not saved yet\'|@translate|escape:html}",

@@ -24,7 +24,8 @@ test.afterEach(() => {
 });
 
 const STATUS_DIRTY = 'noch nicht gespeichert';
-const STATUS_SAVED = '✓ Gespeichert';
+/** The saved status; a save that wrote a history entry also offers Rückgängig. */
+const STATUS_SAVED = /^✓ Gespeichert( · Rückgängig)?$/;
 const SETINFO = 'pwg.photoinfo.setInfo';
 
 /** @param {import('@playwright/test').Page} page */

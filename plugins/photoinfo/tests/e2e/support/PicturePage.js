@@ -41,6 +41,9 @@ class PicturePage {
     this.historySummary = page.locator('#photoinfo-history > summary');
     this.historyEntries = page.locator('#photoinfo-history-list li');
     this.historyCount = page.locator('#photoinfo-history-count');
+    this.historyWarning = page.locator('#photoinfo-history-warning');
+    this.dateUndo = page.locator('#photoinfo-date-status .pwg-row-undo');
+    this.infoUndo = page.locator('#PhotoInfo .pwg-row-status .pwg-row-undo');
     this.historyUndoButtons = page.locator('#photoinfo-history-list .photoinfo-undo');
 
     // typetags' field for a new tag, and the Tags row its answer lands in
@@ -221,6 +224,20 @@ class PicturePage {
    */
   async markDocument() {
     await this.page.evaluate(() => { window.__notReloaded = true; });
+  }
+
+  /**
+   * Calls a web-service method as the signed-in account, the way another tab or client would, using
+   * the token the Info form carries.
+   *
+   * @param {Record<string, string>} params
+   */
+  async callWs(params) {
+    await this.page.evaluate(async (fields) => {
+      const token = document.querySelector('#photoinfo-info-form').dataset.token;
+      const body = new URLSearchParams({ ...fields, pwg_token: token });
+      await fetch('ws.php?format=json', { method: 'POST', body, credentials: 'same-origin' });
+    }, params);
   }
 
   /** @return {Promise<boolean>} whether the mark set by markDocument() survived */

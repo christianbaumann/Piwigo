@@ -4,7 +4,10 @@
  * list follows the month and leap years. The qualifier needs a year too, and
  * only "zwischen" shows the range end, which has controls of its own. All parts
  * are saved as one value when focus leaves the form or on Done; the row text
- * and the row status are updated in place, the page is not reloaded.
+ * and the row status are updated in place, the page is not reloaded. A save
+ * that returned a history entry offers Undo on the status; an undo started
+ * here or in the change list arrives as the photoinfo:undone event, whose
+ * answer carries the restored date.
  */
 (function () {
   var view = document.getElementById('photoinfo-date-view');
@@ -139,10 +142,58 @@
     editButton.hidden = false;
   }
 
-  function showStatus(kind, text) {
+  function showStatus(kind, text, historyId) {
     status.className = 'pwg-row-status pwg-row-status--' + kind;
     status.textContent = text;
+    if (historyId) {
+      status.appendChild(document.createTextNode(' · '));
+      var undoButton = document.createElement('button');
+      undoButton.type = 'button';
+      undoButton.className = 'pwg-row-undo';
+      undoButton.textContent = form.dataset.undoLabel;
+      undoButton.addEventListener('click', function () { undo(undoButton, historyId); });
+      status.appendChild(undoButton);
+    }
   }
+
+  function undo(button, historyId) {
+    button.disabled = true;
+    var body = new URLSearchParams();
+    body.set('method', 'pwg.photoinfo.undo');
+    body.set('history_id', historyId);
+    body.set('pwg_token', form.dataset.token);
+    fetch(form.dataset.wsUrl, { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (response) { return response.json(); })
+      .then(function (json) {
+        if (json.stat === 'ok') {
+          document.dispatchEvent(new CustomEvent('photoinfo:undone', { detail: json.result }));
+        } else {
+          showStatus('error', json.message || form.dataset.errorSave);
+        }
+      })
+      .catch(function () { showStatus('error', form.dataset.errorSave); });
+  }
+
+  /** The value an undo restored, from the answer; the status says so, or that the file kept the old value. */
+  document.addEventListener('photoinfo:undone', function (event) {
+    var result = event.detail;
+    if (result.field !== 'date' || String(result.image_id) !== form.dataset.imageId) {
+      return;
+    }
+    var text = function (part) { return String(part); };
+    var restore = function (fields) {
+      return { year: text(fields.year), month: text(fields.month), day: text(fields.day) };
+    };
+    saved = { qualifier: result.qualifier, start: restore(result.start), end: restore(result.end) };
+    reset();
+    showDate(result.date);
+    closeEditor();
+    if (result.written === false) {
+      showStatus('error', form.dataset.statusWrite.replace('%s', result.message_l10n));
+    } else {
+      showStatus('undone', form.dataset.statusUndone);
+    }
+  });
 
   function yearError() {
     return form.dataset.errorYear.replace('%d', minYear).replace('%d', maxYear);
@@ -268,7 +319,7 @@
         saving = false;
         doneButton.disabled = false;
         if (json.result.written) {
-          showStatus('saved', form.dataset.statusSaved);
+          showStatus('saved', form.dataset.statusSaved, json.result.history_id);
           if (close) {
             closeEditor();
           }

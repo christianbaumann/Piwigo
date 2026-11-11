@@ -70,6 +70,11 @@ class PicturePage {
     this.tagButtonInRow = page.locator('#imageInfos #standard #Persons #persons-tag-add');
     /** The Personen row's status line. */
     this.rowStatus = page.locator('#Persons .pwg-row-status, .persons-editor-row .pwg-row-status');
+    /** Rückgängig in the Personen row's status. */
+    this.rowUndo = page.locator('#Persons .pwg-row-status .pwg-row-undo, .persons-editor-row .pwg-row-status .pwg-row-undo');
+    /** photoinfo's change list, when that plugin is active. */
+    this.historySummary = page.locator('#photoinfo-history > summary');
+    this.historyEntries = page.locator('#photoinfo-history-list li');
     /** The element carrying the editor's labels and configuration. */
     this.editorConfig = page.locator('#persons-editor');
     /** The theme's information list the editor row follows. */
@@ -1223,6 +1228,19 @@ class PicturePage {
         create: el.classList.contains('persons-picker-create'),
       }))
     );
+  }
+
+  /**
+   * Calls a web-service method as the signed-in account, the way another tab would, with the editor's token.
+   *
+   * @param {Record<string, string>} params
+   */
+  async callWs(params) {
+    await this.page.evaluate(async (fields) => {
+      const token = document.querySelector('#persons-editor').dataset.personsToken;
+      const body = new URLSearchParams({ ...fields, pwg_token: token });
+      await fetch('ws.php?format=json', { method: 'POST', body, credentials: 'same-origin' });
+    }, params);
   }
 
   /** The region ids of the boxes the server has saved, in DOM order. */
