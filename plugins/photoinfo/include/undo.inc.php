@@ -363,7 +363,13 @@ function photoinfo_undo_date($entry, $image)
 
   $result = photoinfo_write_file(array_merge($image, $columns), PHOTOINFO_WRITE_DATE);
 
-  return photoinfo_undo_answer($image, $history_id, $result);
+  return photoinfo_undo_answer($image, $history_id, $result, array(
+    'field' => PROVENANCE_HISTORY_FIELD_DATE,
+    'date' => photoinfo_dating_display($dating),
+    'qualifier' => ($dating === null or $dating['qualifier'] === null) ? '' : $dating['qualifier'],
+    'start' => photoinfo_date_fields($dating === null ? null : $dating['start']),
+    'end' => photoinfo_date_fields($dating === null ? null : $dating['end']),
+    ));
 }
 
 /**
@@ -384,8 +390,13 @@ UPDATE '.IMAGES_TABLE.'
 
   $image['comment'] = $info;
   $result = photoinfo_write_file($image, PHOTOINFO_WRITE_INFO);
+  $text = $info === null ? '' : $info;
 
-  return photoinfo_undo_answer($image, $history_id, $result);
+  return photoinfo_undo_answer($image, $history_id, $result, array(
+    'field' => PROVENANCE_HISTORY_FIELD_INFO,
+    'info' => $text,
+    'info_html' => nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
+    ));
 }
 
 /**
@@ -419,9 +430,30 @@ function photoinfo_undo_tag($entry, $image)
   pwg_activity('photo', $image['id'], 'edit');
   $history_id = photoinfo_undo_record($entry);
 
-  return array_merge(
-    array('image_id' => (int)$image['id'], 'history_id' => $history_id),
+  $answer = array_merge(
+    array('image_id' => (int)$image['id'], 'history_id' => $history_id, 'field' => PROVENANCE_HISTORY_FIELD_TAG,
+      'tag_id' => (int)$tag['id'], 'present' => !$added),
     photoinfo_tag_write_answer(photoinfo_write_tags(array($image['id'])))
+    );
+
+  return array_merge($answer, photoinfo_unified_write_keys($answer));
+}
+
+/**
+ * The one shape every undo answer reports a failed file write in, from a tag
+ * answer's tags_written / tags_message_l10n.
+ *
+ * @param array $answer photoinfo_tag_write_answer()'s keys, possibly none
+ * @return array written, message, message_l10n (the reason alone, as photoinfo_undo_answer() gives it)
+ */
+function photoinfo_unified_write_keys($answer)
+{
+  $failed = (isset($answer['tags_written']) and !$answer['tags_written']);
+
+  return array(
+    'written' => !$failed,
+    'message' => $failed ? $answer['tags_message'] : '',
+    'message_l10n' => $failed ? photoinfo_l10n_reason($answer['tags_message']) : '',
     );
 }
 
@@ -429,17 +461,18 @@ function photoinfo_undo_tag($entry, $image)
  * @param array $image
  * @param int|null $history_id
  * @param array $result photoinfo_write_file()'s answer
+ * @param array $extra the fields the picture page's row needs to show the restored value
  * @return array
  */
-function photoinfo_undo_answer($image, $history_id, $result)
+function photoinfo_undo_answer($image, $history_id, $result, $extra)
 {
-  return array(
+  return array_merge(array(
     'image_id' => (int)$image['id'],
     'history_id' => $history_id,
     'written' => $result['ok'],
     'message' => $result['message'],
     'message_l10n' => photoinfo_l10n_reason($result['message']),
-    );
+    ), $extra);
 }
 
 /**
@@ -503,11 +536,12 @@ function photoinfo_undo_region($entry, $image)
 
   pwg_activity('photo', $image['id'], 'edit');
 
-  return array(
+  $writes = photoinfo_tag_write_answer(isset($answer['tag_writes']) ? $answer['tag_writes'] : array());
+  $answer = array(
     'image_id' => (int)$image['id'],
     'history_id' => photoinfo_undo_record($entry),
-    'written' => true,
-    'message' => '',
-    'message_l10n' => '',
+    'field' => PROVENANCE_HISTORY_FIELD_REGION,
     );
+
+  return array_merge($answer, $writes, photoinfo_unified_write_keys($writes));
 }

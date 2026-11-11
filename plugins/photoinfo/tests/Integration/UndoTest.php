@@ -154,6 +154,71 @@ final class UndoTest extends TestCase
         $this->assertSame(self::ENTRY_INFO, FixtureBuilder::readFileTags($this->image['file'])['XMP-pwginfo:Info']);
     }
 
+    /** [HAPPY] The answer carries what the rows show: the restored date's fields and text, the info's text and html, the tag's state. */
+    public function testTheAnswerCarriesTheRestoredValueForTheRows(): void
+    {
+        $this->fixture->setDate($this->image['id'], '1965-03-01 00:00:00', 'month');
+        $this->call(TestUsers::NORMAL, 'pwg.photoinfo.setDate', array('image_id' => $this->image['id'], 'qualifier' => 'circa', 'year' => '1971'));
+        $date = $this->undo(TestUsers::NORMAL, $this->latest(PROVENANCE_HISTORY_FIELD_DATE)['id'])['json']['result'];
+        $this->assertSame('date', $date['field']);
+        $this->assertSame('März 1965', $date['date']);
+        $this->assertSame('', $date['qualifier']);
+        $this->assertSame(array('year' => 1965, 'month' => 3, 'day' => ''), $date['start']);
+        $this->assertSame(array('year' => '', 'month' => '', 'day' => ''), $date['end']);
+
+        $this->fixture->setComment($this->image['id'], "Zeile <1>\nZeile 2");
+        $this->call(TestUsers::NORMAL, 'pwg.photoinfo.setInfo', array('image_id' => $this->image['id'], 'info' => self::NEW_INFO));
+        $info = $this->undo(TestUsers::NORMAL, $this->latest(PROVENANCE_HISTORY_FIELD_INFO)['id'])['json']['result'];
+        $this->assertSame('info', $info['field']);
+        $this->assertSame("Zeile <1>\nZeile 2", $info['info']);
+        $this->assertSame("Zeile &lt;1&gt;<br />\nZeile 2", $info['info_html']);
+
+        $tag = $this->fixture->createTag($this->tagName('Kirche'), $this->fixture->createGroup('Feste ' . $this->suffix));
+        $this->call(TestUsers::NORMAL, 'typetags.image.addTag', array('image_id' => $this->image['id'], 'tag_id' => $tag));
+        $added = $this->undo(TestUsers::NORMAL, $this->latest(PROVENANCE_HISTORY_FIELD_TAG)['id'])['json']['result'];
+        $this->assertSame('tag', $added['field']);
+        $this->assertSame($tag, $added['tag_id']);
+        $this->assertFalse($added['present']);
+        $this->assertTrue($added['written']);
+        $this->assertSame('', $added['message_l10n']);
+    }
+
+    /**
+     * [ERR] A file that takes no write: the undo is done in the database and the answer says the file kept the
+     * old value, in one shape (written, message_l10n) for info and tags alike.
+     */
+    public function testAnUndoTheFileDoesNotTakeIsReported(): void
+    {
+        $tag = $this->fixture->createTag($this->tagName('Kirche'), $this->fixture->createGroup('Feste ' . $this->suffix));
+        $this->call(TestUsers::NORMAL, 'typetags.image.addTag', array('image_id' => $this->image['id'], 'tag_id' => $tag));
+        $tagEntry = $this->latest(PROVENANCE_HISTORY_FIELD_TAG);
+        $this->call(TestUsers::NORMAL, 'pwg.photoinfo.setInfo', array('image_id' => $this->image['id'], 'info' => self::NEW_INFO));
+        $infoEntry = $this->latest(PROVENANCE_HISTORY_FIELD_INFO);
+
+        chmod($this->image['file'], 0444);
+        clearstatcache();
+        $this->assertFalse(is_writable($this->image['file']), 'anti-vacuity: the file is still writable');
+        try
+        {
+            $info = $this->undo(TestUsers::NORMAL, $infoEntry['id']);
+            $tags = $this->undo(TestUsers::NORMAL, $tagEntry['id']);
+        }
+        finally
+        {
+            chmod($this->image['file'], 0644);
+        }
+
+        foreach (array($info, $tags) as $res)
+        {
+            $this->assertSame('ok', $res['json']['stat'] ?? null, $res['body']);
+            $this->assertFalse($res['json']['result']['written'], $res['body']);
+            $this->assertNotSame('', $res['json']['result']['message_l10n'], $res['body']);
+        }
+        $this->assertFalse($tags['json']['result']['tags_written'], $tags['body']);
+        $this->assertSame(array(), $this->fixture->tagIdsOf($this->image['id']));
+        $this->assertNull($this->fixture->imageRow($this->image['id'])['comment']);
+    }
+
     /** [ST] The info save after an undo is an entry of its own, never merged into the undone one. */
     public function testALaterInfoSaveIsNotMergedIntoAnUndoneEntry(): void
     {

@@ -24,6 +24,9 @@ define('PERSONS_UNDO_RESTORE', 'restore');
  *   state   array('present' => bool): the index holds the region now
  *   remove  array('ok' => bool, 'forbidden' => bool, 'message' => string)
  *   restore the same; the region comes back with $region['drawn_by']
+ * remove and restore also carry 'tag_writes': what the listeners of
+ * persons_tags_changed answered (one write result per photo), so the caller
+ * can report a failed keyword write.
  *
  * @return array
  */
@@ -97,5 +100,8 @@ function persons_undo_answer($ok, $forbidden, $message)
  */
 function persons_undo_outcome($outcome)
 {
-  return persons_undo_answer($outcome['ok'], false, $outcome['ok'] ? '' : $outcome['message']);
+  $answer = persons_undo_answer($outcome['ok'], false, $outcome['ok'] ? '' : $outcome['message']);
+  $answer['tag_writes'] = isset($outcome['tag_writes']) ? $outcome['tag_writes'] : array();
+
+  return $answer;
 }

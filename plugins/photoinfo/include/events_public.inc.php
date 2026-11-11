@@ -119,26 +119,6 @@ function photoinfo_picture_prefilter($content)
 }
 
 /**
- * One date as the editor's three fields hold it.
- *
- * @param array|null $date
- * @return array year, month, day; '' where unknown
- */
-function photoinfo_date_fields($date)
-{
-  $fields = array('year' => '', 'month' => '', 'day' => '');
-  if ($date !== null)
-  {
-    foreach ($fields as $part => $empty)
-    {
-      $fields[$part] = $date[$part] === null ? '' : $date[$part];
-    }
-  }
-
-  return $fields;
-}
-
-/**
  * The photo's last changes for the list under the info rows, or null when the
  * account may not read them (a guest, or a photo it cannot see) or provenance
  * is not loaded. The list reads what pwg.provenance.getHistory answers.

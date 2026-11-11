@@ -475,6 +475,26 @@ function photoinfo_dating_columns($dating)
 }
 
 /**
+ * One date as the editor's three fields hold it.
+ *
+ * @param array|null $date
+ * @return array year, month, day; '' where unknown
+ */
+function photoinfo_date_fields($date)
+{
+  $fields = array('year' => '', 'month' => '', 'day' => '');
+  if ($date !== null)
+  {
+    foreach ($fields as $part => $empty)
+    {
+      $fields[$part] = $date[$part] === null ? '' : $date[$part];
+    }
+  }
+
+  return $fields;
+}
+
+/**
  * The dating as people read it: "ca. 1965", "vor 1965", "nach März 1965",
  * "1965–1970" (en dash, no spaces).
  *
