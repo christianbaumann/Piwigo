@@ -140,6 +140,19 @@ final class HistoryListTest extends TestCase
         $this->assertSame('fail', $res['json']['stat'] ?? null, $res['body']);
     }
 
+    /** [NEG] A private album without a grant: the account gets no picture page, so no list block in its source. */
+    public function testNoBlockInThePageOfAPhotoTheAccountCannotSee(): void
+    {
+        $this->seed('tag', null, '{"id":5,"name":"Kirche"}', null);
+        $this->fixture->makeAlbumPrivate($this->albumId);
+
+        $page = $this->normal->fetchPage('/picture.php?/' . $this->image['id'] . '/category/' . $this->albumId);
+
+        $this->assertStringNotContainsString('id="theMainImage"', $page, 'the account reached the photo; the case proves nothing');
+        $this->assertStringNotContainsString('photoinfo-history', $page);
+        $this->assertStringNotContainsString('Kirche', $page);
+    }
+
     private function history(array $params): array
     {
         return $this->normal->call('pwg.provenance.getHistory', $params + array('object' => 'photo', 'object_id' => $this->image['id']));

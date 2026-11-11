@@ -227,6 +227,19 @@ final class HistoryTest extends TestCase
         $this->assertCount(0, $this->call(array('date_min' => $tomorrow))['histories']);
     }
 
+    /** [ERR] Without fields and formatted the rows are the stored ones, with no display entry (the unchanged answer). */
+    public function testRowsCarryNoDisplayEntryUnlessAskedFor(): void
+    {
+        provenance_record_change(self::OBJECT, $this->objectId, 'provenance_owner', null, 'Anna', 'photo_edit');
+        $rows = $this->call(array())['histories'];
+
+        $this->assertNotEmpty($rows, 'anti-vacuity: the fixture left no rows to check');
+        foreach ($rows as $row)
+        {
+            $this->assertArrayNotHasKey('display', $row);
+        }
+    }
+
     /** [NEG] An object outside the enum is refused rather than queried for. */
     public function testUnknownObjectIsRejected(): void
     {
