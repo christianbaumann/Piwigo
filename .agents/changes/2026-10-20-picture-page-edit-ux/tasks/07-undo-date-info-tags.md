@@ -4,9 +4,9 @@ dependencies:
 - 02
 - 03
 - 06
-status: todo
-owner:
-branch:
+status: in-progress
+owner: s-e4c1
+branch: task/2026-10-20-picture-page-edit-ux-07
 ---
 
 # Task 07: Undo for date, info and tag entries
