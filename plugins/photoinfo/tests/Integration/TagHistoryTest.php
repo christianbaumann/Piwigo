@@ -40,6 +40,9 @@ final class TagHistoryTest extends TestCase
         $this->ws = new WsClient();
         list($username, $password) = Config::credentials(TestUsers::WEBMASTER);
         $this->ws->login($username, $password);
+        $this->fixture->invalidateUserCache();
+        $res = $this->ws->call('pwg.session.getStatus');
+        $this->assertSame('ok', $res['json']['stat'] ?? '', $res['body']);
         $this->accountId = (int)$this->db->scalar("SELECT id FROM piwigo_users WHERE username = '" . $this->db->escape($username) . "'");
         $this->assertGreaterThan(0, $this->accountId, 'anti-vacuity: the test account is missing');
     }

@@ -34,6 +34,10 @@ final class HistoryPhotoEditTest extends TestCase
         $this->ws = new WsClient();
         list($username, $password) = Config::credentials(TestUsers::WEBMASTER);
         $this->ws->login($username, $password);
+
+        $this->fixture->invalidateUserCache();
+        $res = $this->ws->call('pwg.session.getStatus');
+        $this->assertSame('ok', $res['json']['stat'] ?? '', $res['body']);
     }
 
     protected function tearDown(): void

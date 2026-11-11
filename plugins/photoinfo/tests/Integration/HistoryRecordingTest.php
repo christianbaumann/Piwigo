@@ -32,6 +32,21 @@ final class HistoryRecordingTest extends TestCase
 
         $this->webmaster = $this->clientAs(TestUsers::WEBMASTER);
         $this->normal = $this->clientAs(TestUsers::NORMAL);
+
+        $this->fixture->invalidateUserCache();
+        $this->rebuildPermissions($this->webmaster);
+        $this->rebuildPermissions($this->normal);
+    }
+
+    /**
+     * Makes core rebuild the account's cached album permissions: a ws call whose
+     * Referer is an admin page reads piwigo_user_cache without rebuilding it, so
+     * a photo attached after the cache was computed would be refused as unknown.
+     */
+    private function rebuildPermissions(WsClient $client): void
+    {
+        $res = $client->call('pwg.session.getStatus');
+        $this->assertSame('ok', $res['json']['stat'] ?? '', $res['body']);
     }
 
     protected function tearDown(): void
@@ -231,6 +246,8 @@ final class HistoryRecordingTest extends TestCase
     {
         $other = $this->fixture->createTestImage();
         $this->fixture->attachImage($other['id'], $this->albumId);
+        $this->fixture->invalidateUserCache();
+        $this->rebuildPermissions($this->webmaster);
         $this->setDate($this->webmaster, '1965', '', '', 'circa');
         $this->setDateOf($this->webmaster, $other['id'], '1980', '6', '');
 
