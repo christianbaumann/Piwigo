@@ -227,10 +227,34 @@
 </figure>
 
 <p>
-  Ein Klick auf das Datum oder den Text öffnet das Bearbeitungsfeld. Fehlt eine Angabe noch,
-  steht dort <em>Klicken, um ein Datum hinzuzufügen</em> oder
-  <em>Klicken, um eine Beschreibung hinzuzufügen</em>. Jede der beiden Angaben wird für sich
-  gespeichert. <strong>Abbrechen</strong> schließt das Feld, ohne etwas zu ändern.
+  Unter jeder der beiden Angaben steht <strong>ändern</strong> mit einem Stift davor. Das öffnet das Bearbeitungsfeld;
+  bei der Info öffnet auch ein Klick auf den Text das Feld. Fehlt eine Angabe noch, steht dort
+  <em>Noch kein Datum</em> oder <em>Klicken, um eine Beschreibung hinzuzufügen</em>.
+</p>
+
+<p>
+  Es gibt keine Schaltfläche <strong>Speichern</strong> und keine zweite Abfrage. Eine Änderung
+  wird gespeichert, sobald man das Feld verlässt, oder mit <strong>Fertig</strong>, das
+  zugleich das Feld schließt. Die Seite lädt dabei nicht neu. Neben der Angabe steht, wie es
+  gerade steht:
+</p>
+
+<ul>
+  <li><em>noch nicht gespeichert</em>: es wurde etwas geändert, aber das Feld noch nicht
+    verlassen. Wer die Seite jetzt verlässt, bekommt bei der Info eine Warnung.</li>
+  <li><em>Speichert …</em>: die Änderung wird gerade gespeichert.</li>
+  <li><em>Gespeichert · Rückgängig</em>, mit einem Häkchen davor: die Änderung ist gespeichert. <strong>Rückgängig</strong>
+    stellt den vorherigen Wert wieder her, danach steht dort <em>Rückgängig gemacht</em>.</li>
+  <li>In Rot <em>Nicht gespeichert: …</em> mit dem Grund. Das Feld bleibt offen und die Änderung
+    ist nicht verloren; sie lässt sich noch einmal speichern. Die Meldung bleibt, bis ein
+    Speichern gelingt.</li>
+</ul>
+
+<p>
+  Jede der beiden Angaben wird für sich gespeichert. Ein Datum wird immer als Ganzes gespeichert,
+  erst wenn man die Felder des Datums verlässt, nicht bei jedem einzelnen Feld. Ein unvollständiges
+  Datum wird nicht gespeichert; die Seite nennt den Grund, etwa
+  <em>Ein Zeitraum braucht ein Endjahr</em>.
 </p>
 
 <h3>Ein Datum auf der Fotoseite eintragen</h3>
@@ -241,14 +265,15 @@
 </p>
 
 <ol>
-  <li>Auf das Datum klicken. Es erscheinen ein Auswahlfeld für einen Zusatz (siehe
+  <li>Auf <strong>ändern</strong> unter <strong>Datum</strong> klicken. Es erscheinen ein Auswahlfeld für einen Zusatz (siehe
     unten), ein Feld für das Jahr und zwei Auswahlfelder für Monat und Tag.</li>
   <li>Das Jahr vierstellig eintragen, zum Beispiel <em>1965</em>. Erlaubt sind Jahre von 1800
     bis zum laufenden Jahr.</li>
   <li>Den Monat auswählen, falls er bekannt ist. Erst danach lässt sich auch der Tag wählen. Bleibt
     beim Monat oder Tag der Strich stehen, gilt er als unbekannt.</li>
-  <li>Auf <strong>Speichern</strong> klicken. Die Seite lädt neu und zeigt das Datum, je nach
-    Angabe als <em>1965</em>, <em>März 1965</em> oder <em>14. März 1965</em>.</li>
+  <li>Auf <strong>Fertig</strong> klicken oder aus den Feldern hinausklicken. Das Datum wird
+    gespeichert und steht je nach Angabe als <em>1965</em>, <em>März 1965</em> oder
+    <em>14. März 1965</em> in der Zeile.</li>
 </ol>
 
 <p>
@@ -272,31 +297,60 @@
 </p>
 
 <figure>
-  <img src="assets/screenshots/24-datum-zeitraum.png" alt="Das geöffnete Datumsfeld mit dem Zusatz zwischen, Anfang 1955 und Ende 1960" />
-  <figcaption>Ein Zeitraum: zwischen 1955 und 1960, Monat und Tag unbekannt.</figcaption>
+  <img src="assets/screenshots/24-datum-zeitraum.png" alt="Das geöffnete Datumsfeld mit dem Zusatz zwischen, Anfang 1955 und Ende 1960, darunter noch nicht gespeichert" />
+  <figcaption>Ein Zeitraum: zwischen 1955 und 1960, Monat und Tag unbekannt. Noch nicht gespeichert.</figcaption>
 </figure>
 
 <p>
   Um ein Datum zu entfernen, das Jahr im Bearbeitungsfeld löschen und auf
-  <strong>Speichern</strong> klicken. Die übrigen Felder spielen dann keine Rolle.
+  <strong>Fertig</strong> klicken. Die übrigen Felder spielen dann keine Rolle.
 </p>
 
 <h3>Die Info auf der Fotoseite eintragen</h3>
 
 <ol>
-  <li>Auf den Text unter <strong>Info</strong> klicken. Er erscheint in einem Textfeld.</li>
-  <li>Den Text ändern oder neu schreiben. Zeilenumbrüche bleiben erhalten.</li>
-  <li>Auf <strong>Speichern</strong> klicken. Die Seite lädt neu und zeigt den neuen Text.</li>
+  <li>Auf <strong>ändern</strong> unter <strong>Info</strong> oder auf den Text klicken. Er
+    erscheint in einem Textfeld.</li>
+  <li>Den Text ändern oder neu schreiben. Zeilenumbrüche bleiben erhalten. Solange das Feld offen
+    ist und der Text vom gespeicherten abweicht, steht dort <em>noch nicht gespeichert</em>.
+    Gespeichert wird nie nach einer Zeit, sondern erst beim Verlassen des Feldes.</li>
+  <li>Auf <strong>Fertig</strong> klicken oder aus dem Feld hinausklicken. Der Text wird
+    gespeichert und die Seite zeigt ihn, ohne neu zu laden.</li>
 </ol>
 
 <figure>
-  <img src="assets/screenshots/25-info-bearbeiten.png" alt="Das geöffnete Textfeld unter Info mit den Schaltflächen Speichern und Abbrechen" />
+  <img src="assets/screenshots/25-info-bearbeiten.png" alt="Das geöffnete Textfeld unter Info mit der Schaltfläche Fertig" />
   <figcaption>Die Info im Bearbeitungsfeld.</figcaption>
 </figure>
 
 <p>
-  Um die Info zu entfernen, das Textfeld leeren und auf <strong>Speichern</strong> klicken.
+  Um die Info zu entfernen, das Textfeld leeren und auf <strong>Fertig</strong> klicken.
 </p>
+
+<h3 id="aenderungen">Letzte Änderungen an diesem Foto</h3>
+
+<p>
+  Unter den Angaben steht eine eingeklappte Zeile
+  <strong>Letzte Änderungen an diesem Foto (Anzahl)</strong>. Ein Klick klappt die Liste der
+  letzten acht Änderungen auf. Jeder Eintrag sagt, was geändert wurde (Datum, Info, ein
+  Schlagwort, eine markierte Person oder eine Drehung oder ein Zuschnitt), wer es war
+  (<em>(Sie)</em> bei den eigenen Änderungen) und wann (<em>heute, 14:05</em>,
+  <em>gestern, 18:42</em>, sonst das Datum). Die Liste ist bei jedem Aufruf der Seite wieder
+  eingeklappt.
+</p>
+
+<ul>
+  <li><strong>Rückgängig</strong> steht an einem Eintrag, wenn es erlaubt ist: jeder Benutzer
+    kann seine eigenen Änderungen zurücknehmen, Administratoren auch die der anderen. Eine
+    Drehung oder ein Zuschnitt lässt sich nicht zurücknehmen.</li>
+  <li>Hat seitdem jemand denselben Wert noch einmal geändert, lehnt die Seite das Rückgängigmachen
+    ab und nennt, wer es war. Sonst würde die spätere Änderung überschrieben. Ein schon
+    zurückgenommener Eintrag lässt sich nicht noch einmal zurücknehmen; ein erneutes Wiederherstellen
+    gibt es nicht.</li>
+  <li><strong>alle anzeigen</strong> führt zur Seite <em>Details und Verlauf</em> des
+    Fotos (Link im Abschnitt Herkunft) mit dem vollständigen Verlauf. Die Liste sehen alle angemeldeten Benutzer, die das
+    Foto sehen dürfen.</li>
+</ul>
 
 <h3>Datum, Info und Bilddatei</h3>
 
@@ -333,7 +387,7 @@
 
 <div class="hinweis">
   <p>
-    Erscheint nach dem Speichern auf der Fotoseite die Meldung
+    Erscheint nach dem Speichern auf der Fotoseite in Rot die Meldung
     <em>Gespeichert, aber nicht in die Bilddatei geschrieben</em>, ist die Angabe in der
     Galerie gespeichert, aber die Bilddatei blieb unverändert. Dahinter steht der Grund auf
     Deutsch, etwa <em>Die Datei fehlt oder ist nicht beschreibbar</em>. Nur seltene technische

@@ -369,6 +369,8 @@ async function waitForStageTransitions(page) {
 
 /** Drags a rectangle over one of the drawn faces, in rendered pixels. */
 async function dragOverFace(page, face) {
+  // Pressing the button in the panel can scroll the photo partly out of the window.
+  await page.locator('#theMainImage').scrollIntoViewIfNeeded();
   const box = await page.locator('#theMainImage').boundingBox();
   if (box === null) {
     throw new Error('the photo has no bounding box; the overlay cannot be drawn on');
@@ -650,9 +652,9 @@ const SHOTS = [
     async take(page, demo) {
       await open(page, demo.photos.atelier.picture_path);
       await waitForOverlayPlacement(page);
-      await page.click('#persons-tag-toggle');
+      await page.click('#persons-tag-add');
       await page.waitForSelector('#persons-stage.persons-tagging', { timeout: ELEMENT_TIMEOUT });
-      // The photo and the information panel: the toggle sits in the panel.
+      // The photo and the information panel: the button sits in the Personen row.
       await shoot(page.locator('#theImageAndInfos'), this.file, demo.image_dir);
     },
   },
@@ -662,7 +664,7 @@ const SHOTS = [
     async take(page, demo) {
       await open(page, demo.photos.atelier.picture_path);
       await waitForOverlayPlacement(page);
-      await page.click('#persons-tag-toggle');
+      await page.click('#persons-tag-add');
       await page.waitForSelector('#persons-stage.persons-tagging', { timeout: ELEMENT_TIMEOUT });
       await dragOverFace(page, demo.photos.atelier.faces[0]);
       await page.waitForSelector('#persons-overlay .person-draft', { timeout: ELEMENT_TIMEOUT });
@@ -676,7 +678,7 @@ const SHOTS = [
     async take(page, demo) {
       await open(page, demo.photos.atelier.picture_path);
       await waitForOverlayPlacement(page);
-      await page.click('#persons-tag-toggle');
+      await page.click('#persons-tag-add');
       await page.waitForSelector('#persons-stage.persons-tagging', { timeout: ELEMENT_TIMEOUT });
       await dragOverFace(page, demo.photos.atelier.faces[0]);
       await page.waitForSelector('#persons-picker', { state: 'visible', timeout: ELEMENT_TIMEOUT });
@@ -759,7 +761,7 @@ const SHOTS = [
     async take(page, demo) {
       // A photo with no date yet, so the editor shows only what the shot types.
       await open(page, demo.photos.rathaus.picture_path);
-      await page.click('#photoinfo-date-view');
+      await page.click('#photoinfo-date-edit');
       await page.fill('#photoinfo-date-form input[name=year]', '1955');
       await page.selectOption('#photoinfo-date-form select[name=qualifier]', 'between');
       await page.waitForSelector('#photoinfo-date-form .photoinfo-date-end', {
@@ -769,9 +771,13 @@ const SHOTS = [
       await page.fill('#photoinfo-date-form input[name=end_year]', '1960');
       await page.mouse.move(0, 0);
       await shoot(page.locator('#PhotoDate'), this.file, demo.image_dir);
-      // Cancelled, not saved: the handbook shows the editor, it does not need
-      // the demo photo's file rewritten.
-      await page.click('#photoinfo-date-form .photoinfo-cancel');
+      // The editor saves a changed value when it is closed or left. Put the
+      // fields back to the empty date first, so closing it writes nothing into
+      // the demo photo's file.
+      await page.fill('#photoinfo-date-form input[name=end_year]', '');
+      await page.selectOption('#photoinfo-date-form select[name=qualifier]', '');
+      await page.fill('#photoinfo-date-form input[name=year]', '');
+      await page.click('#photoinfo-date-form .photoinfo-done');
     },
   },
   {
@@ -779,11 +785,12 @@ const SHOTS = [
     role: 'WEBMASTER',
     async take(page, demo) {
       await open(page, demo.photos.sommerfest.picture_path);
-      await page.click('#photoinfo-info-view');
+      await page.click('#photoinfo-info-edit');
       await page.waitForSelector('#photoinfo-info-form textarea', { state: 'visible', timeout: ELEMENT_TIMEOUT });
       await page.mouse.move(0, 0);
       await shoot(page.locator('#PhotoInfo'), this.file, demo.image_dir);
-      await page.click('#photoinfo-info-form .photoinfo-cancel');
+      // Unchanged text: closing the editor writes nothing.
+      await page.click('#photoinfo-info-form input[type=submit]');
     },
   },
   {

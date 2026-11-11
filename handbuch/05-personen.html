@@ -39,8 +39,8 @@
 <p>
   Ein gestrichelter, halb durchsichtiger Rahmen bedeutet: die Markierung wurde auf einer anders
   zugeschnittenen Fassung des Fotos gesetzt und sitzt deshalb vermutlich nicht mehr an der
-  richtigen Stelle. Zeigt der Mauszeiger auf den Namen am Rahmen (im
-  Markierungsmodus: auf eine beliebige Stelle des Rahmens), erscheint der Kurzhinweis
+  richtigen Stelle. Zeigt der Mauszeiger auf den Namen am Rahmen (beim
+  Markieren: auf eine beliebige Stelle des Rahmens), erscheint der Kurzhinweis
   <em>Der Bereich ist womöglich veraltet: das Bild wurde nach der Markierung
   zugeschnitten</em>. Ein reines Verkleinern des Fotos löst das nicht aus,
   nur ein veränderter Bildausschnitt. Solche Rahmen lassen sich löschen und neu ziehen.
@@ -56,8 +56,10 @@
 <ol>
   <li>
     Das Foto öffnen und rechts neben dem Foto, direkt unterhalb der Angaben, auf
-    <strong>Personen markieren</strong> klicken. Auf einem Tablet oder Smartphone stehen die
-    Angaben unter dem Foto. Die Schaltfläche heißt danach <strong>Markieren beenden</strong>.
+    <strong>+ Person markieren</strong> klicken. Sie steht in der Zeile <strong>Personen</strong>.
+    Auf einem Tablet oder Smartphone stehen die Angaben unter dem Foto. Eine Markierung ist ein
+    einzelner Vorgang: ein Rahmen, ein Name, fertig. Es gibt keinen Modus, der danach beendet
+    werden müsste.
   </li>
   <li>
     Mit gedrückter Maustaste ein Rechteck über das Gesicht ziehen. Ist der Rahmen zu klein,
@@ -86,31 +88,35 @@
     mit genau diesem Namen, sonst <strong>Anlegen "..."</strong>.
   </li>
   <li>
-    Der Name steht sofort in der Zeile <strong>Personen</strong> in den Angaben rechts neben dem
-    Foto, vorerst als einfacher Text, noch nicht anklickbar. Der Markierungsmodus bleibt offen, das nächste
-    Gesicht lässt sich gleich markieren.
+    Die Markierung wird gespeichert. Der Name steht sofort in der Zeile <strong>Personen</strong>
+    in den Angaben rechts neben dem Foto und ist anklickbar; war es eine neue Person, steht sie
+    auch in der Zeile <strong>Schlagworte</strong>. Daneben steht <em>Speichert …</em>, danach
+    <em>Gespeichert</em> mit <strong>Rückgängig</strong>, das die Markierung wieder entfernt
+    (danach <em>Rückgängig gemacht</em>). Schlägt das Speichern fehl, steht dort in Rot
+    <em>Nicht gespeichert: …</em> mit dem Grund. Für das nächste Gesicht noch einmal auf
+    <strong>+ Person markieren</strong> klicken.
   </li>
 </ol>
 
 <p>
-  Im Markierungsmodus zeigt jeder Rahmen seinen Namen, nicht nur der unter dem Mauszeiger. Ist
-  der Name länger als der Rahmen breit, wird er mit Auslassungspunkten gekürzt; steht der
-  Mauszeiger im Rahmen, erscheint der volle Name. Zieht man mit der Maus, beginnt auch innerhalb
-  eines vorhandenen Rahmens ein neues Rechteck. Nur der Name und das <strong>x</strong> reagieren
-  auf einen Klick. Veraltete Rahmen (siehe oben) haben im Markierungsmodus einen blasseren Rand.
+  Solange ein Rahmen gezogen werden kann, zeigt jeder Rahmen seinen Namen, nicht nur der unter dem
+  Mauszeiger. Ist der Name länger als der Rahmen breit, wird er mit Auslassungspunkten gekürzt;
+  steht der Mauszeiger im Rahmen, erscheint der volle Name. Zieht man mit der Maus, beginnt auch
+  innerhalb eines vorhandenen Rahmens ein neues Rechteck. Nur der Name reagiert auf einen Klick.
+  Veraltete Rahmen (siehe oben) haben dabei einen blasseren Rand.
 </p>
 
 <div class="hinweis">
   <p>
-    Ein kleines Gesicht lässt sich genauer markieren, wenn das Foto vorher vergrößert wird. Da im
-    Markierungsmodus die gedrückte Maustaste ein Rechteck aufzieht, lässt sich das vergrößerte
+    Ein kleines Gesicht lässt sich genauer markieren, wenn das Foto vorher vergrößert wird. Da beim
+    Markieren die gedrückte Maustaste ein Rechteck aufzieht, lässt sich das vergrößerte
     Foto dann nur mit dem Mausrad oder den Bildlaufleisten verschieben.
   </p>
 </div>
 
 <figure>
-  <img src="assets/screenshots/17-personen-markieren.png" alt="Ein Foto im Markierungsmodus" />
-  <figcaption>Im Markierungsmodus. Die Schaltfläche heißt jetzt Markieren beenden.</figcaption>
+  <img src="assets/screenshots/17-personen-markieren.png" alt="Ein Foto, auf dem ein Rahmen gezogen werden kann, daneben die Angaben mit Person markieren" />
+  <figcaption>Nach einem Klick auf + Person markieren: oben steht der Hinweis, dass ein Rahmen gezogen werden kann.</figcaption>
 </figure>
 
 <figure>
@@ -137,38 +143,35 @@
 
 <ul>
   <li>
-    <em>Esc</em> verwirft ein gerade aufgezogenes Rechteck. Ist keines offen, beendet
-    <em>Esc</em> den Markierungsmodus.
-  </li>
-  <li>
-    <strong>Markieren beenden</strong> verlässt den Modus ebenfalls.
+    <em>Esc</em> bricht das Markieren ab: ein gerade aufgezogenes Rechteck wird verworfen und es
+    wird nichts gespeichert.
   </li>
   <li>
     Ist die Markierung schon von jemand anderem gelöscht worden, meldet die Seite beim Löschen
     <em>Markierung ist nicht mehr vorhanden</em>.
   </li>
   <li>
-    Eine gesetzte Markierung wird im Markierungsmodus über das <strong>x</strong> am Rahmen
-    gelöscht (Kurzhinweis <em>Diese Person vom Foto entfernen</em>). Hat die
-    Person auf dem Foto keinen weiteren Rahmen, verschwindet ihr Name sofort aus der Zeile
-    <strong>Personen</strong>; war es das letzte markierte Gesicht, verschwindet die ganze
-    Zeile.
+    Eine gesetzte Markierung wird über das <strong>x</strong> hinter dem Namen in der Zeile
+    <strong>Personen</strong> gelöscht (Kurzhinweis <em>Diese Person vom Foto entfernen</em>). Der
+    Mauszeiger auf einem Namen hebt dessen Rahmen auf dem Foto hervor. Hat die Person mehrere
+    Rahmen, löscht jedes <strong>x</strong> einen davon. Das Löschen wird gespeichert und lässt
+    sich mit <strong>Rückgängig</strong> zurücknehmen; der Name verschwindet sofort aus der Zeile.
   </li>
   <li>
-    Das <strong>x</strong> steht nur an Markierungen, die man selbst gesetzt hat.
+    Das <strong>x</strong> steht nur an Namen, deren Markierung man selbst gesetzt hat.
     Markierungen anderer Benutzer und solche, die schon in der Bilddatei standen, können nur
-    Administratoren löschen; Administratoren sehen das <strong>x</strong> an jedem Rahmen.
+    Administratoren löschen; Administratoren sehen das <strong>x</strong> an jedem Namen.
     Bei älteren Markierungen kennt die Galerie nicht immer, wer sie gesetzt hat; solche
     Markierungen gelten als fremd, auch wenn man sie selbst gesetzt hat.
   </li>
 </ul>
 
 <p>
-  Wurde im Markierungsmodus eine Person markiert oder entfernt, lädt die Seite beim Verlassen
-  des Modus neu, ob über <strong>Markieren beenden</strong> oder über <em>Esc</em>.
-  Erst danach sind die Namen in der Zeile <strong>Personen</strong> anklickbar und erst
-  dann steht eine neu markierte Person auch in der Zeile <strong>Schlagworte</strong>. Wurde
-  nichts geändert, lädt die Seite nicht neu.
+  Die Seite lädt nach dem Markieren oder Löschen nicht neu: Zeile, Rahmen und die Zeile
+  <strong>Schlagworte</strong> ändern sich an Ort und Stelle. Jede Markierung und jedes Löschen
+  steht auch in der Liste
+  <a href="03-fototexte.html#aenderungen">Letzte Änderungen an diesem Foto</a>, wo es sich ebenfalls
+  mit <strong>Rückgängig</strong> zurücknehmen lässt.
 </p>
 
 <h3>Nach Personen suchen</h3>
@@ -232,7 +235,7 @@
 
 <p>
   Markierungen werden in die Bilddatei selbst geschrieben. Kann der Server das nicht, bleibt
-  <strong>Personen markieren</strong> sichtbar, ist aber ausgegraut und trägt den Kurzhinweis
+  <strong>+ Person markieren</strong> sichtbar, ist aber ausgegraut und trägt den Kurzhinweis
   <em>Dieser Server kann keine Metadaten in Bilddateien schreiben</em>. Vorhandene Markierungen
   sind dann weiterhin zu sehen, neue lassen sich nicht setzen. In dem Fall den Webmaster
   benachrichtigen.
