@@ -42,7 +42,7 @@ DDEV_TIMEOUT_SECONDS = 120
 FUTURE = 4_000_000_000
 PAST = 1_000_000_000
 DB_CONFIG = (
-    "<?php\n$conf['db_base'] = '{db}';\n$conf['db_user'] = 'root';\n$conf['db_pw'] = 'root';\n"
+    "<?php\n$conf['db_base'] = '{db}';\n$conf['db_user'] = 'root';\n$conf['db_password'] = 'root';\n"
     "$conf['db_host'] = 'db';\n$prefixeTable = 'piwigo_';\n"
 )
 

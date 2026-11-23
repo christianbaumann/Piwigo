@@ -17,6 +17,8 @@ from pwgdeploy.errors import RemoteHttpError
 from pwgdeploy.http import Response
 from pwgdeploy.snapshot import RemoteFile
 
+from tests.fakes import REPO_ROOT
+
 TOKEN = "s3cret-token-value"
 MIN_SOURCE_BYTES = 1000
 URL = "https://g.example.test/abc.php"
@@ -104,6 +106,19 @@ def test_an_answer_outside_the_protocol_raises(body):
     c, _ = client(200, body)
     with pytest.raises(agent.AgentError):
         c.dump()
+
+
+MIN_DB_KEYS = 4
+
+
+def test_the_script_reads_only_database_keys_core_writes():
+    """[NEG] A key core never writes reads as null: the first real backup connected with an
+    empty password because the script asked for db_pw instead of db_password."""
+    written = set(re.findall(r"\$conf\[\\'(db_\w+)\\'\]", (REPO_ROOT / "install.php").read_text()))
+    read = set(re.findall(r"\$conf\['(db_\w+)'\]", agent.render(TOKEN, 1, "d")))
+    assert len(written) >= MIN_DB_KEYS
+    assert len(read) >= MIN_DB_KEYS
+    assert read <= written, sorted(read - written)
 
 
 def test_the_script_never_displays_php_errors():

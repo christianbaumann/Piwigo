@@ -77,7 +77,7 @@ function agent_database()
   }
 
   mysqli_report(MYSQLI_REPORT_OFF);
-  $db = @mysqli_connect($host, $conf['db_user'], $conf['db_pw'], $conf['db_base'], $port ? (int) $port : null);
+  $db = @mysqli_connect($host, $conf['db_user'], $conf['db_password'], $conf['db_base'], $port ? (int) $port : null);
   if (!$db)
   {
     throw new AgentFailure('database connection failed');
@@ -158,7 +158,7 @@ function agent_dump_with_mysqldump($dir, $conf)
 
   $defaults = $dir.'/'.AGENT_DEFAULTS_FILE;
   $lines = "[client]\nuser=".agent_option_value($conf['db_user'])."\n"
-    .'password='.agent_option_value($conf['db_pw'])."\nhost=".agent_option_value($host)."\n"
+    .'password='.agent_option_value($conf['db_password'])."\nhost=".agent_option_value($host)."\n"
     .($port !== '' ? 'port='.(int) $port."\n" : '');
   $plain = $dir.'/'.AGENT_PLAIN_DUMP_FILE;
   $command = escapeshellarg(AGENT_MYSQLDUMP)
