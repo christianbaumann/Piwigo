@@ -15,6 +15,8 @@
  *                                                        replace option's refusal
  *   php tests/e2e/support/seed.php --scenario=empty     an album holding no photo, for the note an
  *                                                        administrator sees on its page
+ *   php tests/e2e/support/seed.php --scenario=two-empty two albums holding no photo, for two uploads
+ *                                                        running in two tabs at once
  *   php tests/e2e/support/seed.php --scenario=tags      three tags for the tag screen: one on one photo,
  *                                                        one on two, one on none and unused for two days
  *                                                        (--restore deletes them)
@@ -25,6 +27,8 @@
  *   php tests/e2e/support/seed.php --track-uploads=<album id> records the photos a spec uploaded into an
  *                                                        album through the browser, so --restore deletes them
  *                                                        with their files and lounge rows
+ *   php tests/e2e/support/seed.php --album-photos=<album id> the photos linked to an album (file name,
+ *                                                        md5sum) and how many still wait in the lounge for it
  *   php tests/e2e/support/seed.php --restore
  *
  * Prints one JSON object on stdout; errors go to stderr with exit 1.
@@ -53,7 +57,7 @@ function payload(string $field): string
     return '<img src=x alt=galleryrules-' . $field . ' onerror=document.body.dataset.' . XSS_MARKER . '=this.alt>';
 }
 
-$args = getopt('', array('scenario::', 'restore', 'album-count', 'album-name-hint', 'track-album:', 'track-uploads:'));
+$args = getopt('', array('scenario::', 'restore', 'album-count', 'album-name-hint', 'track-album:', 'track-uploads:', 'album-photos:'));
 
 try
 {
@@ -126,6 +130,23 @@ if (isset($args['track-uploads']))
     exit(0);
 }
 
+if (isset($args['album-photos']))
+{
+    $albumId = (int)$args['album-photos'];
+    $photos = array();
+    $result = $db->query(
+        'SELECT i.id, i.file, i.md5sum FROM piwigo_images i JOIN piwigo_image_category ic ON ic.image_id = i.id ' .
+        "WHERE ic.category_id = $albumId ORDER BY i.id"
+    );
+    while ($row = $result->fetch_assoc())
+    {
+        $photos[] = array('id' => (int)$row['id'], 'file' => $row['file'], 'md5sum' => $row['md5sum']);
+    }
+    $inLounge = (int)$db->scalar("SELECT COUNT(*) FROM piwigo_lounge WHERE category_id = $albumId");
+    echo json_encode(array('photos' => $photos, 'in_lounge' => $inLounge)), "\n";
+    exit(0);
+}
+
 if (isset($args['restore']))
 {
     if (!is_file(SNAPSHOT_FILE))
@@ -165,9 +186,9 @@ if (isset($args['restore']))
     exit(0);
 }
 
-if (!in_array($args['scenario'] ?? '', array('payload', 'same-name', 'empty', 'tags'), true))
+if (!in_array($args['scenario'] ?? '', array('payload', 'same-name', 'empty', 'two-empty', 'tags'), true))
 {
-    fail('--scenario must be one of: payload, same-name, empty, tags');
+    fail('--scenario must be one of: payload, same-name, empty, two-empty, tags');
 }
 if (is_file(SNAPSHOT_FILE))
 {
@@ -188,6 +209,11 @@ if ($args['scenario'] === 'same-name')
 if ($args['scenario'] === 'empty')
 {
     seedEmpty($db, $builder);
+    exit(0);
+}
+if ($args['scenario'] === 'two-empty')
+{
+    seedTwoEmpty($db, $builder);
     exit(0);
 }
 if ($args['scenario'] === 'tags')
@@ -290,6 +316,34 @@ function seedEmpty(Db $db, FixtureBuilder $builder): void
     include GALLERYRULES_PATH . 'language/de_DE/plugin.lang.php';
 
     echo json_encode(array('album_id' => $albumId, 'note' => $lang[GALLERYRULES_EMPTY_ALBUM_NOTE])), "\n";
+}
+
+/** Two albums holding no photo, their emptiness asserted. */
+function seedTwoEmpty(Db $db, FixtureBuilder $builder): void
+{
+    try
+    {
+        $albumIds = array();
+        foreach (array('a', 'b') as $suffix)
+        {
+            $albumIds[] = $builder->createTestAlbum('galleryrules-e2e-two-' . $suffix . '-' . bin2hex(random_bytes(4)));
+            file_put_contents(SNAPSHOT_FILE, json_encode($builder->exportTestObjects(), JSON_PRETTY_PRINT));
+        }
+        foreach ($albumIds as $albumId)
+        {
+            if ((int)$db->scalar("SELECT COUNT(*) FROM piwigo_image_category WHERE category_id = $albumId") !== 0)
+            {
+                throw new RuntimeException("album $albumId is not empty");
+            }
+        }
+        $builder->invalidateUserCache();
+    }
+    catch (RuntimeException $e)
+    {
+        fail($e->getMessage());
+    }
+
+    echo json_encode(array('album_ids' => $albumIds)), "\n";
 }
 
 /** Three tags of this suite's own, on one photo, on two photos and on none, for the tag screen's menu and rename. */

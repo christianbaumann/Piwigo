@@ -39,6 +39,15 @@ function seedEmpty() {
 }
 
 /**
+ * Creates two albums holding no photo.
+ *
+ * @returns {{album_ids: number[]}}
+ */
+function seedTwoEmpty() {
+  return run('--scenario=two-empty');
+}
+
+/**
  * Creates three tags: `one` on one photo, `two` on two, `none` on none.
  *
  * @returns {{names: {one: string, two: string, none: string}, tag_ids: {one: number, two: number, none: number}}}
@@ -76,9 +85,19 @@ function trackUploads(albumId) {
   return run(`--track-uploads=${albumId}`).image_ids;
 }
 
+/**
+ * Reads the photos linked to an album and how many still wait in the lounge for it.
+ *
+ * @param {number} albumId
+ * @returns {{photos: {id: number, file: string, md5sum: string}[], in_lounge: number}}
+ */
+function albumPhotos(albumId) {
+  return run(`--album-photos=${albumId}`);
+}
+
 /** Removes whatever the seed created. Safe to call unseeded. */
 function restore() {
   run('--restore');
 }
 
-module.exports = { seedPayload, seedSameName, seedEmpty, seedTags, albumCount, albumNameHint, trackAlbum, trackUploads, restore };
+module.exports = { seedPayload, seedSameName, seedEmpty, seedTwoEmpty, seedTags, albumCount, albumNameHint, trackAlbum, trackUploads, albumPhotos, restore };
